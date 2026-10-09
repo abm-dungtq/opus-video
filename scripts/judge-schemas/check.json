@@ -1,0 +1,32 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["duration_s", "onscreen_text", "verdict", "issues"],
+  "properties": {
+    "duration_s": { "type": "number", "description": "Total length of the video in seconds, as watched." },
+    "onscreen_text": {
+      "type": "array",
+      "maxItems": 12,
+      "items": { "type": "string" },
+      "description": "Up to 12 text phrases seen on screen, copied verbatim with diacritics."
+    },
+    "verdict": { "type": "string", "enum": ["PASS", "FAIL"] },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "t_s", "severity", "note"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": ["UNREADABLE_TEXT", "OVERLAP", "DEAD_AIR", "DIACRITIC_OR_CASE", "FAKE_UI", "FLICKER", "AV_DESYNC", "OTHER"]
+          },
+          "t_s": { "type": "number", "description": "Second where the problem is most visible." },
+          "severity": { "type": "string", "enum": ["hard", "soft"] },
+          "note": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["duration_first_s", "duration_second_s", "winner", "dimensions", "top_fix_for_loser"],
+  "properties": {
+    "duration_first_s": { "type": "number", "description": "Length of first.mp4 in seconds." },
+    "duration_second_s": { "type": "number", "description": "Length of second.mp4 in seconds." },
+    "winner": { "type": "string", "enum": ["first", "second", "tie"] },
+    "dimensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "better", "evidence"],
+        "properties": {
+          "name": { "type": "string", "enum": ["clarity", "motion", "layout", "pacing", "polish"] },
+          "better": { "type": "string", "enum": ["first", "second", "tie"] },
+          "evidence": { "type": "string", "description": "Concrete observation with seconds, e.g. 'second @4s: caption covers logo'." }
+        }
+      }
+    },
+    "top_fix_for_loser": { "type": "string" }
+  }
+}

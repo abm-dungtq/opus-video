@@ -1,0 +1,37 @@
+[
+  {
+    "text": "Vì",
+    "start": 0,
+    "end": 0.2
+  },
+  {
+    "text": "sao",
+    "start": 0.24,
+    "end": 0.48
+  },
+  {
+    "text": "bầu",
+    "start": 0.56,
+    "end": 0.72
+  },
+  {
+    "text": "trời",
+    "start": 0.8,
+    "end": 0.96
+  },
+  {
+    "text": "lại",
+    "start": 1.04,
+    "end": 1.12
+  },
+  {
+    "text": "màu",
+    "start": 1.2,
+    "end": 1.36
+  },
+  {
+    "text": "xanh?",
+    "start": 1.44,
+    "end": 2
+  }
+]
