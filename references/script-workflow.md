@@ -63,4 +63,5 @@ Chỉ làm khi người dùng yêu cầu caption.
 - Làm theo `$VP/references/publishing/repurpose-matrix.md` (giữ cùng insight và số liệu, viết lại hook theo kênh) và file kênh tương ứng: Facebook theo `$VP/references/publishing/facebook.md`; TikTok và YouTube theo `$VP/references/publishing/video-script.md` cùng dòng video-script trong ma trận.
 - Ghi mỗi kênh một file: `<project>/captions/tiktok.md`, `<project>/captions/facebook.md`, `<project>/captions/youtube.md`.
 - Chạy lint ở mục 4 cho từng file caption.
+- File phụ đề cho YouTube/Facebook: `mkdir -p captions && hyperframes transcribe <voice.mp3> -e whisper -m large-v3 -l vi -d captions --to srt -o captions/<name>.srt` (tải mô hình ~3 GB lần đầu; `-d captions` để `transcript.json` không ghi đè file ở gốc project). Rà lại chính tả và dấu trước khi giao.
 - **Không tự đăng.** Giao file cho người dùng; đăng hay không là việc của họ.

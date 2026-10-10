@@ -14,12 +14,14 @@ Dùng cho phần lớn trường hợp. Gọi skill `hyperframes` (cửa vào b�
 | Ngắn, không lời, motion là chính (intro, title) | `motion-graphics` |
 | Dài hơn, nhiều cảnh, montage, sizzle | `general-video` |
 | Phụ đề nằm trong video | `embedded-captions` (dùng kèm) |
+| Footage thật: talking-head, phỏng vấn, UGC cần cắt khoảng lặng | nhánh footage (beta), xem `references/footage-lane.md` |
+| Nhiều biến thể của một mẫu quảng cáo | composition có biến + `render --batch` |
 
-CLI (binary đã cài, `hyperframes` ≥ 0.8.140): `lint` → `check` → `render`. Trước khi tự viết motion, tìm primitive có sẵn bằng `hyperframes catalog --query "<hiệu ứng>"`.
+CLI (binary đã cài, `hyperframes` ≥ 0.8.144): `lint` → `check` → `render`. Trước khi tự viết motion, tìm primitive có sẵn bằng `hyperframes catalog --query "<hiệu ứng>"`.
 
 ## 2. Remotion (`ak-remotion`)
 
-Dùng khi video dựng từ dữ liệu, render batch nhiều biến thể, hoặc người dùng yêu cầu React. Trong corpus có 89 prompt nhắc tới Remotion, chủ yếu là video sản phẩm và data. Chỉ chọn khi có lý do rõ, và ghi lý do vào `engine_reason`.
+Dùng khi người dùng yêu cầu React hoặc đã có codebase Remotion. Nhiều biến thể của cùng một mẫu (headline, giá, CTA, tên cửa hàng) **không** còn là lý do chọn Remotion: dùng HyperFrames `render --variables` / `--batch rows.json --output "renders/{name}.mp4"` với `data-composition-variables` (xem `hyperframes-cli/references/compare-and-batch.md`). Trong corpus có 89 prompt nhắc tới Remotion, chủ yếu là video sản phẩm và data. Chỉ chọn khi có lý do rõ, và ghi lý do vào `engine_reason`.
 
 ## 3. Raw HTML/Canvas/Three.js + Playwright + ffmpeg
 
@@ -53,7 +55,7 @@ Blender (12 case trong corpus chuspeeism) và After Effects (5 case) có xuất 
   - Bố cục ngang (trái–phải) chuyển thành dọc (trên–dưới).
 - Dùng chung một bộ audio (voice, sfx, bgm) cho cả hai khổ để timing giống nhau.
 - Bài học từ lần chạy thử (lint HyperFrames 0.8.140–0.8.141):
-  - File trong `compositions/` phải dùng đường dẫn tính từ gốc project (`assets/...`), không dùng `../assets/...` (lỗi `invalid_parent_traversal_in_asset_path`).
+  - Từ 0.8.144, `../assets/...` trong `compositions/` đã qua lint; chỉ đường dẫn ra ngoài project mới lỗi. Vẫn nên viết `assets/...` cho thống nhất.
   - `window.__timelines["<id>"] = …` phải nằm inline trong từng file HTML (lỗi `missing_timeline_registry`). Logic chung đặt trong `assets/<name>.js`, file đó export một hàm build trả về timeline.
   - Mỗi SFX đặt trên một `data-track-index` riêng và có `data-duration`, để tránh cảnh báo `duplicate_audio_track`.
   - Chữ trắng trên nền màu nhấn phải đạt contrast ≥ 3:1. `hyperframes check` sẽ báo nếu không đạt.
@@ -64,6 +66,6 @@ Blender (12 case trong corpus chuspeeism) và After Effects (5 case) có xuất 
   - `assemble-index` từ chối frame có hai clip **cùng `data-track-index`** mà khung thời gian chồng nhau. Dặn worker cho mỗi clip một lane riêng.
   - Thời lượng frame bằng đúng thời lượng voice, nên frame CTA cuối không còn nhịp giữ hình. Tăng `duration` của frame cuối trong STORYBOARD và `data-duration` trong file frame thêm khoảng 1 giây, rồi assemble lại.
   - Trường `blueprint:` trong STORYBOARD chỉ được ghi `<id>` hoặc `<id> (Adapt)`, vì `frame-packets.mjs` lấy nguyên chuỗi đó làm tên file. Muốn gợi ý registry block thì ghi vào dòng riêng `- registry_block: compositions/components/<name>.html`.
-  - `build-frame.mjs` remix màu theo độ sáng nên có thể gán sai vai. Ví dụ ở dự án ABM, `cream-muted` (chữ phụ trên nền tối) bị gán thành navy đậm. Sau khi build phải đọc khối `colors:` trong `frame.md` và sửa tay các vai chữ sáng trên nền tối. Đồng thời đổi mọi font label/mono (IBM Plex Mono…) sang Be Vietnam Pro.
+  - `build-frame.mjs` remix màu theo độ sáng nên có thể gán sai vai. Ví dụ ở dự án ABM, `cream-muted` (chữ phụ trên nền tối) bị gán thành navy đậm. Sau khi build phải đọc khối `colors:` trong `frame.md` và sửa tay các vai chữ sáng trên nền tối. Đồng thời đổi mọi font label/mono (IBM Plex Mono…) sang Be Vietnam Pro. (0.8.144 chỉ sửa phần tự kiểm contrast, phần remix vẫn vậy.)
   - Một số caption skin (ví dụ broadside) có `text-transform: lowercase`. Với tiếng Việt, kiểu này biến "AI" thành "ai" (nghĩa là "người nào") và "ABM" thành "abm". Ngay sau `build-frame.mjs`, sửa thành `none` trong `.hyperframes/caption-skin.html` để mọi lần dựng phụ đề sau đều đúng. Nhắc frame worker giữ nguyên chữ hoa cho từ viết tắt.
   - Lỗi lint/check hay gặp ở frame worker: xem `references/edit-method.md` § Kỷ luật GSAP / render.

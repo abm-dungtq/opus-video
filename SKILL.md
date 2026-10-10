@@ -23,6 +23,10 @@ Kết quả đạt khi exit 0 và in ra `tier`, `tts model`, `voice`. Script t�
 
 Mặc định: voice `eGSd0uV8dNQnZuEEX9lu`, TTS `eleven_v4` (có tiếng Việt), music `music_v2_5`, SFX `eleven_text_to_sound_v2`.
 
+## Nhánh footage thật (beta)
+
+Người dùng đưa clip quay thật cần cắt gọn (talking-head, phỏng vấn, UGC): làm theo `references/footage-lane.md` (`scripts/cut.mjs` tìm điểm cắt và ghép), rồi quay lại bước 6–8 bên dưới. Video dựng mới hoàn toàn thì đi thẳng quy trình 8 bước.
+
 ## Quy trình 8 bước
 
 Mỗi dự án có một thư mục riêng:
@@ -52,7 +56,7 @@ Mỗi dự án có một thư mục riêng:
    - Đọc 2–3 case. Chọn **thẻ kỹ thuật** và dòng trong **bảng nối nhóm → HyperFrames** ở `references/pattern-library.md` (blueprint, rule, catalog query, preset).
    - Ghi id case tham khảo vào `BRIEF.md`.
 
-4. **Engine.** Chọn theo `references/engine-selection.md`. Mặc định là HyperFrames. Ghi `engine`, `workflow`, `engine_reason` vào `BRIEF.md`.
+4. **Engine.** Chọn theo `references/engine-selection.md`. Mặc định là HyperFrames. Ghi `engine`, `workflow`, `engine_reason` vào `BRIEF.md`. Nhiều biến thể của cùng một mẫu thì dùng `render --batch` của HyperFrames, không chuyển sang Remotion.
 
 5. **Âm thanh.** Làm theo `references/audio-pipeline.md`.
    - **Dùng workflow HyperFrames chuyên biệt** (faceless-explainer, product-launch-video, pr-to-video): **không** chạy `audio.mjs generate` của workflow. Thay vào đó chạy:
@@ -95,6 +99,7 @@ Giao cho người dùng: đường dẫn MP4, link preview (`hyperframes preview
 - Không tự đăng video lên mạng xã hội hay publish. Chỉ làm khi người dùng yêu cầu rõ.
 - Tôn trọng bản quyền: chỉ dùng tài sản người dùng cấp, audio sinh từ ElevenLabs, hoặc catalog có license. Ghi nguồn vào `assets/CREDITS.md`.
 - `judge.mjs` gửi video 540p lên Gemini qua agy (đã được đồng ý 2026-10-08).
+- `scripts/cut.mjs` phỏng theo ý tưởng của open-edit (Apache-2.0); giữ `NOTICE` và `third_party/open-edit/LICENSE` khi phân phối.
 - Prompt trong corpus (`data/`) thuộc về tác giả gốc. Chỉ dùng để học cấu trúc, và luôn kèm link khi trích.
 
 ## Tham chiếu
@@ -111,6 +116,8 @@ Giao cho người dùng: đường dẫn MP4, link preview (`hyperframes preview
 | `references/edit-method.md` | Bước 3 và 6: chức năng câu → hình, sàn chất lượng, GSAP, SFX |
 | `scripts/video-lint.mjs` | Bước 8: lowercase, chữ nhỏ, vùng UI 9:16 |
 | `scripts/judge.mjs` | Bước 8: `check`/`pair`; exit 3–4 → QA ảnh tĩnh |
+| `references/footage-lane.md` | Nhánh footage thật (beta): transcribe, probe, EDL, ghép |
+| `scripts/cut.mjs` | `probe` (khoảng lặng an toàn), `apply-edl` (ghép theo danh sách cắt) |
 | `scripts/find-cases.mjs` | Bước 3: tra 813 case trong `data/cases.jsonl`. Tra bằng script, không đọc file trực tiếp |
 | `data/exemplars.md` | 17 prompt mẫu nguyên văn, có nguồn. Chỉ mở khi cần đọc prompt đầy đủ |
 | `data/SOURCES.md` | Nguồn, commit và license của corpus; lệnh rebuild |

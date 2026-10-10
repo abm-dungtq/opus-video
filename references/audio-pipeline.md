@@ -71,6 +71,7 @@ node ~/.claude/skills/opus-video/scripts/eleven.mjs music --prompt "calm curious
 | Bản master giao cho mạng xã hội | khoảng −14 LUFS integrated, −1 dBTP |
 
 - Trong HyperFrames, đặt volume và ducking theo `hyperframes-audio`. Có thể dùng `media-use/scripts/audio-duck.mjs`.
+- Chỉnh mức bằng lệnh thay vì thử tay: `hyperframes normalize-audio --lufs=-16 --target <id> --write` cho từng track voice; đặt limiter ở bus master theo `hyperframes-audio` để đạt −1 dBTP. Sau đó vẫn đo bằng lệnh ffmpeg bên dưới.
 - Đo loudness: `ffmpeg -i renders/x.mp4 -af loudnorm=print_format=json -f null - 2>&1 | tail -12`
 
 ## Bản quyền

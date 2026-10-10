@@ -24,7 +24,7 @@ Công cụ được nhắc đến (`/tmp/ov-stats.json`): Remotion 89 bài (ch�
 
 **Khi nào dùng:** intro thương hiệu, bumper hay logo sting, kiểu "showreel cho CV". Video ngắn, không lời, tác động chủ yếu bằng hình và nhạc. Đây là nhóm lớn nhất (motion 317/513, 动效与片头 70/300).
 
-**Engine gợi ý:** HyperFrames là mặc định (workflow `motion-graphics`). Chuyển sang Remotion khi người dùng muốn React hoặc cần sinh từ dữ liệu. Nếu cần shader hay generative nặng thì dùng raw Canvas/WebGL, chụp frame bằng Playwright rồi ghép bằng ffmpeg.
+**Engine gợi ý:** HyperFrames là mặc định (workflow `motion-graphics`). Chuyển sang Remotion chỉ khi người dùng muốn React; nhiều biến thể từ dữ liệu thì dùng `render --batch` (xem `engine-selection.md`). Nếu cần shader hay generative nặng thì dùng raw Canvas/WebGL, chụp frame bằng Playwright rồi ghép bằng ffmpeg.
 
 **Nhịp và thời lượng:** 15 giây là chuẩn ngầm (106/549), một số dài 20–30 giây. Hook phải có trong giây đầu tiên (12/549 nhắc "hook"). Mỗi 1.5–2 giây có một ý mới. Cắt theo nhạc 120–128 BPM. Khung cuối phải gọn, giữ đủ lâu để đọc.
 
@@ -81,7 +81,7 @@ Công cụ được nhắc đến (`/tmp/ov-stats.json`): Remotion 89 bài (ch�
 
 **Khi nào dùng:** có sẵn bài hát hoặc lời bài hát, câu chuyện ngắn có nhân vật, MV, video cảm xúc cho dịp lễ (叙事与音乐 86/300, nhóm đông nhất bên chuspeeism).
 
-**Engine gợi ý:** HyperFrames với workflow `music-to-video`. Khi cần lồng footage thật thì tách footage thành chuỗi JPEG hoặc re-encode all-intra để seek chính xác. Nếu phong cách là vẽ tay hoặc giấy và cần nhiều mô phỏng thì dùng raw Canvas, Playwright và ffmpeg. Các case dùng AI sinh video (Seedance, Kling) nằm ngoài phạm vi skill này.
+**Engine gợi ý:** HyperFrames với workflow `music-to-video`. Footage thật đặt thẳng bằng `<video>` với `data-media-start`; HyperFrames tự trích frame khi render (công thức cắt, tốc độ, punch-in ở `hyperframes-core/references/creator-editing-recipes.md`). Nếu phong cách là vẽ tay hoặc giấy và cần nhiều mô phỏng thì dùng raw Canvas, Playwright và ffmpeg. Các case dùng AI sinh video (Seedance, Kling) nằm ngoài phạm vi skill này.
 
 **Nhịp và thời lượng:** 20–60 giây cho bản social, cả bài nếu là MV. Cắt trên downbeat. Hit UI hoặc hành động đặt trên beat. Cảnh lớn đặt ở drop, cảnh yên đặt ở breakdown. Cường độ hiệu ứng tăng theo đoạn, ví dụ intro khoảng 40%, verse 70%, chorus 100%.
 
@@ -119,7 +119,7 @@ Công cụ được nhắc đến (`/tmp/ov-stats.json`): Remotion 89 bài (ch�
 
 **Khi nào dùng:** câu nói, manifesto, tagline, lời bài hát, quote. Chữ là nhân vật chính, có thể kèm giọng đọc. Nhóm này ít case nhưng prompt rất kỹ (typograph 13/549, word-by-word 9/549).
 
-**Engine gợi ý:** HyperFrames, dùng SVG hoặc Canvas để có path glyph thật. Dùng Remotion khi chữ sinh từ dữ liệu. Lời đọc tiếng Việt bằng ElevenLabs `eleven_v4`, lấy `words.json` để làm cue sheet.
+**Engine gợi ý:** HyperFrames, dùng SVG hoặc Canvas để có path glyph thật. Chữ sinh từ dữ liệu: dùng `data-composition-variables` + `render --batch`. Lời đọc tiếng Việt bằng ElevenLabs `eleven_v4`, lấy `words.json` để làm cue sheet.
 
 **Nhịp và thời lượng:** 15–20 giây, khổ vuông 1080×1080 cho X hoặc 9:16. Có hai kiểu nhịp: theo **cue sheet của lời nói** (cụm từ, khoảng ngừng, nhấn) cho spoken-word, hoặc theo **lưới 120 BPM** cho bumper (stagger 1/16 nốt, tức 125 ms). Cần ít nhất một khoảnh khắc đứng yên khoảng 400 ms trở lên.
 

@@ -8,6 +8,7 @@ Skill này là phần điều phối và không tự render. Nó nối các bư�
 2. **Âm thanh:** ElevenLabs. Giọng đọc `eleven_v4` có timestamp từng từ, SFX `eleven_text_to_sound_v2`, nhạc nền `music_v2_5`.
 3. **Dựng:** [HyperFrames](https://hyperframes.dev) là mặc định. Remotion hoặc Canvas được dùng khi dự án cần.
 4. **QA:** lint, check, kiểm vùng an toàn 9:16, rồi cho Gemini (qua `agy`) xem video và chấm, tối đa 3 vòng.
+5. **Footage thật (beta):** tìm khoảng lặng và ghép clip theo danh sách cắt bằng `scripts/cut.mjs`, rồi thêm phụ đề và đồ hoạ bằng HyperFrames.
 
 Mẫu dựng được chắt lọc từ 813 video làm bằng Opus 5.5 (xem `data/SOURCES.md`).
 
@@ -19,7 +20,7 @@ git clone https://github.com/abm-dungtq/opus-video ~/.claude/skills/opus-video
 
 Cần có:
 - Node.js 20 trở lên và `ffmpeg`.
-- CLI `hyperframes` (bản 0.8.140 trở lên) cùng các skill `hyperframes*`.
+- CLI `hyperframes` (bản 0.8.144 trở lên) cùng các skill `hyperframes*`.
 - Skill `viet-pro`.
 - Key ElevenLabs. Tạo file `~/.config/opus-video/.env` rồi `chmod 600`:
   ```
@@ -52,6 +53,7 @@ Quy trình 8 bước nằm trong `SKILL.md`. Chi tiết từng bước nằm tro
 | `scripts/find-cases.mjs` | Tra 813 case mẫu theo nhóm và từ khoá |
 | `scripts/video-lint.mjs` | Bắt chữ bị ép thường, chữ quá nhỏ, nội dung lấn vùng UI ở khổ 9:16 |
 | `scripts/judge.mjs` | Gemini chấm một video (`check`) hoặc so hai phiên bản có đổi thứ tự (`pair`) |
+| `scripts/cut.mjs` | `probe` tìm khoảng lặng an toàn để cắt; `apply-edl` ghép footage theo danh sách cắt JSON |
 
 Chạy test:
 
@@ -63,4 +65,4 @@ Test cần project thật sẽ tự bỏ qua khi không tìm thấy project đó
 
 ## Giấy phép
 
-Mã nguồn và tài liệu dùng giấy phép MIT (xem `LICENSE`). Corpus trong `data/` lấy từ hai repo có giấy phép MIT. Prompt trong corpus thuộc về tác giả gốc, và mỗi dòng đều ghi tác giả cùng link. Repo không phân phối lại video gốc.
+Mã nguồn và tài liệu dùng giấy phép MIT (xem `LICENSE`). Corpus trong `data/` lấy từ hai repo có giấy phép MIT. Prompt trong corpus thuộc về tác giả gốc, và mỗi dòng đều ghi tác giả cùng link. Repo không phân phối lại video gốc. `scripts/cut.mjs` phỏng theo ý tưởng của [open-edit](https://github.com/veedstudio/open-edit) (Apache-2.0, © VEED LIMITED); xem `NOTICE`.

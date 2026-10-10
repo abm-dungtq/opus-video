@@ -17,7 +17,7 @@ Chạy cho **mỗi** file render. Ghi kết quả vào `<project>/QA.md` theo t�
 
 ## Xem bằng mắt
 
-Trích 5 khung hình rải đều (không dùng `hyperframes snapshot`, vì lệnh đó không chọn được composition 9:16):
+Trích 5 khung hình rải đều bằng ffmpeg (`hyperframes snapshot` không chọn được composition 9:16; với project 9:16 riêng thì dùng được `hyperframes snapshot <dir> --at T`):
 
 ```bash
 mkdir -p qa && for T in 1 4 7 10 13; do ffmpeg -v error -y -ss $T -i renders/f.mp4 -frames:v 1 qa/f-$T.png; done
@@ -30,6 +30,7 @@ mkdir -p qa && for T in 1 4 7 10 13; do ffmpeg -v error -y -ss $T -i renders/f.m
 - [ ] 9:16: không có nội dung chính trong 12% trên và 20% dưới.
 - [ ] Bảng màu và font đúng `<art_direction>`, không có thứ nằm trong banned list.
 - [ ] Mỗi mốc thời gian đúng cảnh như trong storyboard.
+- [ ] Nghi lỗi dấu ở chữ nhỏ: `hyperframes snapshot . --at <T> --zoom "<selector hoặc x,y,w,h>"` để xem ảnh phóng to (độ phân giải gấp 3) trước khi kết luận.
 
 ## Nghe
 
@@ -55,6 +56,7 @@ mkdir -p qa && for T in 1 4 7 10 13; do ffmpeg -v error -y -ss $T -i renders/f.m
    - A: giữ bản mới. B: quay về bản cũ.
    - tie: giữ bản cũ, trừ khi bản mới sửa được lỗi hard.
    - invalid: **chưa so**, không tính là thua. Một lượt riêng lẻ không đáng tin vì Gemini thiên vị video đưa vào trước.
+   - Muốn xem tận mắt hai phiên bản cạnh nhau (không cần Gemini, cần giữ bản sao thư mục project cũ): `hyperframes compare <dir-cũ> <dir-mới> --at <T> --labels cu,moi --out qc/compare-vN.png`.
 7. Dừng khi các cổng đều qua và: bản mới không thắng, hoặc đã tới v3, hoặc chỉ còn sửa nhỏ. Mỗi phiên bản phải sửa ít nhất một lỗi lớn.
 8. Exit code của judge:
    - 3 (auth) hoặc 4 (thiếu agy): QA bằng ảnh tĩnh như các mục trên, ghi "không có giám khảo video".
