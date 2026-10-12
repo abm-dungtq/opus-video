@@ -16,3 +16,9 @@ node ~/.claude/skills/opus-video/scripts/build-case-index.mjs \
   /tmp/vresearch/chuspeeism__awesome-opus-5-5-videos/data/cases.json \
   ~/.claude/skills/opus-video/data/cases.jsonl
 ```
+
+Sau khi rebuild `cases.jsonl`, cập nhật cache nhãn cho bước tra case bằng Jev (cần `TYPESAFE_API_KEY`; resumable, chỉ gắn nhãn dòng mới hoặc đã đổi):
+
+```bash
+node ~/.claude/skills/opus-video/scripts/case-features.mjs --stats
+```

@@ -1,6 +1,6 @@
 # Pattern library — công thức theo nhóm video
 
-Rút ra từ 813 case trong hai repo MIT (yihui-dev: 513 case, 279 prompt đầy đủ; chuspeeism: 300 case, 36 prompt công khai). Phần này là bản tóm lược viết lại, không chép nguyên văn prompt. Muốn xem prompt gốc thì chạy `scripts/find-cases.mjs`, hoặc mở `data/exemplars.md`. Brief để điền nằm ở `brief-template.md`, còn engine thì xem `engine-selection.md`.
+Rút ra từ 813 case trong hai repo MIT (yihui-dev: 513 case, 279 prompt đầy đủ; chuspeeism: 300 case, 36 prompt công khai). Phần này là bản tóm lược viết lại, không chép nguyên văn prompt. Muốn xem prompt gốc thì chạy `scripts/rerank-cases.mjs` (có `TYPESAFE_API_KEY`) hoặc `scripts/find-cases.mjs` như bước 3 trong `SKILL.md`, hoặc mở `data/exemplars.md`. Khi tra case báo `weak matches`, file này là nguồn chính: chọn thẻ kỹ thuật theo nhóm video, chỉ mượn cấu trúc từ case. Brief để điền nằm ở `brief-template.md`, còn engine thì xem `engine-selection.md`.
 
 Cách đọc số liệu: "N/549" là số prompt có chứa từ khoá, tính trên 513 prompt của yihui (gồm cả bản trích một phần) và 36 prompt công khai của chuspeeism. "N/279" là số prompt đầy đủ của yihui có chứa từ khoá. Đây là tần suất thô dùng để định hướng, không phải thống kê chặt chẽ.
 

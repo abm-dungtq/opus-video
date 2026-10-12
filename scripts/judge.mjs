@@ -13,7 +13,8 @@
 // agy binary: $AGY_BIN, else `which agy`, else ~/.local/bin/agy.
 // Exit codes: 0 ok (check PASS / pair consensus), 1 check FAIL, 2 invalid or usage, 3 agy auth, 4 agy missing.
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, copyFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, copyFileSync, readdirSync, statSync, realpathSync } from "node:fs";
+import { wantsHelp, helpText } from "./cli-help.mjs";
 import { homedir, tmpdir } from "node:os";
 import { join, dirname, resolve, extname } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -414,6 +415,7 @@ function authExit() {
 }
 
 export async function main(argv = process.argv.slice(2)) {
+  if (wantsHelp(argv)) { process.stdout.write(helpText(import.meta.url)); return 0; }
   const [cmd, ...rest] = argv;
   const commands = { check: cmdCheck, pair: cmdPair };
   if (!commands[cmd]) {
@@ -434,6 +436,6 @@ export async function main(argv = process.argv.slice(2)) {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) { // realpath: invoked via ~/.claude/skills symlink
   main().then((code) => process.exit(code));
 }

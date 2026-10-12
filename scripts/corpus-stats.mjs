@@ -5,6 +5,8 @@
 //         "chuspeeism":{total,public_prompts,by_category,keywords}}
 
 import { readFileSync } from "node:fs";
+import { maybeHelp } from "./cli-help.mjs";
+maybeHelp(process.argv.slice(2), import.meta.url);
 
 const [yihuiPath, chusPath] = process.argv.slice(2);
 if (!yihuiPath || !chusPath) {

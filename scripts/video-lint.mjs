@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // video-lint.mjs — catch what `hyperframes check` misses in a HyperFrames project.
 //   node video-lint.mjs --hyperframes <dir> [--json] [--skip-runtime]
+//   node video-lint.mjs --help
 // Codes:
 //   LOWERCASE_TRANSFORM  ERROR  text-transform: lowercase (turns "AI" into "ai").
 //   FONT_TOO_SMALL       ERROR < 1.6% / WARN < 2.2% of the short canvas edge (px, cqw, vw).
@@ -11,6 +12,8 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { maybeHelp } from "./cli-help.mjs";
+maybeHelp(process.argv.slice(2), import.meta.url);
 
 const SEEK = "seek=.05,.15,.25,.35,.45,.55,.65,.75,.85,.95";
 const ZONES = [
@@ -31,7 +34,7 @@ for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (a === "--json" || a === "--skip-runtime") opts[a.slice(2)] = true;
   else if (a === "--hyperframes") opts.hyperframes = argv[++i];
-  else fail(`unknown argument ${a}\nusage: node video-lint.mjs --hyperframes <dir> [--json] [--skip-runtime]`);
+  else fail(`unknown argument ${a}\nusage: node video-lint.mjs --hyperframes <dir> [--json] [--skip-runtime]  (--help for details)`);
 }
 if (!opts.hyperframes) fail("missing --hyperframes <dir>");
 const dir = resolve(opts.hyperframes);

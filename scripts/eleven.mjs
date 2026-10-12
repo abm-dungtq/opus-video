@@ -23,6 +23,8 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { maybeHelp } from "./cli-help.mjs";
+maybeHelp(process.argv.slice(2), import.meta.url);
 
 const API = "https://api.elevenlabs.io";
 const ENV_FILE = join(homedir(), ".config", "opus-video", ".env");

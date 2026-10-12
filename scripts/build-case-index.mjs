@@ -4,6 +4,8 @@
 
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { maybeHelp } from "./cli-help.mjs";
+maybeHelp(process.argv.slice(2), import.meta.url);
 
 const [yihuiPath, chusPath, outPath] = process.argv.slice(2);
 if (!yihuiPath || !chusPath || !outPath) {

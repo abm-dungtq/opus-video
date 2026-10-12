@@ -6,6 +6,8 @@
 // Every result carries author + source URL; prompts belong to their authors.
 
 import { readFileSync } from "node:fs";
+import { maybeHelp } from "./cli-help.mjs";
+maybeHelp(process.argv.slice(2), import.meta.url);
 
 const argv = process.argv.slice(2);
 const keywords = [];

@@ -4,7 +4,7 @@ Skill cho Claude Code: biến brief hoặc chủ đề tiếng Việt thành vid
 
 Skill này là phần điều phối và không tự render. Nó nối các bước sau:
 
-1. **Kịch bản:** viết bằng [viet-pro](https://github.com/abm-dungtq/viet-pro-codex), có kiểm chứng dữ kiện.
+1. **Kịch bản:** viết bằng [viet-pro](https://github.com/abm-dungtq/viet-pro-codex) ở mức đầy đủ (đọc hết review/editorial, lượt Humanizer có ghi chép, lint), có kiểm chứng dữ kiện. `scripts/check-viet-pro.mjs` chặn tạo giọng và render khi chưa đạt; lúc giao kèm `CAPTIONS.md` (Facebook cá nhân + TikTok) cũng qua viet-pro.
 2. **Âm thanh:** ElevenLabs. Giọng đọc `eleven_v4` có timestamp từng từ, SFX `eleven_text_to_sound_v2`, nhạc nền `music_v2_5`.
 3. **Dựng:** [HyperFrames](https://hyperframes.dev) là mặc định. Remotion hoặc Canvas được dùng khi dự án cần.
 4. **QA:** lint, check, kiểm vùng an toàn 9:16, rồi cho Gemini (qua `agy`) xem video và chấm, tối đa 3 vòng.
@@ -43,7 +43,7 @@ Trong Claude Code:
 /opus-video làm video 30 giây giới thiệu <sản phẩm>, cả 16:9 và 9:16
 ```
 
-Quy trình 8 bước nằm trong `SKILL.md`. Chi tiết từng bước nằm trong `references/`.
+Quy trình 9 bước nằm trong `SKILL.md`. Chi tiết từng bước nằm trong `references/`.
 
 ## Script
 
@@ -51,9 +51,14 @@ Quy trình 8 bước nằm trong `SKILL.md`. Chi tiết từng bước nằm tro
 |---|---|
 | `scripts/eleven.mjs` | `doctor`, `tts`, `sfx`, `music`, `audio-meta` (cầu nối sang workflow HyperFrames) |
 | `scripts/find-cases.mjs` | Tra 813 case mẫu theo nhóm và từ khoá |
+| `scripts/rerank-cases.mjs` | (Tuỳ chọn, cần `TYPESAFE_API_KEY`) TypeSafe Jev xếp hạng ~740 case có prompt ≥ 40 ký tự (738/813 + case khớp từ khoá) theo brief; thiếu key hoặc lỗi API thì trả kết quả như `find-cases` |
+| `scripts/case-features.mjs` | Gắn nhãn một lần cho mọi case vào `data/case-features.jsonl`; chạy lại khi `data/cases.jsonl` đổi |
+| `scripts/check-viet-pro.mjs` | Cổng viet-pro: biên bản `## viet_pro`, lint viet-pro từng file lời đọc, `CAPTIONS.md` (Facebook + TikTok) khi giao |
 | `scripts/video-lint.mjs` | Bắt chữ bị ép thường, chữ quá nhỏ, nội dung lấn vùng UI ở khổ 9:16 |
 | `scripts/judge.mjs` | Gemini chấm một video (`check`) hoặc so hai phiên bản có đổi thứ tự (`pair`) |
 | `scripts/cut.mjs` | `probe` tìm khoảng lặng an toàn để cắt; `apply-edl` ghép footage theo danh sách cắt JSON |
+
+Mọi script đều có `--help` / `-h` (in phần mô tả đầu file, thoát mã 0, không làm gì khác).
 
 Chạy test:
 

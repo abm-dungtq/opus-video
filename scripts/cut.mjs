@@ -18,6 +18,7 @@
 // See NOTICE and third_party/open-edit/LICENSE.
 
 import { readFileSync, writeFileSync, existsSync, realpathSync, renameSync, rmSync } from "node:fs";
+import { wantsHelp, helpText } from "./cli-help.mjs";
 import { dirname, resolve, isAbsolute, basename, extname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -343,6 +344,7 @@ function applyEdl(args) {
 }
 
 export function main(argv = process.argv.slice(2)) {
+  if (wantsHelp(argv)) { process.stdout.write(helpText(import.meta.url)); return 0; }
   const [cmd, ...rest] = argv;
   const commands = { probe, "apply-edl": applyEdl };
   if (!commands[cmd]) {
@@ -357,6 +359,6 @@ export function main(argv = process.argv.slice(2)) {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) { // realpath: invoked via ~/.claude/skills symlink
   process.exit(main());
 }

@@ -13,7 +13,7 @@ Chạy cho **mỗi** file render. Ghi kết quả vào `<project>/QA.md` theo t�
 | Loudness | `ffmpeg -i f.mp4 -af loudnorm=print_format=json -f null - 2>&1 \| tail -12` | `input_i` trong khoảng −16 đến −12 LUFS, `input_tp` ≤ −1 |
 | Khung đen đầu/cuối | `ffmpeg -i f.mp4 -vf blackdetect=d=0.2:pix_th=0.1 -an -f null - 2>&1 \| grep black_start` | không có dòng nào ở 0s hoặc ở cuối (trừ khi brief yêu cầu). Với nền tối (vd. #0B1B2B), lệnh này báo nhầm các khung nền trống: trích khung đó ra xem; nếu chỉ là nền màu trong lúc nội dung đang hiện dần thì ghi PASS kèm ghi chú, không cần thêm nội dung chỉ để tránh cảnh báo |
 | Lint/check (HyperFrames) | `hyperframes check` | exit 0 |
-| Lint kịch bản tiếng Việt | node ~/.claude/skills/viet-pro/scripts/lint-vietnamese-content.mjs script-table.md | không có ERROR |
+| Cổng viet-pro (kịch bản + caption) | `node ~/.claude/skills/opus-video/scripts/check-viet-pro.mjs --project . --stage delivery` | `PASS`, exit 0 (biên bản `## viet_pro` đủ, lint viet-pro 0 ERROR cho `script-table.md`, từng `script/NN.txt`, từng mục của `CAPTIONS.md`) |
 
 ## Xem bằng mắt
 
