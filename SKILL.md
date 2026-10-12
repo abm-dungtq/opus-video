@@ -15,7 +15,7 @@ Skill dir: `~/.claude/skills/opus-video` (bên dưới viết tắt là `$OV`).
 node ~/.claude/skills/opus-video/scripts/eleven.mjs doctor
 ```
 
-Kết quả đạt khi exit 0 và in ra `tier`, `tts model`, `voice`. Script tự đọc key từ `~/.config/opus-video/.env`. Ba dòng phụ không làm lệnh thất bại: `jev key: present|absent` (`TYPESAFE_API_KEY`, cùng file `.env`, chỉ báo có/không), `jev: reachable|unreachable|skipped`, `viet-pro: installed|missing` (thiếu viet-pro thì cổng bước 2 không chạy được).
+Kết quả đạt khi exit 0 và in ra `tier`, `tts model`, `voice`. Script tự đọc key từ `~/.config/opus-video/.env`. Ba dòng phụ không làm lệnh thất bại: `jev key: present|absent` (`TYPESAFE_API_KEY`, cùng file `.env`, chỉ báo có/không), `jev: reachable|unreachable|skipped` (khi có key, mỗi lần doctor tốn một request Jev rất nhỏ), `viet-pro: installed|missing` (thiếu viet-pro thì cổng bước 2 không chạy được).
 
 - **Không** source, cat hay echo file `.env` trong shell, và không in key ra hội thoại.
 - Nếu thiếu key, nhờ người dùng tạo file với 2 dòng `ELEVENLABS_API_KEY=...` và `OPUS_VIDEO_VOICE_ID=...` (chmod 600).
@@ -58,7 +58,7 @@ Mỗi dự án có một thư mục riêng:
      - facts: compare-preserved-content 0 MISMATCH; nguồn ở SOURCES.md
      ```
    - **Cổng:** `node $OV/scripts/check-viet-pro.mjs --project .` phải in `PASS` (exit 0) **trước** khi chạy `eleven.mjs tts`/`audio-meta` (bước 5) hay bất kỳ lệnh render nào. Exit 1 (`BLOCKED`) thì sửa rồi chạy lại. Cổng kiểm cả `script-table.v1.md` (bản nháp trước Humanizer, so bằng `compare-preserved-content`, MISMATCH là chặn) và lời đọc trong `SCRIPT.md` nếu có.
-   - **`eleven.mjs` tự chặn.** `tts`/`audio-meta` gọi lại cổng; chưa PASS thì exit **4** trước khi gọi API. `tts` chỉ nhận `--text-file <project>/script/NN.txt` (không nhận `--text`), và mỗi frame trong `SCRIPT.md` phải trùng `script/NN.txt`. Ngôn ngữ lấy từ `BRIEF.md` `language:`, không lấy từ `--lang`.
+   - **`eleven.mjs` tự chặn.** `tts`/`audio-meta` gọi lại cổng; chưa PASS thì exit **4** trước khi gọi API. `tts` chỉ nhận `--text-file <project>/script/NN.txt` (không nhận `--text`), và mỗi frame trong `SCRIPT.md` phải trùng `script/NN.txt`. Ngôn ngữ lấy từ `BRIEF.md` `language:` (`vi`, `vie`, `vi-VN`, `tiếng Việt`/`tieng viet` hoặc bỏ trống đều tính là tiếng Việt). Dự án ngôn ngữ khác phải truyền `--lang` đúng ngôn ngữ đó, vì mặc định `vi` sẽ bị từ chối. Mỗi file giọng có kèm `NN.mp3.gate.json` (hash lời đọc và override). `--reuse` chỉ dùng lại file có stamp khớp, và `--stage delivery` chặn mp3 không có stamp, có stamp override hoặc lệch với `script/NN.txt` hiện tại.
    - **Bỏ cổng** chỉ khi người dùng nói rõ là bỏ viet-pro: ghi `viet_pro_override: <lý do ≥10 ký tự, không có #>` vào frontmatter `BRIEF.md` rồi thêm cờ `--skip-viet-pro-gate`. Lý do được in ra mỗi lần chạy, và `check-viet-pro --stage delivery` sẽ chặn khi còn dòng override, nên trước khi giao phải bỏ override và tạo lại voice qua cổng.
    - **Tuỳ chọn:** `check-viet-pro.mjs --project . --jev-audit` nhờ Jev rà từng câu lời đọc (Humanizer 1–5, câu mồi, trải nghiệm bịa, số không nguồn). Chỉ in WARN, không đổi kết quả cổng; xem `references/script-workflow.md`.
    - **Riêng video TikTok/Reels/Shorts viral** (vẫn theo viet-pro, không thay thế viet-pro):

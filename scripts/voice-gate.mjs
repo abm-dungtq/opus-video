@@ -2,7 +2,9 @@
 // generation (tts, audio-meta). It runs check-viet-pro's check() and also requires that the
 // text being voiced is the gated text: tts reads only <project>/script/NN.txt, and every
 // SCRIPT.md frame matches its script/NN.txt (whitespace-insensitive).
-// The gate language comes from BRIEF.md `language:` (inside check()), never from --lang.
+// The gate language comes from BRIEF.md `language:` (inside check()). It fails closed: a voice
+// language of vi (eleven.mjs default) on a project whose BRIEF says another language is refused.
+// Returns the gated texts so the caller voices exactly what was checked.
 // Override: --skip-viet-pro-gate plus BRIEF.md frontmatter `viet_pro_override: <reason>`
 // (≥ 10 chars, no `#`). It is printed on every run and rejected by check-viet-pro at delivery.
 
@@ -20,14 +22,19 @@ export function briefOverride(project) {
 
 const real = (p) => { try { return realpathSync(p); } catch { return null; } };
 
-export function voiceGate({ project = ".", textFiles = [], frames = null, inline = false, skip = false, checkImpl = check } = {}) {
+export function voiceGate({ project = ".", textFiles = [], frames = null, inline = false, skip = false, voiceLang = "vi", checkImpl = check } = {}) {
+  // Read the text first: these exact bytes are what check() then lints and the caller voices.
+  const texts = textFiles.map((f) => { try { return readFileSync(f, "utf8").trim(); } catch { return null; } });
   const r = checkImpl({ project, stage: "script" });
   if (r.usage) return { ok: false, skipped: false, override: "", messages: [r.usage] };
-  if (r.skipped) return { ok: true, skipped: true, override: "", messages: [] };
+  if (r.skipped) {
+    if (/^vi/i.test(voiceLang)) return { ok: false, skipped: false, override: "", messages: [`BRIEF.md ${r.reason || "language"} but the voice language is ${voiceLang}: pass --lang <code> matching BRIEF.md, or set language: vi and pass the viet-pro gate`] };
+    return { ok: true, skipped: true, override: "", messages: [], texts };
+  }
 
   if (skip) {
     const reason = briefOverride(project);
-    if (reason.length >= 10) return { ok: true, skipped: false, override: reason, messages: [`OVERRIDE viet-pro gate: ${reason}`] };
+    if (reason.length >= 10) return { ok: true, skipped: false, override: reason, messages: [`OVERRIDE viet-pro gate: ${reason}`], texts };
     return { ok: false, skipped: false, override: "", messages: ["--skip-viet-pro-gate needs BRIEF.md frontmatter viet_pro_override: <reason, ≥10 chars, no #>"] };
   }
 
@@ -37,7 +44,7 @@ export function voiceGate({ project = ".", textFiles = [], frames = null, inline
   const scriptDir = real(join(project, "script"));
   for (const f of textFiles) {
     const dir = real(dirname(f));
-    if (!scriptDir || dir !== scriptDir || !/^\d{2}\.txt$/.test(basename(f))) return fail([`text file must be <project>/script/NN.txt: ${f}`]);
+    if (!scriptDir || dir !== scriptDir || !/^\d{2,}\.txt$/.test(basename(f)) || texts[textFiles.indexOf(f)] == null) return fail([`text file must be <project>/script/NN.txt: ${f}`]);
   }
 
   if (frames) {
@@ -52,5 +59,5 @@ export function voiceGate({ project = ".", textFiles = [], frames = null, inline
   }
 
   if (!r.pass) return fail([...r.errors.map((e) => `FAIL ${e}`), `BLOCKED viet-pro gate: run node ~/.claude/skills/opus-video/scripts/check-viet-pro.mjs --project ${project}`]);
-  return { ok: true, skipped: false, override: "", messages: [] };
+  return { ok: true, skipped: false, override: "", messages: [], texts };
 }

@@ -199,3 +199,61 @@ test("delivery stage: a viet_pro_override in BRIEF.md fails the gate", () => {
     assert.ok(r.errors.some((e) => e.includes("viet_pro_override")));
   } finally { rmSync(vp, { recursive: true, force: true }); rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("language detection: vi, vie, vi-VN, tiếng Việt (NFC/NFD), tieng viet, missing → gated; en → skipped", async () => {
+  const { isVietnamese } = await import("../check-viet-pro.mjs");
+  for (const l of ["", "vi", "VIE", "vi-VN", "tiếng Việt", "tiếng Việt".normalize("NFD"), "tieng viet", "Vietnamese"]) assert.equal(isVietnamese(l), true, l);
+  for (const l of ["en", "english", "ja", "video"]) assert.equal(isVietnamese(l), false, l);
+});
+
+test("a non-vi project skips even when viet-pro is not installed", () => {
+  const dir = project({ lang: "en" });
+  try {
+    const r = check({ project: dir, vp: join(tmpdir(), "no-such-viet-pro") });
+    assert.equal(r.skipped, true);
+    assert.equal(r.usage, undefined);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("a crashing lint or a missing compare script blocks instead of passing", () => {
+  const vp = fakeVp(), dir = project();
+  try {
+    writeFileSync(join(vp, "scripts", "lint-vietnamese-content.mjs"), "throw new Error('boom');\n");
+    const r = check({ project: dir, vp });
+    assert.equal(r.pass, false);
+    assert.ok(r.errors.some((e) => e.includes("lint ERROR")));
+    assert.ok(Object.values(r.lint).some((l) => l.errors.some((e) => e.includes("lint crashed"))));
+    const r2 = check({ project: dir, vp: fakeVp(), compareScript: join(vp, "nope.mjs") });
+    assert.ok(r2.errors.some((e) => e.includes("compare-preserved-content.mjs not found")));
+  } finally { rmSync(vp, { recursive: true, force: true }); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("delivery: every assets/voice mp3 needs a matching, non-override gate stamp", async () => {
+  const { writeStamp } = await import("../script-md.mjs");
+  const vp = fakeVp();
+  const dir = project({ record: RECORD("- captions: FB + TikTok, lint 0 ERROR\n", ALL_READ + ", publishing/facebook.md, publishing/repurpose-matrix.md"), captions: GOOD_CAPTIONS });
+  const voice = join(dir, "assets", "voice");
+  mkdirSync(voice, { recursive: true });
+  const mp3 = (n) => { const p = join(voice, `0${n}.mp3`); writeFileSync(p, "x"); return p; };
+  const errs = () => check({ project: dir, vp, stage: "delivery" }).errors.filter((e) => e.startsWith("assets/voice"));
+  try {
+    mp3(1);
+    assert.match(errs()[0], /no gate stamp/);
+    writeStamp(join(voice, "01.mp3"), { text: "Sếp hỏi số liệu tuần này.", override: "khách duyệt giọng thử" });
+    assert.match(errs()[0], /viet_pro_override/);
+    writeStamp(join(voice, "01.mp3"), { text: "Một câu khác" });
+    assert.match(errs()[0], /does not match the current script\/01\.txt/);
+    writeStamp(join(voice, "01.mp3"), { text: "Sếp  hỏi số liệu tuần này.\n" });
+    assert.deepEqual(errs(), []);
+  } finally { rmSync(vp, { recursive: true, force: true }); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("--jev-audit with --json keeps stdout valid JSON and the exit code unchanged", () => {
+  const vp = fakeVp(), dir = project(), home = mkdtempSync(join(tmpdir(), "home-"));
+  try {
+    const r = run(["--project", dir, "--vp", vp, "--json", "--jev-audit"], { HOME: home, TYPESAFE_API_KEY: "" });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(JSON.parse(r.stdout).pass, true);
+    assert.match(r.stderr, /jev audit skipped: no TYPESAFE_API_KEY/);
+  } finally { for (const d of [vp, dir, home]) rmSync(d, { recursive: true, force: true }); }
+});

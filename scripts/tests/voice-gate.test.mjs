@@ -22,9 +22,15 @@ function proj({ fm = "", voice = ["Xin chào bạn"], record = "" } = {}) {
 const clean = (...d) => d.forEach((x) => rmSync(x, { recursive: true, force: true }));
 
 test("non-vi project (check skipped) passes without further checks", () => {
-  const g = voiceGate({ project: "/nowhere", inline: true, checkImpl: () => ({ skipped: true, pass: true }) });
+  const g = voiceGate({ project: "/nowhere", inline: true, voiceLang: "en", checkImpl: () => ({ skipped: true, pass: true }) });
   assert.equal(g.ok, true);
   assert.equal(g.skipped, true);
+});
+
+test("non-vi BRIEF but the voice language is vi (the default) → refused, fails closed", () => {
+  const g = voiceGate({ project: "/nowhere", checkImpl: () => ({ skipped: true, pass: true, reason: "language: en" }) });
+  assert.equal(g.ok, false);
+  assert.match(g.messages[0], /voice language is vi/);
 });
 
 test("a failing check blocks with FAIL lines and a BLOCKED line", () => {
@@ -105,4 +111,34 @@ test("eleven.mjs audio-meta exits 4 when a SCRIPT.md frame differs from script/N
     assert.match(r.stderr, /differs/);
     assert.equal(existsSync(join(dir, "assets", "voice", "01.mp3")), false);
   } finally { clean(vp, dir, home); }
+});
+
+test("stamps: --reuse trusts only a non-override stamp for the same normalized text", async () => {
+  const { writeStamp, stampMatches } = await import("../script-md.mjs");
+  const d = mkdtempSync(join(tmpdir(), "vg-st-")), mp3 = join(d, "01.mp3");
+  try {
+    writeFileSync(mp3, "x");
+    assert.equal(stampMatches(mp3, "Xin chào"), false);
+    writeStamp(mp3, { text: "Xin  chào\n" });
+    assert.equal(stampMatches(mp3, "Xin chào"), true);
+    assert.equal(stampMatches(mp3, "Chào"), false);
+    writeStamp(mp3, { text: "Xin chào", override: "khách duyệt giọng thử" });
+    assert.equal(stampMatches(mp3, "Xin chào"), false);
+  } finally { clean(d); }
+});
+
+test("voiceGate returns the exact gated text for tts", () => {
+  const dir = proj({ voice: ["Xin chào bạn"] });
+  try {
+    assert.deepEqual(voiceGate({ project: dir, textFiles: [join(dir, "script", "01.txt")], checkImpl: PASS }).texts, ["Xin chào bạn"]);
+  } finally { clean(dir); }
+});
+
+test("probe-models rejects the removed --outdir flag", () => {
+  const home = mkdtempSync(join(tmpdir(), "vg-home-"));
+  try {
+    const r = spawnSync("node", [eleven, "probe-models", "--text", "x", "--outdir", "/tmp"], { encoding: "utf8", env: { ...process.env, HOME: home, ELEVENLABS_API_KEY: "dummy" } });
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /--outdir was removed/);
+  } finally { clean(home); }
 });

@@ -22,7 +22,7 @@ test("audio-meta survives fetch-sfx", () => {
   const dir = mkdtempSync(join(tmpdir(), "ov-audio-meta-"));
   cpSync(fixture, dir, { recursive: true });
 
-  run([eleven, "audio-meta", "--script", "SCRIPT.md", "--hyperframes", dir, "--reuse", "--bgm", "assets/bgm/bed.mp3", "--bgm-volume", "0.2"], dir);
+  run([eleven, "audio-meta", "--script", "SCRIPT.md", "--hyperframes", dir, "--reuse", "--lang", "en", "--bgm", "assets/bgm/bed.mp3", "--bgm-volume", "0.2"], dir);
   const before = JSON.parse(readFileSync(join(dir, "audio_meta.json"), "utf8"));
   const sidecar = JSON.parse(readFileSync(join(dir, "audio_engine_meta.json"), "utf8"));
   assert.equal(before.voices.length, 2);

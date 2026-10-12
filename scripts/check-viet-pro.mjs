@@ -23,7 +23,11 @@
 //   - script-table.v1.md (the draft before Humanizer) must exist next to script-table.md, and
 //     viet-pro compare-preserved-content.mjs v1 → final must not report MISMATCH.
 //   - SCRIPT.md, when present: its voiced frame lines are linted too (label SCRIPT.md#voice).
-//   - delivery: BRIEF.md frontmatter viet_pro_override (a voice-gate override) fails the gate.
+//   - delivery: BRIEF.md frontmatter viet_pro_override (a voice-gate override) fails the gate, and
+//     every assets/voice/NN.mp3 needs a non-override gate stamp (NN.mp3.gate.json, written by
+//     eleven.mjs) whose text hash equals the current script/NN.txt.
+//   - language: vi, vie, vi-VN, "tiếng Việt"/"tieng viet" (any normalization) or missing → gated.
+//   - a viet-pro lint that crashes counts as an ERROR; a missing compare script is an error.
 // The lint is re-run here; the record is the agent's account (what was read, patterns fixed).
 // --jev-audit (optional, needs TYPESAFE_API_KEY): asks Jev, one request per script/NN.txt, how
 //   likely each line shows Humanizer patterns 1–5, engagement bait, invented first-hand
@@ -36,7 +40,7 @@ import { join, resolve, basename } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
-import { parseScript } from "./script-md.mjs";
+import { parseScript, readStamp, textHash } from "./script-md.mjs";
 import { loadKey } from "./jev-client.mjs";
 import { audit } from "./jev-audit.mjs";
 
@@ -72,6 +76,14 @@ export function parseRecord(text, file = "") {
   return { file, fields };
 }
 
+// BRIEF `language:` → is it Vietnamese? Missing → yes. Tolerant of ISO codes (vi, vie, vi-VN),
+// NFD input and missing diacritics ("tieng viet").
+export function isVietnamese(lang) {
+  if (!lang) return true;
+  const l = lang.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/gi, "d").toLowerCase().trim();
+  return /^vie?\b|^vi[-_]|viet/.test(l);
+}
+
 export function frontmatter(text) {
   const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   const out = {};
@@ -95,10 +107,13 @@ export function lintFiles(vp, files) {
   const lint = join(vp, "scripts", "lint-vietnamese-content.mjs");
   const res = {};
   for (const f of files) {
-    const r = spawnSync("node", [lint, f.path], { encoding: "utf8" });
+    const r = spawnSync(process.execPath, [lint, f.path], { encoding: "utf8" });
     const lines = (r.stdout || "").split("\n").filter(Boolean);
+    const errors = lines.filter((l) => l.startsWith("ERROR")).map((l) => l.replace(f.path, f.label));
+    // A crash (non-zero exit with no ERROR line) must not read as a clean lint.
+    if (r.status !== 0 && !errors.length) errors.push(`ERROR ${f.label} lint crashed (status ${r.status}): ${(r.stderr || "").trim().split("\n")[0] || "no output"}`);
     res[f.label] = {
-      errors: lines.filter((l) => l.startsWith("ERROR")).map((l) => l.replace(f.path, f.label)),
+      errors,
       warns: lines.filter((l) => l.startsWith("WARN")).map((l) => l.replace(f.path, f.label)),
       status: r.status,
     };
@@ -112,12 +127,12 @@ export function check({ project = ".", stage = "script", vp = defaultVp(), compa
   const dir = resolve(project);
   const errors = [], warnings = [];
   const out = { project: dir, stage, pass: false, skipped: false, errors, warnings, lint: {}, record: null };
+  const brief = existsSync(join(dir, "BRIEF.md")) ? readFileSync(join(dir, "BRIEF.md"), "utf8") : "";
+  const lang = frontmatter(brief).language || "";
+  if (!isVietnamese(lang)) return { ...out, pass: true, skipped: true, reason: `language: ${lang}` };
   if (!existsSync(join(vp, "SKILL.md")) || !existsSync(join(vp, "scripts", "lint-vietnamese-content.mjs"))) {
     return { ...out, usage: `viet-pro not found at ${vp} (use --vp or $VIET_PRO_DIR)` };
   }
-  const brief = existsSync(join(dir, "BRIEF.md")) ? readFileSync(join(dir, "BRIEF.md"), "utf8") : "";
-  const lang = (frontmatter(brief).language || "vi").toLowerCase();
-  if (!/^vi\b|việt|vietnam/.test(lang)) return { ...out, pass: true, skipped: true, reason: `language: ${lang}` };
 
   // 1. record
   const table = existsSync(join(dir, "script-table.md")) ? readFileSync(join(dir, "script-table.md"), "utf8") : null;
@@ -136,11 +151,12 @@ export function check({ project = ".", stage = "script", vp = defaultVp(), compa
   if (table) {
     const v1 = join(dir, "script-table.v1.md");
     if (!existsSync(v1)) errors.push("script-table.v1.md not found (viet-pro draft before Humanizer)");
-    else if (existsSync(compareScript)) {
+    else if (!existsSync(compareScript)) errors.push(`compare-preserved-content.mjs not found at ${compareScript} (update viet-pro)`);
+    else {
       const c = spawnSync(process.execPath, [compareScript, v1, join(dir, "script-table.md")], { encoding: "utf8" });
       out.compare = { status: c.status, lines: `${c.stderr || ""}${c.stdout || ""}`.split("\n").filter((l) => /^(MISMATCH|REVIEW)/.test(l)).slice(0, 3) };
       if (c.status === 1) errors.push("compare-preserved-content MISMATCH script-table.v1.md → script-table.md");
-      else if (c.status !== 0) warnings.push(`compare-preserved-content exited ${c.status}`);
+      else if (c.status !== 0) errors.push(`compare-preserved-content did not run cleanly (status ${c.status})`);
     }
   }
 
@@ -174,6 +190,14 @@ export function check({ project = ".", stage = "script", vp = defaultVp(), compa
   // 4. delivery: captions
   if (stage === "delivery") {
     if (frontmatter(brief).viet_pro_override) errors.push("viet_pro_override is set in BRIEF.md: not allowed at delivery; remove it and re-voice through the gate");
+    const voiceDir = join(dir, "assets", "voice");
+    for (const f of existsSync(voiceDir) ? readdirSync(voiceDir).filter((x) => x.endsWith(".mp3")).sort() : []) {
+      const st = readStamp(join(voiceDir, f));
+      const src = join(dir, "script", f.replace(/\.mp3$/, ".txt"));
+      if (!st) errors.push(`assets/voice/${f} has no gate stamp (voiced outside the viet-pro gate); re-voice with eleven.mjs`);
+      else if (st.override) errors.push(`assets/voice/${f} was voiced under viet_pro_override; re-voice through the gate`);
+      else if (!existsSync(src) || st.sha256 !== textHash(readFileSync(src, "utf8"))) errors.push(`assets/voice/${f} does not match the current script/${basename(src)}; re-voice it`);
+    }
     const capPath = join(dir, "CAPTIONS.md");
     if (!existsSync(capPath)) errors.push("CAPTIONS.md not found (## Facebook cá nhân + ## TikTok)");
     else {
@@ -230,18 +254,22 @@ export function main(argv = process.argv.slice(2)) {
     console.log(r.pass ? `PASS  viet-pro gate (${r.stage})${r.record ? ` · record in ${r.record.file}` : ""}` : `BLOCKED  viet-pro gate (${r.stage}): fix the FAIL lines before ${r.stage === "script" ? "voice (eleven.mjs) or render" : "delivery"}`);
   }
   const code = r.pass ? 0 : 1;
-  return o.jevAudit && !r.skipped ? jevAudit(r.project).then(() => code) : code;
+  if (!o.jevAudit || r.skipped) return code;
+  // Advisory only: any audit failure is a WARN and the exit code stays the gate's.
+  const log = o.json ? (m) => console.error(m) : (m) => console.log(m);
+  return jevAudit(r.project, { log }).catch((e) => log(`WARN  jev audit skipped: ${e?.code || e?.name || "error"}`)).then(() => code);
 }
 
 // --jev-audit: WARN lines only; the exit code stays what check() decided.
-async function jevAudit(dir, { apiKey = loadKey(), fetchImpl } = {}) {
+async function jevAudit(dir, { log = console.log, fetchImpl } = {}) {
+  const apiKey = loadKey();
   const scriptDir = join(dir, "script");
   const files = existsSync(scriptDir) ? readdirSync(scriptDir).filter((f) => f.endsWith(".txt")).sort() : [];
   const lines = files.map((f) => readFileSync(join(scriptDir, f), "utf8").replace(/\s+/g, " ").trim());
   const res = await audit(lines, { apiKey, fetchImpl });
-  for (const w of res.warnings) console.log(`WARN  jev ${w.pattern} p=${w.p.toFixed(2)} script/${files[w.line]}`);
-  if (res.error) console.log(`WARN  jev audit skipped: ${res.error}`);
-  else console.log(`jev audit: ${lines.length} lines, ${res.warnings.length} WARN (advisory; precision per pattern in data/jev-audit-eval.jsonl)`);
+  for (const w of res.warnings) log(`WARN  jev ${w.pattern} p=${w.p.toFixed(2)} script/${files[w.line]}`);
+  if (res.error) log(`WARN  jev audit skipped: ${res.error}`);
+  else log(`jev audit: ${lines.length} lines, ${res.warnings.length} WARN (advisory; precision per pattern in data/jev-audit-eval.jsonl)`);
 }
 
 if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) Promise.resolve(main()).then((c) => process.exit(c));

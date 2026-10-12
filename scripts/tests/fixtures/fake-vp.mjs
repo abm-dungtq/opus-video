@@ -14,6 +14,8 @@ export function fakeVp() {
     publishing: ["video-script.md", "facebook.md", "repurpose-matrix.md"],
   })) { mkdirSync(join(vp, "references", d), { recursive: true }); for (const f of files) writeFileSync(join(vp, "references", d, f), "x\n"); }
   mkdirSync(join(vp, "scripts"));
+  // compare-preserved-content stand-in: always PASS (tests that need MISMATCH pass compareScript).
+  writeFileSync(join(vp, "scripts", "compare-preserved-content.mjs"), 'console.log("PASS");\n');
   writeFileSync(join(vp, "scripts", "lint-vietnamese-content.mjs"), `
 import { readFileSync } from "node:fs";
 let err = false;

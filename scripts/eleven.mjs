@@ -16,7 +16,9 @@
 // frame must equal script/NN.txt (whitespace-insensitive). Project: --project, else the parent
 // of the script/ dir (tts) or --hyperframes (audio-meta). Override: --skip-viet-pro-gate with
 // BRIEF.md frontmatter `viet_pro_override: <reason, ≥10 chars, no #>`; printed every run and
-// rejected by `check-viet-pro --stage delivery`. doctor/voice-info/models/sfx/music/probe-models
+// rejected by `check-viet-pro --stage delivery`. Each generated voice gets <mp3>.gate.json (text
+// hash + override); --reuse and the delivery gate accept only a matching non-override stamp.
+// A non-Vietnamese BRIEF needs a matching --lang (the default vi is refused there). doctor/voice-info/models/sfx/music/probe-models
 // are not gated.
 //
 // audio-meta feeds HyperFrames workflows (faceless-explainer, product-launch-video, …) with
@@ -31,10 +33,10 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join, dirname, resolve } from "node:path";
+import { join, dirname, resolve, basename } from "node:path";
 import { spawnSync } from "node:child_process";
 import { maybeHelp } from "./cli-help.mjs";
-import { parseScript } from "./script-md.mjs";
+import { parseScript, writeStamp, stampMatches } from "./script-md.mjs";
 import { voiceGate, GATE_EXIT } from "./voice-gate.mjs";
 import { loadKey, ping } from "./jev-client.mjs";
 import { defaultVp } from "./check-viet-pro.mjs";
@@ -81,6 +83,7 @@ function gate(opts) {
   const g = voiceGate(opts);
   for (const m of g.messages) console.error(m);
   if (!g.ok) die("viet-pro gate blocked voice generation", GATE_EXIT);
+  return g;
 }
 function need(k) {
   if (!args[k]) die(`missing --${k}`, 2);
@@ -217,20 +220,26 @@ const commands = {
 
   async tts() {
     const textFile = args["text-file"] ? resolve(args["text-file"]) : null;
-    gate({
-      project: resolve(args.project || (textFile ? dirname(dirname(textFile)) : ".")),
+    const lang = args.lang || "vi";
+    const g = gate({
+      // <project>/script/NN.txt → <project>; any other location → --project or the cwd.
+      project: resolve(args.project || (textFile && basename(dirname(textFile)) === "script" ? dirname(dirname(textFile)) : ".")),
       textFiles: textFile ? [textFile] : [],
       inline: !!args.text,
       skip: !!args["skip-viet-pro-gate"],
+      voiceLang: lang,
     });
+    const text = g.texts?.[0] ?? readText();
+    const out = need("out");
     await tts({
-      text: readText(),
-      out: need("out"),
+      text,
+      out,
       voice: args.voice || env("OPUS_VIDEO_VOICE_ID") || DEFAULTS.voice,
       model: args.model || env("OPUS_VIDEO_TTS_MODEL") || DEFAULTS.ttsModel,
       speed: Number(args.speed || 1.0),
-      lang: args.lang || "vi",
+      lang,
     });
+    if (!g.skipped) writeStamp(out, { text, script: textFile && `script/${basename(textFile)}`, override: g.override });
   },
 
   async sfx() {
@@ -280,7 +289,8 @@ const commands = {
     const hf = resolve(args.hyperframes || ".");
     const lines = parseScript(readFileSync(resolve(need("script")), "utf8"));
     if (!lines.length) die("no `## … (Frame N)` lines with indented text found in the script");
-    gate({ project: resolve(args.project || hf), frames: lines, skip: !!args["skip-viet-pro-gate"] });
+    const lang = args.lang || "vi";
+    const g = gate({ project: resolve(args.project || hf), frames: lines, skip: !!args["skip-viet-pro-gate"], voiceLang: lang });
     const voice = args.voice || env("OPUS_VIDEO_VOICE_ID") || DEFAULTS.voice;
     const model = args.model || env("OPUS_VIDEO_TTS_MODEL") || DEFAULTS.ttsModel;
 
@@ -289,9 +299,14 @@ const commands = {
       const id = String(frame).padStart(2, "0");
       const rel = `assets/voice/${id}.mp3`;
       const abs = join(hf, rel);
-      const reuse = args.reuse && existsSync(abs) && existsSync(`${abs}.words.json`);
+      // Reuse only audio stamped by the gate for this exact text (never an override run).
+      const reuse = args.reuse && existsSync(abs) && existsSync(`${abs}.words.json`) && (g.skipped || stampMatches(abs, text));
       if (reuse) console.error(`frame ${id}: reuse ${rel}`);
-      else await tts({ text, out: abs, voice, model, speed: Number(args.speed || 1.0), lang: args.lang || "vi" });
+      else {
+        if (args.reuse && existsSync(abs)) console.error(`frame ${id}: not reused (no matching gate stamp), re-voicing`);
+        await tts({ text, out: abs, voice, model, speed: Number(args.speed || 1.0), lang });
+        if (!g.skipped) writeStamp(abs, { text, script: `script/${id}.txt`, override: g.override });
+      }
       const words = JSON.parse(readFileSync(`${abs}.words.json`, "utf8")).map((w, i) => ({
         id: `w${i}`,
         text: w.text,
@@ -330,6 +345,7 @@ const commands = {
   async "probe-models"() {
     const text = readText();
     const models = (args.models || "eleven_v4,eleven_v3,eleven_flash_v2_5").split(",");
+    if (args.outdir) die("--outdir was removed: probe-models always writes to $TMPDIR/ov-probe", 2);
     // Model probes always land in a temp dir so they never serve as ungated production voice.
     const outdir = join(tmpdir(), "ov-probe");
     mkdirSync(outdir, { recursive: true });

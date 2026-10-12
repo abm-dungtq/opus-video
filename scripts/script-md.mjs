@@ -1,5 +1,8 @@
 // script-md.mjs — shared parser for the HyperFrames SCRIPT.md format, used by eleven.mjs
-// (audio-meta) and check-viet-pro.mjs (lint of the voiced lines).
+// (audio-meta) and check-viet-pro.mjs (lint of the voiced lines), plus voice gate stamps.
+
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
 
 // SCRIPT.md (hyperframes script-format) → [{ frame, text }]. A `## … (Frame N)` heading opens a
 // line, `**key:**` rows are metadata, indented lines are the spoken text. Same rules as
@@ -22,3 +25,23 @@ export function parseScript(md) {
 
 // Whitespace-insensitive comparison key for a voice line.
 export const norm = (t) => t.replace(/\s+/g, " ").trim();
+
+// Gate stamps: eleven.mjs writes `<mp3>.gate.json` next to every voice file it generates, so
+// `--reuse` and `check-viet-pro --stage delivery` can prove the audio came from the current
+// gated text (sha256 of the normalized text) and not from an override run.
+export const textHash = (t) => createHash("sha256").update(norm(t)).digest("hex");
+export const stampPath = (mp3) => `${mp3}.gate.json`;
+
+export function writeStamp(mp3, { text, script = null, override = "" }) {
+  writeFileSync(stampPath(mp3), JSON.stringify({ sha256: textHash(text), script, override: override || null }, null, 2) + "\n");
+}
+
+export function readStamp(mp3) {
+  try { return JSON.parse(readFileSync(stampPath(mp3), "utf8")); } catch { return null; }
+}
+
+// true when mp3 has a non-override stamp whose hash equals the given text.
+export function stampMatches(mp3, text) {
+  const s = readStamp(mp3);
+  return !!s && !s.override && s.sha256 === textHash(text);
+}

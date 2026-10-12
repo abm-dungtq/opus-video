@@ -7,7 +7,10 @@
 - The voiced text must be the gated text. `tts` accepts only `--text-file <project>/script/NN.txt` and refuses `--text`. In `audio-meta`, every `SCRIPT.md` frame must equal its `script/NN.txt`, ignoring whitespace; extra `script/*.txt` files are allowed.
 - Override: `--skip-viet-pro-gate` works only with `viet_pro_override: <reason ≥10 chars>` in the `BRIEF.md` frontmatter. The reason is printed on every run, and `check-viet-pro --stage delivery` fails while the override is set.
 - `check-viet-pro.mjs` now requires `script-table.v1.md` and re-runs viet-pro `compare-preserved-content.mjs` from v1 to final (MISMATCH blocks). It also lints the voiced lines of `SCRIPT.md` (`SCRIPT.md#voice`).
-- `probe-models` always writes to `$TMPDIR/ov-probe/`; `--outdir` was removed so it cannot produce ungated production voice.
+- `probe-models` always writes to `$TMPDIR/ov-probe/`; `--outdir` is rejected (exit 2) so it cannot produce ungated production voice.
+- Every voice file generated through the gate gets `<mp3>.gate.json`, holding the sha256 of the normalized text and the override reason or null. `audio-meta --reuse` reuses only audio whose stamp matches and is not an override. `check-viet-pro --stage delivery` fails on any `assets/voice/*.mp3` that has no stamp, has an override stamp, or whose hash differs from the current `script/NN.txt`.
+- Language detection accepts `vi`, `vie`, `vi-VN`, and "tiếng Việt" with or without diacritics or NFD encoding. It fails closed: when BRIEF.md says another language, the default `--lang vi` is refused, so pass the matching `--lang`. A non-vi project no longer needs viet-pro installed. `tts` uses `--project` or the cwd unless the text file sits in a `script/` folder.
+- The gate reads the text once, before checking, and `tts` voices exactly those bytes. A lint crash counts as an ERROR. A missing compare script, or one that exits with any non-zero status, is an error. `--jev-audit --json` writes audit lines to stderr, and audit failures never change the exit code.
 - `rerank-cases.mjs` uses `jev-client.post` (one retry policy: 429/5xx/network).
 
 ### Added
