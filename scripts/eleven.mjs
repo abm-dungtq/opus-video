@@ -36,6 +36,8 @@ import { spawnSync } from "node:child_process";
 import { maybeHelp } from "./cli-help.mjs";
 import { parseScript } from "./script-md.mjs";
 import { voiceGate, GATE_EXIT } from "./voice-gate.mjs";
+import { loadKey, ping } from "./jev-client.mjs";
+import { defaultVp } from "./check-viet-pro.mjs";
 maybeHelp(process.argv.slice(2), import.meta.url);
 
 const API = "https://api.elevenlabs.io";
@@ -184,6 +186,11 @@ const commands = {
     console.log(`env file: ${existsSync(ENV_FILE) ? "present" : "absent"}`);
     console.log(`tts model: ${env("OPUS_VIDEO_TTS_MODEL") || DEFAULTS.ttsModel}`);
     console.log(`voice: ${env("OPUS_VIDEO_VOICE_ID") || DEFAULTS.voice}`);
+    // Optional services: reported, never fatal. Key presence only, never its value.
+    const jevKey = loadKey();
+    console.log(`jev key: ${jevKey ? "present" : "absent"}`);
+    console.log(`jev: ${await ping({ apiKey: jevKey })}`);
+    console.log(`viet-pro: ${existsSync(join(defaultVp(), "scripts", "lint-vietnamese-content.mjs")) ? "installed" : "missing"}`);
   },
 
   async "voice-info"() {

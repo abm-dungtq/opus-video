@@ -11,6 +11,7 @@
 - `rerank-cases.mjs` uses `jev-client.post` (one retry policy: 429/5xx/network).
 
 ### Added
+- `eleven.mjs doctor` prints `jev key: present|absent`, `jev: reachable|unreachable|skipped` (`jev-client.ping`, one noul question, no retry) and `viet-pro: installed|missing`. None of these change the exit code, and no key value is printed. Tests: `jev-client.test.mjs`.
 - `scripts/script-md.mjs`: shared `parseScript` and `norm`.
 - `scripts/voice-gate.mjs` and `voice-gate.test.mjs`, including CLI tests that check exit 4 with no mp3 written. A shared `tests/fixtures/fake-vp.mjs`, and a `language: en` BRIEF for the audio-meta fixture.
 

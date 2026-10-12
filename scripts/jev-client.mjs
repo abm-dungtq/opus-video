@@ -54,3 +54,15 @@ export async function runPool(jobs, concurrency = 8) {
 
 export const addUsage = (a, b) => ({ input_tokens: (a?.input_tokens || 0) + (b?.input_tokens || 0), output_tokens: (a?.output_tokens || 0) + (b?.output_tokens || 0) });
 export const costOf = (u) => ((u?.input_tokens || 0) / 1e6) * PRICE_PER_M_INPUT;
+
+// Health probe for `eleven.mjs doctor`: "skipped" (no key) | "reachable" | "unreachable".
+// One noul question, no retries. Never returns or logs the key.
+export async function ping({ apiKey, fetchImpl = globalThis.fetch, timeoutMs = 10000 } = {}) {
+  if (!apiKey) return "skipped";
+  try {
+    const data = await post({ state: "ping", model: MODEL, questions: { q: { type: "noul", instructions: "Is this a connectivity test?" } } }, { apiKey, fetchImpl, timeoutMs, retries: 0 });
+    return data?.answers ? "reachable" : "unreachable";
+  } catch {
+    return "unreachable";
+  }
+}

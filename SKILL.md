@@ -15,7 +15,7 @@ Skill dir: `~/.claude/skills/opus-video` (bên dưới viết tắt là `$OV`).
 node ~/.claude/skills/opus-video/scripts/eleven.mjs doctor
 ```
 
-Kết quả đạt khi exit 0 và in ra `tier`, `tts model`, `voice`. Script tự đọc key từ `~/.config/opus-video/.env`.
+Kết quả đạt khi exit 0 và in ra `tier`, `tts model`, `voice`. Script tự đọc key từ `~/.config/opus-video/.env`. Ba dòng phụ không làm lệnh thất bại: `jev key: present|absent` (`TYPESAFE_API_KEY`, cùng file `.env`, chỉ báo có/không), `jev: reachable|unreachable|skipped`, `viet-pro: installed|missing` (thiếu viet-pro thì cổng bước 2 không chạy được).
 
 - **Không** source, cat hay echo file `.env` trong shell, và không in key ra hội thoại.
 - Nếu thiếu key, nhờ người dùng tạo file với 2 dòng `ELEVENLABS_API_KEY=...` và `OPUS_VIDEO_VOICE_ID=...` (chmod 600).
