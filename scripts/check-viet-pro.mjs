@@ -3,7 +3,8 @@
 // through the FULL viet-pro workflow before voice/render (SKILL.md step 2) and hand-off (step 9).
 //   node check-viet-pro.mjs [--project .] [--stage script|delivery] [--vp <viet-pro dir>] [--json]
 //   node check-viet-pro.mjs --help | -h
-// viet-pro dir: --vp, else $VIET_PRO_DIR, else ~/.claude/skills/viet-pro (must hold SKILL.md and
+// viet-pro dir: --vp, else $VIET_PRO_DIR, else the first viet-pro found by skill-paths.mjs (sibling
+//   of this skill, then Claude Code / Codex / Antigravity skill dirs) (must hold SKILL.md and
 //   scripts/lint-vietnamese-content.mjs). The required reading list is built from that install.
 // Stage "script" (before eleven.mjs tts/audio-meta and before any render):
 //   - BRIEF.md `language:` other than vi → SKIP (exit 0). Missing field → treated as vi.
@@ -43,6 +44,7 @@ import { wantsHelp, helpText } from "./cli-help.mjs";
 import { parseScript, readStamp, textHash } from "./script-md.mjs";
 import { loadKey } from "./jev-client.mjs";
 import { audit } from "./jev-audit.mjs";
+import { findSkill } from "./skill-paths.mjs";
 
 export const REQUIRED_FIELDS = ["mode", "files_read", "humanizer", "lint"];
 export const BAIT = /đừng (?:vội )?lướt|xem (?:hết|đến cuối|tới cuối)|99\s?% (?:mọi )?người|bạn sẽ không (?:thể )?tin|sự thật (?:gây sốc|ít ai biết)|không ai nói (?:cho )?bạn|bí mật (?:mà )?(?:ít ai|không ai)|like,? share|follow (?:ngay )?để không bỏ lỡ|comment\s+["“]?[^\s"”]+["”]?\s+để nhận|thả tim nếu|tag (?:ngay )?(?:một )?người bạn/giu;
@@ -50,7 +52,7 @@ export const FIRST_HAND = /(?:mình|tôi|em) (?:đã )?(?:thử|dùng|xài|test)
 const PLACEHOLDER = /^(?:…|\.{3}|todo|tbd|-|n\/a|none yet|chưa)?$/i;
 
 export function defaultVp(env = process.env) {
-  return env.VIET_PRO_DIR || join(homedir(), ".claude", "skills", "viet-pro");
+  return env.VIET_PRO_DIR || findSkill("viet-pro") || join(homedir(), ".claude", "skills", "viet-pro");
 }
 
 // Files the agent must have read: SKILL.md + all review/ + all editorial/ (+ publishing refs).

@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-12: portable install for every agent and OS; plan and demo gates before the final render
+
+### Added
+- `install.sh` (macOS, Linux, WSL, Git Bash) and `install.ps1` (Windows PowerShell) install opus-video for Claude Code, Codex, Antigravity app and CLI, or the current workspace. They also install viet-pro v5.3.0 and every HyperFrames skill (`npx hyperframes skills`), create the key file template with owner-only permissions, and finish with `setup-check`. An existing copy is moved to `~/.opus-video-backups/`, and a git checkout is never overwritten.
+- `scripts/setup-check.mjs` (SKILL.md step 0) checks Node ≥ 22, git, ffmpeg/ffprobe, hyperframes CLI ≥ 0.8.144, viet-pro (with its self-tests), the 20 HyperFrames core and workflow skills, and the ElevenLabs keys (presence only). Each MISSING item prints the fix command for the current OS. Exit 0 means READY, 1 means something is missing. agy, `TYPESAFE_API_KEY` and a Remotion skill are WARN only.
+- `scripts/skill-paths.mjs` finds a skill in every agent's skills dir (`~/.claude`, `~/.agents`, `~/.codex`, `~/.gemini/config`, `~/.gemini/antigravity-cli`, workspace `.claude`/`.agents`, and sibling dirs). `check-viet-pro` and `voice-gate` use it instead of a hardcoded `~/.claude/skills` path.
+- Plan gate (SKILL.md step 4b): `PLAN.md` with Mục tiêu, a Cảnh table, Âm thanh, Engine, Khung hình demo (at least one timestamp per scene; a 9:16 list too when `aspect: both`) and QA. `scripts/check-preflight.mjs --stage plan` must PASS before voice and build. The template is in `references/plan-demo.md`.
+- Demo gate (step 6b): `scripts/make-demo.mjs` captures the planned frames into `demo/` (and `demo/9x16/`), using `hyperframes snapshot`, or a draft render plus ffmpeg for a composition, and resets `DEMO.md` to `approval: pending`. `check-preflight --stage final` requires real PNGs newer than PLAN.md and a recorded approval. A composition edited after the demo is a WARN.
+- `scripts/render-final.mjs` is the only path to the delivery render. It runs the final preflight, exits 5 when blocked, refuses `--quality`, and forwards the remaining args to `hyperframes render --quality delivery`.
+- `scripts/replace-in-file.mjs` is a portable replacement for the macOS-only `sed -i ''` recipes (9:16 caption band, Be Vietnam Pro font swap).
+- Tests: `preflight.test.mjs`, `setup-check.test.mjs`; every new script is covered by the `--help` test.
+
+### Changed
+- SKILL.md defines `$OV` as the folder holding SKILL.md on any agent. The references use `$OV` instead of `~/.claude/skills/opus-video`, and the font paths cover macOS, Linux and Windows.
+- README rewritten: install per agent and per OS, manual install, keys, setup-check, invocation per agent, the gated workflow, update/uninstall and troubleshooting. The Node requirement is now 22.
+
 ## 2026-10-12: eleven.mjs enforces the viet-pro gate
 
 ### Changed

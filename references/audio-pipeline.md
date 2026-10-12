@@ -1,6 +1,6 @@
 # Pipeline âm thanh
 
-Script: `node ~/.claude/skills/opus-video/scripts/eleven.mjs <cmd>`. Script tự đọc key từ `~/.config/opus-video/.env`. **Không** source, cat hay echo file đó trong shell.
+Script: `node $OV/scripts/eleven.mjs <cmd>`. Script tự đọc key từ `~/.config/opus-video/.env`. **Không** source, cat hay echo file đó trong shell.
 
 Thứ tự làm: **voice trước** (để có thời lượng thật), sau đó chỉnh storyboard cho khớp, rồi mới làm SFX, nhạc nền và mix.
 
@@ -9,7 +9,7 @@ Thứ tự làm: **voice trước** (để có thời lượng thật), sau đó
 Chia lời theo cảnh, mỗi cảnh một file. Như vậy dễ sửa từng câu và timing không bị trôi.
 
 ```bash
-node ~/.claude/skills/opus-video/scripts/eleven.mjs tts --text-file script/01.txt --out assets/voice/01.mp3
+node $OV/scripts/eleven.mjs tts --text-file script/01.txt --out assets/voice/01.mp3
 ```
 
 - **Cổng viet-pro** (dự án tiếng Việt theo `BRIEF.md` `language:`): lệnh chạy `check-viet-pro` trước khi gọi API và exit **4** nếu chưa PASS. File lời đọc phải là `<project>/script/NN.txt` (thư mục dự án = cha của `script/`, hoặc `--project`); `--text` bị từ chối. Bỏ cổng: `--skip-viet-pro-gate` kèm `viet_pro_override: <lý do>` trong frontmatter `BRIEF.md` (không hợp lệ ở bước giao). Mỗi mp3 có `NN.mp3.gate.json`; đừng xoá hay chép mp3 từ chỗ khác vào `assets/voice/`, vì bước giao sẽ chặn. Dự án không phải tiếng Việt phải truyền `--lang <mã>`.
@@ -25,7 +25,7 @@ node ~/.claude/skills/opus-video/scripts/eleven.mjs tts --text-file script/01.tx
 Bước audio (`audio.mjs generate`) của các workflow HyperFrames ghim cứng `eleven_multilingual_v2`, model không có tiếng Việt. Vì vậy **bỏ qua** bước đó và chạy:
 
 ```bash
-node ~/.claude/skills/opus-video/scripts/eleven.mjs audio-meta --script SCRIPT.md --hyperframes . [--bgm assets/bgm/bgm.mp3 --bgm-volume 0.2] [--reuse]
+node $OV/scripts/eleven.mjs audio-meta --script SCRIPT.md --hyperframes . [--bgm assets/bgm/bgm.mp3 --bgm-volume 0.2] [--reuse]
 ```
 
 - **Cổng viet-pro:** trước khi tạo giọng, lệnh chạy `check-viet-pro` cho dự án (`--project`, mặc định `--hyperframes`) và so từng frame với `script/NN.txt` (bỏ qua khác biệt khoảng trắng). Thiếu file hoặc lệch chữ thì exit 4. `script/` được phép có file thừa. Bỏ cổng như mục 1 (`--skip-viet-pro-gate`).
@@ -34,7 +34,7 @@ node ~/.claude/skills/opus-video/scripts/eleven.mjs audio-meta --script SCRIPT.m
   - `audio_meta.json`: theo frame, gồm voices, words `w0…`, và bgm `source: "host"`.
   - `audio_engine_meta.json`: sidecar theo id `"01"`. `fetch-sfx` merge từ sidecar này rồi ghi đè `audio_meta.json`, nên **thiếu sidecar là mất hết giọng**. Không được xoá nó.
 - Sau đó chạy tiếp như bình thường: `audio.mjs sync-durations` → `audio.mjs fetch-sfx` → `captions.mjs build`. `fetch-sfx` không cần HeyGen: nó lấy từ thư viện bundled, và bỏ qua frame đã có SFX `source: "host"`.
-- Đã kiểm bằng `node --test ~/.claude/skills/opus-video/scripts/tests/`. Test round-trip xác nhận voices và bgm giữ nguyên sau `fetch-sfx`.
+- Đã kiểm bằng `node --test $OV/scripts/tests/`. Test round-trip xác nhận voices và bgm giữ nguyên sau `fetch-sfx`.
 
 ## 2. SFX
 
@@ -45,7 +45,7 @@ node ~/.claude/skills/opus-video/scripts/eleven.mjs audio-meta --script SCRIPT.m
    Lệnh này lấy từ bộ 19 file bundled, hoặc từ catalog HeyGen nếu đã đăng nhập. Kiểm chứng ngày 2026-10-08: heygen CLI đang cài không có lệnh `audio`, nên resolve chỉ trả file bundled (vd. một whoosh dài 5,5 giây). Nghe thử và kiểm tra độ dài trước khi dùng.
 2. Nếu thiếu hoặc không hợp, sinh mới (mô tả bằng tiếng Anh, ngắn và cụ thể):
    ```bash
-   node ~/.claude/skills/opus-video/scripts/eleven.mjs sfx --text "airy whoosh, short, modern UI" --seconds 0.8 --out assets/sfx/whoosh.mp3
+   node $OV/scripts/eleven.mjs sfx --text "airy whoosh, short, modern UI" --seconds 0.8 --out assets/sfx/whoosh.mp3
    ```
    Model `eleven_text_to_sound_v2`, dài 0,5–30 giây, `--influence 0.3` (tăng lên nếu muốn bám mô tả hơn).
 3. Mỗi video ngắn dùng 2–6 SFX. Mỗi cue gắn với một hành động hình ảnh, không rắc SFX cho có.
@@ -53,7 +53,7 @@ node ~/.claude/skills/opus-video/scripts/eleven.mjs audio-meta --script SCRIPT.m
 ## 3. Nhạc nền
 
 ```bash
-node ~/.claude/skills/opus-video/scripts/eleven.mjs music --prompt "calm curious ambient, 100 BPM, light piano and soft pads" --seconds 15 --out assets/bgm/bgm.mp3
+node $OV/scripts/eleven.mjs music --prompt "calm curious ambient, 100 BPM, light piano and soft pads" --seconds 15 --out assets/bgm/bgm.mp3
 ```
 
 - Model `music_v2_5`, `force_instrumental: true`. Độ dài bằng đúng thời lượng video (hoặc dư 1–2 giây để fade).

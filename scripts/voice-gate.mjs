@@ -12,6 +12,7 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
 import { check, frontmatter } from "./check-viet-pro.mjs";
 import { norm } from "./script-md.mjs";
+import { OV_DIR } from "./skill-paths.mjs";
 
 export const GATE_EXIT = 4;
 
@@ -58,6 +59,6 @@ export function voiceGate({ project = ".", textFiles = [], frames = null, inline
     if (bad.length) return fail(bad);
   }
 
-  if (!r.pass) return fail([...r.errors.map((e) => `FAIL ${e}`), `BLOCKED viet-pro gate: run node ~/.claude/skills/opus-video/scripts/check-viet-pro.mjs --project ${project}`]);
+  if (!r.pass) return fail([...r.errors.map((e) => `FAIL ${e}`), `BLOCKED viet-pro gate: run node ${join(OV_DIR, "scripts", "check-viet-pro.mjs")} --project ${project}`]);
   return { ok: true, skipped: false, override: "", messages: [], texts };
 }

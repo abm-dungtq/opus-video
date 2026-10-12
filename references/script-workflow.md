@@ -1,6 +1,6 @@
 # Quy trình kịch bản (nối với viet-pro)
 
-Dùng khi video có lời đọc hoặc chữ trên hình bằng tiếng Việt. Đường dẫn gốc: `VP=~/.claude/skills/viet-pro`. **Đây là cổng bắt buộc** (SKILL.md bước 2): mọi kịch bản tiếng Việt, kể cả video TikTok viral, đi qua quy trình viet-pro đầy đủ ở mục 2 và phải qua `scripts/check-viet-pro.mjs` trước khi tạo giọng hay render. Bảng ở mục 1 chỉ quyết định kỹ thuật nào được **dùng**; mọi file trong `review/` và `editorial/` vẫn phải **đọc**. Kỹ thuật là lựa chọn, không phải quota.
+Dùng khi video có lời đọc hoặc chữ trên hình bằng tiếng Việt. Đường dẫn gốc: `VP` = thư mục skill `viet-pro` trên agent đang chạy (Claude Code `~/.claude/skills/viet-pro`, Codex `~/.agents/skills/viet-pro`, Antigravity `~/.gemini/config/skills/viet-pro`; `setup-check.mjs` in đường dẫn thật). **Đây là cổng bắt buộc** (SKILL.md bước 2): mọi kịch bản tiếng Việt, kể cả video TikTok viral, đi qua quy trình viet-pro đầy đủ ở mục 2 và phải qua `scripts/check-viet-pro.mjs` trước khi tạo giọng hay render. Bảng ở mục 1 chỉ quyết định kỹ thuật nào được **dùng**; mọi file trong `review/` và `editorial/` vẫn phải **đọc**. Kỹ thuật là lựa chọn, không phải quota.
 
 ## 1. Bảng chọn theo loại video
 
@@ -28,7 +28,7 @@ Chuyển thể sang văn nói luôn theo `$VP/references/publishing/video-script
    MISMATCH (exit 1) phải xử lý; REVIEW thì đọc lại câu đó.
 6. Lưu bản cuối vào `<project>/script-table.md` (không dùng `script.md`, vì trên macOS nó trùng file với `SCRIPT.md`). Tách lời theo frame vào `script/NN.txt`: mỗi dòng bảng ứng với đúng một frame trong `STORYBOARD.md`. Dòng nào quá dài cho thời lượng frame thì tách frame hoặc cắt lời, không nói nhanh hơn.
 7. **Lint** (mục 4), rồi ghi biên bản `## viet_pro` (mục 4.1), rồi chạy cổng `check-viet-pro.mjs`.
-8. Với workflow HyperFrames: xuất `<project>/SCRIPT.md` theo `~/.claude/skills/hyperframes/references/script-format.md`:
+8. Với workflow HyperFrames: xuất `<project>/SCRIPT.md` theo `references/script-format.md` của skill `hyperframes` (cùng thư mục skills với opus-video):
    - header `**Voice:**`, `**Voice settings:**`, `**Voice direction:**`;
    - mỗi lời một mục `## Line N — <nhãn> (Frame N)`, có `**Time:**` và `**Delivery:**`;
    - lời đọc thụt đúng 4 dấu cách (chỉ phần này được đưa vào TTS), và phải trùng từng chữ với `script/NN.txt` đã qua lint.

@@ -7,12 +7,20 @@ description: "Làm video với Claude Opus 5.5 từ brief, chủ đề hoặc k�
 
 Skill điều phối: biến một ý tưởng thành MP4 hoàn chỉnh. Skill này **không** tự render. Nó nối các skill có sẵn (`viet-pro`, `hyperframes` và các workflow con, `media-use`, `ak-remotion`) với script ElevenLabs của riêng nó, và áp dụng các mẫu chắt lọc từ 813 video làm bằng Opus 5.5.
 
-Skill dir: `~/.claude/skills/opus-video` (bên dưới viết tắt là `$OV`).
+`$OV` là **thư mục chứa file SKILL.md này**, trên bất kỳ agent nào: Claude Code `~/.claude/skills/opus-video`, Codex `~/.agents/skills/opus-video`, Antigravity `~/.gemini/config/skills/opus-video` (CLI: `~/.gemini/antigravity-cli/skills/opus-video`), hoặc `.claude/skills/` / `.agents/skills/` trong workspace. Các skill phụ thuộc (`viet-pro`, `hyperframes*`, `media-use`…) được script tự tìm trong mọi thư mục đó. Lệnh dưới đây chạy được trên macOS, Linux và Windows (PowerShell: thay `$OV` bằng đường dẫn đầy đủ).
+
+## Bước 0: kiểm tra cài đặt (BẮT BUỘC, mỗi máy/agent mới và khi có lỗi thiếu công cụ)
+
+```bash
+node $OV/scripts/setup-check.mjs
+```
+
+Phải in `READY` (exit 0) **trước** bước 1. Exit 1 (`NOT READY`) thì làm theo dòng `fix:` dưới mỗi mục `MISSING` (Node ≥ 22, git, ffmpeg/ffprobe, CLI hyperframes, viet-pro và self-test của nó, đủ bộ skill HyperFrames gồm core + `media-use` + mọi workflow, key ElevenLabs), hoặc chạy lại installer (`install.sh` / `install.ps1`, xem `README.md`), rồi chạy lại cho tới khi `READY`. Không bỏ qua bước này và không tự viết lại workflow HyperFrames khi skill của nó chưa cài. `WARN` (agy, `TYPESAFE_API_KEY`, skill Remotion) không chặn.
 
 ## Thiết lập (mỗi phiên một lần)
 
 ```bash
-node ~/.claude/skills/opus-video/scripts/eleven.mjs doctor
+node $OV/scripts/eleven.mjs doctor
 ```
 
 Kết quả đạt khi exit 0 và in ra `tier`, `tts model`, `voice`. Script tự đọc key từ `~/.config/opus-video/.env`. Ba dòng phụ không làm lệnh thất bại: `jev key: present|absent` (`TYPESAFE_API_KEY`, cùng file `.env`, chỉ báo có/không), `jev: reachable|unreachable|skipped` (khi có key, mỗi lần doctor tốn một request Jev rất nhỏ), `viet-pro: installed|missing` (thiếu viet-pro thì cổng bước 2 không chạy được).
@@ -26,7 +34,9 @@ Mặc định: voice `eGSd0uV8dNQnZuEEX9lu`, TTS `eleven_v4` (có tiếng Việt
 
 ## Nhánh footage thật (beta)
 
-Người dùng đưa clip quay thật cần cắt gọn (talking-head, phỏng vấn, UGC): làm theo `references/footage-lane.md` (`scripts/cut.mjs` tìm điểm cắt và ghép), rồi quay lại bước 6–9 bên dưới (lời đọc hay chữ tiếng Việt mới thêm vẫn phải qua cổng viet-pro ở bước 2). Video dựng mới hoàn toàn thì đi thẳng quy trình 9 bước.
+Người dùng đưa clip quay thật cần cắt gọn (talking-head, phỏng vấn, UGC): làm theo `references/footage-lane.md` (`scripts/cut.mjs` tìm điểm cắt và ghép), rồi quay lại bước 4b (PLAN.md) và 6–9 bên dưới (lời đọc hay chữ tiếng Việt mới thêm vẫn phải qua cổng viet-pro ở bước 2; plan và demo vẫn bắt buộc). Video dựng mới hoàn toàn thì đi thẳng quy trình 9 bước.
+
+**Ba cổng không được bỏ:** kịch bản viet-pro (bước 2) → **PLAN.md** (bước 4b) → **khung hình demo đã duyệt** (bước 6b). Bản giao cuối chỉ được render bằng `render-final.mjs`, script này chặn (exit 5) khi thiếu plan, thiếu demo hoặc demo chưa được duyệt.
 
 ## Quy trình 9 bước
 
@@ -34,15 +44,16 @@ Mỗi dự án có một thư mục riêng:
 
 ```
 <project>/
-  BRIEF.md  STORYBOARD.md  script-table.md  QA.md  CAPTIONS.md
+  BRIEF.md  STORYBOARD.md  script-table.md  PLAN.md  DEMO.md  QA.md  CAPTIONS.md
   script/01.txt …          # lời đọc theo cảnh
+  demo/  demo/9x16/        # khung hình demo (make-demo.mjs)
   assets/voice/ assets/sfx/ assets/bgm/ assets/CREDITS.md
   renders/
 ```
 
 1. **Brief.** Điền theo `references/brief-template.md` vào `BRIEF.md`. Chỉ hỏi người dùng những gì không suy ra được (chủ đề, `aspect` 16:9 / 9:16 / both, thời lượng). Các trường khác tự đề xuất.
 
-2. **Kịch bản: cổng viet-pro đầy đủ (BẮT BUỘC với mọi lời đọc/chữ trên hình tiếng Việt, kể cả video TikTok viral).** Làm theo `references/script-workflow.md`. `VP=~/.claude/skills/viet-pro`. Chạy viet-pro ở mức **Chuẩn** (brief → soạn → rà sự thật/ngôn ngữ → bản cuối), không dùng mức Nhanh. Làm đủ (a)–(e) theo đúng thứ tự:
+2. **Kịch bản: cổng viet-pro đầy đủ (BẮT BUỘC với mọi lời đọc/chữ trên hình tiếng Việt, kể cả video TikTok viral).** Làm theo `references/script-workflow.md`. `VP` = thư mục skill `viet-pro` (`setup-check.mjs` in đường dẫn; Claude Code `~/.claude/skills/viet-pro`, Codex `~/.agents/skills/viet-pro`). Chạy viet-pro ở mức **Chuẩn** (brief → soạn → rà sự thật/ngôn ngữ → bản cuối), không dùng mức Nhanh. Làm đủ (a)–(e) theo đúng thứ tự:
    - **(a) Đọc hết, không đọc lướt:** `$VP/SKILL.md`; toàn bộ `$VP/references/review/` (`lead.md`, `anti-ai.md`, `humanizer-patterns.md`, `natural.md`, `punctuation.md`, `capitalization.md`, `consistency.md`, `fact-check.md`); toàn bộ `$VP/references/editorial/` (`lead.md`, `hook-close.md`, `rhythm.md`, `story-core.md`, `debunk.md`, `emphasis.md`, `metaphor.md`, `reframe.md`, `technical.md`); và file kênh `$VP/references/publishing/video-script.md` (TikTok/Reels/Shorts/YouTube). Người dùng yêu cầu đọc đủ nên ở đây `humanizer-patterns.md` luôn được đọc toàn bộ, không chỉ khi có cụm dấu hiệu.
    - **(b) Soạn** bảng 3 cột `Thời điểm | Voice-over (văn nói) | Visual / text trên hình` theo `video-script.md`, khoảng 2,5–3 từ/giây (60 giây ≈ 150–180 từ, đếm trước khi chốt). Chọn kỹ thuật theo loại video ở bảng trong `script-workflow.md`. Explainer, phản bác ngộ nhận hoặc có số liệu thì **bắt buộc kiểm chứng** theo `$VP/references/review/fact-check.md`, ghi `SOURCES.md`. Lưu bản nháp đầu thành `script-table.v1.md`.
    - **(c) Lượt Humanizer/anti-AI có ghi chép:** rà theo `$VP/references/review/anti-ai.md` và đủ 25 pattern trong `humanizer-patterns.md`; pattern mạnh 1–5 sửa từ một lần xuất hiện, pattern yếu 6–25 chỉ sửa khi thành cụm. Liệt kê **từng pattern tìm thấy → câu gốc → cách sửa** (hoặc ghi rõ "không thấy pattern 1–5"). Tối đa hai vòng sửa. Sau đó đối chiếu dữ kiện: `node $VP/scripts/compare-preserved-content.mjs script-table.v1.md script-table.md --keep "<tên riêng>"` (MISMATCH phải xử lý).
@@ -101,7 +112,11 @@ Mỗi dự án có một thư mục riêng:
 
 4. **Engine.** Chọn theo `references/engine-selection.md`. Mặc định là HyperFrames. Ghi `engine`, `workflow`, `engine_reason` vào `BRIEF.md`. Nhiều biến thể của cùng một mẫu thì dùng `render --batch` của HyperFrames, không chuyển sang Remotion.
 
-5. **Âm thanh.** Chỉ bắt đầu khi `check-viet-pro.mjs --project .` đã PASS ở bước 2 (đổi lời đọc sau đó thì chạy lại cổng trước khi tạo lại voice; `eleven.mjs` exit 4 nghĩa là cổng chặn). Làm theo `references/audio-pipeline.md`.
+4b. **Plan (BẮT BUỘC).** Viết `PLAN.md` theo mẫu trong `references/plan-demo.md`: Mục tiêu · Cảnh (bảng, mỗi cảnh một dòng) · Âm thanh · Engine · Khung hình demo (mỗi cảnh ít nhất một mốc giây cần xem) · Khung hình demo 9:16 (khi `aspect: both`) · QA.
+   - **Cổng:** `node $OV/scripts/check-preflight.mjs --project . --stage plan` phải `PASS` (exit 0) **trước** khi tạo voice (bước 5) và dựng (bước 6).
+   - Gửi tóm tắt plan cho người dùng. Người dùng đổi ý thì sửa `PLAN.md` và chạy lại cổng.
+
+5. **Âm thanh.** Chỉ bắt đầu khi `check-viet-pro.mjs --project .` đã PASS ở bước 2 và `check-preflight --stage plan` đã PASS ở bước 4b (đổi lời đọc sau đó thì chạy lại cổng trước khi tạo lại voice; `eleven.mjs` exit 4 nghĩa là cổng chặn). Làm theo `references/audio-pipeline.md`.
    - **Dùng workflow HyperFrames chuyên biệt** (faceless-explainer, product-launch-video, pr-to-video): **không** chạy `audio.mjs generate` của workflow. Thay vào đó chạy:
      ```bash
      node $OV/scripts/eleven.mjs audio-meta --script SCRIPT.md --hyperframes . --bgm assets/bgm/bgm.mp3 --bgm-volume 0.2
@@ -121,14 +136,20 @@ Mỗi dự án có một thư mục riêng:
    - Raw canvas: làm theo công thức trong `engine-selection.md`.
    - Với `aspect: both`, bản dọc phải dàn lại bố cục, không crop:
      - **Dựng tay** (general-video): 2 composition trong cùng project, gồm `index.html` (1920×1080) và `compositions/main-9x16.html` (1080×1920).
-     - **Workflow có frame worker** (faceless-explainer, pr-to-video, product-launch-video): làm **một project 9:16 riêng**, theo mục "Bài học từ smoke v2" trong `engine-selection.md`. Sau mỗi lần `captions.mjs build` ở 1080×1920, **bắt buộc** chạy `sed -i '' 's/--cap-band-top: [0-9]*px;/--cap-band-top: 1340px;/; s/--cap-band-height: [0-9]*px;/--cap-band-height: 200px;/' compositions/captions.html`, vì mặc định 1600px rơi vào vùng UI che.
+     - **Workflow có frame worker** (faceless-explainer, pr-to-video, product-launch-video): làm **một project 9:16 riêng**, theo mục "Bài học từ smoke v2" trong `engine-selection.md`. Sau mỗi lần `captions.mjs build` ở 1080×1920, **bắt buộc** chạy `node $OV/scripts/replace-in-file.mjs compositions/captions.html "--cap-band-top: [0-9]*px;" "--cap-band-top: 1340px;" "--cap-band-height: [0-9]*px;" "--cap-band-height: 200px;"`, vì mặc định 1600px rơi vào vùng UI che.
    - Áp dụng banned list trong brief.
 
+6b. **Khung hình demo (BẮT BUỘC trước video cuối).** Làm theo `references/plan-demo.md`:
+   - Chụp đúng các mốc trong `PLAN.md`: `node $OV/scripts/make-demo.mjs --project .` (bản 9:16: thêm `--aspect 9x16` và `--composition compositions/main-9x16.html`, hoặc `--hyperframes <project-9x16>` nếu là project riêng). Script ghi `demo/`, `demo/9x16/` và `DEMO.md` với `approval: pending`.
+   - Tự xem từng khung (đủ dấu, không tràn chữ, vùng an toàn, đúng nội dung cảnh), rồi **gửi các khung hình cho người dùng duyệt** và dừng chờ trả lời.
+   - Có góp ý thì sửa và chụp lại. Người dùng đồng ý thì ghi `approval: <ai>, <khi nào>, "<lời đồng ý>"` vào `DEMO.md`. Chỉ khi người dùng đã nói rõ là chạy không dừng mới được ghi `approval: auto — <lý do và lời người dùng>`.
+   - Kiểm: `node $OV/scripts/check-preflight.mjs --project . --stage final` phải `PASS`.
+
 7. **Render.**
-   - 16:9: `hyperframes render --quality looks --output renders/<name>-16x9.mp4`
-   - 9:16: `hyperframes render -c compositions/main-9x16.html --quality looks --output renders/<name>-9x16.mp4`. Nếu là project 9:16 riêng thì chạy `hyperframes render` ngay trong thư mục đó.
+   - Bản nháp/QA, 16:9: `hyperframes render --quality looks --output renders/<name>-16x9.mp4`
+   - Bản nháp/QA, 9:16: `hyperframes render -c compositions/main-9x16.html --quality looks --output renders/<name>-9x16.mp4`. Nếu là project 9:16 riêng thì chạy `hyperframes render` ngay trong thư mục đó.
    - `--resolution` chỉ đổi kích thước render, không đổi khổ hình.
-   - Bản giao cuối render với `--quality delivery`.
+   - **Bản giao cuối chỉ render qua cổng:** `node $OV/scripts/render-final.mjs --project . -- --output renders/<name>-16x9.mp4` (9:16: thêm `-c compositions/main-9x16.html`). Script tự chạy `check-preflight --stage final` rồi `hyperframes render --quality delivery`; exit **5** là thiếu plan/demo/duyệt. Không gọi thẳng `hyperframes render --quality delivery`.
 
 8. **QA.** Làm theo `references/qa-checklist.md` § "Vòng QA tự xem video": lint + check → `video-lint.mjs` → render vN → `judge.mjs check`, từ v2 thêm `pair`. Ghi kết quả vào `QA.md`. Tối đa 3 vòng, sau đó dừng lại và báo người dùng kèm bằng chứng.
 
@@ -138,7 +159,7 @@ Mỗi dự án có một thư mục riêng:
    - **Cổng giao:** `node $OV/scripts/check-viet-pro.mjs --project . --stage delivery` phải PASS trước khi gửi link video cho người dùng.
    - Không tự đăng. Người dùng muốn thêm caption YouTube thì làm theo cùng quy trình, thêm mục `## YouTube`.
 
-Giao cho người dùng: đường dẫn MP4, `CAPTIONS.md` (đã qua cổng `--stage delivery`), link preview (`hyperframes preview --background`; ghi PID và dừng preview khi người dùng xem xong), cùng tóm tắt QA. Các mục cần tai người (giọng, thanh điệu) phải nói rõ là người dùng tự nghe.
+Giao cho người dùng: đường dẫn MP4 (render bằng `render-final.mjs`), `PLAN.md` và `DEMO.md` đã duyệt, `CAPTIONS.md` (đã qua cổng `--stage delivery`), link preview (`hyperframes preview --background`; ghi PID và dừng preview khi người dùng xem xong), cùng tóm tắt QA. Các mục cần tai người (giọng, thanh điệu) phải nói rõ là người dùng tự nghe.
 
 ## Ranh giới
 
@@ -160,6 +181,13 @@ Giao cho người dùng: đường dẫn MP4, `CAPTIONS.md` (đã qua cổng `--
 | `references/engine-selection.md` | Bước 4 và 6: chọn engine, xử lý 16:9 / 9:16 |
 | `references/audio-pipeline.md` | Bước 5: voice, SFX, nhạc nền, mix, bản quyền |
 | `references/qa-checklist.md` | Bước 8: đo bằng lệnh, xem frame, nghe |
+| `references/plan-demo.md` | Bước 4b, 6b, 7: mẫu `PLAN.md`, chụp và duyệt demo, `DEMO.md`, render bản cuối |
+| `scripts/setup-check.mjs` | Bước 0: đủ công cụ, skill, key chưa (`READY` / `NOT READY` + lệnh sửa theo hệ điều hành) |
+| `scripts/check-preflight.mjs` | Bước 4b (`--stage plan`) và 6b (`--stage final`): cổng plan + demo + duyệt |
+| `scripts/make-demo.mjs` | Bước 6b: chụp khung hình demo theo `PLAN.md`, ghi `DEMO.md` |
+| `scripts/render-final.mjs` | Bước 7: render bản giao (`--quality delivery`) chỉ khi cổng final PASS (exit 5 nếu chặn) |
+| `scripts/skill-paths.mjs` | Tìm skill trên mọi agent (Claude Code, Codex, Antigravity, workspace) |
+| `scripts/replace-in-file.mjs` | Thay chuỗi trong file bằng regex, chạy được mọi hệ điều hành (thay `sed -i`) |
 | `scripts/eleven.mjs` | `doctor`, `voice-info`, `models`, `tts`, `sfx`, `music`, `probe-models`, `audio-meta`; `tts`/`audio-meta` qua cổng viet-pro (`scripts/voice-gate.mjs`, exit 4) |
 | `references/edit-method.md` | Bước 3 và 6: chức năng câu → hình, sàn chất lượng, GSAP, SFX |
 | `scripts/video-lint.mjs` | Bước 8: lowercase, chữ nhỏ, vùng UI 9:16 |
