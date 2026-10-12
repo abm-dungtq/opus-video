@@ -12,12 +12,13 @@ Chia lời theo cảnh, mỗi cảnh một file. Như vậy dễ sửa từng c�
 node ~/.claude/skills/opus-video/scripts/eleven.mjs tts --text-file script/01.txt --out assets/voice/01.mp3
 ```
 
+- **Cổng viet-pro** (dự án tiếng Việt theo `BRIEF.md` `language:`): lệnh chạy `check-viet-pro` trước khi gọi API và exit **4** nếu chưa PASS. File lời đọc phải là `<project>/script/NN.txt` (thư mục dự án = cha của `script/`, hoặc `--project`); `--text` bị từ chối. Bỏ cổng: `--skip-viet-pro-gate` kèm `viet_pro_override: <lý do>` trong frontmatter `BRIEF.md` (không hợp lệ ở bước giao).
 - Mặc định: model `eleven_v4`, voice `eGSd0uV8dNQnZuEEX9lu` (Adam, do người dùng chọn; nhãn ElevenLabs là tiếng Anh, giọng Mỹ), `--lang vi`. Vì giọng không gắn nhãn tiếng Việt, luôn đưa file cho người dùng nghe trước khi giao bản cuối. Ghi đè bằng `--voice`/`--model`, hoặc đặt `OPUS_VIDEO_VOICE_ID` / `OPUS_VIDEO_TTS_MODEL` (biến môi trường hoặc trong file env).
 - Đầu ra gồm `01.mp3` và `01.mp3.words.json` (`[{text,start,end}]`, giây). Dùng file json này cho phụ đề và để canh beat.
 - `--speed 0.9–1.1` để chỉnh nhịp. Tiếng Việt khoảng 2,5–3 từ/giây.
 - Route A là `/v1/text-to-speech/{voice}/with-timestamps`, tối đa 10.000 ký tự. Nếu bị 400/422, script tự chuyển sang Route B (`text-to-dialogue`, tối đa 2.000 ký tự, không có `speed`).
 - **Không** dùng TTS của `media-use` cho tiếng Việt, vì nó ghim cứng `eleven_multilingual_v2`, model không có tiếng Việt.
-- So sánh giọng hoặc model: `eleven.mjs probe-models --text-file x.txt --models eleven_v4,eleven_v3 --outdir <dir>`, rồi đưa file cho người dùng nghe. Agent không tự chấm chất lượng giọng.
+- So sánh giọng hoặc model: `eleven.mjs probe-models --text-file x.txt --models eleven_v4,eleven_v3` (không qua cổng; file luôn ghi vào `$TMPDIR/ov-probe/`, không dùng làm voice thật), rồi đưa file cho người dùng nghe. Agent không tự chấm chất lượng giọng.
 
 ## 1b. Cầu nối HyperFrames (`audio-meta`)
 
@@ -27,6 +28,7 @@ Bước audio (`audio.mjs generate`) của các workflow HyperFrames ghim cứng
 node ~/.claude/skills/opus-video/scripts/eleven.mjs audio-meta --script SCRIPT.md --hyperframes . [--bgm assets/bgm/bgm.mp3 --bgm-volume 0.2] [--reuse]
 ```
 
+- **Cổng viet-pro:** trước khi tạo giọng, lệnh chạy `check-viet-pro` cho dự án (`--project`, mặc định `--hyperframes`) và so từng frame với `script/NN.txt` (bỏ qua khác biệt khoảng trắng). Thiếu file hoặc lệch chữ thì exit 4. `script/` được phép có file thừa. Bỏ cổng như mục 1 (`--skip-viet-pro-gate`).
 - Đọc `SCRIPT.md` (`## Line N — … (Frame N)`, lời đọc thụt 4 dấu cách), tạo giọng `eleven_v4` cho từng frame vào `assets/voice/NN.mp3`. `--reuse` dùng lại file đã có, không tốn credit.
 - Ghi **hai** file:
   - `audio_meta.json`: theo frame, gồm voices, words `w0…`, và bgm `source: "host"`.

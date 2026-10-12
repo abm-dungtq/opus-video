@@ -145,9 +145,10 @@ test("large pools are split into <=100-question requests and merged", async () =
 });
 
 test("one failing chunk falls back to keyword order (all-or-nothing)", async () => {
-  const many = Array.from({ length: 150 }, (_, i) => ({ id: `x${i}`, category: "motion", tags: [], title: "", prompt: "p", has_full_prompt: false, prompt_len: 1 }));
-  let n = 0;
-  const fetchImpl = async (url, init) => (++n === 2 ? { ok: false, status: 500 } : { ok: true, json: async () => ({ answers: Object.fromEntries(Object.keys(JSON.parse(init.body).questions).map((k) => [k, { score: 1 }])) }) });
+  const many = Array.from({ length: 150 }, (_, i) => ({ id: `x${i}`, category: "motion", tags: [], title: "", prompt: `p${i}`, has_full_prompt: false, prompt_len: 1 }));
+  // The chunk holding the last candidate keeps failing (5xx is retried by jev-client.post, so a
+  // one-off 500 would recover); the others succeed.
+  const fetchImpl = async (url, init) => (init.body.includes('"p149"') ? { ok: false, status: 500 } : { ok: true, json: async () => ({ answers: Object.fromEntries(Object.keys(JSON.parse(init.body).questions).map((k) => [k, { score: 1 }])) }) });
   const out = await rerank({ brief: "b", candidates: many, limit: 2, apiKey: "k", fetchImpl });
   assert.equal(out.reranked, false);
   assert.deepEqual(out.results.map((r) => r.id), ["x0", "x1"]);

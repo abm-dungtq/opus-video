@@ -6,43 +6,16 @@ import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { check, parseRecord, captionSections, requiredReading } from "../check-viet-pro.mjs";
+import { fakeVp, ALL_READ, RECORD } from "./fixtures/fake-vp.mjs";
 
 const script = fileURLToPath(new URL("../check-viet-pro.mjs", import.meta.url));
 
-// Minimal fake viet-pro install: the real reference layout (names only) + a tiny lint with the
-// same output contract as lint-vietnamese-content.mjs (ERROR/WARN lines, exit 1 on ERROR).
-function fakeVp() {
-  const vp = mkdtempSync(join(tmpdir(), "vp-"));
-  writeFileSync(join(vp, "SKILL.md"), "# viet-pro\n");
-  for (const [d, files] of Object.entries({
-    review: ["lead.md", "anti-ai.md", "humanizer-patterns.md", "natural.md", "punctuation.md"],
-    editorial: ["lead.md", "hook-close.md", "rhythm.md", "story-core.md"],
-    publishing: ["video-script.md", "facebook.md", "repurpose-matrix.md"],
-  })) { mkdirSync(join(vp, "references", d), { recursive: true }); for (const f of files) writeFileSync(join(vp, "references", d, f), "x\n"); }
-  mkdirSync(join(vp, "scripts"));
-  writeFileSync(join(vp, "scripts", "lint-vietnamese-content.mjs"), `
-import { readFileSync } from "node:fs";
-let err = false;
-for (const f of process.argv.slice(2)) {
-  let n = 0;
-  readFileSync(f, "utf8").split("\\n").forEach((l, i) => {
-    if (/\\S\\s+[.,!?;](?=\\s|$)/.test(l)) { console.log("ERROR " + f + ":" + (i + 1) + " [space-before-punct] x"); err = true; n++; }
-    if (/,\\s+và\\s/.test(l)) { console.log("WARN " + f + ":" + (i + 1) + " [oxford-comma] x"); n++; }
-  });
-  if (!n) console.log("OK    " + f + " — 0 vi phạm");
-}
-process.exit(err ? 1 : 0);
-`);
-  return vp;
-}
-
-const ALL_READ = "SKILL.md, review/lead.md, review/anti-ai.md, review/humanizer-patterns.md, review/natural.md, review/punctuation.md, editorial/lead.md, editorial/hook-close.md, editorial/rhythm.md, editorial/story-core.md, publishing/video-script.md";
-const RECORD = (extra = "", read = ALL_READ) => `## viet_pro\n- mode: Chuẩn\n- files_read: ${read}\n- humanizer: #4 dẫn dài "Trong thời đại" → mở bằng hành vi; không còn pattern 1–5\n- lint: 0 ERROR\n${extra}`;
-
-function project({ lang = "vi", record = RECORD(), voice = ["Sếp hỏi số liệu tuần này.", "Hỏi bằng lời thường, có ngay bảng."], captions, duration = 60 } = {}) {
+const TABLE = "| Thời điểm | Voice-over | Visual |\n|---|---|---|\n| 0-3s | Sếp hỏi số liệu tuần này. | TV |\n";
+function project({ lang = "vi", record = RECORD(), voice = ["Sếp hỏi số liệu tuần này.", "Hỏi bằng lời thường, có ngay bảng."], captions, duration = 60, v1 = TABLE, fm = "" } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "proj-"));
-  writeFileSync(join(dir, "BRIEF.md"), `---\ntitle: t\nlanguage: ${lang}\nduration: ${duration}\n---\n\n# Brief\n\n${record}\n`);
-  writeFileSync(join(dir, "script-table.md"), "| Thời điểm | Voice-over | Visual |\n|---|---|---|\n| 0-3s | Sếp hỏi số liệu tuần này. | TV |\n");
+  writeFileSync(join(dir, "BRIEF.md"), `---\ntitle: t\nlanguage: ${lang}\nduration: ${duration}\n${fm}---\n\n# Brief\n\n${record}\n`);
+  writeFileSync(join(dir, "script-table.md"), TABLE);
+  if (v1 !== null) writeFileSync(join(dir, "script-table.v1.md"), v1);
   mkdirSync(join(dir, "script"));
   voice.forEach((v, i) => writeFileSync(join(dir, "script", `0${i + 1}.txt`), v + "\n"));
   if (captions !== undefined) writeFileSync(join(dir, "CAPTIONS.md"), captions);
@@ -188,4 +161,41 @@ test("real viet-pro install: clean project passes, space-before-punct blocks", {
     assert.equal(b.pass, false);
     assert.match(b.lint["script/01.txt"].errors.join(), /space-before-punct/);
   } finally { rmSync(good, { recursive: true, force: true }); rmSync(bad, { recursive: true, force: true }); }
+});
+
+test("script stage: script-table.v1.md is required and compare MISMATCH blocks", () => {
+  const vp = fakeVp();
+  const noV1 = project({ v1: null }), ok = project(), bad = project();
+  const cmp = join(mkdtempSync(join(tmpdir(), "cmp-")), "compare.mjs");
+  writeFileSync(cmp, 'console.error("MISMATCH [number] \\"3\\": 3 -> 4"); process.exit(1);\n');
+  try {
+    const r1 = check({ project: noV1, vp });
+    assert.equal(r1.pass, false);
+    assert.ok(r1.errors.some((e) => e.includes("script-table.v1.md not found")));
+    assert.equal(check({ project: ok, vp }).pass, true);
+    const r3 = check({ project: bad, vp, compareScript: cmp });
+    assert.equal(r3.pass, false);
+    assert.ok(r3.errors.some((e) => e.includes("compare-preserved-content MISMATCH")));
+    assert.ok(r3.compare.lines[0].startsWith("MISMATCH"));
+  } finally { for (const d of [vp, noV1, ok, bad]) rmSync(d, { recursive: true, force: true }); }
+});
+
+test("script stage: SCRIPT.md voice lines are linted as SCRIPT.md#voice", () => {
+  const vp = fakeVp(), dir = project();
+  writeFileSync(join(dir, "SCRIPT.md"), "## Line 1 — hook (Frame 1)\n\n    Sai dấu cách .\n");
+  try {
+    const r = check({ project: dir, vp });
+    assert.equal(r.pass, false);
+    assert.equal(r.lint["SCRIPT.md#voice"].errors.length, 1);
+  } finally { rmSync(vp, { recursive: true, force: true }); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("delivery stage: a viet_pro_override in BRIEF.md fails the gate", () => {
+  const vp = fakeVp();
+  const dir = project({ fm: "viet_pro_override: giọng thử nghiệm cho khách duyệt\n", record: RECORD("- captions: FB + TikTok, lint 0 ERROR\n", ALL_READ + ", publishing/facebook.md, publishing/repurpose-matrix.md"), captions: GOOD_CAPTIONS });
+  try {
+    const r = check({ project: dir, vp, stage: "delivery" });
+    assert.equal(r.pass, false);
+    assert.ok(r.errors.some((e) => e.includes("viet_pro_override")));
+  } finally { rmSync(vp, { recursive: true, force: true }); rmSync(dir, { recursive: true, force: true }); }
 });

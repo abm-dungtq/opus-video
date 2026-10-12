@@ -4,11 +4,20 @@
 //   node eleven.mjs doctor
 //   node eleven.mjs voice-info [--voice id]
 //   node eleven.mjs models
-//   node eleven.mjs tts   (--text str | --text-file path) --out f.mp3 [--voice id] [--model id] [--speed 1.0] [--lang vi]
+//   node eleven.mjs tts   --text-file <project>/script/NN.txt --out f.mp3 [--project dir] [--voice id] [--model id] [--speed 1.0] [--lang vi] [--skip-viet-pro-gate]
 //   node eleven.mjs sfx   --text "english description" --seconds 1.5 --out f.mp3 [--influence 0.3]
 //   node eleven.mjs music --prompt str --seconds 15 --out f.mp3
-//   node eleven.mjs probe-models --text-file path [--models a,b,c] [--outdir /tmp]
-//   node eleven.mjs audio-meta --script SCRIPT.md [--hyperframes .] [--bgm assets/bgm/x.mp3 --bgm-volume 0.2] [--reuse]
+//   node eleven.mjs probe-models --text-file path [--models a,b,c]   (writes to $TMPDIR/ov-probe)
+//   node eleven.mjs audio-meta --script SCRIPT.md [--hyperframes .] [--project dir] [--bgm assets/bgm/x.mp3 --bgm-volume 0.2] [--reuse] [--skip-viet-pro-gate]
+//
+// viet-pro gate (tts, audio-meta): when BRIEF.md `language:` is Vietnamese (or missing), voice is
+// generated only if check-viet-pro.mjs passes for the project AND the voiced text is the gated
+// text — tts takes only --text-file <project>/script/NN.txt (no --text), and every SCRIPT.md
+// frame must equal script/NN.txt (whitespace-insensitive). Project: --project, else the parent
+// of the script/ dir (tts) or --hyperframes (audio-meta). Override: --skip-viet-pro-gate with
+// BRIEF.md frontmatter `viet_pro_override: <reason, ≥10 chars, no #>`; printed every run and
+// rejected by `check-viet-pro --stage delivery`. doctor/voice-info/models/sfx/music/probe-models
+// are not gated.
 //
 // audio-meta feeds HyperFrames workflows (faceless-explainer, product-launch-video, …) with
 // eleven_v4 Vietnamese narration instead of their own TTS step. It writes BOTH
@@ -17,13 +26,16 @@
 // missing sidecar would drop every voice.
 //
 // Credentials: $ELEVENLABS_API_KEY, else ~/.config/opus-video/.env (KEY=VALUE lines).
-// The key is never printed. Exit codes: 0 ok, 1 error, 2 usage, 3 music unavailable on plan.
+// The key is never printed. Exit codes: 0 ok, 1 error, 2 usage, 3 music unavailable on plan,
+// 4 viet-pro gate blocked.
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { maybeHelp } from "./cli-help.mjs";
+import { parseScript } from "./script-md.mjs";
+import { voiceGate, GATE_EXIT } from "./voice-gate.mjs";
 maybeHelp(process.argv.slice(2), import.meta.url);
 
 const API = "https://api.elevenlabs.io";
@@ -61,6 +73,12 @@ for (let i = 0; i < rest.length; i++) {
 function die(msg, code = 1) {
   console.error(`error: ${msg}`);
   process.exit(code);
+}
+// viet-pro gate (voice-gate.mjs): prints its messages, exits 4 when blocked.
+function gate(opts) {
+  const g = voiceGate(opts);
+  for (const m of g.messages) console.error(m);
+  if (!g.ok) die("viet-pro gate blocked voice generation", GATE_EXIT);
 }
 function need(k) {
   if (!args[k]) die(`missing --${k}`, 2);
@@ -149,25 +167,6 @@ async function tts({ text, out, voice, model, speed, lang }) {
   return { route, words: words.length };
 }
 
-// SCRIPT.md (hyperframes script-format) → [{ frame, text }]. A `## … (Frame N)` heading opens a
-// line, `**key:**` rows are metadata, indented lines are the spoken text. Same rules as
-// faceless-explainer's parser; lines sharing a frame are joined.
-function parseScript(md) {
-  const byFrame = new Map();
-  let frame = null;
-  for (const line of md.split(/\r?\n/)) {
-    const h = line.match(/^#{2,3}\s+.*?\(frame\s+(\d+)\)/i);
-    if (h) {
-      frame = Number(h[1]);
-      continue;
-    }
-    if (frame == null || /^\s*\*\*/.test(line)) continue;
-    const m = line.match(/^(?: {4,}|\t)(.+)$/);
-    if (m) byFrame.set(frame, [byFrame.get(frame), m[1].trim()].filter(Boolean).join(" "));
-  }
-  return [...byFrame].map(([f, text]) => ({ frame: f, text })).sort((a, b) => a.frame - b.frame);
-}
-
 function probeDuration(file) {
   const r = spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file], {
     encoding: "utf8",
@@ -210,6 +209,13 @@ const commands = {
   },
 
   async tts() {
+    const textFile = args["text-file"] ? resolve(args["text-file"]) : null;
+    gate({
+      project: resolve(args.project || (textFile ? dirname(dirname(textFile)) : ".")),
+      textFiles: textFile ? [textFile] : [],
+      inline: !!args.text,
+      skip: !!args["skip-viet-pro-gate"],
+    });
     await tts({
       text: readText(),
       out: need("out"),
@@ -267,6 +273,7 @@ const commands = {
     const hf = resolve(args.hyperframes || ".");
     const lines = parseScript(readFileSync(resolve(need("script")), "utf8"));
     if (!lines.length) die("no `## … (Frame N)` lines with indented text found in the script");
+    gate({ project: resolve(args.project || hf), frames: lines, skip: !!args["skip-viet-pro-gate"] });
     const voice = args.voice || env("OPUS_VIDEO_VOICE_ID") || DEFAULTS.voice;
     const model = args.model || env("OPUS_VIDEO_TTS_MODEL") || DEFAULTS.ttsModel;
 
@@ -316,7 +323,9 @@ const commands = {
   async "probe-models"() {
     const text = readText();
     const models = (args.models || "eleven_v4,eleven_v3,eleven_flash_v2_5").split(",");
-    const outdir = args.outdir || "/tmp";
+    // Model probes always land in a temp dir so they never serve as ungated production voice.
+    const outdir = join(tmpdir(), "ov-probe");
+    mkdirSync(outdir, { recursive: true });
     const voice = args.voice || env("OPUS_VIDEO_VOICE_ID") || DEFAULTS.voice;
     for (const model of models) {
       const out = join(outdir, `ov-probe-${model}.mp3`);

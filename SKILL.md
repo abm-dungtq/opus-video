@@ -57,7 +57,9 @@ Mỗi dự án có một thư mục riêng:
      - words: 158 từ / 60 giây
      - facts: compare-preserved-content 0 MISMATCH; nguồn ở SOURCES.md
      ```
-   - **Cổng:** `node $OV/scripts/check-viet-pro.mjs --project .` phải in `PASS` (exit 0) **trước** khi chạy `eleven.mjs tts`/`audio-meta` (bước 5) hay bất kỳ lệnh render nào. Exit 1 (`BLOCKED`) thì sửa rồi chạy lại. Không bỏ qua cổng này, kể cả khi người dùng giục làm nhanh; nếu họ muốn bỏ thì phải nói rõ là bỏ viet-pro.
+   - **Cổng:** `node $OV/scripts/check-viet-pro.mjs --project .` phải in `PASS` (exit 0) **trước** khi chạy `eleven.mjs tts`/`audio-meta` (bước 5) hay bất kỳ lệnh render nào. Exit 1 (`BLOCKED`) thì sửa rồi chạy lại. Cổng kiểm cả `script-table.v1.md` (bản nháp trước Humanizer, so bằng `compare-preserved-content`, MISMATCH là chặn) và lời đọc trong `SCRIPT.md` nếu có.
+   - **`eleven.mjs` tự chặn.** `tts`/`audio-meta` gọi lại cổng; chưa PASS thì exit **4** trước khi gọi API. `tts` chỉ nhận `--text-file <project>/script/NN.txt` (không nhận `--text`), và mỗi frame trong `SCRIPT.md` phải trùng `script/NN.txt`. Ngôn ngữ lấy từ `BRIEF.md` `language:`, không lấy từ `--lang`.
+   - **Bỏ cổng** chỉ khi người dùng nói rõ là bỏ viet-pro: ghi `viet_pro_override: <lý do ≥10 ký tự, không có #>` vào frontmatter `BRIEF.md` rồi thêm cờ `--skip-viet-pro-gate`. Lý do được in ra mỗi lần chạy, và `check-viet-pro --stage delivery` sẽ chặn khi còn dòng override, nên trước khi giao phải bỏ override và tạo lại voice qua cổng.
    - **Riêng video TikTok/Reels/Shorts viral** (vẫn theo viet-pro, không thay thế viet-pro):
      - **Hook 1–3 giây:** vào thẳng ý bằng dữ kiện, hành vi người xem nhận ra ngay hoặc câu hỏi gắn với insight (`hook-close.md`, `video-script.md`). Không chào, không dàn cảnh, và không dùng câu mồi công thức như "Đừng lướt qua", "99% người không biết", "Sự thật gây sốc", "Xem đến cuối" (humanizer #4, #13). Ô `[Hook — câu sốc]` trong bảng mẫu của `video-script.md` chỉ là chỗ trống; chính file đó ghi rõ là không bắt buộc gây sốc.
      - **Một góc nhìn:** một video một insight. Ý phụ ghi "video sau", không nhồi.
@@ -98,7 +100,7 @@ Mỗi dự án có một thư mục riêng:
 
 4. **Engine.** Chọn theo `references/engine-selection.md`. Mặc định là HyperFrames. Ghi `engine`, `workflow`, `engine_reason` vào `BRIEF.md`. Nhiều biến thể của cùng một mẫu thì dùng `render --batch` của HyperFrames, không chuyển sang Remotion.
 
-5. **Âm thanh.** Chỉ bắt đầu khi `check-viet-pro.mjs --project .` đã PASS ở bước 2 (đổi lời đọc sau đó thì chạy lại cổng trước khi tạo lại voice). Làm theo `references/audio-pipeline.md`.
+5. **Âm thanh.** Chỉ bắt đầu khi `check-viet-pro.mjs --project .` đã PASS ở bước 2 (đổi lời đọc sau đó thì chạy lại cổng trước khi tạo lại voice; `eleven.mjs` exit 4 nghĩa là cổng chặn). Làm theo `references/audio-pipeline.md`.
    - **Dùng workflow HyperFrames chuyên biệt** (faceless-explainer, product-launch-video, pr-to-video): **không** chạy `audio.mjs generate` của workflow. Thay vào đó chạy:
      ```bash
      node $OV/scripts/eleven.mjs audio-meta --script SCRIPT.md --hyperframes . --bgm assets/bgm/bgm.mp3 --bgm-volume 0.2
@@ -157,7 +159,7 @@ Giao cho người dùng: đường dẫn MP4, `CAPTIONS.md` (đã qua cổng `--
 | `references/engine-selection.md` | Bước 4 và 6: chọn engine, xử lý 16:9 / 9:16 |
 | `references/audio-pipeline.md` | Bước 5: voice, SFX, nhạc nền, mix, bản quyền |
 | `references/qa-checklist.md` | Bước 8: đo bằng lệnh, xem frame, nghe |
-| `scripts/eleven.mjs` | `doctor`, `voice-info`, `models`, `tts`, `sfx`, `music`, `probe-models`, `audio-meta` |
+| `scripts/eleven.mjs` | `doctor`, `voice-info`, `models`, `tts`, `sfx`, `music`, `probe-models`, `audio-meta`; `tts`/`audio-meta` qua cổng viet-pro (`scripts/voice-gate.mjs`, exit 4) |
 | `references/edit-method.md` | Bước 3 và 6: chức năng câu → hình, sàn chất lượng, GSAP, SFX |
 | `scripts/video-lint.mjs` | Bước 8: lowercase, chữ nhỏ, vùng UI 9:16 |
 | `scripts/judge.mjs` | Bước 8: `check`/`pair`; exit 3–4 → QA ảnh tĩnh |

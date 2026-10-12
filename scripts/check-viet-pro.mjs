@@ -20,6 +20,10 @@
 //     own (ERROR fails); no heading/bullet/markdown inside the Facebook section (personal profile).
 //   - record field `captions`, and files_read also names publishing/facebook.md and
 //     publishing/repurpose-matrix.md.
+//   - script-table.v1.md (the draft before Humanizer) must exist next to script-table.md, and
+//     viet-pro compare-preserved-content.mjs v1 → final must not report MISMATCH.
+//   - SCRIPT.md, when present: its voiced frame lines are linted too (label SCRIPT.md#voice).
+//   - delivery: BRIEF.md frontmatter viet_pro_override (a voice-gate override) fails the gate.
 // The lint is re-run here; the record is the agent's account (what was read, patterns fixed).
 // Exit: 0 pass (or skip) · 1 gate failed · 2 bad usage / viet-pro not found.
 
@@ -29,6 +33,7 @@ import { join, resolve, basename } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
+import { parseScript } from "./script-md.mjs";
 
 export const REQUIRED_FIELDS = ["mode", "files_read", "humanizer", "lint"];
 export const BAIT = /đừng (?:vội )?lướt|xem (?:hết|đến cuối|tới cuối)|99\s?% (?:mọi )?người|bạn sẽ không (?:thể )?tin|sự thật (?:gây sốc|ít ai biết)|không ai nói (?:cho )?bạn|bí mật (?:mà )?(?:ít ai|không ai)|like,? share|follow (?:ngay )?để không bỏ lỡ|comment\s+["“]?[^\s"”]+["”]?\s+để nhận|thả tim nếu|tag (?:ngay )?(?:một )?người bạn/giu;
@@ -98,7 +103,7 @@ export function lintFiles(vp, files) {
 
 const words = (t) => t.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 
-export function check({ project = ".", stage = "script", vp = defaultVp() } = {}) {
+export function check({ project = ".", stage = "script", vp = defaultVp(), compareScript = join(vp, "scripts", "compare-preserved-content.mjs") } = {}) {
   const dir = resolve(project);
   const errors = [], warnings = [];
   const out = { project: dir, stage, pass: false, skipped: false, errors, warnings, lint: {}, record: null };
@@ -122,12 +127,36 @@ export function check({ project = ".", stage = "script", vp = defaultVp() } = {}
     if (rec.fields.files_read && missing.length) errors.push(`viet_pro.files_read does not list: ${missing.join(", ")}`);
   }
 
+  // 1b. the pre-Humanizer draft exists and the Humanizer pass preserved its facts
+  if (table) {
+    const v1 = join(dir, "script-table.v1.md");
+    if (!existsSync(v1)) errors.push("script-table.v1.md not found (viet-pro draft before Humanizer)");
+    else if (existsSync(compareScript)) {
+      const c = spawnSync(process.execPath, [compareScript, v1, join(dir, "script-table.md")], { encoding: "utf8" });
+      out.compare = { status: c.status, lines: `${c.stderr || ""}${c.stdout || ""}`.split("\n").filter((l) => /^(MISMATCH|REVIEW)/.test(l)).slice(0, 3) };
+      if (c.status === 1) errors.push("compare-preserved-content MISMATCH script-table.v1.md → script-table.md");
+      else if (c.status !== 0) warnings.push(`compare-preserved-content exited ${c.status}`);
+    }
+  }
+
   // 2. lint script-table.md and each voice line
   const scriptDir = join(dir, "script");
   const voice = existsSync(scriptDir) ? readdirSync(scriptDir).filter((f) => f.endsWith(".txt")).sort().map((f) => ({ path: join(scriptDir, f), label: `script/${f}` })) : [];
   if (!table) errors.push("script-table.md not found");
   const targets = [...(table ? [{ path: join(dir, "script-table.md"), label: "script-table.md" }] : []), ...voice];
   Object.assign(out.lint, lintFiles(vp, targets));
+  // SCRIPT.md (HyperFrames workflows): the lines audio-meta will voice
+  if (existsSync(join(dir, "SCRIPT.md"))) {
+    const frames = parseScript(readFileSync(join(dir, "SCRIPT.md"), "utf8"));
+    if (frames.length) {
+      const tmp = mkdtempSync(join(tmpdir(), "vp-voice-"));
+      try {
+        const path = join(tmp, "voice.md");
+        writeFileSync(path, frames.map((f) => f.text).join("\n\n") + "\n");
+        Object.assign(out.lint, lintFiles(vp, [{ path, label: "SCRIPT.md#voice" }]));
+      } finally { rmSync(tmp, { recursive: true, force: true }); }
+    }
+  }
 
   // 3. soft checks on the spoken text
   const voiceText = voice.map((v) => readFileSync(v.path, "utf8")).join("\n");
@@ -139,6 +168,7 @@ export function check({ project = ".", stage = "script", vp = defaultVp() } = {}
 
   // 4. delivery: captions
   if (stage === "delivery") {
+    if (frontmatter(brief).viet_pro_override) errors.push("viet_pro_override is set in BRIEF.md: not allowed at delivery; remove it and re-voice through the gate");
     const capPath = join(dir, "CAPTIONS.md");
     if (!existsSync(capPath)) errors.push("CAPTIONS.md not found (## Facebook cá nhân + ## TikTok)");
     else {

@@ -33,7 +33,7 @@
 import { readFileSync, existsSync, realpathSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { API_URL, MODEL, loadKey } from "./jev-client.mjs";
+import { API_URL, MODEL, loadKey, post } from "./jev-client.mjs";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { loadFeatures } from "./case-features.mjs";
 import { rerankComposite, WEIGHTS } from "./rerank-composite.mjs";
@@ -127,21 +127,11 @@ export async function rerank({ brief, candidates, limit = 5, apiKey, fetchImpl =
   const chunks = [];
   for (let i = 0; i < candidates.length; i += CHUNK) chunks.push(candidates.slice(i, i + CHUNK));
   const call = async (chunk) => {
-    for (let attempt = 0; ; attempt++) {
-      const res = await fetchImpl(API_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify(buildRequest(brief, chunk)),
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-      if ((res.status === 429 || res.status === 529) && attempt < 2) { await new Promise((r) => setTimeout(r, 500 * 2 ** attempt)); continue; }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const answers = data?.answers || {};
-      const scores = chunk.map((_, i) => answers[`c${i}`]);
-      if (!scores.every((a) => a && typeof a.score === "number")) throw new Error("malformed answers");
-      return { scores, usage: data.usage, model: data.model };
-    }
+    const data = await post(buildRequest(brief, chunk), { apiKey, fetchImpl, timeoutMs });
+    const answers = data?.answers || {};
+    const scores = chunk.map((_, i) => answers[`c${i}`]);
+    if (!scores.every((a) => a && typeof a.score === "number")) throw new Error("malformed answers");
+    return { scores, usage: data.usage, model: data.model };
   };
   let parts;
   try {
