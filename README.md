@@ -14,6 +14,8 @@ Skill này là phần điều phối và không tự render. Nó nối các bư�
 
 Mẫu dựng được chắt lọc từ 813 video làm bằng Opus 5.5 (xem `data/SOURCES.md`).
 
+Đọc thêm: [giới thiệu opus-video](docs/gioi-thieu.md) · [hướng dẫn cài đặt chuyên sâu cho từng agent](docs/cai-dat-agent.md).
+
 ---
 
 ## 1. Cài đặt nhanh (khuyên dùng)
