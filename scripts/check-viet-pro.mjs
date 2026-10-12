@@ -25,6 +25,9 @@
 //   - SCRIPT.md, when present: its voiced frame lines are linted too (label SCRIPT.md#voice).
 //   - delivery: BRIEF.md frontmatter viet_pro_override (a voice-gate override) fails the gate.
 // The lint is re-run here; the record is the agent's account (what was read, patterns fixed).
+// --jev-audit (optional, needs TYPESAFE_API_KEY): asks Jev, one request per script/NN.txt, how
+//   likely each line shows Humanizer patterns 1–5, engagement bait, invented first-hand
+//   experience or an unsourced number. Prints WARN lines only; never changes the exit code.
 // Exit: 0 pass (or skip) · 1 gate failed · 2 bad usage / viet-pro not found.
 
 import { existsSync, readFileSync, readdirSync, mkdtempSync, writeFileSync, rmSync, realpathSync } from "node:fs";
@@ -34,6 +37,8 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { parseScript } from "./script-md.mjs";
+import { loadKey } from "./jev-client.mjs";
+import { audit } from "./jev-audit.mjs";
 
 export const REQUIRED_FIELDS = ["mode", "files_read", "humanizer", "lint"];
 export const BAIT = /đừng (?:vội )?lướt|xem (?:hết|đến cuối|tới cuối)|99\s?% (?:mọi )?người|bạn sẽ không (?:thể )?tin|sự thật (?:gây sốc|ít ai biết)|không ai nói (?:cho )?bạn|bí mật (?:mà )?(?:ít ai|không ai)|like,? share|follow (?:ngay )?để không bỏ lỡ|comment\s+["“]?[^\s"”]+["”]?\s+để nhận|thả tim nếu|tag (?:ngay )?(?:một )?người bạn/giu;
@@ -198,6 +203,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--json") o.json = true;
+    else if (a === "--jev-audit") o.jevAudit = true;
     else if (["--project", "--stage", "--vp"].includes(a)) o[a.slice(2)] = argv[++i];
     else return { bad: `unknown argument ${a}` };
   }
@@ -208,7 +214,7 @@ function parseArgs(argv) {
 export function main(argv = process.argv.slice(2)) {
   if (wantsHelp(argv)) { process.stdout.write(helpText(import.meta.url)); return 0; }
   const o = parseArgs(argv);
-  if (o.bad) { console.error(`check-viet-pro: ${o.bad}\nusage: node check-viet-pro.mjs [--project .] [--stage script|delivery] [--vp dir] [--json]  (--help for details)`); return 2; }
+  if (o.bad) { console.error(`check-viet-pro: ${o.bad}\nusage: node check-viet-pro.mjs [--project .] [--stage script|delivery] [--vp dir] [--json] [--jev-audit]  (--help for details)`); return 2; }
   const r = check({ project: o.project, stage: o.stage, vp: o.vp || defaultVp() });
   if (r.usage) { console.error(`check-viet-pro: ${r.usage}`); return 2; }
   if (o.json) console.log(JSON.stringify(r, null, 2));
@@ -223,7 +229,19 @@ export function main(argv = process.argv.slice(2)) {
     for (const e of r.errors) console.log(`FAIL  ${e}`);
     console.log(r.pass ? `PASS  viet-pro gate (${r.stage})${r.record ? ` · record in ${r.record.file}` : ""}` : `BLOCKED  viet-pro gate (${r.stage}): fix the FAIL lines before ${r.stage === "script" ? "voice (eleven.mjs) or render" : "delivery"}`);
   }
-  return r.pass ? 0 : 1;
+  const code = r.pass ? 0 : 1;
+  return o.jevAudit && !r.skipped ? jevAudit(r.project).then(() => code) : code;
 }
 
-if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) process.exit(main());
+// --jev-audit: WARN lines only; the exit code stays what check() decided.
+async function jevAudit(dir, { apiKey = loadKey(), fetchImpl } = {}) {
+  const scriptDir = join(dir, "script");
+  const files = existsSync(scriptDir) ? readdirSync(scriptDir).filter((f) => f.endsWith(".txt")).sort() : [];
+  const lines = files.map((f) => readFileSync(join(scriptDir, f), "utf8").replace(/\s+/g, " ").trim());
+  const res = await audit(lines, { apiKey, fetchImpl });
+  for (const w of res.warnings) console.log(`WARN  jev ${w.pattern} p=${w.p.toFixed(2)} script/${files[w.line]}`);
+  if (res.error) console.log(`WARN  jev audit skipped: ${res.error}`);
+  else console.log(`jev audit: ${lines.length} lines, ${res.warnings.length} WARN (advisory; precision per pattern in data/jev-audit-eval.jsonl)`);
+}
+
+if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) Promise.resolve(main()).then((c) => process.exit(c));

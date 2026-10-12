@@ -60,6 +60,7 @@ Mỗi dự án có một thư mục riêng:
    - **Cổng:** `node $OV/scripts/check-viet-pro.mjs --project .` phải in `PASS` (exit 0) **trước** khi chạy `eleven.mjs tts`/`audio-meta` (bước 5) hay bất kỳ lệnh render nào. Exit 1 (`BLOCKED`) thì sửa rồi chạy lại. Cổng kiểm cả `script-table.v1.md` (bản nháp trước Humanizer, so bằng `compare-preserved-content`, MISMATCH là chặn) và lời đọc trong `SCRIPT.md` nếu có.
    - **`eleven.mjs` tự chặn.** `tts`/`audio-meta` gọi lại cổng; chưa PASS thì exit **4** trước khi gọi API. `tts` chỉ nhận `--text-file <project>/script/NN.txt` (không nhận `--text`), và mỗi frame trong `SCRIPT.md` phải trùng `script/NN.txt`. Ngôn ngữ lấy từ `BRIEF.md` `language:`, không lấy từ `--lang`.
    - **Bỏ cổng** chỉ khi người dùng nói rõ là bỏ viet-pro: ghi `viet_pro_override: <lý do ≥10 ký tự, không có #>` vào frontmatter `BRIEF.md` rồi thêm cờ `--skip-viet-pro-gate`. Lý do được in ra mỗi lần chạy, và `check-viet-pro --stage delivery` sẽ chặn khi còn dòng override, nên trước khi giao phải bỏ override và tạo lại voice qua cổng.
+   - **Tuỳ chọn:** `check-viet-pro.mjs --project . --jev-audit` nhờ Jev rà từng câu lời đọc (Humanizer 1–5, câu mồi, trải nghiệm bịa, số không nguồn). Chỉ in WARN, không đổi kết quả cổng; xem `references/script-workflow.md`.
    - **Riêng video TikTok/Reels/Shorts viral** (vẫn theo viet-pro, không thay thế viet-pro):
      - **Hook 1–3 giây:** vào thẳng ý bằng dữ kiện, hành vi người xem nhận ra ngay hoặc câu hỏi gắn với insight (`hook-close.md`, `video-script.md`). Không chào, không dàn cảnh, và không dùng câu mồi công thức như "Đừng lướt qua", "99% người không biết", "Sự thật gây sốc", "Xem đến cuối" (humanizer #4, #13). Ô `[Hook — câu sốc]` trong bảng mẫu của `video-script.md` chỉ là chỗ trống; chính file đó ghi rõ là không bắt buộc gây sốc.
      - **Một góc nhìn:** một video một insight. Ý phụ ghi "video sau", không nhồi.
@@ -155,7 +156,7 @@ Giao cho người dùng: đường dẫn MP4, `CAPTIONS.md` (đã qua cổng `--
 | `references/brief-template.md` | Bước 1: khung brief và ví dụ 15 giây |
 | `references/pattern-library.md` | Bước 3: công thức theo 6 nhóm video |
 | `references/script-workflow.md` | Bước 2 và 9: cổng viet-pro đầy đủ, kỹ thuật theo loại video, kiểm chứng, lint, TikTok viral, `CAPTIONS.md` |
-| `scripts/check-viet-pro.mjs` | Bước 2 (`--stage script`, trước voice/render) và bước 9 (`--stage delivery`): biên bản `## viet_pro`, lint viet-pro từng file, caption FB + TikTok |
+| `scripts/check-viet-pro.mjs` | Bước 2 (`--stage script`, trước voice/render) và bước 9 (`--stage delivery`): biên bản `## viet_pro`, `script-table.v1.md` + compare, lint viet-pro từng file và `SCRIPT.md`, caption FB + TikTok; `--jev-audit` tuỳ chọn (chỉ WARN) |
 | `references/engine-selection.md` | Bước 4 và 6: chọn engine, xử lý 16:9 / 9:16 |
 | `references/audio-pipeline.md` | Bước 5: voice, SFX, nhạc nền, mix, bản quyền |
 | `references/qa-checklist.md` | Bước 8: đo bằng lệnh, xem frame, nghe |

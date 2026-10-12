@@ -96,6 +96,8 @@ node $OV/scripts/check-viet-pro.mjs --project <project> --stage delivery   # tr�
 
 Cổng chặn (exit 1) khi: thiếu biên bản hoặc trường bắt buộc; thiếu `script-table.v1.md`; `compare-preserved-content` báo MISMATCH giữa `script-table.v1.md` và `script-table.md`; lint ERROR ở `script-table.md`, `script/*.txt` hoặc lời đọc trong `SCRIPT.md` (`SCRIPT.md#voice`); ở bước giao còn dòng `viet_pro_override` trong `BRIEF.md`. `eleven.mjs tts`/`audio-meta` tự chạy lại cổng và exit 4 khi bị chặn, nên lời đọc phải nằm trong `script/NN.txt` và `SCRIPT.md` phải trùng từng file đó.
 
+**Tuỳ chọn: `--jev-audit`** (cần `TYPESAFE_API_KEY`). Lệnh gửi từng `script/NN.txt` cho Jev và hỏi xác suất câu đó mắc Humanizer 1–5, câu mồi, trải nghiệm tự bịa hoặc số liệu không nguồn. Kết quả chỉ in `WARN  jev <pattern> p=… script/NN.txt`, không đổi exit code. Chi phí khoảng 0,04 USD/1 triệu token đầu vào. Agent đọc từng WARN như một gợi ý để rà lại; Jev không thay việc đọc viet-pro. Độ chính xác từng pattern đo bằng `node $OV/scripts/jev-audit-eval.mjs` trên `data/jev-audit-eval.jsonl` (24 câu có nhãn). Chỉ người dùng mới quyết định nâng một pattern thành lỗi chặn, và chỉ khi precision ≥ 0,9.
+
 Cổng kiểm tra biên bản có đủ `mode`, `files_read`, `humanizer`, `lint` (bước 9 thêm `captions`) và `files_read` có nêu đủ mọi file `review/`, `editorial/` của bản viet-pro đang cài. Cổng tự chạy lại lint viet-pro cho từng file, còn ERROR là `BLOCKED` (exit 1). Câu mồi, lời kể trải nghiệm ngôi thứ nhất và lời đọc quá ~3 từ/giây chỉ là WARN: đọc và sửa, hoặc ghi lý do giữ. `BRIEF.md` có `language:` khác `vi` thì cổng bỏ qua (SKIP).
 
 ## 5. Bước 9 (bắt buộc khi giao): `CAPTIONS.md`
