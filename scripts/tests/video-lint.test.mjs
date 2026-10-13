@@ -26,3 +26,27 @@ test("ABM intro passes static lint", { skip: !existsSync(abm) }, () => {
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.ok(!/^ERROR /m.test(r.stdout));
 });
+
+const hedgeFixture = fileURLToPath(new URL("./fixtures/video-lint-hedge", import.meta.url));
+
+test("HEDGE_LABEL: ERROR for voice_source: clip; only rendered text (no title/alt/Error/comments/unloaded js)", () => {
+  const r = run("--hyperframes", hedgeFixture, "--skip-runtime", "--json");
+  assert.equal(r.status, 1, r.stderr);
+  const hedge = JSON.parse(r.stdout).filter((f) => f.code === "HEDGE_LABEL");
+  assert.deepEqual(hedge.map((f) => `${f.file}:${f.line}`).sort(), ["assets/fx.js:2", "assets/fx.js:2", "assets/fx.js:6", "index.html:12", "index.html:8", "index.html:8"]);
+  assert.ok(hedge.every((f) => f.severity === "ERROR"));
+});
+
+test("HEDGE_LABEL: only WARN (exit 0) without voice_source: clip", async () => {
+  const { mkdtempSync, cpSync, writeFileSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = mkdtempSync(join(tmpdir(), "hedge-"));
+  try {
+    cpSync(hedgeFixture, dir, { recursive: true });
+    writeFileSync(join(dir, "BRIEF.md"), "---\nlanguage: vi\n---\n");
+    const r = run("--hyperframes", dir, "--skip-runtime", "--json");
+    assert.equal(r.status, 0, r.stdout);
+    assert.ok(JSON.parse(r.stdout).filter((f) => f.code === "HEDGE_LABEL").every((f) => f.severity === "WARN"));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

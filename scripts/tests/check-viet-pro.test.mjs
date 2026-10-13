@@ -257,3 +257,57 @@ test("--jev-audit with --json keeps stdout valid JSON and the exit code unchange
     assert.match(r.stderr, /jev audit skipped: no TYPESAFE_API_KEY/);
   } finally { for (const d of [vp, dir, home]) rmSync(d, { recursive: true, force: true }); }
 });
+
+// voice_source: clip — the voice is the user's own footage; captions + on-screen text are gated.
+const CLIP_READ = "SKILL.md, review/lead.md, review/anti-ai.md, review/humanizer-patterns.md, review/natural.md, review/punctuation.md";
+const CLIP_RECORD = (extra = "", read = CLIP_READ) => `## viet_pro\n- mode: Chuẩn\n- files_read: ${read}\n- lint: script/captions.txt + script/on-screen.txt: 0 ERROR\n${extra}`;
+function clipProject({ record = CLIP_RECORD(), files = { "captions.txt": "Đây là chợ Diên An.\n", "on-screen.txt": "Lô 72m² · 5×15\n" }, captions } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "clip-"));
+  writeFileSync(join(dir, "BRIEF.md"), `---\nlanguage: vi\nvoice_source: clip\nduration: 60\n---\n\n# Brief\n\n${record}\n`);
+  mkdirSync(join(dir, "script"));
+  for (const [f, t] of Object.entries(files)) writeFileSync(join(dir, "script", f), t);
+  if (captions !== undefined) writeFileSync(join(dir, "CAPTIONS.md"), captions);
+  return dir;
+}
+
+test("voice_source: clip PASSes without script-table.md; lints captions + on-screen text; no humanizer field needed", () => {
+  const vp = fakeVp(), dir = clipProject();
+  try {
+    const r = check({ project: dir, vp });
+    assert.equal(r.pass, true, JSON.stringify(r.errors));
+    assert.equal(r.voiceSource, "clip");
+    assert.deepEqual(Object.keys(r.lint), ["script/captions.txt", "script/on-screen.txt"]);
+    assert.ok(!requiredReading(vp, "script", { clip: true }).some((f) => f.startsWith("editorial/") || f === "publishing/video-script.md"));
+  } finally { rmSync(vp, { recursive: true, force: true }); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("voice_source: clip BLOCKS when captions.txt or on-screen.txt is missing, or a caption has a lint ERROR", () => {
+  const vp = fakeVp();
+  const noOn = clipProject({ files: { "captions.txt": "Câu sạch.\n" } });
+  const bad = clipProject({ files: { "captions.txt": "Sai dấu , ở đây.\n", "on-screen.txt": "Nhãn\n" } });
+  try {
+    const a = check({ project: noOn, vp });
+    assert.equal(a.pass, false); assert.match(a.errors.join(), /script\/on-screen\.txt not found/);
+    const b = check({ project: bad, vp });
+    assert.equal(b.pass, false); assert.match(b.errors.join(), /lint ERROR in script\/captions\.txt/);
+  } finally { rmSync(vp, { recursive: true, force: true }); rmSync(noOn, { recursive: true, force: true }); rmSync(bad, { recursive: true, force: true }); }
+});
+
+test("voice_source: clip skips bait/first-hand WARNs on the user's own words; delivery still needs CAPTIONS.md", () => {
+  const vp = fakeVp();
+  const dir = clipProject({ files: { "captions.txt": "Mình đã thử ở đây 3 tháng rồi.\n", "on-screen.txt": "Nhãn\n" } });
+  const del = clipProject({ record: CLIP_RECORD("- captions: FB + TikTok 0 ERROR\n", CLIP_READ + ", publishing/facebook.md, publishing/repurpose-matrix.md") });
+  try {
+    assert.equal(check({ project: dir, vp }).warnings.length, 0);
+    const d = check({ project: del, vp, stage: "delivery" });
+    assert.equal(d.pass, false); assert.match(d.errors.join(), /CAPTIONS\.md not found/);
+    writeFileSync(join(del, "CAPTIONS.md"), GOOD_CAPTIONS);
+    assert.equal(check({ project: del, vp, stage: "delivery" }).pass, true);
+  } finally { rmSync(vp, { recursive: true, force: true }); rmSync(dir, { recursive: true, force: true }); rmSync(del, { recursive: true, force: true }); }
+});
+
+test("parseRecord ignores a template record inside a code fence", () => {
+  const tpl = "# Brief\n\n```markdown\n## viet_pro\n- mode: Chuẩn\n- lint: x\n```\n";
+  assert.equal(parseRecord(tpl), null);
+  assert.equal(parseRecord(tpl + "\n## viet_pro\n- mode: Nhanh\n").fields.mode, "Nhanh");
+});

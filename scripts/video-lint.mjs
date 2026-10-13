@@ -7,12 +7,20 @@
 //   FONT_TOO_SMALL       ERROR < 1.6% / WARN < 2.2% of the short canvas edge (px, cqw, vw).
 //   SAFE_ZONE_9X16       ERROR  text in the top 12% / bottom 20% UI bands of a portrait
 //                               canvas, via `hyperframes check --caption-zone` (runtime).
+//   HEDGE_LABEL          ERROR when BRIEF.md has `voice_source: clip` (the user's own content),
+//                        WARN otherwise: on-screen hedges such as "minh họa", "không đúng tỉ lệ",
+//                        "theo người đăng", "theo lời người nói", "video độc lập", "~" before a
+//                        number. Scans rendered text only: HTML text nodes and inline scripts
+//                        (tags, attributes and <title> blanked), plus local *.js files the HTML
+//                        loads via <script src> (not *.min.js); comments, Error(…) and console.*
+//                        lines are skipped, and so is any line containing `hedge-ok`.
 // Exit: 0 clean or warnings only · 1 any ERROR · 2 bad usage or tool failure.
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { maybeHelp } from "./cli-help.mjs";
+import { frontmatter } from "./check-viet-pro.mjs";
 maybeHelp(process.argv.slice(2), import.meta.url);
 
 const SEEK = "seek=.05,.15,.25,.35,.45,.55,.65,.75,.85,.95";
@@ -55,13 +63,26 @@ function htmlFilesUnder(root) {
   if (!existsSync(root)) return [];
   const out = [];
   for (const name of readdirSync(root)) {
-    if (name === "node_modules") continue;
+    if (name === "node_modules" || name.startsWith(".")) continue;
     const p = join(root, name);
     if (statSync(p).isDirectory()) out.push(...htmlFilesUnder(p));
     else if (name.endsWith(".html")) out.push(p);
   }
   return out.sort();
 }
+
+export const HEDGE = /minh\s+h(?:ọa|oạ)|không\s+đúng\s+tỉ\s+lệ|theo\s+người\s+(?:đăng|bán)|theo\s+lời\s+người\s+nói|video\s+độc\s+lập|ví\s+dụ\s+giả\s+lập|~\s?\d/giu;
+// Blank out comments (keep offsets, so line numbers stay right): HTML, block and line comments.
+const blank = (m) => m.replace(/[^\n]/g, " ");
+export const stripComments = (t) =>
+  t.replace(/<!--[\s\S]*?-->/g, blank).replace(/\/\*[\s\S]*?\*\//g, blank).replace(/(^|[\s;{}()])\/\/[^\n]*/gm, (m, p) => p + blank(m.slice(p.length)));
+// HTML: keep only text between tags (inline <script>/<style> bodies included); <title> is not on screen.
+export const htmlText = (t) => stripComments(t).replace(/<title>[\s\S]*?<\/title>/gi, blank).replace(/<[^>]*>/g, blank);
+const notRendered = (line) => /\bError\(|\bconsole\.|hedge-ok/.test(line);
+// Local scripts an HTML file loads (relative src, not CDN, not minified bundles).
+const scriptSrcs = (html, file) => [...html.matchAll(/<script[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi)]
+  .map((m) => m[1]).filter((s) => !/^[a-z]+:|^\/\//i.test(s) && !/\.min\.js$/i.test(s))
+  .map((s) => resolve(dirname(file), s.split(/[?#]/)[0])).filter((p) => p.startsWith(dir) && existsSync(p));
 
 const files = [indexPath, ...htmlFilesUnder(join(dir, "compositions"))];
 const skin = join(dir, ".hyperframes", "caption-skin.html");
@@ -71,6 +92,21 @@ const findings = [];
 const add = (severity, code, file, line, message) =>
   findings.push({ severity, code, file: relative(dir, file) || file, line, message });
 const lineAt = (text, index) => text.slice(0, index).split("\n").length;
+
+const briefPath = join(dir, "BRIEF.md");
+const clipVoice = existsSync(briefPath) && /^clip$/i.test((frontmatter(readFileSync(briefPath, "utf8")).voice_source || "").trim());
+const scripts = [...new Set(files.flatMap((f) => scriptSrcs(readFileSync(f, "utf8"), f)))];
+for (const file of [...files, ...scripts]) {
+  const raw = readFileSync(file, "utf8").normalize("NFC");
+  const text = file.endsWith(".html") ? htmlText(raw) : stripComments(raw);
+  const lines = raw.split("\n");
+  for (const m of text.matchAll(HEDGE)) {
+    const line = lineAt(text, m.index);
+    if (notRendered(lines[line - 1])) continue;
+    add(clipVoice ? "ERROR" : "WARN", "HEDGE_LABEL", file, line,
+      `"${m[0]}" hedges the user's own content on screen; show the fact plainly and keep source notes in BRIEF.md/PLAN.md or code comments`);
+  }
+}
 
 for (const file of files) {
   const text = readFileSync(file, "utf8");

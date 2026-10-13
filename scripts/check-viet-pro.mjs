@@ -14,8 +14,15 @@
 //     references/review/ and references/editorial/, and publishing/video-script.md.
 //   - viet-pro lint on script-table.md and on every script/*.txt (one voice line per file),
 //     each file separately: any ERROR fails the gate.
-//   - WARN only (never fails): voice words > duration × 3 (BRIEF `duration:`, ~2.5–3 words/s);
+//   - WARN only (never fails): voice words > duration × 3 (BRIEF `duration_s:` or `duration:`, ~2.5–3 words/s);
 //     engagement-bait phrases; first-hand claims ("mình đã thử…") to confirm with the user.
+// BRIEF frontmatter `voice_source: clip` (the voice is the user's own clip, no TTS script):
+//   - no script-table.md / script-table.v1.md / compare; no voice word-count, bait or first-hand
+//     WARNs (the words are the user's, not ours);
+//   - record needs mode, files_read, lint (no humanizer); files_read = SKILL.md + review/*
+//     (+ publishing/facebook.md, repurpose-matrix.md at delivery), no editorial/video-script.md;
+//   - script/captions.txt (burned-in captions) and script/on-screen.txt (every other on-screen
+//     string) must exist; they are linted like voice lines. Delivery (CAPTIONS.md) is unchanged.
 // Stage "delivery" = stage script plus:
 //   - CAPTIONS.md with a "## Facebook…" section and a "## TikTok…" section, each linted on its
 //     own (ERROR fails); no heading/bullet/markdown inside the Facebook section (personal profile).
@@ -56,15 +63,33 @@ export function defaultVp(env = process.env) {
 }
 
 // Files the agent must have read: SKILL.md + all review/ + all editorial/ (+ publishing refs).
-export function requiredReading(vp, stage = "script") {
+export function requiredReading(vp, stage = "script", { clip = false } = {}) {
   const list = (d) => (existsSync(join(vp, "references", d)) ? readdirSync(join(vp, "references", d)).filter((f) => f.endsWith(".md")).sort().map((f) => `${d}/${f}`) : []);
-  const pub = ["publishing/video-script.md", ...(stage === "delivery" ? ["publishing/facebook.md", "publishing/repurpose-matrix.md"] : [])];
-  return ["SKILL.md", ...list("review"), ...list("editorial"), ...pub];
+  const delivery = stage === "delivery" ? ["publishing/facebook.md", "publishing/repurpose-matrix.md"] : [];
+  // A clip-voiced project has no authored script: editorial/ and video-script.md do not apply.
+  if (clip) return ["SKILL.md", ...list("review"), ...delivery];
+  return ["SKILL.md", ...list("review"), ...list("editorial"), "publishing/video-script.md", ...delivery];
+}
+
+export const CLIP_FIELDS = ["mode", "files_read", "lint"];
+export const CLIP_TEXT = ["captions.txt", "on-screen.txt"];
+
+export function isClipVoice(brief) {
+  return /^clip$/i.test((frontmatter(brief).voice_source || "").trim());
+}
+
+// Blank out fenced code blocks (keeping line count) so a template record inside ``` is not read.
+export function stripFences(text) {
+  let inFence = false;
+  return text.split(/\r?\n/).map((l) => {
+    if (/^\s*(`{3,}|~{3,})/.test(l)) { inFence = !inFence; return ""; }
+    return inFence ? "" : l;
+  }).join("\n");
 }
 
 // Parse the viet_pro record. Returns { file, fields } or null.
 export function parseRecord(text, file = "") {
-  const lines = text.split(/\r?\n/);
+  const lines = stripFences(text).split(/\r?\n/);
   const start = lines.findIndex((l) => /^#{1,4}\s*`?viet_pro`?\s*$/i.test(l.trim()) || /^viet_pro:\s*$/i.test(l.trim()));
   if (start < 0) return null;
   const fields = {};
@@ -136,16 +161,19 @@ export function check({ project = ".", stage = "script", vp = defaultVp(), compa
     return { ...out, usage: `viet-pro not found at ${vp} (use --vp or $VIET_PRO_DIR)` };
   }
 
+  const clip = isClipVoice(brief);
+  out.voiceSource = clip ? "clip" : "tts";
+
   // 1. record
-  const table = existsSync(join(dir, "script-table.md")) ? readFileSync(join(dir, "script-table.md"), "utf8") : null;
+  const table = !clip && existsSync(join(dir, "script-table.md")) ? readFileSync(join(dir, "script-table.md"), "utf8") : null;
   const rec = parseRecord(brief, "BRIEF.md") || (table && parseRecord(table, "script-table.md"));
   out.record = rec;
   if (!rec) errors.push("no viet_pro record in BRIEF.md or script-table.md (heading `## viet_pro` + mode/files_read/humanizer/lint)");
   else {
-    const need = [...REQUIRED_FIELDS, ...(stage === "delivery" ? ["captions"] : [])];
+    const need = [...(clip ? CLIP_FIELDS : REQUIRED_FIELDS), ...(stage === "delivery" ? ["captions"] : [])];
     for (const k of need) if (!rec.fields[k] || PLACEHOLDER.test(rec.fields[k].trim())) errors.push(`viet_pro.${k} is missing or empty (${rec.file})`);
     const read = rec.fields.files_read || "";
-    const missing = requiredReading(vp, stage).filter((f) => !read.includes(f));
+    const missing = requiredReading(vp, stage, { clip }).filter((f) => !read.includes(f));
     if (rec.fields.files_read && missing.length) errors.push(`viet_pro.files_read does not list: ${missing.join(", ")}`);
   }
 
@@ -165,7 +193,9 @@ export function check({ project = ".", stage = "script", vp = defaultVp(), compa
   // 2. lint script-table.md and each voice line
   const scriptDir = join(dir, "script");
   const voice = existsSync(scriptDir) ? readdirSync(scriptDir).filter((f) => f.endsWith(".txt")).sort().map((f) => ({ path: join(scriptDir, f), label: `script/${f}` })) : [];
-  if (!table) errors.push("script-table.md not found");
+  if (clip) {
+    for (const f of CLIP_TEXT) if (!voice.some((v) => v.label === `script/${f}`)) errors.push(`script/${f} not found (voice_source: clip lints captions and on-screen text instead of a script table)`);
+  } else if (!table) errors.push("script-table.md not found");
   const targets = [...(table ? [{ path: join(dir, "script-table.md"), label: "script-table.md" }] : []), ...voice];
   Object.assign(out.lint, lintFiles(vp, targets));
   // SCRIPT.md (HyperFrames workflows): the lines audio-meta will voice
@@ -181,11 +211,12 @@ export function check({ project = ".", stage = "script", vp = defaultVp(), compa
     }
   }
 
-  // 3. soft checks on the spoken text
-  const voiceText = voice.map((v) => readFileSync(v.path, "utf8")).join("\n");
-  const duration = Number(frontmatter(brief).duration);
+  // 3. soft checks on the spoken text (ours only: a clip's words belong to the user)
+  const voiceText = clip ? "" : voice.map((v) => readFileSync(v.path, "utf8")).join("\n");
+  const fm = frontmatter(brief);
+  const duration = Number(fm.duration_s || fm.duration);
   if (voiceText && duration > 0 && words(voiceText) > duration * 3) warnings.push(`voice has ${words(voiceText)} words for ${duration}s (> ~3 words/s; viet-pro video-script.md: ~2.5–3)`);
-  const spoken = voiceText || table || "";
+  const spoken = clip ? "" : voiceText || table || "";
   for (const m of new Set([...spoken.matchAll(BAIT)].map((x) => x[0]))) warnings.push(`engagement-bait phrase in the script: "${m}"`);
   for (const m of new Set([...spoken.matchAll(FIRST_HAND)].map((x) => x[0]))) warnings.push(`first-hand claim "${m}": keep only if the user gave this experience (viet-pro: không bịa trải nghiệm)`);
 

@@ -36,6 +36,10 @@ Mặc định: voice `eGSd0uV8dNQnZuEEX9lu`, TTS `eleven_v4` (có tiếng Việt
 
 Người dùng đưa clip quay thật cần cắt gọn (talking-head, phỏng vấn, UGC): làm theo `references/footage-lane.md` (`scripts/cut.mjs` tìm điểm cắt và ghép), rồi quay lại bước 4b (PLAN.md) và 6–9 bên dưới (lời đọc hay chữ tiếng Việt mới thêm vẫn phải qua cổng viet-pro ở bước 2; plan và demo vẫn bắt buộc). Video dựng mới hoàn toàn thì đi thẳng quy trình 9 bước.
 
+**Clip làm trục + nền dựng mới** (clip đi thực địa, giới thiệu nhà đất, địa điểm đặt trong khung PiP trên bản đồ hoặc phối cảnh, hiệu ứng bám lời người nói): làm theo `references/clip-master-canvas.md`. BRIEF đặt `voice_source: clip`; khi đó cổng viet-pro lint `script/captions.txt` (sinh bằng `scripts/captions-from-transcript.mjs` từ bảng sửa lời người dùng đã duyệt) và `script/on-screen.txt` thay cho kịch bản TTS. PLAN.md viết ngay sau bản chép lời.
+
+**Nội dung của người dùng là nội dung thật:** không gắn lên hình các nhãn rào đón như "minh họa", "không đúng tỉ lệ", "theo người đăng", "theo lời người nói", "video độc lập", "~" trước số. Số liệu vẫn chỉ lấy từ clip hoặc brief, nguồn ghi trong file dữ liệu. `video-lint` báo `HEDGE_LABEL`.
+
 **Ba cổng không được bỏ:** kịch bản viet-pro (bước 2) → **PLAN.md** (bước 4b) → **khung hình demo đã duyệt** (bước 6b). Bản giao cuối chỉ được render bằng `render-final.mjs`, script này chặn (exit 5) khi thiếu plan, thiếu demo hoặc demo chưa được duyệt.
 
 ## Quy trình 9 bước
@@ -177,23 +181,25 @@ Giao cho người dùng: đường dẫn MP4 (render bằng `render-final.mjs`),
 | `references/brief-template.md` | Bước 1: khung brief và ví dụ 15 giây |
 | `references/pattern-library.md` | Bước 3: công thức theo 6 nhóm video |
 | `references/script-workflow.md` | Bước 2 và 9: cổng viet-pro đầy đủ, kỹ thuật theo loại video, kiểm chứng, lint, TikTok viral, `CAPTIONS.md` |
-| `scripts/check-viet-pro.mjs` | Bước 2 (`--stage script`, trước voice/render) và bước 9 (`--stage delivery`): biên bản `## viet_pro`, `script-table.v1.md` + compare, lint viet-pro từng file và `SCRIPT.md`, caption FB + TikTok; `--jev-audit` tuỳ chọn (chỉ WARN) |
+| `scripts/check-viet-pro.mjs` | Bước 2 (`--stage script`, trước voice/render) và bước 9 (`--stage delivery`): biên bản `## viet_pro`, `script-table.v1.md` + compare, lint viet-pro từng file và `SCRIPT.md`, caption FB + TikTok; `voice_source: clip` lint phụ đề + chữ trên hình thay kịch bản; `--jev-audit` tuỳ chọn (chỉ WARN) |
 | `references/engine-selection.md` | Bước 4 và 6: chọn engine, xử lý 16:9 / 9:16 |
 | `references/audio-pipeline.md` | Bước 5: voice, SFX, nhạc nền, mix, bản quyền |
 | `references/qa-checklist.md` | Bước 8: đo bằng lệnh, xem frame, nghe |
 | `references/plan-demo.md` | Bước 4b, 6b, 7: mẫu `PLAN.md`, chụp và duyệt demo, `DEMO.md`, render bản cuối |
 | `scripts/setup-check.mjs` | Bước 0: đủ công cụ, skill, key chưa (`READY` / `NOT READY` + lệnh sửa theo hệ điều hành) |
 | `scripts/check-preflight.mjs` | Bước 4b (`--stage plan`) và 6b (`--stage final`): cổng plan + demo + duyệt |
-| `scripts/make-demo.mjs` | Bước 6b: chụp khung hình demo theo `PLAN.md`, ghi `DEMO.md` |
+| `scripts/make-demo.mjs` | Bước 6b: chụp khung hình demo theo `PLAN.md`, ghi `DEMO.md`; `--from-video` cắt từ bản nháp người dùng đã xem |
 | `scripts/render-final.mjs` | Bước 7: render bản giao (`--quality delivery`) chỉ khi cổng final PASS (exit 5 nếu chặn) |
 | `scripts/skill-paths.mjs` | Tìm skill trên mọi agent (Claude Code, Codex, Antigravity, workspace) |
 | `scripts/replace-in-file.mjs` | Thay chuỗi trong file bằng regex, chạy được mọi hệ điều hành (thay `sed -i`) |
 | `scripts/eleven.mjs` | `doctor`, `voice-info`, `models`, `tts`, `sfx`, `music`, `probe-models`, `audio-meta`; `tts`/`audio-meta` qua cổng viet-pro (`scripts/voice-gate.mjs`, exit 4) |
 | `references/edit-method.md` | Bước 3 và 6: chức năng câu → hình, sàn chất lượng, GSAP, SFX |
-| `scripts/video-lint.mjs` | Bước 8: lowercase, chữ nhỏ, vùng UI 9:16 |
+| `scripts/video-lint.mjs` | Bước 8: lowercase, chữ nhỏ, vùng UI 9:16, nhãn rào đón (`HEDGE_LABEL`) |
 | `scripts/judge.mjs` | Bước 8: `check`/`pair`; exit 3–4 → QA ảnh tĩnh |
 | `references/footage-lane.md` | Nhánh footage thật (beta): transcribe, probe, EDL, ghép |
 | `scripts/cut.mjs` | `probe` (khoảng lặng an toàn), `apply-edl` (ghép theo danh sách cắt) |
+| `references/clip-master-canvas.md` | Clip người dùng làm trục + PiP trên bản đồ/phối cảnh; `voice_source: clip`; bố cục 9:16 và bẫy đã gặp |
+| `scripts/captions-from-transcript.mjs` | Phụ đề từ `transcript.json` + `captions.fixes.json` (sửa lời, đoạn chưa rõ, chia cụm); ra `captions.js`, `script/captions.txt`, `captions.review.md` |
 | `scripts/find-cases.mjs` | Bước 3: tra 813 case trong `data/cases.jsonl`. Tra bằng script, không đọc file trực tiếp |
 | `scripts/rerank-cases.mjs` | Bước 3 (tuỳ chọn, cần `TYPESAFE_API_KEY`): Jev xếp hạng ~740 case có prompt dùng được (≥ 40 ký tự) theo brief JSON; thiếu key hoặc lỗi API thì tự trả kết quả `find-cases` (`--stats` cho biết lý do) |
 | `scripts/case-features.mjs` | Gắn nhãn cố định cho từng case vào `data/case-features.jsonl` (khổ hình, thể loại, chủ đề, độ chi tiết). **Chạy lại mỗi khi `data/cases.jsonl` thay đổi** (chỉ gắn nhãn dòng mới/đổi, khoảng 0,07 USD cho cả corpus) |

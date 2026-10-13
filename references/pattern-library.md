@@ -178,6 +178,11 @@ Viết danh sách cấm cụ thể (crossfade, glow, particle, RGB split, camera
 Case: `y:techhalla-498547`, `y:verbove-268381`
 HyperFrames: lệnh `hyperframes snapshot`, `hyperframes check` (thẻ quy trình, không gắn blueprint)
 
+### Thẻ 9 — Bản đồ / vị trí bám lời người nói (bất động sản, địa điểm)
+Clip của người dùng nằm trong khung PiP, nền là bản đồ hoặc phối cảnh vẽ từ một file dữ liệu. Mỗi ý người nói kích một hiệu ứng tại đúng giây của từ đó: pin rơi xuống ("đây là chợ…"), tuyến đường tự vẽ ("đi bộ ra chợ…"), khoanh lô hoặc vùng ("lô đất 72m²…", "đường vào…"), thẻ số liệu hiện ngay giá trị thật (giá, diện tích), key text cho câu chốt ("ô tô vào tận nơi"), mũi tên chỉ hướng ra mép khung, nhãn bật lần lượt cho hàng xóm hoặc tiện ích. Camera chuyển trước chữ 0,3–0,5 giây; giữa các lần chuyển, bản đồ trôi chậm. Không gắn nhãn "minh họa" hay nhãn nguồn lên hình.
+Case: không có trong corpus (`weak matches`); mẫu chạy thật là dự án `bds-ban-do-pip-9x16`, quy trình ở `clip-master-canvas.md`
+HyperFrames: blueprint `camera-journey` · rule `svg-path-draw` · `catalog --query "map pin route"`
+
 ## Bảng nối nhóm → HyperFrames
 
 Tên trong bảng đều có thật (blueprint/rule trong `hyperframes-animation`, preset trong `hyperframes-creative/frame-presets`, block lấy từ output của câu `catalog --query` cùng dòng).

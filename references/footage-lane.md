@@ -1,6 +1,6 @@
 # Nhánh footage thật (beta)
 
-Dùng khi người dùng đưa clip quay thật (talking-head, phỏng vấn, UGC) cần cắt gọn rồi thêm phụ đề, đồ hoạ, bản 9:16. Trạng thái **beta**: đã smoke trên clip tổng hợp có giọng tiếng Việt thật (2026-10-10); chưa chạy trên clip người thật.
+Dùng khi người dùng đưa clip quay thật (talking-head, phỏng vấn, UGC) cần cắt gọn rồi thêm phụ đề, đồ hoạ, bản 9:16. Clip giữ nguyên làm trục và đặt trong khung PiP trên nền bản đồ/phối cảnh dựng mới: xem `clip-master-canvas.md`. Cả hai nhánh đặt `voice_source: clip` trong BRIEF khi lời nói là của clip (không TTS). Trạng thái **beta**: đã smoke trên clip tổng hợp có giọng tiếng Việt thật (2026-10-10); chưa chạy trên clip người thật.
 
 ## Quy trình
 

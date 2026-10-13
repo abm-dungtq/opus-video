@@ -10,6 +10,8 @@ engine_reason: <1 câu: vì sao chọn engine này>
 aspect: <16:9 | 9:16 | both>
 duration_s: <số giây>
 fps: <30 | 60>
+language: vi
+voice_source: <tts | clip>   # clip: lời nói lấy từ clip của người dùng, cổng viet-pro lint phụ đề + chữ trên hình
 voice_id: eGSd0uV8dNQnZuEEX9lu
 tts_model: eleven_v4
 ---

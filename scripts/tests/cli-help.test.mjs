@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { helpText, wantsHelp } from "../cli-help.mjs";
 
 const dir = fileURLToPath(new URL("..", import.meta.url));
-const CLIS = ["build-case-index", "case-features", "check-preflight", "check-viet-pro", "corpus-stats", "cut", "eleven", "find-cases", "judge", "make-demo", "render-final", "replace-in-file", "rerank-cases", "setup-check", "video-lint"];
+const CLIS = ["build-case-index", "captions-from-transcript", "case-features", "check-preflight", "check-viet-pro", "corpus-stats", "cut", "eleven", "find-cases", "judge", "make-demo", "render-final", "replace-in-file", "rerank-cases", "setup-check", "video-lint"];
 
 test("wantsHelp / helpText read the leading comment block", () => {
   assert.equal(wantsHelp(["--json", "-h"]), true);

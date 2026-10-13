@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { check, parsePlan, isPng } from "../check-preflight.mjs";
 import { main as renderFinal, PREFLIGHT_EXIT } from "../render-final.mjs";
 import { writeDemoMd } from "../make-demo.mjs";
@@ -152,4 +154,26 @@ test("replace-in-file: global regex pairs applied in order, with counts", async 
   const r = replaceAll(css, [["--cap-band-top: [0-9]*px;", "--cap-band-top: 1340px;"], ["--cap-band-height: [0-9]*px;", "--cap-band-height: 200px;"]]);
   assert.equal(r.text, ":root{--cap-band-top: 1340px; --cap-band-height: 200px;}");
   assert.deepEqual(r.counts, [1, 1]);
+});
+
+test("make-demo --from-video cuts PLAN.md frames from an approved draft and records the source", { skip: spawnSync("ffmpeg", ["-version"]).status !== 0 }, () => {
+  const dir = proj();
+  const script = fileURLToPath(new URL("../make-demo.mjs", import.meta.url));
+  try {
+    writeFileSync(join(dir, "index.html"), "<html></html>");
+    past(join(dir, "index.html"));
+    const mp4 = join(dir, "draft.mp4");
+    const g = spawnSync("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "color=c=purple:s=64x64:d=11", "-pix_fmt", "yuv420p", mp4]);
+    assert.equal(g.status, 0);
+    const r = spawnSync("node", [script, "--project", dir, "--from-video", mp4], { encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+    const demo = readFileSync(join(dir, "DEMO.md"), "utf8");
+    assert.match(demo, /^source: draft\.mp4$/m);
+    assert.match(demo, /approval: pending/);
+    assert.match(demo, /demo\/frame-01-at-9\.5s\.png \(main\)/);
+    past(mp4, 200);
+    const stale = spawnSync("node", [script, "--project", dir, "--from-video", mp4], { encoding: "utf8" });
+    assert.equal(stale.status, 2);
+    assert.match(stale.stderr, /older than index\.html/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
