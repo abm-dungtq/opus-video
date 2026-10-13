@@ -155,7 +155,7 @@ Mỗi dự án có một thư mục riêng:
    - `--resolution` chỉ đổi kích thước render, không đổi khổ hình.
    - **Bản giao cuối chỉ render qua cổng:** `node $OV/scripts/render-final.mjs --project . -- --output renders/<name>-16x9.mp4` (9:16: thêm `-c compositions/main-9x16.html`). Script tự chạy `check-preflight --stage final` rồi `hyperframes render --quality delivery`; exit **5** là thiếu plan/demo/duyệt. Không gọi thẳng `hyperframes render --quality delivery`.
 
-8. **QA.** Làm theo `references/qa-checklist.md` § "Vòng QA tự xem video": lint + check → `video-lint.mjs` → render vN → `judge.mjs check`, từ v2 thêm `pair`. Ghi kết quả vào `QA.md`. Tối đa 3 vòng, sau đó dừng lại và báo người dùng kèm bằng chứng.
+8. **QA.** Mọi bản render đều chạy `node $OV/scripts/qc-mp4.mjs renders/<name>.mp4 --project ./ --write-qa` trước; còn dòng FAIL (exit 1) thì sửa rồi render lại, WARN thì xem và ghi lý do vào `QA.md`. Sau đó làm theo `references/qa-checklist.md` § "Vòng QA tự xem video": lint + check → `video-lint.mjs` → render vN → `judge.mjs check`, từ v2 thêm `pair`. Ghi kết quả vào `QA.md`. Tối đa 3 vòng, sau đó dừng lại và báo người dùng kèm bằng chứng.
 
 9. **Caption khi giao (BẮT BUỘC với video tiếng Việt).** Viết hai caption, **Facebook cá nhân** và **TikTok**, qua đúng quy trình viet-pro đầy đủ như bước 2 (đọc thêm `$VP/references/publishing/facebook.md` và `$VP/references/publishing/repurpose-matrix.md`; soạn → lượt Humanizer có ghi chép → lint). Lưu chung một file `CAPTIONS.md` gồm hai mục `## Facebook cá nhân` và `## TikTok`; chi tiết ở mục 5 của `references/script-workflow.md`.
    - Cùng insight và số liệu với kịch bản, không thêm claim mới. Hook viết lại theo kênh, không copy câu mở của video.
@@ -164,6 +164,8 @@ Mỗi dự án có một thư mục riêng:
    - Không tự đăng. Người dùng muốn thêm caption YouTube thì làm theo cùng quy trình, thêm mục `## YouTube`.
 
 Giao cho người dùng: đường dẫn MP4 (render bằng `render-final.mjs`), `PLAN.md` và `DEMO.md` đã duyệt, `CAPTIONS.md` (đã qua cổng `--stage delivery`), link preview (`hyperframes preview --background`; ghi PID và dừng preview khi người dùng xem xong), cùng tóm tắt QA. Các mục cần tai người (giọng, thanh điệu) phải nói rõ là người dùng tự nghe.
+
+Cần bản đăng theo từng nơi thì xuất từ bản final bằng `node $OV/scripts/export.mjs --project ./ --input renders/<name>.mp4 --target <zalo|youtube|tiktok|facebook>` (nhiều nơi thì cách nhau bằng dấu phẩy). Script chạy lại cổng final, ghi `<name>-<target>.mp4` cạnh file nguồn và lấy thumbnail `<name>-thumb.jpg` từ khung demo đã duyệt; exit 5 là cổng chặn hoặc demo chưa duyệt.
 
 ## Ranh giới
 
@@ -190,6 +192,8 @@ Giao cho người dùng: đường dẫn MP4 (render bằng `render-final.mjs`),
 | `scripts/check-preflight.mjs` | Bước 4b (`--stage plan`) và 6b (`--stage final`): cổng plan + demo + duyệt |
 | `scripts/make-demo.mjs` | Bước 6b: chụp khung hình demo theo `PLAN.md`, ghi `DEMO.md`; `--from-video` cắt từ bản nháp người dùng đã xem |
 | `scripts/render-final.mjs` | Bước 7: render bản giao (`--quality delivery`) chỉ khi cổng final PASS (exit 5 nếu chặn) |
+| `scripts/qc-mp4.mjs` | Bước 8: kiểm kỹ thuật file MP4 (khổ hình, thời lượng, khung đen, đứng hình, khoảng lặng, loudness, true peak, bitrate); `--write-qa` ghi vào `QA.md`, exit 1 khi có FAIL |
+| `scripts/export.mjs` | Sau bước 9: bản giao theo nơi đăng (`zalo`, `youtube`, `tiktok`, `facebook`) kèm thumbnail từ khung demo đã duyệt; exit 5 nếu cổng final chặn |
 | `scripts/skill-paths.mjs` | Tìm skill trên mọi agent (Claude Code, Codex, Antigravity, workspace) |
 | `scripts/replace-in-file.mjs` | Thay chuỗi trong file bằng regex, chạy được mọi hệ điều hành (thay `sed -i`) |
 | `scripts/eleven.mjs` | `doctor`, `voice-info`, `models`, `tts`, `sfx`, `music`, `probe-models`, `audio-meta`; `tts`/`audio-meta` qua cổng viet-pro (`scripts/voice-gate.mjs`, exit 4) |

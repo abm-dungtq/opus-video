@@ -430,7 +430,7 @@ Với `pair`: `A` giữ bản mới, `B` quay về bản cũ, `tie` giữ bản 
 
 ### 7.4 Đo bằng lệnh và nghe
 
-Độ phân giải, fps, thời lượng, có audio, loudness (`input_i` từ -16 đến -12 LUFS, `input_tp` không quá -1), khung đen đầu và cuối được đo bằng các lệnh ffprobe và ffmpeg trong [qa-checklist.md](../references/qa-checklist.md). Nền tối dễ làm `blackdetect` báo nhầm: trích khung đó ra xem, nếu chỉ là nền màu trong lúc nội dung đang hiện dần thì ghi PASS kèm ghi chú. Phần nghe trong checklist gồm phụ đề lệch giọng không quá 150 ms (so `words.json` với thời điểm chữ xuất hiện), giọng không bị cắt, nhạc không lấn giọng. Thanh điệu tiếng Việt thì agent không tự chấm mà đưa file cho người dùng nghe.
+Độ phân giải, fps, thời lượng và có audio được đo bằng các lệnh ffprobe trong [qa-checklist.md](../references/qa-checklist.md). Loudness, true peak, khung đen, đứng hình, khoảng lặng và bitrate do `qc-mp4.mjs` đo (mục 10.1). Nền tối dễ làm `BLACK_EDGE` báo nhầm: trích khung đó ra xem, nếu chỉ là nền màu trong lúc nội dung đang hiện dần thì ghi PASS kèm ghi chú. Phần nghe trong checklist gồm phụ đề lệch giọng không quá 150 ms (so `words.json` với thời điểm chữ xuất hiện), giọng không bị cắt, nhạc không lấn giọng. Thanh điệu tiếng Việt thì agent không tự chấm mà đưa file cho người dùng nghe.
 
 ## 8. Caption khi giao
 
@@ -469,6 +469,8 @@ Ba script dưới đây không thuộc opus-video. Chúng nằm trong thư mục
 
 `npm run render` trong dự án studio là lệnh render HyperFrames thường, phù hợp cho bản nháp. Bản giao vẫn đi qua `render-final.mjs`. Xoá ảnh demo bằng `sweep-after-final.sh` thì lần `render-final` sau phải chạy lại `make-demo.mjs`, vì cổng final đòi PNG mới hơn `PLAN.md`.
 
+Không có workspace studio thì dùng `node $OV/scripts/export.mjs --project ./ --input renders/<tên>.mp4 --target facebook` thay cho `compress-final.sh` (mục 10.2).
+
 ## 10. Công cụ mới
 
 ### 10.1 `qc-mp4.mjs`, kiểm kỹ thuật file MP4
@@ -499,7 +501,38 @@ node $OV/scripts/qc-mp4.mjs <file.mp4> [--project <dir>] [--write-qa] [--json]
 | `TRUE_PEAK` | Đỉnh | Trên -1 dBFS | Trên 0 dBFS |
 | `BITRATE` | Bitrate tổng | Trên 12 Mbit/s, tức file chưa nén | |
 
-Khi `BITRATE` báo WARN trong workspace studio, nén bằng `compress-final.sh` rồi chạy lại `qc-mp4` trên file đã nén. `qc-mp4` chỉ đo kỹ thuật, không thay vòng QA ở mục 7 hay phần nghe của người dùng.
+Khi `BITRATE` báo WARN, xuất bản giao bằng `export.mjs` (mục 10.2), hoặc nén bằng `compress-final.sh` nếu đang ở workspace studio, rồi chạy lại `qc-mp4` trên file mới. `qc-mp4` chỉ đo kỹ thuật, không thay vòng QA ở mục 7 hay phần nghe của người dùng.
+
+### 10.2 `export.mjs`, bản giao theo nơi đăng
+
+`export.mjs` tạo bản giao cho từng nơi đăng từ một bản final, kèm thumbnail lấy từ khung demo người dùng đã duyệt.
+
+```bash
+node $OV/scripts/export.mjs --project . --input renders/<tên>.mp4 --target <zalo|youtube|tiktok|facebook>[,<...>] [--thumb-frame <n>] [--no-thumb]
+```
+
+- Script chạy `check-preflight --stage final` trước tiên. Cổng chặn thì không xuất gì.
+- File ra nằm cạnh file nguồn, tên `<tên>-<target>.mp4` và `<tên>-thumb.jpg`. File đã có thì không ghi đè.
+- Mọi target giữ fps, dùng `yuv420p`, `+faststart`, tiếng AAC 48 kHz và chuẩn hoá loudness hai lượt về -14 LUFS, true peak -1 dBFS.
+- Xuất xong, mỗi file được kiểm lại: fps giữ nguyên, thời lượng lệch không quá 0,5 giây, kích thước đúng bảng, loudness trong khoảng 1 LU quanh -14. Trượt thì file đó bị xoá.
+
+| Target | Kích thước | Hình | Tiếng |
+|---|---|---|---|
+| `youtube` | Giữ nguyên | H.264 high, 10 Mbit/s (tối đa 12) | AAC 192 kbit/s |
+| `tiktok` | Giữ nguyên | 8 Mbit/s (tối đa 10) | AAC 192 kbit/s |
+| `facebook` | Giữ nguyên | 8 Mbit/s (tối đa 10) | AAC 192 kbit/s |
+| `zalo` | Cạnh ngắn 720, giữ tỉ lệ | 3 Mbit/s (tối đa 4) | AAC 128 kbit/s |
+
+Thông số `zalo` và `facebook` là giả định, chưa đối chiếu với tài liệu của nền tảng (Zalo không công bố thông số chính thức). Chúng nằm trong hằng `TARGETS` của `scripts/export.mjs`. Nếu bản Zalo bị mờ rõ sau khi gửi thì đổi sang cạnh ngắn 1080 và 5 Mbit/s.
+
+Thumbnail lấy từ các dòng `- demo/....png (<nhãn>)` dưới mục `## Frames` của `DEMO.md`. Video dọc dùng khung nhãn `9:16` (không có thì dùng `main`), video ngang dùng `main`. Mặc định lấy khung đầu tiên, `--thumb-frame <n>` chọn khung thứ n (đếm từ 0). `DEMO.md` phải có lời duyệt, `approval: pending` bị chặn. `--no-thumb` bỏ qua thumbnail.
+
+| Mã thoát | Nghĩa |
+|---|---|
+| 0 | Xuất xong |
+| 1 | ffmpeg lỗi hoặc file ra trượt bước kiểm sau khi xuất |
+| 2 | Sai cú pháp, không có file vào, hoặc file ra đã có |
+| 5 | Cổng chặn: `check-preflight --stage final` không PASS hoặc demo chưa duyệt |
 
 ## 11. Xử lý sự cố
 
@@ -535,6 +568,8 @@ Khi `BITRATE` báo WARN trong workspace studio, nén bằng `compress-final.sh` 
 | Whisper không ra tiếng Việt | Dùng model `.en` | Dùng `-m large-v3 -l vi` |
 | Bản chép lời bị ghi đè | Redirect stdout của `transcribe --json` vào file | Không redirect, đọc file `transcript.json` do lệnh ghi |
 | `judge.mjs` thoát 3 hoặc 4 | `agy` chưa đăng nhập hoặc chưa cài | QA bằng ảnh tĩnh, ghi "không có giám khảo video" vào `QA.md` |
-| `blackdetect` báo khung đen giữa video nền tối | Nền tối dưới ngưỡng phát hiện | Trích khung ra xem, ghi PASS kèm ghi chú nếu chỉ là nền màu |
+| `qc-mp4` báo `BLACK_EDGE` với video nền tối | Nền tối dưới ngưỡng phát hiện khung đen | Trích khung ra xem, ghi PASS kèm ghi chú nếu chỉ là nền màu |
+| `export.mjs` thoát 5 | Cổng final chặn, hoặc `DEMO.md` chưa có lời duyệt | Chạy `check-preflight.mjs --stage final` trong thư mục dự án để xem lý do, sửa rồi chạy lại |
+| `export.mjs` thoát 2 vì file ra đã có | Script không ghi đè `<tên>-<target>.mp4` hay `<tên>-thumb.jpg` | Đổi tên hoặc xoá file cũ có chủ đích rồi chạy lại |
 | `compress-final.sh` báo file ra đã có | Script không ghi đè | Đổi tên file ra hoặc xoá file cũ có chủ đích |
 | `sweep-after-final.sh` dừng, không xoá gì | Nhiều video mà không file nào tên `final` hay `delivery` | Chỉ định file cần giữ bằng `--keep renders/<file>` |

@@ -10,8 +10,7 @@ Chạy cho **mỗi** file render. Ghi kết quả vào `<project>/QA.md` theo t�
 | FPS | `ffprobe -v error -select_streams v:0 -show_entries stream=r_frame_rate -of csv=p=0 f.mp4` | đúng `fps` trong brief |
 | Thời lượng | `ffprobe -v error -show_entries format=duration -of csv=p=0 f.mp4` | lệch ≤ 0,5 giây so với brief |
 | Có audio | `ffprobe -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 f.mp4` | `audio` |
-| Loudness | `ffmpeg -i f.mp4 -af loudnorm=print_format=json -f null - 2>&1 \| tail -12` | `input_i` trong khoảng −16 đến −12 LUFS, `input_tp` ≤ −1 |
-| Khung đen đầu/cuối | `ffmpeg -i f.mp4 -vf blackdetect=d=0.2:pix_th=0.1 -an -f null - 2>&1 \| grep black_start` | không có dòng nào ở 0s hoặc ở cuối (trừ khi brief yêu cầu). Với nền tối (vd. #0B1B2B), lệnh này báo nhầm các khung nền trống: trích khung đó ra xem; nếu chỉ là nền màu trong lúc nội dung đang hiện dần thì ghi PASS kèm ghi chú, không cần thêm nội dung chỉ để tránh cảnh báo |
+| Loudness, true peak, khung đen, đứng hình, khoảng lặng, bitrate | `node $OV/scripts/qc-mp4.mjs f.mp4 --project ./ --write-qa` (mã từng phép kiểm và ngưỡng: `--help`) | không có dòng `FAIL`, exit 0; mỗi `WARN` đã xem và ghi lý do. `BLACK_EDGE` hay báo nhầm với nền tối (vd. #0B1B2B): trích khung đó ra xem; nếu chỉ là nền màu trong lúc nội dung đang hiện dần thì ghi PASS kèm ghi chú, không cần thêm nội dung chỉ để tránh cảnh báo |
 | Lint/check (HyperFrames) | `hyperframes check` | exit 0 |
 | Cổng viet-pro (kịch bản + caption) | `node $OV/scripts/check-viet-pro.mjs --project . --stage delivery` | `PASS`, exit 0 (biên bản `## viet_pro` đủ, lint viet-pro 0 ERROR cho `script-table.md`, từng `script/NN.txt`, từng mục của `CAPTIONS.md`) |
 | Plan + demo đã duyệt (bản giao cuối) | `node $OV/scripts/check-preflight.mjs --project . --stage final` | `PASS`, exit 0 (`PLAN.md` đủ mục, `demo/` đủ PNG mới hơn plan, `DEMO.md` có `approval:` thật). Bản giao render bằng `render-final.mjs` |

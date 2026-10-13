@@ -2,7 +2,7 @@
 
 Nhóm prompt cho việc sau khi dự án đã dựng xong hoặc đã có bản giao: sửa lời, đổi âm thanh, xuất lại, viết caption, kiểm tra trước khi giao, dọn file. Các mục này không cần tra case mẫu, nên phần case tham khảo ghi "chưa có case sát". Cấu trúc mỗi mục giải thích ở [README.md](README.md).
 
-Hai mục 27 và 30 dùng script của workspace studio (`scripts/compress-final.sh`, `scripts/sweep-after-final.sh`), không thuộc opus-video. Xem mục 9 của [hướng dẫn chuyên sâu](../huong-dan-chuyen-sau.md).
+Hai mục 27 và 30 dùng script của workspace studio (`scripts/compress-final.sh`, `scripts/sweep-after-final.sh`), không thuộc opus-video. Xem mục 9 của [hướng dẫn chuyên sâu](../huong-dan-chuyen-sau.md). Không có workspace studio thì dùng `node $OV/scripts/export.mjs --project ./ --input renders/<tên>.mp4 --target facebook` thay cho `compress-final.sh`.
 
 ### 25. Sửa một câu lời đọc
 
@@ -105,7 +105,7 @@ Chưa có case sát (việc vận hành, không cần tra corpus).
 
 #### Khi nào dùng
 
-Bản render cuối quá nặng để gửi hoặc đăng. Bạn cần bản nén giữ nguyên độ phân giải, fps. Mục này dùng script của workspace studio.
+Bản render cuối quá nặng để gửi hoặc đăng. Bạn cần bản nén giữ nguyên độ phân giải, fps. Mục này dùng script của workspace studio; cần bản riêng cho từng nơi đăng (Zalo, YouTube, TikTok, Facebook) kèm thumbnail thì dùng `export.mjs` của opus-video, xem lưu ý cuối mục.
 
 #### Prompt mẫu
 
@@ -131,7 +131,7 @@ Kiểm lại file ra: độ phân giải, fps, thời lượng, bitrate. Không 
 #### opus-video sẽ làm gì
 
 - Việc nén do `compress-final.sh` làm: H.264 8 Mbit/s, tiếng AAC 192 kbit/s, giữ độ phân giải và fps. Nguồn đã từ 12 Mbit/s trở xuống thì script không nén lại. Script không ghi đè file ra đã có và tự xoá file ra khi độ phân giải, fps hoặc thời lượng bị lệch.
-- Kiểm lại bằng `qc-mp4.mjs` (luật `BITRATE` cảnh báo trên 12 Mbit/s) hoặc các lệnh đo trong `qa-checklist.md` khi bản cài chưa có `qc-mp4`.
+- Kiểm lại bằng `qc-mp4.mjs` (luật `BITRATE` cảnh báo trên 12 Mbit/s).
 
 #### Case tham khảo
 
@@ -141,6 +141,7 @@ Chưa có case sát (việc vận hành, không cần tra corpus).
 
 - Prompt này không mở đầu bằng `/opus-video` vì nén là việc của script studio; agent vẫn đọc được prompt trong cùng phiên.
 - Cần render lại vì composition thay đổi thì đi qua `render-final.mjs` trước, rồi mới nén.
+- Ngoài workspace studio, hoặc khi cần bản theo nơi đăng, nhờ `/opus-video` chạy `node $OV/scripts/export.mjs --project ./ --input renders/<tên>.mp4 --target facebook` (hoặc `zalo`, `youtube`, `tiktok`, cách nhau bằng dấu phẩy). Script chạy lại cổng final, ghi `<tên>-<target>.mp4` và `<tên>-thumb.jpg` cạnh file nguồn, lấy thumbnail từ khung demo đã duyệt. Thông số `zalo` và `facebook` là giả định, xem mục 10.2 của [hướng dẫn chuyên sâu](../huong-dan-chuyen-sau.md).
 
 ### 28. Viết caption Facebook và TikTok
 
@@ -222,7 +223,7 @@ Liệt kê các mục tôi cần tự nghe.
 
 #### opus-video sẽ làm gì
 
-- `node $OV/scripts/qc-mp4.mjs <file.mp4> --project <thư mục dự án> --write-qa`: khổ hình, thời lượng, khung đen, đứng hình, khoảng lặng, loudness, true peak, bitrate. Thoát 1 khi có FAIL. Bản cài chưa có `qc-mp4` thì dùng các lệnh đo trong `qa-checklist.md`.
+- `node $OV/scripts/qc-mp4.mjs <file.mp4> --project <thư mục dự án> --write-qa`: khổ hình, thời lượng, khung đen, đứng hình, khoảng lặng, loudness, true peak, bitrate. Thoát 1 khi có FAIL.
 - `video-lint.mjs --hyperframes .`, `check-preflight.mjs --stage final`, `check-viet-pro.mjs --stage delivery`.
 - `judge.mjs check`; thoát 3 hoặc 4 thì QA bằng ảnh tĩnh và ghi "không có giám khảo video".
 - Thanh điệu tiếng Việt và giọng đọc được liệt kê là mục bạn tự nghe.

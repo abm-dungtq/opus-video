@@ -92,3 +92,4 @@ node $OV/scripts/render-final.mjs --project . -- -c compositions/main-9x16.html 
 - Cổng chặn thì exit **5** và in lý do; sửa rồi chạy lại. Không gọi thẳng `hyperframes render --quality delivery` để né cổng.
 - Bản nháp và bản QA (`--quality draft|looks`) vẫn chạy `hyperframes render` như cũ.
 - Composition sửa sau lần chụp demo cuối chỉ là WARN: nếu thay đổi nhìn thấy được, chụp lại demo và xin duyệt lại.
+- Thumbnail của bản giao không chụp riêng: `node $OV/scripts/export.mjs --project ./ --input renders/<name>.mp4 --target <…>` lấy một khung trong mục `## Frames` của `DEMO.md` đã duyệt (`--thumb-frame <n>` để chọn khung khác khung đầu).
