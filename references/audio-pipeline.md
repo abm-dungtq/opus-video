@@ -73,8 +73,25 @@ node $OV/scripts/eleven.mjs music --prompt "calm curious ambient, 100 BPM, light
 | Bản master giao cho mạng xã hội | khoảng −14 LUFS integrated, −1 dBTP |
 
 - Trong HyperFrames, đặt volume và ducking theo `hyperframes-audio`. Có thể dùng `media-use/scripts/audio-duck.mjs`.
-- Chỉnh mức bằng lệnh thay vì thử tay: `hyperframes normalize-audio --lufs=-16 --target <id> --write` cho từng track voice; đặt limiter ở bus master theo `hyperframes-audio` để đạt −1 dBTP. Sau đó vẫn đo bằng lệnh ffmpeg bên dưới.
-- Đo loudness: `ffmpeg -i renders/x.mp4 -af loudnorm=print_format=json -f null - 2>&1 | tail -12`
+- Chỉnh mức bằng lệnh thay vì thử tay: `hyperframes normalize-audio --lufs=-16 --target <id> --write` cho từng track voice; đặt limiter ở bus master theo `hyperframes-audio` để đạt −1 dBTP. Sau đó đo lại trên file render.
+- Đo loudness và true peak: `node $OV/scripts/qc-mp4.mjs renders/x.mp4 --project ./` (dòng `LOUDNESS` và `TRUE_PEAK`).
+- Bản giao do `render-final.mjs` dựng lại tiếng bằng `audio-mix.mjs` (ffmpeg) từ các thuộc tính audio tĩnh trong composition. Đo trên một video 9:16 dài 60 giây, loudness của hai cách mix chỉ lệch 0,1 LU.
+
+## 5. Đổi tiếng không render lại
+
+Chỉ đổi nhạc nền, SFX hay mức âm (`data-volume`) thì giữ hình của bản final cũ và chỉ mix lại tiếng:
+
+```bash
+node $OV/scripts/render-final.mjs --project . --audio-only renders/<cũ>.mp4 -- --output renders/<mới>.mp4
+```
+
+- Bản 9:16 thêm `-c compositions/main-9x16.html` sau `--`. Sau `--` chỉ nhận `-c` và `--output`; `--output` bắt buộc và phải khác file cũ.
+- Đo trên video 9:16 dài 60 giây: render đầy đủ mất khoảng 108–111 giây, `--audio-only` khoảng 1 giây.
+- File âm thanh mới đặt trong `assets/voice/`, `assets/sfx/` hoặc `assets/bgm/`. File mới ở chỗ khác trong `assets/` bị tính là đổi hình.
+- **Tiếng động** (giữ bản mix của HyperFrames, không đổi tiếng riêng được): `data-audio-group`, `data-automation`, `data-fx-chain`, `data-fx-carve`, tween GSAP trên volume hoặc script gán `.volume`, `<audio>` hay `<video>` không `muted` trong cảnh con (`data-composition-src`).
+- **Sidecar** `<file>.mp4.render.json` do `render-final` ghi sau mỗi lần chạy: `composition`, `visual_hash`, `audio_hash`, `mode` (`full` hoặc `audio-only`), `mixer` (`audio-mix` hoặc `hyperframes`), `source`, `source_sha256`, `created`. `source_sha256` là sha256 của chính file MP4, nên file đã nén hay sửa sau khi render không còn khớp.
+- Tiếng không đổi so với sidecar thì lệnh báo và thoát 0, không ghi file mới.
+- **Exit 6** khi không đổi tiếng được: file cũ không có sidecar, sidecar không khớp file (sha256 khác), file cũ render từ composition khác, hình đã đổi, có tiếng động, hoặc thiếu file được tham chiếu. Khi đó render đầy đủ bằng `render-final.mjs`.
 
 ## Bản quyền
 

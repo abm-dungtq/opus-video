@@ -154,6 +154,8 @@ Mỗi dự án có một thư mục riêng:
    - Bản nháp/QA, 9:16: `hyperframes render -c compositions/main-9x16.html --quality looks --output renders/<name>-9x16.mp4`. Nếu là project 9:16 riêng thì chạy `hyperframes render` ngay trong thư mục đó.
    - `--resolution` chỉ đổi kích thước render, không đổi khổ hình.
    - **Bản giao cuối chỉ render qua cổng:** `node $OV/scripts/render-final.mjs --project . -- --output renders/<name>-16x9.mp4` (9:16: thêm `-c compositions/main-9x16.html`). Script tự chạy `check-preflight --stage final` rồi `hyperframes render --quality delivery`; exit **5** là thiếu plan/demo/duyệt. Không gọi thẳng `hyperframes render --quality delivery`.
+   - Sau khi render, `render-final.mjs` thay tiếng bằng bản mix của `audio-mix.mjs` (ffmpeg), trừ khi composition có tiếng động (`data-fx-chain`, `data-automation`, tween volume…) thì giữ bản mix của HyperFrames. Script ghi kèm `<output>.render.json`.
+   - **Chỉ đổi nhạc, SFX hay mức âm** thì không render lại hình: `node $OV/scripts/render-final.mjs --project ./ --audio-only renders/<cũ>.mp4 -- --output renders/<mới>.mp4` (9:16: thêm `-c compositions/main-9x16.html`). File âm thanh mới để trong `assets/voice/`, `assets/sfx/` hoặc `assets/bgm/`. Exit **6** là không đổi tiếng được (thiếu sidecar, hình đã đổi, tiếng động…), khi đó render đầy đủ.
 
 8. **QA.** Mọi bản render đều chạy `node $OV/scripts/qc-mp4.mjs renders/<name>.mp4 --project ./ --write-qa` trước; còn dòng FAIL (exit 1) thì sửa rồi render lại, WARN thì xem và ghi lý do vào `QA.md`. Sau đó làm theo `references/qa-checklist.md` § "Vòng QA tự xem video": lint + check → `video-lint.mjs` → render vN → `judge.mjs check`, từ v2 thêm `pair`. Ghi kết quả vào `QA.md`. Tối đa 3 vòng, sau đó dừng lại và báo người dùng kèm bằng chứng.
 
@@ -191,7 +193,8 @@ Cần bản đăng theo từng nơi thì xuất từ bản final bằng `node $O
 | `scripts/setup-check.mjs` | Bước 0: đủ công cụ, skill, key chưa (`READY` / `NOT READY` + lệnh sửa theo hệ điều hành) |
 | `scripts/check-preflight.mjs` | Bước 4b (`--stage plan`) và 6b (`--stage final`): cổng plan + demo + duyệt |
 | `scripts/make-demo.mjs` | Bước 6b: chụp khung hình demo theo `PLAN.md`, ghi `DEMO.md`; `--from-video` cắt từ bản nháp người dùng đã xem |
-| `scripts/render-final.mjs` | Bước 7: render bản giao (`--quality delivery`) chỉ khi cổng final PASS (exit 5 nếu chặn) |
+| `scripts/render-final.mjs` | Bước 7: render bản giao (`--quality delivery`) chỉ khi cổng final PASS (exit 5 nếu chặn), mix lại tiếng bằng `audio-mix.mjs` và ghi `<output>.render.json`; `--audio-only <cũ.mp4>` chỉ thay tiếng, giữ hình (exit 6 nếu không thay được) |
+| `scripts/audio-mix.mjs` | Bước 7 (do `render-final` gọi): dựng lại tiếng của composition thành một WAV bằng ffmpeg từ các thuộc tính audio tĩnh; `--dry-run` in lệnh ffmpeg |
 | `scripts/qc-mp4.mjs` | Bước 8: kiểm kỹ thuật file MP4 (khổ hình, thời lượng, khung đen, đứng hình, khoảng lặng, loudness, true peak, bitrate); `--write-qa` ghi vào `QA.md`, exit 1 khi có FAIL |
 | `scripts/export.mjs` | Sau bước 9: bản giao theo nơi đăng (`zalo`, `youtube`, `tiktok`, `facebook`) kèm thumbnail từ khung demo đã duyệt; exit 5 nếu cổng final chặn |
 | `scripts/skill-paths.mjs` | Tìm skill trên mọi agent (Claude Code, Codex, Antigravity, workspace) |

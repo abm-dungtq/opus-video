@@ -90,7 +90,9 @@ Render lại bản cuối qua render-final.mjs khi xong.
 - Nhạc: `eleven.mjs music --prompt "<mô tả tiếng Anh, có BPM>" --seconds <độ dài> --out assets/bgm/<tên>.mp3`. Thoát 3 kèm `MUSIC_UNAVAILABLE` thì `hyperframes media-use resolve --type bgm`.
 - SFX: thử `hyperframes media-use resolve --type sfx` trước, không hợp thì `eleven.mjs sfx`. Mỗi tiếng gắn với một hành động hình, tối đa 2 tiếng trong 3 giây.
 - Mức âm: nhạc khi có giọng -28 đến -31 LUFS, bản master khoảng -14 LUFS và -1 dBTP, chỉnh bằng `hyperframes normalize-audio` rồi đo lại.
-- Nhạc và SFX không qua cổng viet-pro, nhưng bản giao vẫn đi qua `render-final.mjs`.
+- File nhạc và SFX mới đặt trong `assets/bgm/` và `assets/sfx/`, rồi chỉ thay tiếng của bản final cũ, không render lại hình: `node $OV/scripts/render-final.mjs --project ./ --audio-only renders/<cũ>.mp4 -- --output renders/<mới>.mp4` (bản 9:16 thêm `-c compositions/main-9x16.html`). Với video dài 60 giây, việc này mất khoảng 1 giây thay vì gần 2 phút render lại.
+- Lệnh thoát 6 (file cũ không có sidecar `.render.json`, hình đã đổi, hoặc composition có tiếng động như `data-fx-chain`) thì agent render đầy đủ bằng `render-final.mjs`.
+- Nhạc và SFX không qua cổng viet-pro, nhưng `--audio-only` vẫn chạy cổng final như bản render đầy đủ.
 
 #### Case tham khảo
 

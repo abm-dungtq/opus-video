@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-13: post-render tools
+
+### Added
+- `scripts/qc-mp4.mjs` checks a rendered MP4 before delivery: aspect and duration against `BRIEF.md`, black edges, freezes, silences, loudness, true peak and bitrate. One `LEVEL CODE detail` line per check; `--write-qa` appends the result to `QA.md`, `--json` prints an array. Exit 1 on any FAIL, 2 on bad usage. Tests: `qc-mp4.test.mjs`.
+- `scripts/export.mjs` writes per-platform delivery copies (`zalo`, `youtube`, `tiktok`, `facebook`) next to a final MP4, loudness-normalized to -14 LUFS, plus a thumbnail from an approved demo frame. It re-runs the final preflight (exit 5), never overwrites, and deletes an output that fails its post-export check. The `zalo` and `facebook` settings are assumptions, not checked against platform docs. Tests: `export.test.mjs`.
+- `scripts/audio-mix.mjs` rebuilds a composition's sound as one 48 kHz stereo WAV with ffmpeg from the static audio attributes in its HTML. `--dry-run` prints the ffmpeg command.
+- `render-final.mjs --audio-only <old.mp4> -- --output <new.mp4>` swaps in a new mix (music, SFX, volumes) while copying the old video stream, about 1 s instead of a full render (about 108–111 s for a 60 s 9:16 video). It needs the old file's sidecar, the same composition and the same picture, and no dynamic sound; otherwise it exits 6.
+- Every single-MP4 `render-final` writes `<output>.render.json` (`composition`, `visual_hash`, `audio_hash`, `mode`, `mixer`, `source`, `source_sha256`, `created`).
+- `docs/huong-dan-chuyen-sau.md`, an in-depth feature guide in Vietnamese, and the prompt library in `docs/thu-vien-prompt/`.
+
+### Changed
+- `render-final.mjs` always replaces the HyperFrames sound with the `audio-mix` mix, unless the composition has dynamic sound (`data-audio-group`, `data-automation`, `data-fx-chain`, `data-fx-carve`, a volume tween or script, or sound inside a sub-scene), which keeps the HyperFrames mix. Measured loudness difference between the two mixers: 0.1 LU.
+- `render-final.mjs` checks that ffmpeg and ffprobe run before the render (exit 2 when missing), and exits 2 when a render without `--output` leaves several new MP4s in `renders/`.
+- `references/qa-checklist.md` and `references/audio-pipeline.md` measure loudness, black edges and the other technical checks with `qc-mp4.mjs` instead of hand-typed ffmpeg commands. `audio-pipeline.md` gains "Đổi tiếng không render lại".
+- SKILL.md: step 7 covers the audio-mix remux and `--audio-only`, step 8 starts with `qc-mp4.mjs`, and delivery adds `export.mjs`. The Tham chiếu table lists `qc-mp4.mjs`, `export.mjs` and `audio-mix.mjs`.
+
 ## 2026-10-12: portable install for every agent and OS; plan and demo gates before the final render
 
 ### Added

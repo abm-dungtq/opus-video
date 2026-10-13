@@ -193,7 +193,7 @@ node $OV/scripts/render-final.mjs --project . -- --output renders/<name>-16x9.mp
 node $OV/scripts/render-final.mjs --project . -- -c compositions/main-9x16.html --output renders/<name>-9x16.mp4
 ```
 
-`render-final.mjs` chạy `check-preflight --stage final` rồi `hyperframes render --quality delivery` với các tham số sau `--`. Mã thoát: 5 là cổng chặn, 2 là sai cú pháp (kể cả khi truyền `--quality` hay `-q`), còn lại là mã thoát của chính lệnh render. Không gọi thẳng `hyperframes render --quality delivery`. `--resolution` chỉ đổi kích thước render, không đổi khổ hình. Project 9:16 riêng thì chạy lệnh ngay trong thư mục đó.
+`render-final.mjs` chạy `check-preflight --stage final`, kiểm ffmpeg và ffprobe chạy được, rồi `hyperframes render --quality delivery` với các tham số sau `--`. Render xong, script thay tiếng bằng bản mix của `audio-mix.mjs` và ghi `<output>.render.json` (mục 10.3). Mã thoát: 5 là cổng chặn, 2 là sai cú pháp (kể cả khi truyền `--quality` hay `-q`) hoặc thiếu ffmpeg, 1 là mix lại tiếng lỗi, còn lại là mã thoát của chính lệnh render. Chỉ đổi nhạc, SFX hay mức âm thì dùng `--audio-only` thay cho render lại (mục 10.3). Không gọi thẳng `hyperframes render --quality delivery`. `--resolution` chỉ đổi kích thước render, không đổi khổ hình. Project 9:16 riêng thì chạy lệnh ngay trong thư mục đó.
 
 ### Bước 8. QA
 
@@ -345,7 +345,7 @@ Lệnh so từng frame của `SCRIPT.md` với `script/NN.txt` (bỏ qua khác b
 
 ### 6.5 Mix
 
-Mức mục tiêu: giọng khoảng -16 LUFS, nhạc nền khi có giọng -28 đến -31 LUFS, nhạc khi không có giọng khoảng -20 LUFS, SFX khoảng -20 LUFS với đỉnh không quá -3 dBTP, bản master khoảng -14 LUFS integrated và -1 dBTP. Chỉnh bằng `hyperframes normalize-audio` và limiter ở bus master theo skill `hyperframes-audio`, rồi đo lại. Bảng đầy đủ ở [audio-pipeline.md](../references/audio-pipeline.md).
+Mức mục tiêu: giọng khoảng -16 LUFS, nhạc nền khi có giọng -28 đến -31 LUFS, nhạc khi không có giọng khoảng -20 LUFS, SFX khoảng -20 LUFS với đỉnh không quá -3 dBTP, bản master khoảng -14 LUFS integrated và -1 dBTP. Chỉnh bằng `hyperframes normalize-audio` và limiter ở bus master theo skill `hyperframes-audio`, rồi đo lại bằng `qc-mp4.mjs` (mục 10.1). Bảng đầy đủ ở [audio-pipeline.md](../references/audio-pipeline.md). Bản giao không giữ bản mix của HyperFrames mà dựng lại bằng `audio-mix.mjs` (mục 10.3).
 
 ### 6.6 Nhánh footage thật (beta)
 
@@ -534,6 +534,48 @@ Thumbnail lấy từ các dòng `- demo/....png (<nhãn>)` dưới mục `## Fra
 | 2 | Sai cú pháp, không có file vào, hoặc file ra đã có |
 | 5 | Cổng chặn: `check-preflight --stage final` không PASS hoặc demo chưa duyệt |
 
+### 10.3 `render-final --audio-only` và `audio-mix.mjs`, đổi tiếng không render lại
+
+`render-final.mjs` luôn dựng lại tiếng của bản giao bằng `audio-mix.mjs`, một lệnh ffmpeg đọc các thuộc tính audio tĩnh trong composition: mọi `<audio>` và `<video>` không `muted` (bỏ qua `data-volume="0"`), với `data-start`, `data-duration`, `data-volume`, `data-media-start`, `data-playback-rate`. Vì tiếng do ffmpeg dựng từ HTML, có thể đổi tiếng của một bản final cũ mà không render lại hình. Đo trên video 9:16 dài 60 giây: render đầy đủ mất khoảng 108 đến 111 giây, `--audio-only` khoảng 1 giây; loudness của bản mix HyperFrames và bản `audio-mix` lệch 0,1 LU.
+
+Dùng khi chỉ đổi nhạc nền, SFX hay mức âm. Đổi lời đọc, chữ, hình hay thời lượng thì render đầy đủ.
+
+```bash
+node $OV/scripts/render-final.mjs --project . --audio-only renders/<cũ>.mp4 -- --output renders/<mới>.mp4
+node $OV/scripts/render-final.mjs --project . --audio-only renders/<cũ>-9x16.mp4 -- -c compositions/main-9x16.html --output renders/<mới>-9x16.mp4
+```
+
+- Lệnh chạy cùng cổng final như render đầy đủ. Sau `--` chỉ nhận `-c` và `--output`; `--output` bắt buộc và không được trùng file cũ.
+- Script chép nguyên luồng hình của file cũ, ghép tiếng mới vào `--output` và ghi sidecar với `mode` là `audio-only`. File tạm nằm cạnh file ra, không nằm trong `/tmp`.
+- Tiếng không đổi so với sidecar thì lệnh báo file cũ vẫn đúng, thoát 0 và không ghi file mới.
+- File âm thanh mới đặt trong `assets/voice/`, `assets/sfx/` hoặc `assets/bgm/`. Các file khác trong `assets/` được tính vào hình.
+- `audio-mix.mjs` chạy riêng được để xem lệnh ffmpeg: `node $OV/scripts/audio-mix.mjs --html index.html --duration <giây> --out mix.wav --base ./ --dry-run`. Đầu ra là WAV 48 kHz stereo. Mã thoát: 0 xong, 1 ffmpeg lỗi, 2 sai cú pháp hoặc thiếu file `src`.
+
+**Sidecar** `<output>.render.json` được ghi sau mỗi lần `render-final` ra một file MP4 (`--format` khác mp4 hay `--batch` thì không có sidecar):
+
+| Trường | Nghĩa |
+|---|---|
+| `composition` | Composition đã render, ví dụ `index.html` hay `compositions/main-9x16.html` |
+| `visual_hash` | Băm phần hình: composition và các cảnh con đã bỏ `<audio>` và `data-volume`, file không phải HTML trong `compositions/`, `assets/` trừ `voice/`, `sfx/`, `bgm/`, và mọi file cục bộ được tham chiếu (`src`, `<link href>`, `url()`, kể cả `../` ra ngoài dự án) |
+| `audio_hash` | Băm các track tiếng và nội dung file của chúng |
+| `mode` | `full` hoặc `audio-only` |
+| `mixer` | `audio-mix`, hoặc `hyperframes` khi giữ bản mix của HyperFrames (tiếng động, hoặc composition không có track tiếng) |
+| `source` | File cũ đã lấy hình (chỉ với `audio-only`) |
+| `source_sha256` | sha256 của chính file MP4 này. Nén hay sửa file sau khi render thì không còn khớp |
+| `created` | Thời điểm ghi |
+
+**Điều kiện chặn.** `--audio-only` chỉ chạy khi file cũ có sidecar, `source_sha256` khớp file, sidecar cùng composition, `visual_hash` không đổi và không có tiếng động. Tiếng động là những thứ chỉ HyperFrames mix được: `data-audio-group`, `data-automation`, `data-fx-chain`, `data-fx-carve`, tween GSAP trên volume hoặc script gán `.volume`, và `<audio>` hay `<video>` có tiếng trong một cảnh con. Gặp tiếng động, render đầy đủ vẫn giữ bản mix của HyperFrames (`mixer` là `hyperframes`).
+
+Cảnh con là các file nhúng qua `data-composition-src` (đệ quy). Composition anh em như `compositions/main-9x16.html` cạnh `index.html` không phải cảnh con. Đường dẫn trong composition tìm theo thư mục của composition trước, không thấy thì tìm từ gốc dự án, giống HyperFrames. Đường dẫn trong tham số lệnh và sau `--audio-only` tính từ thư mục dự án.
+
+| Mã thoát | Nghĩa |
+|---|---|
+| 0 | Xong, hoặc tiếng không đổi |
+| 1 | Mix hay ghép tiếng lỗi. Với render đầy đủ, file ra giữ tiếng của HyperFrames |
+| 2 | Sai cú pháp, thiếu ffmpeg hoặc ffprobe, hoặc render đầy đủ không có `--output` mà `renders/` có nhiều file MP4 mới |
+| 5 | Cổng final chặn |
+| 6 | Không đổi tiếng được: không có sidecar, sidecar không khớp file, khác composition, hình đã đổi, có tiếng động, hoặc thiếu file được tham chiếu |
+
 ## 11. Xử lý sự cố
 
 | Triệu chứng | Nguyên nhân | Cách sửa |
@@ -553,6 +595,13 @@ Thumbnail lấy từ các dòng `- demo/....png (<nhãn>)` dưới mục `## Fra
 | `render-final.mjs` thoát 5 | Thiếu plan, demo, hoặc chưa có lời duyệt | Chạy `check-preflight.mjs --stage final` trong thư mục dự án để xem lý do |
 | Cổng final chặn dù đã chụp demo | Sửa `PLAN.md` sau khi chụp, khung cũ hơn plan | Chạy lại `make-demo.mjs` và xin duyệt lại |
 | `render-final.mjs` thoát 2 | Truyền `--quality` hoặc `-q` | Bỏ cờ đó, lệnh luôn render `delivery` |
+| `render-final.mjs` thoát 2, báo `cannot run ffmpeg` | Chưa cài ffmpeg (kèm ffprobe) | Cài ffmpeg, chạy `setup-check.mjs`, rồi render lại |
+| `render-final.mjs` thoát 2, báo `new MP4s in renders/` | Không có `--output` mà lần render tạo nhiều MP4 mới | Truyền `--output renders/<tên>.mp4` sau `--` |
+| `--audio-only` thoát 6, báo `has no sidecar` hoặc `sha256 differs` | File cũ render trước khi có sidecar, hoặc đã nén hay sửa sau khi render | Render đầy đủ một lần bằng `render-final.mjs`, lần sau mới đổi tiếng riêng được |
+| `--audio-only` thoát 6, báo `was rendered from` | Sai composition (thiếu hoặc thừa `-c`) | Truyền đúng `-c` như lần render file cũ |
+| `--audio-only` thoát 6, báo `picture changed` | Đã sửa hình, chữ, file trong `compositions/` hay `assets/` ngoài `voice/`, `sfx/`, `bgm/` | Render đầy đủ; file tiếng mới để trong ba thư mục trên |
+| `--audio-only` thoát 6, báo `dynamic effects` | Composition có tiếng động (mục 10.3) | Render đầy đủ, HyperFrames giữ bản mix |
+| `--audio-only` thoát 6, báo `not found` | Thiếu file mà composition tham chiếu | Khôi phục file hoặc sửa đường dẫn rồi chạy lại |
 | `make-demo --from-video` từ chối | Bản nháp cũ hơn composition | Render lại bản nháp rồi cắt khung |
 | `find-cases` in `no matching cases` | Từ khoá không khớp | Bỏ `--keyword`, tra lại chỉ theo nhóm |
 | `rerank-cases: Jev unavailable (HTTP 401)` | Key Jev sai hoặc hết hạn | Quy trình vẫn chạy với kết quả `find-cases`, báo người dùng về key |
