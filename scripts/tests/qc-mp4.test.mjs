@@ -134,7 +134,7 @@ test("TRUE_PEAK warns above -1 dBFS and fails above 0", () => {
 test("BITRATE warns above 12 Mbit/s and asks to compress", () => {
   const w = pick(evaluate({ ...GOOD, bitRate: 50e6 }, BRIEF, 60), "BITRATE");
   assert.equal(w[0].level, "WARN");
-  assert.match(w[0].detail, /cần nén trước khi giao/);
+  assert.match(w[0].detail, /chạy export\.mjs/);
 });
 
 // CLI: usage errors need no ffmpeg.

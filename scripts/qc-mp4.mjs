@@ -14,7 +14,7 @@
 //   SILENCE    WARN each silence of 1.5s or more (silencedetect -50dB d=1.5) · FAIL whole file silent
 //   LOUDNESS   WARN integrated loudness (ebur128) outside [-16, -12] LUFS
 //   TRUE_PEAK  WARN above -1 dBFS · FAIL above 0 dBFS
-//   BITRATE    WARN above 12 Mbit/s (not compressed yet, compress before delivery)
+//   BITRATE    WARN above 12 Mbit/s (not compressed yet, run export.mjs)
 // --project <dir>  read <dir>/BRIEF.md frontmatter (aspect, duration_s).
 // --write-qa       append a "## qc-mp4 <file> <YYYY-MM-DD HH:mm>" block to <project>/QA.md
 //                  (created if missing); needs --project.
@@ -139,7 +139,7 @@ export function evaluate(metrics, brief, duration) {
 
   const br = Number(m.bitRate);
   if (!(br > 0)) add("BITRATE", "PASS", "không đọc được bit_rate");
-  else add("BITRATE", br > L.bitrateMax ? "WARN" : "PASS", `${fmt(br / 1e6)} Mbit/s${br > L.bitrateMax ? " (chưa nén, cần nén trước khi giao)" : ""}`);
+  else add("BITRATE", br > L.bitrateMax ? "WARN" : "PASS", `${fmt(br / 1e6)} Mbit/s${br > L.bitrateMax ? " (chưa nén, chạy export.mjs)" : ""}`);
   return out;
 }
 
