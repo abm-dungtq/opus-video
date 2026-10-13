@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseTracks, buildArgs } from "../audio-mix.mjs";
+import { parseTracks, buildArgs, dynamicAudio } from "../audio-mix.mjs";
 
 const CLI = fileURLToPath(new URL("../audio-mix.mjs", import.meta.url));
 const BASE = "/proj";
@@ -37,17 +37,18 @@ test("parseTracks: a <video> written over several lines", () => {
   assert.deepEqual(t[0], { src: "/proj/assets/video/clip.mp4", start: 0.5, duration: 60.18, volume: 0.8, mediaStart: 0, rate: 1, group: null });
 });
 
-test("buildArgs: per-track filters, adelay in ms, amix without normalize", () => {
+test("buildArgs: per-track filters, adelay in ms, amix without normalize, length bounded by samples and -t", () => {
   const t = parseTracks(HTML, BASE);
   const args = buildArgs(t, 12, "/tmp/out.wav");
   const fc = args[args.indexOf("-filter_complex") + 1];
   assert.equal(args.filter((a) => a === "-i").length, 3);
   assert.match(fc, /adelay=1500:all=1/);
-  assert.match(fc, /amix=inputs=3:normalize=0,apad,atrim=duration=12\[out\]/);
+  assert.match(fc, /amix=inputs=3:normalize=0,apad=whole_dur=12,atrim=end_sample=576000\[out\]/);
   assert.match(fc, /\[1:a\]atrim=start=2:duration=10,asetpts=PTS-STARTPTS,volume=0\.3,adelay=0:all=1,aresample=48000\[a1\]/);
   assert.match(fc, /\[2:a\]atrim=start=0:duration=7\.5,asetpts=PTS-STARTPTS,atempo=1\.25,volume=1,adelay=3000:all=1/);
   assert.ok(!fc.split(";")[0].includes("atempo"), "rate 1 adds no atempo");
-  assert.deepEqual(args.slice(-5), ["-ar", "48000", "-ac", "2", "/tmp/out.wav"]);
+  assert.deepEqual(args.slice(-9), ["-ar", "48000", "-ac", "2", "-t", "12", "-fs", String(576000 * 4 + (1 << 20)), "/tmp/out.wav"]);
+  assert.ok(args.includes("-nostdin"));
   assert.throws(() => buildArgs([], 3, "/tmp/x.wav"), /no audible tracks/);
 });
 
@@ -85,5 +86,36 @@ test("CLI: mixes two sine files into a WAV of the requested length", () => {
     assert.ok(Math.abs(Number(info.format.duration) - 3) <= 0.05, `duration ${info.format.duration}`);
     assert.equal(info.streams[0].sample_rate, "48000");
     assert.equal(info.streams[0].channels, 2);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("dynamicAudio: flags Web Audio attributes and GSAP volume tweens, not the word fade", () => {
+  const plain = `<div class="fade-in"></div><audio src="a.mp3" data-volume="0.3"></audio>
+<script>tl.to("#t", { opacity: 0 }); // fade out the title</script>`;
+  assert.deepEqual(dynamicAudio(plain), []);
+  assert.deepEqual(dynamicAudio(`<!-- <audio data-automation="x"> --><p>no</p>`), [], "comments are ignored");
+  assert.deepEqual(dynamicAudio(`<audio src="v.mp3" data-audio-group="voiceover"></audio>`), ["data-audio-group"]);
+  assert.deepEqual(dynamicAudio(`<audio\n  src="b.mp3"\n  data-automation='[]' data-fx-chain="eq"></audio><audio data-fx-carve="vo"></audio>`), ["data-automation", "data-fx-chain", "data-fx-carve"]);
+  assert.deepEqual(dynamicAudio(`<script>tl.to(bgm, { volume: 0, duration: 1 }, 4);</script>`), ["GSAP tween on volume"]);
+  assert.deepEqual(dynamicAudio(`<script>gsap.fromTo(a, {"volume": 1}, {"volume": 0});</script>`), ["GSAP tween on volume"]);
+  assert.deepEqual(dynamicAudio(`<p>volume: loud</p>`), [], "only inside <script>");
+  assert.deepEqual(dynamicAudio(`<script>document.querySelector("#bgm").volume = 0.2;</script>`), ["script sets .volume"]);
+  assert.deepEqual(dynamicAudio(`<script>if (a.volume === 1) {}</script>`), [], "a comparison is not an assignment");
+});
+
+test("parseTracks/--base: a src missing next to the HTML falls back to the project root", () => {
+  const dir = mkdtempSync(join(tmpdir(), "amix-base-"));
+  try {
+    const sub = join(dir, "compositions");
+    mkdirSync(sub);
+    mkdirSync(join(dir, "assets"));
+    spawnSync("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", join(dir, "assets/a.wav")]);
+    const html = join(sub, "main-9x16.html");
+    writeFileSync(html, `<audio src="assets/a.wav" data-start="0" data-duration="1"></audio>`);
+    assert.equal(parseTracks(readFileSync(html, "utf8"), sub)[0].src, join(sub, "assets/a.wav"));
+    assert.equal(parseTracks(readFileSync(html, "utf8"), sub, dir)[0].src, join(dir, "assets/a.wav"));
+    assert.equal(spawnSync("node", [CLI, "--html", html, "--duration", "1", "--out", join(dir, "m.wav")], { encoding: "utf8" }).status, 2, "without --base the src is missing");
+    const r = spawnSync("node", [CLI, "--html", html, "--duration", "1", "--out", join(dir, "m.wav"), "--base", dir], { encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

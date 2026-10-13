@@ -137,12 +137,14 @@ test("isPng reads the signature; writeDemoMd lists frames and resets approval", 
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test("render-final: blocked preflight → exit 5 without rendering; pass → delivery render with forwarded args", () => {
+test("render-final: blocked preflight → exit 5 without rendering; pass → delivery render with forwarded args, render's exit code", () => {
   const calls = [];
-  const spawn = (cmd, args, opts) => { calls.push({ cmd, args, cwd: opts.cwd }); return { status: 0 }; };
+  // ffmpeg/ffprobe -version succeed; the render itself fails with 3
+  const spawn = (cmd, args, opts) => { if (cmd !== "npx") return { status: 0 }; calls.push({ cmd, args, cwd: opts.cwd }); return { status: 3 }; };
   assert.equal(renderFinal(["--project", "/p"], { checkImpl: () => ({ pass: false, stage: "final", errors: ["x"], warnings: [] }), spawn }), PREFLIGHT_EXIT);
   assert.equal(calls.length, 0);
-  assert.equal(renderFinal(["--project", "/p", "--", "-c", "compositions/main-9x16.html", "--output", "renders/x.mp4"], { checkImpl: () => ({ pass: true, stage: "final", errors: [], warnings: [] }), spawn }), 0);
+  assert.equal(renderFinal(["--project", "/p", "--", "-c", "compositions/main-9x16.html", "--output", "renders/x.mp4"], { checkImpl: () => ({ pass: true, stage: "final", errors: [], warnings: [] }), spawn }), 3);
+  assert.equal(calls.length, 1, "a failed render is not remixed");
   assert.deepEqual(calls[0].args, ["hyperframes", "render", "--quality", "delivery", "-c", "compositions/main-9x16.html", "--output", "renders/x.mp4"]);
   assert.equal(calls[0].cwd, "/p");
   assert.equal(renderFinal(["--", "--quality", "draft"], { checkImpl: () => ({ pass: true, errors: [], warnings: [] }), spawn }), 2);
