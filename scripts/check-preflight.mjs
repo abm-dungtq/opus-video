@@ -42,7 +42,8 @@
 // Readable hold, both stages, every project, WARN only (thresholds not yet calibrated): a "## Cảnh"
 //   row whose quoted text ("…", “…”, «…») in the Hình column stays up shorter than
 //   max(1s, words / 2.5 + 0.5s) — 2.5 words/s from viet-pro's speech rate, 0.5s eye-landing is
-//   an assumption. Quotes in the Lời đọc column do not count.
+//   an assumption. Quotes in the Lời đọc column do not count. A cell may state `(giữ đến <t>s)` /
+//   `(giữ đến hết)`; the hold is then measured to that mark.
 // Exit: 0 pass · 1 blocked · 2 bad usage.
 
 import { existsSync, readFileSync, readdirSync, statSync, openSync, readSync, closeSync, realpathSync } from "node:fs";
@@ -100,8 +101,13 @@ export function parsePlan(text) {
 const MUSIC_ONLY = /^(?:|-|—|–|\(?nhac\)?|\(?chi nhac\)?|khong loi|\(khong loi\)|\(im lang\)|im lang|music only)$/;
 // "0–1.5s", "1.5 - 3s", "0.0s - 4.9s" → seconds (0 when unreadable)
 export function spanSeconds(cell) {
+  const b = spanBounds(cell);
+  return b ? Math.max(0, b.end - b.start) : 0;
+}
+// Same cell → { start, end } in seconds, or null when unreadable.
+export function spanBounds(cell) {
   const m = String(cell || "").replace(/,/g, ".").match(/(\d+(?:\.\d+)?)\s*s?\s*[-–—→]\s*(\d+(?:\.\d+)?)/);
-  return m ? Math.max(0, Number(m[2]) - Number(m[1])) : 0;
+  return m ? { start: Number(m[1]), end: Number(m[2]) } : null;
 }
 const col = (headers, re) => headers.findIndex((h) => re.test(h));
 
@@ -119,23 +125,39 @@ export function readableHold(words) {
   return Math.max(MIN_HOLD_S, words / READ_WPS + EYE_LAND_S);
 }
 
+// Hold mark in the picture cell: "(giữ đến 15s)", "(giữ tới 2,8s)", "(giữ đến hết)" — seconds on the
+// root timeline (same convention as "## Sự kiện"). "giữ hình khoảng 1 giây cuối" is not a mark.
+const HOLD_MARK = /giu (?:den|toi) (?:(het)|(\d+(?:\.\d+)?))/;
+
 // parseTable output of "## Cảnh" → WARN lines for rows whose quoted text in the picture column
 // ("Hình / hiệu ứng") leaves before it can be read. Lời đọc quotes are not on-screen text;
-// rows with an unreadable Thời điểm cell are skipped.
+// rows with an unreadable Thời điểm cell are skipped. Without a hold mark the text is assumed to
+// leave when the beat ends; a mark later than the beat start measures the hold to that mark.
 export function holdWarnings(table) {
   const pic = col(table.headers, /hinh/);
   const tm = col(table.headers, /thoi diem|thoi gian|^t$|time/);
   if (pic < 0 || tm < 0) return [];
+  const ends = table.rows.map((r) => spanBounds(r[tm])).filter(Boolean).map((b) => b.end);
+  const lastEnd = ends.length ? Math.max(...ends) : 0;
   const out = [];
   table.rows.forEach((r, i) => {
     const len = spanSeconds(r[tm]);
     if (!len) return;
-    const quotes = [...String(r[pic] || "").matchAll(QUOTED)].map((m) => (m[1] ?? m[2] ?? m[3]).trim()).filter(Boolean);
+    const cell = String(r[pic] || "");
+    const quotes = [...cell.matchAll(QUOTED)].map((m) => (m[1] ?? m[2] ?? m[3]).trim()).filter(Boolean);
     if (!quotes.length) return;
-    const words = quotes.reduce((n, q) => n + q.split(/\s+/).filter(Boolean).length, 0);
+    const counts = quotes.map((q) => q.split(/\s+/).filter(Boolean).length);
+    const words = counts.reduce((a, b) => a + b, 0);
     const need = readableHold(words);
-    if (len >= need) return;
-    out.push(`PLAN.md "## Cảnh" row ${i + 1}: chữ trên hình "${quotes[0].slice(0, 40)}" (${words} từ) cần giữ ≥ ${need.toFixed(1)}s, beat dài ${Number(len.toFixed(2))}s`);
+    const { start } = spanBounds(r[tm]);
+    const mark = fold(cell.replace(/,/g, ".")).match(HOLD_MARK);
+    const until = mark ? (mark[1] ? lastEnd : Number(mark[2])) : null;
+    const marked = until !== null && until > start;
+    const hold = marked ? until - start : len;
+    if (hold + 1e-6 >= need) return;
+    const longest = quotes[counts.indexOf(Math.max(...counts))];
+    const tail = marked ? `giữ tới ${Number(until.toFixed(2))}s, được ${hold.toFixed(1)}s` : `beat dài ${Number(len.toFixed(2))}s`;
+    out.push(`PLAN.md "## Cảnh" row ${i + 1}: chữ trên hình "${longest.slice(0, 40)}" (${words} từ) cần giữ ≥ ${need.toFixed(1)}s, ${tail}`);
   });
   return out;
 }

@@ -62,7 +62,7 @@ HyperFrames <workflow> (hoặc Remotion/Canvas) và lý do; composition nào cho
 Lệnh sẽ chạy ở bước 8 (lint, check, video-lint, qc-mp4 MOTION, judge) và tiêu chí đạt.
 ```
 
-Cổng plan kiểm: đủ 6 mục, bảng Cảnh có ít nhất một dòng, số mốc demo ≥ số cảnh, và có mục 9:16 khi `aspect: both`. Sửa plan sau khi đã chụp demo thì phải chụp lại (frame cũ hơn `PLAN.md` bị chặn).
+Cổng plan kiểm: đủ 6 mục, bảng Cảnh có ít nhất một dòng, số mốc demo ≥ số cảnh, và có mục 9:16 khi `aspect: both`. Chữ trên hình là chuỗi trong ngoặc kép ở cột Hình; cổng WARN khi beat ngắn hơn `số từ / 2,5 + 0,5 s` (tối thiểu 1 s). Chữ còn ở lại qua beat sau thì ghi `(giữ đến 15s)` hoặc `(giữ đến hết)` trong ô Hình, tính bằng giây trên timeline gốc. Sửa plan sau khi đã chụp demo thì phải chụp lại (frame cũ hơn `PLAN.md` bị chặn).
 
 **Bảng `## Sự kiện`** ghi mỗi khoảnh khắc trên hình có gắn tiếng:
 

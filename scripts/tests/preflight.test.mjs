@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { check, parsePlan, isPng, readableHold, holdWarnings, parseTable } from "../check-preflight.mjs";
+import { check, parsePlan, isPng, readableHold, holdWarnings, parseTable, spanBounds, spanSeconds } from "../check-preflight.mjs";
 import { main as renderFinal, PREFLIGHT_EXIT } from "../render-final.mjs";
 import { writeDemoMd } from "../make-demo.mjs";
 
@@ -75,6 +75,41 @@ test("holdWarnings: quoted on-screen text shorter than its reading time warns", 
 test("holdWarnings: quotes in the voice-over column are not on-screen text", () => {
   const row = '| 1 | 0–1s | "Từ kế hoạch đến kiểm thử, mọi bước đều rõ" | Logo bật lên | whoosh |';
   assert.deepEqual(holdWarnings(parseTable(HEAD + row)), []);
+});
+
+const ROW1 = 'Styleframe đã duyệt: con trỏ nhấp nháy, câu "Sửa lỗi đăng nhập giúp mình" gõ từng cụm, camera bám con trỏ; ba chip đính kèm bật vào hàng đính kèm; nút gửi lún ở 2,2 giây';
+const ROW4 = 'Dòng "Kiểm thử" nở thành thẻ kết quả bốn dấu tích; khung lệnh hoá thành thẻ, tiêu đề "Gemini 4 Argon" quét sáng, dòng "Từ kế hoạch đến kiểm thử"; camera lùi chậm, giữ hình khoảng 1 giây cuối';
+const REAL = (r1 = ROW1) => HEAD + `| 1 | 0–2.5s | — | ${r1} | keycap |\n| 4 | 11.4–15s | — | ${ROW4} | impact |`;
+
+test("spanBounds: start and end seconds of a Thời điểm cell; spanSeconds unchanged", () => {
+  assert.deepEqual(spanBounds("11.4–15s"), { start: 11.4, end: 15 });
+  assert.equal(spanBounds("—"), null);
+  assert.equal(spanSeconds("0–1.5s"), 1.5);
+});
+
+test("holdWarnings: names the longest string; a vague 'giữ hình' is not a hold mark", () => {
+  const w = holdWarnings(parseTable(REAL()));
+  assert.equal(w.length, 2);
+  assert.ok(w[0].includes('"Sửa lỗi đăng nhập giúp mình" (6 từ) cần giữ ≥ 2.9s, beat dài 2.5s'), w[0]);
+  assert.ok(w[1].includes('"Từ kế hoạch đến kiểm thử" (11 từ) cần giữ ≥ 4.9s, beat dài 3.6s'), w[1]);
+});
+
+test("holdWarnings: (giữ đến <t>s) / (giữ đến hết) measures the hold to that mark", () => {
+  let w = holdWarnings(parseTable(REAL(ROW1 + " (giữ đến hết)")));
+  assert.equal(w.length, 1);
+  assert.match(w[0], /row 2: chữ trên hình "Từ kế hoạch đến kiểm thử"/);
+  w = holdWarnings(parseTable(REAL(ROW1 + " (giữ đến 4s)")));
+  assert.equal(w.length, 1);
+  assert.match(w[0], /row 2: chữ trên hình "Từ kế hoạch đến kiểm thử"/);
+  w = holdWarnings(parseTable(REAL(ROW1 + " (giữ tới 2,8s)")));
+  assert.equal(w.length, 2);
+  assert.ok(w[0].includes("giữ tới 2.8s, được 2.8s"), w[0]);
+  w = holdWarnings(parseTable(REAL(ROW1 + " (giữ đến 0s)")));
+  assert.ok(w[0].includes("beat dài 2.5s"), w[0]);
+});
+
+test("holdWarnings: a beat exactly at the reading time does not warn (float rounding)", () => {
+  assert.deepEqual(holdWarnings(parseTable(HEAD + '| 1 | 5.8–8.7s | — | Chữ "Từ kế hoạch đến kiểm thử" hiện ra | whoosh |')), []);
 });
 
 test("plan stage: a brief without direction still gets the hold WARN and passes", () => {
