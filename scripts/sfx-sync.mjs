@@ -30,7 +30,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
-import { parsePlan, parseTable } from "./check-preflight.mjs";
+import { fold, parsePlan, parseTable } from "./check-preflight.mjs";
 import { parseTracks } from "./audio-mix.mjs";
 
 // check-preflight.mjs imports checkSync from this file: the cycle is safe only while every use of
@@ -39,8 +39,6 @@ import { parseTracks } from "./audio-mix.mjs";
 const SECTION = "su kien";
 const NONE = "khong co sfx gan su kien";
 const NO_SOUND = /^(?:|—|–|-)$/;
-// Same folding as check-preflight's headings: strip diacritics, đ → d, lower case, single spaces.
-const fold = (s) => s.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/gi, "d").toLowerCase().replace(/\s+/g, " ").trim();
 
 // ITU-R BT.1359-1: detectable when sound is 45 ms early or 125 ms late; acceptable when 90 ms
 // early or 185 ms late. Sign: deltaMs = (heard − event) × 1000, positive = sound late.

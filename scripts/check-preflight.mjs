@@ -76,7 +76,8 @@ export const SECTIONS = { goal: "muc tieu", scenes: "canh", audio: "am thanh", e
 export const CREATIVE_SECTION = "y do sang tao";
 export const EVENTS_SECTION = "su kien";
 const EVENTS_MISSING = 'PLAN.md has no "## Sự kiện" table (Thời điểm | Sự kiện | Âm thanh); write "không có SFX gắn sự kiện" when no sound is tied to a picture event';
-const fold = (s) => s.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/gi, "d").toLowerCase().replace(/\s+/g, " ").trim();
+// Heading/label folding shared with sfx-sync: strip diacritics, đ → d, lower case, single spaces.
+export const fold = (s) => s.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/gi, "d").toLowerCase().replace(/\s+/g, " ").trim();
 
 // Markdown table → { headers: [folded], rows: [[cell]] } (separator row dropped).
 export function parseTable(body) {
