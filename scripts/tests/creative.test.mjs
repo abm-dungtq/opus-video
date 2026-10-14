@@ -292,6 +292,10 @@ test("make-pitch choose: a deleted PICK.json brand falls back with a WARN; templ
     assert.match(b, /^voice_id: abc123$/m);
     assert.match(b, /^duration_s: 15$/m);
     assert.match(b, /^tts_model: eleven_v5$/m);
+    mkdirSync(join(root, "elsewhere"));
+    writeFileSync(join(root, "elsewhere", "brand.json"), "{ nope");
+    writeFileSync(join(d, "pitch", "PICK.json"), pick(join(root, "elsewhere", "brand.json")));
+    assert.equal(pitchMain(["choose", "--project", d, "--pick", "1"], quiet, quiet), 2);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

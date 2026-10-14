@@ -242,7 +242,7 @@ function choose(o, data) {
   let brand = null, brandWarn = "";
   try { brand = findBrand(project, o.brand || ""); } catch (e) { return { code: 2, msg: e.message }; }
   if (!o.brand && info.brand) {
-    if (existsSync(info.brand)) brand = findBrand(project, info.brand);
+    if (existsSync(info.brand)) { try { brand = findBrand(project, info.brand); } catch (e) { return { code: 2, msg: e.message }; } }
     else brandWarn = `\nWARN brand trong PICK.json không còn: ${info.brand}; dùng ${brand ? brand.path : "không brand"}`;
   }
   if (o.palette === "thuong-hieu" && !brand) return { code: 2, msg: "--palette thuong-hieu cần brand.json (chép references/brand.example.json thành shared-assets/brand.json)" };
