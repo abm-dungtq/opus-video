@@ -184,17 +184,27 @@ export function wordBudget(energy, duration, data = loadDirections()) {
 }
 
 // Seam cell text → [{ token, class: continuous|soft|banned|unknown }]
+const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const hasWord = (text, word) => new RegExp(`(^|[^a-z0-9-])${esc(word)}($|[^a-z0-9-])`).test(text);
 export function classifySeams(cell, data = loadDirections()) {
-  const banned = new Set(data.seam_classes.banned.map(fold));
+  const banned = [...new Set(data.seam_classes.banned.map(fold))];
   const soft = new Set(data.seam_classes.soft);
-  const parts = String(cell || "").replace(/`/g, "").split(/[,;+·/]|\s+và\s+|\s+then\s+/i).map((s) => s.trim()).filter(Boolean);
-  return parts.map((p) => {
-    const f = fold(p);
-    const id = (data.seams || []).find((s) => f === s.id || f.startsWith(`${s.id} `) || f.includes(` ${s.id}`) || f.startsWith(s.id))?.id;
+  const seams = [...(data.seams || [])].sort((a, b) => b.id.length - a.id.length);
+  const whole = fold(String(cell || "").replace(/`/g, ""));
+  const parts = whole.split(/[,;+·/]|\s+va\s+|\s+roi\s+|\s+sau do\s+|\s+then\s+/).map((s) => s.trim()).filter(Boolean);
+  const out = parts.map((f) => {
+    const id = seams.find((s) => hasWord(f, s.id))?.id;
     if (id) return { token: id, class: soft.has(id) ? "soft" : "continuous" };
-    if (banned.has(f) || [...banned].some((b) => f === b || f.startsWith(`${b} `))) return { token: p, class: "banned" };
-    return { token: p, class: "unknown" };
+    const b = banned.find((w) => hasWord(f, w));
+    if (b) return { token: b, class: "banned" };
+    return { token: f, class: "unknown" };
   });
+  // A banned swap left over once known seam ids are masked ("push-slide-fade") still blocks.
+  let rest = whole;
+  for (const s of seams) rest = rest.replace(new RegExp(`(^|[^a-z0-9-])${esc(s.id)}(?=$|[^a-z0-9-])`, "g"), "$1 ");
+  rest = rest.replace(/-/g, " ");
+  for (const w of banned) if (hasWord(rest, w) && !out.some((x) => x.class === "banned" && x.token === w)) out.push({ token: w, class: "banned" });
+  return out;
 }
 
 const tokenLabel = (t) => (t.kind === "sfx" ? t.prompts.map((p) => `"${p}"`).join(", ") : `${t.kind} \`${t.name}\``);

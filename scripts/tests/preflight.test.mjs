@@ -33,7 +33,7 @@ ${demo}
 lint, check, video-lint, judge.
 ${extra}`;
 
-function proj({ plan = PLAN(), brief = "---\naspect: 16:9\ncreative_override: legacy fixture without a creative pitch\n---\n" } = {}) {
+function proj({ plan = PLAN(), brief = "---\naspect: 16:9\n---\n" } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "pf-"));
   writeFileSync(join(dir, "BRIEF.md"), brief);
   if (plan !== null) writeFileSync(join(dir, "PLAN.md"), plan);
@@ -68,7 +68,7 @@ test("plan stage: missing PLAN.md, missing or placeholder sections, too few time
 });
 
 test("aspect both needs a 9:16 demo list and demo/9x16 frames", () => {
-  const dir = proj({ brief: "---\naspect: both\ncreative_override: legacy fixture without a creative pitch\n---\n" });
+  const dir = proj({ brief: "---\naspect: both\n---\n" });
   try {
     assert.ok(check({ project: dir }).errors.some((e) => e.includes("Khung hình demo 9:16")));
     writeFileSync(join(dir, "PLAN.md"), PLAN(undefined, "\n## Khung hình demo 9:16\n- 2\n- 9\n"));

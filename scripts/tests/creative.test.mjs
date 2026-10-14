@@ -71,6 +71,10 @@ test("classifySeams: banned slide swaps, soft seams, continuous seams, unknown t
   assert.deepEqual(c("blur-crossfade"), ["soft"]);
   assert.deepEqual(c("zoom-through, card-morph-anchor"), ["continuous", "continuous"]);
   assert.deepEqual(c("lướt nhẹ"), ["unknown"]);
+  assert.ok(c("zoom-through rồi fade").includes("banned"));
+  assert.ok(!c("zoom-throughx").includes("continuous"));
+  assert.ok(c("push-slide-fade").includes("banned"));
+  assert.deepEqual(classifySeams("zoom-through", data), [{ token: "zoom-through", class: "continuous" }]);
 });
 
 test("preflight plan: the real slideshow project is blocked; the creative plan passes", () => {
@@ -92,8 +96,12 @@ test("preflight plan: banned or soft seams, fake tokens, missing direction, shor
     const r = preflight({ project: d });
     assert.ok(r.errors.some((e) => e.includes("soft seam") && e.includes("A2")));
     assert.ok(r.errors.some((e) => e.includes('"fancy-cta-x" is not a blueprint or rule')));
-    writeFileSync(join(d, "BRIEF.md"), "---\naspect: 9:16\n---\n");
+    writeFileSync(join(d, "BRIEF.md"), "---\naspect: 9:16\nbrief_version: 2\n---\n");
     assert.ok(preflight({ project: d }).errors.some((e) => e.includes("has no `direction:`")));
+    writeFileSync(join(d, "BRIEF.md"), "---\naspect: 9:16\n---\n");
+    const legacy = preflight({ project: d });
+    assert.ok(legacy.warnings.some((w) => w.includes("creative gate skipped")));
+    assert.ok(!legacy.errors.some((e) => e.includes("direction")));
     writeFileSync(join(d, "BRIEF.md"), "---\naspect: 9:16\ncreative_override: ngắn\n---\n");
     assert.ok(preflight({ project: d }).errors.some((e) => e.includes("at least 10 characters")));
   } finally { rmSync(d, { recursive: true, force: true }); }

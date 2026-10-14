@@ -3,7 +3,7 @@
 // user's own topic, the user picks by eye, the choice is written into BRIEF.md. Works the same on
 // every agent: the menu is plain text in PITCH.md plus file paths (no runtime-specific picker).
 //   node make-pitch.mjs init   --project . --topic "<chủ đề>" --aspect <16:9|9:16|both>
-//                              [--category <motion|explainer|3d|interactive|product|story-music>]
+//                              [--category <motion|explainer|3d|interactive|product|story-music|bat-dong-san>]
 //                              [--energy em|vua|don-dap] [--duration 15]
 //   node make-pitch.mjs render --project .
 //   node make-pitch.mjs choose --project . (--pick <1|2|3> | --auto) [--style id] [--visual id]

@@ -17,7 +17,8 @@
 //   - WARN only: a composition file (index.html, compositions/*.html) newer than the newest
 //     demo frame (the demo may not show the current build).
 // Creative gate (SKILL.md step 1b; data/directions.json), both stages, unless BRIEF.md frontmatter
-//   has `creative_override: <reason ≥10 chars>` (printed as a WARN):
+//   has `creative_override: <reason ≥10 chars>` (printed as a WARN). Active when BRIEF has
+//   `direction:` or `brief_version: 2`; older briefs get one WARN:
 //   - BRIEF.md `direction: <A1..A8>` naming a direction in data/directions.json.
 //   - PLAN.md "## Ý đồ sáng tạo" with lines for Hướng, Chuyển cảnh and Luật chống slideshow.
 //   - "## Cảnh" table has a Blueprint/Rule column and a "Nối sang beat sau" (seam) column.
@@ -85,7 +86,11 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
     return null;
   }
   const id = String(fm.direction || "").trim().toUpperCase().split(/\s/)[0];
-  if (!id) { errors.push("BRIEF.md has no `direction:` — run step 1b (directions.mjs pick → make-pitch.mjs init/render → make-pitch.mjs choose), or set `creative_override: <lý do ≥10 ký tự>` for a footage-only project"); return null; }
+  if (!id) {
+    if (Number(fm.brief_version) >= 2) errors.push("BRIEF.md has no `direction:` — run step 1b (directions.mjs pick → make-pitch.mjs init/render → make-pitch.mjs choose), or set `creative_override: <lý do ≥10 ký tự>` for a footage-only project");
+    else warnings.push("creative gate skipped: BRIEF.md has no direction: and no brief_version: 2 (dự án cũ)");
+    return null;
+  }
   const direction = data.directions.find((d) => d.id === id);
   if (!direction) { errors.push(`BRIEF.md direction "${id}" is not in data/directions.json`); return null; }
   const out = { direction: id, tokens: [], seams: 0, musicOnly: 0 };

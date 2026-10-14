@@ -18,6 +18,7 @@ language: vi
 voice_source: <tts | clip>   # clip: lời nói lấy từ clip của người dùng, cổng viet-pro lint phụ đề + chữ trên hình
 voice_id: eGSd0uV8dNQnZuEEX9lu
 tts_model: eleven_v4
+brief_version: 2   # dự án mới: bật cổng sáng tạo (bước 1b); dự án cũ không có dòng này
 # ↓ make-pitch.mjs choose ghi (bước 1b); không gõ tay
 direction: <A1..A8>
 direction_swaps: <none | transition=lao-xuyen-tam; style=…>
@@ -80,6 +81,7 @@ duration_s: 15
 fps: 30
 voice_id: eGSd0uV8dNQnZuEEX9lu
 tts_model: eleven_v4
+brief_version: 2
 direction: A6
 direction_swaps: transition=lao-xuyen-tam
 energy: vua

@@ -51,7 +51,7 @@ const ff = (args) => { const r = spawnSync("ffmpeg", ["-v", "error", "-y", ...ar
 // Project that passes check-preflight --stage final; demo frame is a real PNG made by ffmpeg.
 function project({ approval = 'approval: test 2026-10-13 "ok"' } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "export-"));
-  writeFileSync(join(dir, "BRIEF.md"), "---\naspect: 16:9\ncreative_override: legacy fixture without a creative pitch\n---\n");
+  writeFileSync(join(dir, "BRIEF.md"), "---\naspect: 16:9\n---\n");
   writeFileSync(join(dir, "PLAN.md"), PLAN);
   const t = Date.now() / 1000 - 100;
   utimesSync(join(dir, "PLAN.md"), t, t);

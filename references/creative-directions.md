@@ -75,7 +75,7 @@ Dùng ở **bước 1b** (`SKILL.md`): agent chọn 3 hướng bằng `direction
 - Styleframe 3 giây: 3 giây: đường biểu đồ tự vẽ, vạch đọc quét theo, con số chính của chủ đề đếm lên và khoá lại.
 - Style: style `Swiss Pulse` · Blueprint: `dataviz-countup`, `comparison-split` · Rule: `chart-scrub-readout`, `counting-dynamic-scale`, `stat-bars-and-fills`, `svg-path-draw`
 - Chuyển cảnh: `zoom-through`, `push-slide`
-- SFX: "subtle digital telemetry chirp", "soft tactile UI pop" · Nhịp: em/vua · Nhóm: explainer, product
+- SFX: "subtle digital telemetry chirp", "soft tactile UI pop" · Nhịp: em/vua · Nhóm: explainer, product, bat-dong-san
 
 ### A7 — Tạp chí giấy, bút dạ vẽ tay
 
@@ -91,7 +91,7 @@ Dùng ở **bước 1b** (`SKILL.md`): agent chọn 3 hướng bằng `direction
 - Styleframe 3 giây: 3 giây: sơ đồ/bản đồ của chủ đề, ghim rơi, một đường nối tự vẽ tới điểm thứ hai, nhãn số liệu bật lên.
 - Style: preset `cartesian` · Blueprint: `camera-journey`, `constellation-hub` · Rule: `svg-path-draw`, `viewport-change`, `ai-tracking-box`
 - Chuyển cảnh: `viewport-change`, `multi-phase-camera` (cho phép chuyển cảnh mềm: `focus-pull`, `blur-crossfade`, `cross-warp-morph`, `thermal-distortion`, `light-leak`)
-- SFX: "soft tactile UI pop", "tight airy whoosh" · Nhịp: em/vua · Nhóm: explainer, story-music
+- SFX: "soft tactile UI pop", "tight airy whoosh" · Nhịp: em/vua · Nhóm: explainer, story-music, bat-dong-san
 
 ## Từ khoá đổi được (5 nhóm)
 
