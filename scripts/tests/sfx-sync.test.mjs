@@ -38,6 +38,13 @@ test("parseEvents: reads the table, drops rows without sound, accepts the no-SFX
   assert.deepEqual(missing.events, []);
 });
 
+test("parseEvents: a time may carry its provenance label (đo) or (đề xuất)", () => {
+  const r = parseEvents("## Sự kiện\n| Thời điểm | Sự kiện | Âm thanh |\n|---|---|---|\n| 6.5s (đề xuất) | Bung ra | assets/sfx/pop.mp3 |\n| 2,12s (đo) | Nhấn | assets/sfx/send.mp3 |\n| 3 (De xuat) | Không dấu | assets/sfx/a.mp3 |\n| 4s (gần đúng) | Nhãn lạ | assets/sfx/b.mp3 |\n");
+  assert.deepEqual(r.events.slice(0, 3).map((e) => e.t), [6.5, 2.12, 3]);
+  assert.ok(Number.isNaN(r.events[3].t), "only the two documented labels are accepted");
+  assert.equal(r.events[3].raw, "4s (gần đúng)");
+});
+
 test("leadFromSilence: leading silence only", () => {
   assert.equal(leadFromSilence("[silencedetect @ 0x1] silence_start: 0\n[silencedetect @ 0x1] silence_end: 0.12 | silence_duration: 0.12\n"), 0.12);
   assert.equal(leadFromSilence("[silencedetect @ 0x1] silence_start: 0.3\n[silencedetect @ 0x1] silence_end: 0.5 | silence_duration: 0.2\n"), 0);

@@ -6,7 +6,8 @@
 //   node sfx-sync.mjs --project <dir> [--html <file>] [--fix] [--write-qa] [--json]
 //   node sfx-sync.mjs --help | -h
 // PLAN.md "## Sự kiện": a table `Thời điểm | Sự kiện | Âm thanh`; Thời điểm in seconds on the root
-//   timeline (6.5, 6.5s, 6,5s); Âm thanh is the src as written in the HTML, or "—" for no sound.
+//   timeline (6.5, 6.5s, 6,5s, optionally followed by "(đo)" or "(đề xuất)"); Âm thanh is the
+//   src as written in the HTML, or "—" for no sound.
 //   A section line "không có SFX gắn sự kiện" (no table) is valid and only prints a WARN.
 // Sound heard at: data-start + max(0, leading silence − data-media-start) / data-playback-rate.
 //   Leading silence: silencedetect at (file peak − 20 dB), so quiet files are not read as silent;
@@ -63,7 +64,8 @@ export function parseEvents(planText) {
   for (const r of table.rows) {
     const sound = String(r[si] || "").replace(/`/g, "").trim();
     if (NO_SOUND.test(sound)) continue;
-    const m = String(r[ti] || "").trim().match(/^(\d+(?:[.,]\d+)?)\s*s?$/i);
+    // plan-demo.md lets a time carry its provenance, "6.5s (đo)" or "6.5s (đề xuất)".
+    const m = fold(String(r[ti] || "")).replace(/\s*\((?:do|de xuat)\)$/, "").match(/^(\d+(?:[.,]\d+)?)\s*s?$/);
     events.push({ t: m ? Number(m[1].replace(",", ".")) : NaN, label: String(r[li] || "").trim(), sound, ...(m ? {} : { raw: String(r[ti] || "").trim() }) });
   }
   return { events, none, missing: false };
