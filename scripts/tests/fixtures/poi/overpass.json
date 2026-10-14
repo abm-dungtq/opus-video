@@ -1,0 +1,87 @@
+{
+  "version": 0.6,
+  "elements": [
+    {
+      "type": "node",
+      "id": 101,
+      "lat": 10.7725,
+      "lon": 106.7,
+      "tags": {
+        "amenity": "marketplace",
+        "name": "Chợ Bến Thành"
+      }
+    },
+    {
+      "type": "node",
+      "id": 102,
+      "lat": 10.7745,
+      "lon": 106.698,
+      "tags": {
+        "amenity": "school",
+        "name": "Trường THPT Trưng Vương",
+        "name:vi": "Trường THPT Trưng Vương"
+      }
+    },
+    {
+      "type": "node",
+      "id": 103,
+      "lat": 10.773,
+      "lon": 106.6985,
+      "tags": {
+        "highway": "bus_stop"
+      }
+    },
+    {
+      "type": "node",
+      "id": 104,
+      "lat": 10.771,
+      "lon": 106.6975,
+      "tags": {
+        "highway": "bus_stop",
+        "name": "Bến xe buýt Sài Gòn"
+      }
+    },
+    {
+      "type": "node",
+      "id": 105,
+      "lat": 10.77145,
+      "lon": 106.6975,
+      "tags": {
+        "highway": "bus_stop",
+        "name": "Bến xe buýt Sài Gòn"
+      }
+    },
+    {
+      "type": "way",
+      "id": 201,
+      "center": {
+        "lat": 10.776,
+        "lon": 106.695
+      },
+      "tags": {
+        "leisure": "park",
+        "name": "Công viên 23 Tháng 9"
+      }
+    },
+    {
+      "type": "node",
+      "id": 106,
+      "lat": 10.774,
+      "lon": 106.699,
+      "tags": {
+        "amenity": "clinic",
+        "name": "Phòng khám Bến Thành"
+      }
+    },
+    {
+      "type": "node",
+      "id": 107,
+      "lat": 10.77,
+      "lon": 106.699,
+      "tags": {
+        "railway": "station",
+        "name": "Ga Bến Thành"
+      }
+    }
+  ]
+}

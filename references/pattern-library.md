@@ -182,6 +182,7 @@ HyperFrames: lệnh `hyperframes snapshot`, `hyperframes check` (thẻ quy trìn
 Clip của người dùng nằm trong khung PiP, nền là bản đồ hoặc phối cảnh vẽ từ một file dữ liệu. Mỗi ý người nói kích một hiệu ứng tại đúng giây của từ đó: pin rơi xuống ("đây là chợ…"), tuyến đường tự vẽ ("đi bộ ra chợ…"), khoanh lô hoặc vùng ("lô đất 72m²…", "đường vào…"), thẻ số liệu hiện ngay giá trị thật (giá, diện tích), key text cho câu chốt ("ô tô vào tận nơi"), mũi tên chỉ hướng ra mép khung, nhãn bật lần lượt cho hàng xóm hoặc tiện ích. Camera chuyển trước chữ 0,3–0,5 giây; giữa các lần chuyển, bản đồ trôi chậm. Không gắn nhãn "minh họa" hay nhãn nguồn lên hình.
 Case: không có trong corpus (`weak matches`); mẫu chạy thật là dự án `bds-ban-do-pip-9x16`, quy trình ở `clip-master-canvas.md`
 HyperFrames: blueprint `camera-journey` · rule `svg-path-draw` · `catalog --query "map pin route"`
+Dữ liệu: tiện ích quanh dự án (trường, chợ, siêu thị, ga/trạm xe buýt, bệnh viện, công viên) lấy thật từ OpenStreetMap bằng `scripts/poi-fetch.mjs`, ghi vào `SOURCES.md`; hướng đạo diễn A8 "Bản đồ dẫn đường bám lời nói".
 
 ## Bảng nối nhóm → HyperFrames
 
