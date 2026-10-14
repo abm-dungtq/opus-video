@@ -68,7 +68,7 @@ Cổng plan kiểm: đủ 6 mục, bảng Cảnh có ít nhất một dòng, s�
 
 - `Thời điểm` là số giây trên timeline gốc (`6.5`, `6.5s` hoặc `6,5s`), không phải giây trong composition con.
 - `Âm thanh` ghi đúng `src` trong `index.html`; `—` khi sự kiện không có tiếng. Video không có SFX gắn sự kiện thì thay bảng bằng một dòng `không có SFX gắn sự kiện` (chỉ in WARN).
-- `scripts/sfx-sync.mjs --project .` đo đoạn im lặng đầu mỗi file SFX (ngưỡng = đỉnh của file − 20 dB, cache theo sha256 ở `assets/sfx-onsets.json`) rồi cộng vào `data-start` để ra lúc tiếng thật sự vang: `data-start + max(0, im lặng − data-media-start) / data-playback-rate`.
+- `scripts/sfx-sync.mjs --project .` đo đoạn im lặng đầu mỗi file SFX (ngưỡng = đỉnh của file − 20 dB, cache theo sha256 ở `assets/sfx-onsets.json`) rồi cộng vào `data-start` để ra lúc tiếng thật sự vang: `data-start + max(0, im lặng − data-media-start) / data-playback-rate`. Đổi cách đo đoạn im lặng thì xoá `assets/sfx-onsets.json` để đo lại.
 - Lệch = lúc tiếng vang − thời điểm sự kiện; số dương là tiếng trễ hơn hình. Ngưỡng theo ITU-R BT.1359-1:
 
   | Mức | Tiếng sớm | Tiếng trễ |
