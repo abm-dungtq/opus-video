@@ -1,4 +1,4 @@
-# REVISIONS.md: vòng sửa khoanh vùng
+# REVISIONS.md — vòng sửa khoanh vùng
 
 Tài liệu này là mẫu và luật để agent làm theo khi người dùng xin sửa video. Mục đích là sửa đúng chỗ, kiểm từng chỗ bằng ảnh chụp mà không render lại cả video, và giữ lại ghi chép đã sửa gì qua từng vòng.
 
@@ -43,19 +43,26 @@ npx hyperframes snapshot . --at <t-0.3>,<t>,<t+0.5> --no-end
 
 # Tìm chữ đè nhau hoặc tràn ở chỗ nối cảnh
 npx hyperframes check --at-transitions
+
+# cần đúng bản 0.8.144:
+npx --yes hyperframes@0.8.144 snapshot . --at <t-0.3>,<t>,<t+0.5> --no-end
 ```
 
 - Thêm vào `--at` các mốc ghi ở `Giữ nguyên` để chắc rằng chúng không bị đổi.
-- Lệnh `npx hyperframes` không ghim phiên bản có thể chạy bản cài toàn cục trên máy. Dự án ghim `hyperframes@0.8.144` trong `package.json`, nên khi cần đúng bản đó thì gọi `npx --yes hyperframes@0.8.144 snapshot . --at …`. Các cờ dùng ở đây (`--at`, `--no-end`, `--at-transitions`) có trong bản 0.8.144.
+- Các mốc trong `--at` không nhỏ hơn 0: mục ở đầu video thì bỏ mốc `t-0.3`.
+- Lệnh `npx hyperframes` không ghim phiên bản có thể chạy bản cài toàn cục trên máy. Dự án ghim `hyperframes@0.8.144` trong `package.json`, nên khi cần đúng bản đó thì gọi bằng lệnh cuối trong khối trên. Các cờ dùng ở đây (`--at`, `--no-end`, `--at-transitions`) có trong bản 0.8.144.
 - Bản 0.8.144 không có cờ `--range` cho `snapshot` hay `check`, nên không dùng cờ đó.
+- `--at-transitions` chỉ để chẩn đoán và báo nhầm khi chữ trượt qua mask (cùng lời ở `qa-checklist.md`, mục "Đo bằng lệnh"). Dòng báo ở mốc không nằm trong `Vị trí` hay `Giữ nguyên` thì xem ảnh rồi mới kết luận.
 
 ## 5. Cho người dùng xem "trước" một đoạn
 
 Trước khi chạy lại `make-demo`, cắt đoạn có lỗi từ animatic cũ để người dùng so trước và sau:
 
 ```bash
-ffmpeg -ss <a> -to <b> -i demo/animatic.mp4 -c:v libx264 -an demo/truoc-R1.mp4
+ffmpeg -nostdin -y -ss <a> -to <b> -i demo/animatic.mp4 -c:v libx264 -c:a copy demo/truoc-R1.mp4
 ```
+
+Đoạn cắt giữ cả tiếng (`-c:a copy`), vì animatic có tiếng và nhiều mục sửa là tiếng lệch hình. `-y` cho phép ghi đè khi cắt lại, `-nostdin` giữ ffmpeg không chờ bàn phím. Vì `-ss` và `-to` đứng trước `-i`, `<b>` là giây tuyệt đối trên animatic, không cộng vào `<a>`: `-ss 3 -to 5` cho đoạn dài 2 giây.
 
 Phải cắt trước, vì `make-demo --animatic` sẽ ghi đè `demo/animatic.mp4`.
 

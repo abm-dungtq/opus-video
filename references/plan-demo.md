@@ -67,6 +67,7 @@ Cổng plan kiểm: đủ 6 mục, bảng Cảnh có ít nhất một dòng, s�
 **Bảng `## Sự kiện`** ghi mỗi khoảnh khắc trên hình có gắn tiếng:
 
 - `Thời điểm` là số giây trên timeline gốc (`6.5`, `6.5s` hoặc `6,5s`), không phải giây trong composition con.
+- **Nhãn nguồn của mốc:** mốc lấy từ `audio_meta.json` hoặc đo trên file là mốc **đo được**; mốc chọn theo cảm nhận là mốc **đề xuất**. Khi cần phân biệt thì ghi `(đo)` hoặc `(đề xuất)` sau thời điểm, ví dụ `6.5s (đề xuất)`. Mốc đề xuất phải được kiểm bằng `hyperframes snapshot . --at <t>` trước khi đặt tiếng vào.
 - `Âm thanh` ghi đúng `src` trong `index.html`; `—` khi sự kiện không có tiếng. Video không có SFX gắn sự kiện thì thay bảng bằng một dòng `không có SFX gắn sự kiện` (chỉ in WARN).
 - `scripts/sfx-sync.mjs --project .` đo đoạn im lặng đầu mỗi file SFX (ngưỡng = đỉnh của file − 20 dB, cache theo sha256 ở `assets/sfx-onsets.json`) rồi cộng vào `data-start` để ra lúc tiếng thật sự vang: `data-start + max(0, im lặng − data-media-start) / data-playback-rate`. Đổi cách đo đoạn im lặng thì xoá `assets/sfx-onsets.json` để đo lại.
 - Lệch = lúc tiếng vang − thời điểm sự kiện; số dương là tiếng trễ hơn hình. Ngưỡng theo ITU-R BT.1359-1:
@@ -78,7 +79,6 @@ Cổng plan kiểm: đủ 6 mục, bảng Cảnh có ít nhất một dòng, s�
   | FAIL | hơn 90 ms | hơn 185 ms |
 
 - `--fix` chỉ in `đề xuất: data-start="…"` cho từng dòng chưa PASS; không ghi vào HTML. `--write-qa` ghi các dòng vào `QA.md`.
-- **Nhãn nguồn của mốc:** mốc lấy từ `audio_meta.json` hoặc đo trên file là mốc **đo được**; mốc chọn theo cảm nhận là mốc **đề xuất**. Khi cần phân biệt thì ghi `(đo)` hoặc `(đề xuất)` sau thời điểm, ví dụ `6.5s (đề xuất)`. Mốc đề xuất phải được kiểm bằng `hyperframes snapshot . --at <t>` trước khi đặt tiếng vào.
 - Chỉ đọc `index.html` (hoặc `--html`): SFX nằm trong composition con báo FAIL "không có trong".
 
 **Cổng sáng tạo** (khi BRIEF có `direction:`; dự án chỉ cắt footage đặt `creative_override: <lý do ≥10 ký tự>`):
