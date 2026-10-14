@@ -91,8 +91,12 @@ ${files.map(([label, v]) => `- ${label}: \`${v}\``).join("\n")}${files.length ? 
 `;
 }
 
+// One finished styleframe per direction (from a real pitch), shown to the agent as a reference.
+const EXAMPLES = fileURLToPath(new URL("../references/styleframe-examples/", import.meta.url));
+
 export function styleframeMd({ n, pick, topic, aspect, energy, data, brand = null }) {
   const d = pick.direction;
+  const example = join(EXAMPLES, `${d.id}.html`);
   const [w, h] = SIZE[aspect] || SIZE["9:16"];
   const sel = resolveSelection(d, {}, data);
   return `# STYLEFRAME ${n} — ${d.id} ${d.ten_vi}
@@ -106,7 +110,7 @@ ${d.styleframe_vi}
 - Hook: ${d.hook_vi}
 - Luật chống slideshow: ${d.anti_slideshow_vi}
 - Style: ${sel.style.kind} \`${sel.style.name}\` · Blueprint: ${sel.blueprints.map((b) => `\`${b}\``).join(", ")} · Rule: ${sel.rules.map((r) => `\`${r}\``).join(", ")} · Seam: ${sel.seams.map((s) => `\`${s}\``).join(", ")}
-
+${existsSync(example) ? `- Ví dụ cùng hướng: \`${example}\` (styleframe mẫu từ một pitch thật, chủ đề khác; học cách dựng, không chép chữ hay màu)\n` : ""}
 ${brandMd(brand)}## Bắt buộc
 1. Đọc hết \`RECIPES.md\` cùng thư mục trước khi viết \`index.html\`; dựng bằng đúng các cơ chế trong đó.
 2. Dùng chữ thật của chủ đề (tên sản phẩm, con số, câu hook ngắn), không lorem ipsum, không bịa số liệu.

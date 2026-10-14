@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="vi" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: #ffffff;
+      }
+      #root {
+        --bg: #ffffff;
+        --fg: #0a0a0a;
+        position: relative;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: var(--bg);
+        font-family: "Be Vietnam Pro", -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+      /* Safe band: everything typographic lives between 13% and 79.7% of the frame. */
+      #band {
+        position: absolute;
+        left: 0;
+        top: 250px;
+        width: 1080px;
+        height: 1280px;
+        overflow: hidden;
+      }
+      #shake {
+        position: absolute;
+        inset: 0;
+      }
+      .ticker {
+        position: absolute;
+        left: 0;
+        width: 1080px;
+        height: 130px;
+        overflow: hidden;
+        -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18%, #000 82%, transparent 100%);
+        mask-image: linear-gradient(90deg, transparent 0, #000 18%, #000 82%, transparent 100%);
+      }
+      #tk-a {
+        top: 40px;
+      }
+      #tk-b {
+        top: 1110px;
+      }
+      .tk-run {
+        position: absolute;
+        top: 0;
+        left: 0;
+        white-space: nowrap;
+        font-size: 112px;
+        font-weight: 900;
+        line-height: 130px;
+        letter-spacing: -0.02em;
+        color: transparent;
+        -webkit-text-stroke: 3px var(--fg);
+        opacity: 0.55;
+      }
+      .pos {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .word {
+        display: flex;
+        font-weight: 900;
+        line-height: 1;
+        color: var(--fg);
+        opacity: 0;
+        will-change: transform;
+      }
+      .ch {
+        display: inline-block;
+        will-change: transform, opacity;
+      }
+      #gem-w {
+        font-size: 262px;
+        letter-spacing: -0.04em;
+      }
+      #four-pos {
+        z-index: 3;
+      }
+      #four-w {
+        font-size: 1120px;
+        letter-spacing: 0;
+        color: #e63946;
+        opacity: 1;
+      }
+      #four-pos {
+        opacity: 0;
+      }
+      #argon-pos {
+        z-index: 4;
+        opacity: 0;
+        flex-direction: column;
+      }
+      #argon-w {
+        font-size: 246px;
+        letter-spacing: -0.04em;
+        opacity: 1;
+      }
+      #argon-w .ch {
+        opacity: 0;
+      }
+      #argon-bar {
+        width: 900px;
+        height: 34px;
+        margin-top: 150px;
+        background: #e63946;
+        transform: scaleX(0);
+        transform-origin: 0 50%;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="3"
+      data-width="1080"
+      data-height="1920"
+    >
+        <div id="band">
+          <div id="shake">
+            <div class="ticker" id="tk-a" aria-hidden="true">
+              <div class="tk-run" id="tk-a-run">GEMINI 4 ARGON · GEMINI 4 ARGON · GEMINI 4 ARGON · GEMINI 4 ARGON ·</div>
+            </div>
+            <div class="ticker" id="tk-b" aria-hidden="true">
+              <div class="tk-run" id="tk-b-run">ARGON · GEMINI 4 · ARGON · GEMINI 4 · ARGON · GEMINI 4 · ARGON ·</div>
+            </div>
+
+            <div class="pos" id="gem-pos">
+              <div class="word" id="gem-w">
+                <span class="ch g">G</span><span class="ch g">E</span><span class="ch g">M</span><span class="ch g">I</span><span class="ch g">N</span><span class="ch g">I</span>
+              </div>
+            </div>
+
+            <div class="pos" id="four-pos">
+              <div class="word" id="four-w">4</div>
+            </div>
+
+            <div class="pos" id="argon-pos">
+              <div class="word" id="argon-w">
+                <span class="ch a">A</span><span class="ch a">R</span><span class="ch a">G</span><span class="ch a">O</span><span class="ch a">N</span>
+              </div>
+              <div id="argon-bar"></div>
+            </div>
+          </div>
+        </div>
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      gsap.set("#gem-w", { scaleX: 1, scaleY: 1.5 });
+      gsap.set("#argon-w", { scaleX: 1, scaleY: 1.55 });
+      const DUR = 3;
+
+      // One beat grid drives every hit (kinetic-beat-slam).
+      const PULSE = 0.45;
+      const BEATS = [0.2, 0.2 + PULSE * 2, 0.2 + PULSE * 4]; // 0.20 / 1.10 / 2.00
+      const STAGE = 1400; // > band size, travel fully off the clipped band
+
+      const clamp01 = (v) => Math.max(0, Math.min(1, v));
+      const gemChars = Array.from(document.querySelectorAll("#gem-w .ch"));
+      const argonChars = Array.from(document.querySelectorAll("#argon-w .ch"));
+      const fourPos = document.getElementById("four-pos");
+      const argonPos = document.getElementById("argon-pos");
+
+      // Ambient type layers: two outline tickers run the whole 3 s in opposite directions.
+      tl.fromTo("#tk-a-run", { x: 0 }, { x: -720, duration: DUR, ease: "none" }, 0);
+      tl.fromTo("#tk-b-run", { x: -820 }, { x: -100, duration: DUR, ease: "none" }, 0);
+
+      // Pre-hit anticipation: tickers squeeze toward center before the first drum.
+      tl.fromTo("#tk-a", { y: 0 }, { y: 40, duration: BEATS[0], ease: "power2.in" }, 0);
+      tl.fromTo("#tk-b", { y: 0 }, { y: -40, duration: BEATS[0], ease: "power2.in" }, 0);
+      tl.to("#tk-a", { y: 0, duration: 0.35, ease: "expo.out" }, BEATS[0]);
+      tl.to("#tk-b", { y: 0, duration: 0.35, ease: "expo.out" }, BEATS[0]);
+
+      // Beat-cut seams: polarity flips in one frame on beat 1 (white -> black) and beat 3 (black -> white).
+      tl.set("#root", { "--bg": "#0a0a0a", "--fg": "#ffffff" }, BEATS[0]);
+      tl.set("#root", { "--bg": "#ffffff", "--fg": "#0a0a0a" }, BEATS[2]);
+
+      // Impact jolt of the whole band on every beat.
+      [22, -26, 30].forEach((amp, i) => {
+        tl.fromTo(
+          "#shake",
+          { y: amp, rotation: i === 1 ? -1.2 : 1.2 },
+          { y: 0, rotation: 0, duration: 0.3, ease: "power3.out", immediateRender: false },
+          BEATS[i],
+        );
+      });
+
+      // BEAT 1 — GEMINI slams into center: oversized + blurred -> sharp (scale slam).
+      tl.set("#gem-w", { opacity: 1 }, BEATS[0]);
+      tl.fromTo(
+        "#gem-w",
+        { scaleX: 2.9, scaleY: 4.4, filter: "blur(18px)" },
+        { scaleX: 1, scaleY: 1.5, filter: "blur(0px)", duration: 0.4, ease: "power4.out", immediateRender: false },
+        BEATS[0],
+      );
+      // Keeps pressing forward until it gets hit.
+      tl.to("#gem-w", { scaleX: 1.07, scaleY: 1.62, duration: BEATS[1] - BEATS[0] - 0.4, ease: "none" }, BEATS[0] + 0.4);
+
+      // BEAT 2 — "4" crashes in from the right and shoves GEMINI off left
+      // (reactive-displacement, letters ripple out like a waterfall cut).
+      const D2 = { p: 0 };
+      const VF = 0.42;
+      tl.to(
+        D2,
+        {
+          p: 1,
+          duration: 0.7,
+          ease: "back.out(1.5)",
+          onUpdate: () => {
+            const p = D2.p;
+            const ix = STAGE * (1 - p);
+            const rot = -12 * (1 - p);
+            fourPos.style.transform = `translateX(${ix}px) rotate(${rot}deg)`;
+            fourPos.style.opacity = String(Math.min(1, Math.max(0, p) * 6));
+            const n = gemChars.length;
+            gemChars.forEach((el, i) => {
+              // Rightmost letter is struck first; the hit ripples leftward.
+              const lag = (n - 1 - i) * 0.035;
+              const vp = clamp01((p - lag) / VF);
+              const k = vp * vp * vp * vp; // power4.in ramp: creeps, then rips
+              const vx = -STAGE * k;
+              const vy = (i % 2 === 0 ? -1 : 1) * 90 * k;
+              const vr = -24 * k * (1 + (i % 3) * 0.3);
+              el.style.transform = `translate(${vx}px, ${vy}px) rotate(${vr}deg)`;
+              el.style.opacity = String(1 - clamp01(vp * 1.6));
+            });
+          },
+        },
+        BEATS[1],
+      );
+      // "4" keeps swelling after it lands.
+      tl.fromTo(
+        "#four-w",
+        { scale: 1 },
+        { scale: 1.1, duration: BEATS[2] - BEATS[1] - 0.45, ease: "none", immediateRender: false },
+        BEATS[1] + 0.45,
+      );
+
+      // BEAT 3 — ARGON drives up from below and knocks "4" off the top (vertical collision),
+      // background inverts on the same frame.
+      const D3 = { p: 0 };
+      const VF3 = 0.45;
+      tl.to(
+        D3,
+        {
+          p: 1,
+          duration: 0.75,
+          ease: "back.out(1.4)",
+          onUpdate: () => {
+            const p = D3.p;
+            const iy = STAGE * (1 - p);
+            const rot = 10 * (1 - p);
+            argonPos.style.transform = `translateY(${iy}px) rotate(${rot}deg)`;
+            argonPos.style.opacity = String(Math.min(1, Math.max(0, p) * 6));
+            const vp = clamp01(p / VF3);
+            const k = vp * vp;
+            fourPos.style.transform = `translateY(${-STAGE * k}px) rotate(${22 * k}deg)`;
+            fourPos.style.opacity = String(1 - clamp01(vp * 1.2));
+          },
+        },
+        BEATS[2],
+      );
+
+      // ARGON letters cascade in from below inside the moving group (waterfall-entry, binary opacity).
+      const F = 1 / 30;
+      const W = [
+        { y: 80, d: 0.2 },
+        { y: 50, d: 0.16 },
+        { y: 50, d: 0.15 },
+        { y: 70, d: 0.16 },
+        { y: 72, d: 0.15 },
+      ];
+      let tc = BEATS[2] - 0.02;
+      argonChars.forEach((el, i) => {
+        tl.set(el, { opacity: 1, y: W[i].y }, tc);
+        tl.to(el, { y: 0, duration: W[i].d, ease: "power4.out" }, tc);
+        tc += W[i].d - (i === 0 ? 0 : 2 * F);
+      });
+
+      // Finale dressing: red bar sweeps under ARGON, then the word breathes to the end.
+      tl.fromTo(
+        "#argon-bar",
+        { scaleX: 0 },
+        { scaleX: 1, duration: 0.35, ease: "expo.out", immediateRender: false },
+        BEATS[2] + 0.62,
+      );
+      tl.fromTo(
+        "#argon-w",
+        { scaleX: 1, scaleY: 1.55 },
+        { scaleX: 1.05, scaleY: 1.62, duration: DUR - (BEATS[2] + 0.75), ease: "none", immediateRender: false },
+        BEATS[2] + 0.75,
+      );
+      const holdStart = BEATS[2] + 0.75;
+      const cycle = 0.25;
+      tl.fromTo(
+        "#argon-w",
+        { rotation: 0 },
+        {
+          rotation: 0.8,
+          duration: cycle / 2,
+          ease: "sine.inOut",
+          yoyo: true,
+          repeat: Math.max(0, Math.floor((DUR - holdStart) / cycle) - 1),
+          immediateRender: false,
+        },
+        holdStart,
+      );
+
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

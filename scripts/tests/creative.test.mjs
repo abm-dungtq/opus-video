@@ -335,6 +335,17 @@ test("styleframeMd adds a brand section only with a brand; pickDirections honour
   assert.ok(!ex.some((x) => x.id === "A1"));
 });
 
+test("styleframeMd points at a shipped example of the same direction when one exists", () => {
+  const base = pickDirections({ aspect: "9:16", topic: "t" }, data)[0];
+  const md = (id) => styleframeMd({ n: 1, pick: { ...base, id, direction: data.directions.find((x) => x.id === id) }, topic: "t", aspect: "9:16", energy: "vua", data });
+  for (const id of ["A2", "A3", "A4"]) {
+    const m = md(id).match(/^- Ví dụ cùng hướng: `(.+)`/m);
+    assert.ok(m, id);
+    assert.ok(m[1].endsWith(`styleframe-examples/${id}.html`) && existsSync(m[1]), m[1]);
+  }
+  assert.doesNotMatch(md("A1"), /Ví dụ cùng hướng/);
+});
+
 test("setFrontmatter / setSection helpers", () => {
   assert.equal(setFrontmatter("", { a: 1 }), "---\na: 1\n---\n");
   assert.equal(setFrontmatter("---\na: 1\nb: 2\n---\nbody\n", { a: 3, c: "" }), "---\na: 3\nb: 2\n---\n\nbody\n");

@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="vi" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@200;300;400;500;600&display=block"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: #0a0a0a;
+      }
+      #root {
+        position: relative;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: #0a0a0a;
+        font-family: "Be Vietnam Pro", -apple-system, BlinkMacSystemFont, sans-serif;
+        color: #e0e0e0;
+      }
+      .clip {
+        position: absolute;
+        inset: 0;
+      }
+
+      /* ---------- atmosphere (not scaled by the camera) ---------- */
+      #bg {
+        overflow: hidden;
+      }
+      .glow {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(90px);
+        will-change: transform;
+      }
+      #glow-a {
+        left: 140px;
+        top: 520px;
+        width: 620px;
+        height: 620px;
+        background: rgba(124, 58, 237, 0.34);
+      }
+      #glow-b {
+        left: 380px;
+        top: 900px;
+        width: 560px;
+        height: 560px;
+        background: rgba(6, 182, 212, 0.22);
+      }
+      #dots {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1080px;
+        height: 1920px;
+        will-change: transform;
+      }
+      .dot {
+        position: absolute;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: #8be9f7;
+      }
+
+      /* ---------- camera: outer scales, inner translates ---------- */
+      #zoom-outer {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1080px;
+        height: 1920px;
+        transform-origin: 50% 50%;
+        will-change: transform;
+      }
+      #zoom-inner {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1080px;
+        height: 1920px;
+        will-change: transform;
+      }
+
+      /* ---------- the prompt box (morphs into the result card) ---------- */
+      #box {
+        position: absolute;
+        left: 110px;
+        top: 600px;
+        width: 860px;
+        height: 840px;
+        background: #15151d;
+        border: 2px solid rgba(224, 224, 224, 0.14);
+        border-bottom: none;
+        border-radius: 36px;
+        clip-path: inset(0px 0px 630px 0px round 36px);
+      }
+      #box-edge {
+        position: absolute;
+        left: 146px;
+        top: 808px;
+        width: 788px;
+        height: 2px;
+        background: rgba(224, 224, 224, 0.14);
+        will-change: transform;
+      }
+      #chip {
+        position: absolute;
+        left: 162px;
+        top: 626px;
+        height: 52px;
+        padding: 0 22px 0 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-radius: 26px;
+        background: rgba(124, 58, 237, 0.2);
+        color: #c4b5fd;
+        font-size: 27px;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      #send {
+        position: absolute;
+        left: 838px;
+        top: 616px;
+        width: 76px;
+        height: 76px;
+        border-radius: 50%;
+        background: #2a2a35;
+        display: grid;
+        place-items: center;
+        will-change: transform;
+      }
+      #prompt-row {
+        position: absolute;
+        left: 162px;
+        top: 708px;
+        width: 756px;
+        height: 76px;
+        display: flex;
+        align-items: center;
+        white-space: nowrap;
+        font-size: 52px;
+        font-weight: 500;
+        letter-spacing: -0.01em;
+      }
+      #ptext {
+        display: inline-block;
+        white-space: pre;
+        color: #f4f4f5;
+      }
+      #caret {
+        display: inline-block;
+        width: 6px;
+        height: 60px;
+        margin-left: 4px;
+        background: #22d3ee;
+        border-radius: 2px;
+      }
+      #placeholder {
+        display: inline-block;
+        margin-left: 10px;
+        color: rgba(224, 224, 224, 0.32);
+        font-weight: 300;
+      }
+      #probe {
+        position: absolute;
+        left: 0;
+        top: 0;
+        visibility: hidden;
+        white-space: pre;
+        font-size: 52px;
+        font-weight: 500;
+        letter-spacing: -0.01em;
+      }
+
+      /* ---------- status theater ---------- */
+      #status {
+        position: absolute;
+        left: 162px;
+        top: 836px;
+        width: 756px;
+        height: 170px;
+        transform-origin: 50% 50%;
+        will-change: transform, filter;
+      }
+      .srow {
+        position: absolute;
+        left: 0;
+        width: 756px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        font-size: 34px;
+        font-weight: 400;
+        color: #cbd5e1;
+        clip-path: inset(0% 100% 0% 0%);
+        will-change: transform;
+      }
+      .srow svg {
+        flex: 0 0 auto;
+      }
+
+      /* ---------- result content ---------- */
+      #res-head {
+        position: absolute;
+        left: 162px;
+        top: 852px;
+        width: 756px;
+        height: 120px;
+        display: flex;
+        align-items: center;
+        opacity: 0;
+        transform-origin: 50% 50%;
+        will-change: transform, filter, opacity;
+      }
+      #res-title {
+        font-size: 92px;
+        font-weight: 300;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+        background: linear-gradient(
+          90deg,
+          #a78bfa 0%,
+          #e0e0e0 35%,
+          #ffffff 45%,
+          #67e8f9 50%,
+          #e0e0e0 60%,
+          #a78bfa 100%
+        );
+        background-size: 300% 100%;
+        background-position: 100% 0%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .bar {
+        position: absolute;
+        left: 162px;
+        height: 22px;
+        border-radius: 11px;
+        background: linear-gradient(90deg, rgba(124, 58, 237, 0.55), rgba(6, 182, 212, 0.45));
+        transform-origin: 0% 50%;
+        will-change: transform;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="3"
+      data-width="1080"
+      data-height="1920"
+    >
+      <div id="bg" class="clip" data-start="0" data-duration="3" data-track-index="0">
+        <div id="glow-a" class="glow"></div>
+        <div id="glow-b" class="glow"></div>
+        <div id="dots"></div>
+      </div>
+
+      <div id="cam" class="clip" data-start="0" data-duration="3" data-track-index="1">
+        <div id="zoom-outer">
+          <div id="zoom-inner">
+            <div id="box"></div>
+            <div id="box-edge"></div>
+
+            <div id="chip">
+              <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 2 C12.8 8 16 11.2 22 12 C16 12.8 12.8 16 12 22 C11.2 16 8 12.8 2 12 C8 11.2 11.2 8 12 2 Z"
+                  fill="#a78bfa"
+                />
+              </svg>
+              <span>Gemini 4 Argon</span>
+            </div>
+
+            <div id="send">
+              <svg width="38" height="38" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 19 V5 M5 12 L12 5 L19 12"
+                  stroke="#e0e0e0"
+                  stroke-width="2.6"
+                  fill="none"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </div>
+
+            <div id="prompt-row">
+              <span id="ptext"></span><span id="caret"></span
+              ><span id="placeholder">Hỏi Gemini 4 Argon…</span>
+            </div>
+            <span id="probe"></span>
+
+            <div id="status">
+              <div class="srow" id="srow-0" style="top: 0px">
+                <svg width="36" height="36" viewBox="0 0 36 36">
+                  <circle
+                    class="spin"
+                    cx="18"
+                    cy="18"
+                    r="13"
+                    fill="none"
+                    stroke="#22d3ee"
+                    stroke-width="3.5"
+                    stroke-linecap="round"
+                    stroke-dasharray="52 82"
+                  />
+                  <path
+                    class="tick"
+                    d="M9 18.5 L15.5 25 L27 11.5"
+                    fill="none"
+                    stroke="#a78bfa"
+                    stroke-width="3.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-dasharray="30"
+                    stroke-dashoffset="30"
+                  />
+                </svg>
+                <span>Đang đọc câu hỏi</span>
+              </div>
+              <div class="srow" id="srow-1" style="top: 58px">
+                <svg width="36" height="36" viewBox="0 0 36 36">
+                  <circle
+                    class="spin"
+                    cx="18"
+                    cy="18"
+                    r="13"
+                    fill="none"
+                    stroke="#22d3ee"
+                    stroke-width="3.5"
+                    stroke-linecap="round"
+                    stroke-dasharray="52 82"
+                  />
+                  <path
+                    class="tick"
+                    d="M9 18.5 L15.5 25 L27 11.5"
+                    fill="none"
+                    stroke="#a78bfa"
+                    stroke-width="3.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-dasharray="30"
+                    stroke-dashoffset="30"
+                  />
+                </svg>
+                <span>Đang gom ý chính</span>
+              </div>
+              <div class="srow" id="srow-2" style="top: 116px">
+                <svg width="36" height="36" viewBox="0 0 36 36">
+                  <circle
+                    class="spin"
+                    cx="18"
+                    cy="18"
+                    r="13"
+                    fill="none"
+                    stroke="#22d3ee"
+                    stroke-width="3.5"
+                    stroke-linecap="round"
+                    stroke-dasharray="52 82"
+                  />
+                  <path
+                    class="tick"
+                    d="M9 18.5 L15.5 25 L27 11.5"
+                    fill="none"
+                    stroke="#a78bfa"
+                    stroke-width="3.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-dasharray="30"
+                    stroke-dashoffset="30"
+                  />
+                </svg>
+                <span>Đang soạn câu trả lời</span>
+              </div>
+            </div>
+
+            <div id="res-head"><span id="res-title">Gemini 4 Argon</span></div>
+            <div class="bar" style="top: 1022px; width: 756px"></div>
+            <div class="bar" style="top: 1076px; width: 700px"></div>
+            <div class="bar" style="top: 1130px; width: 736px"></div>
+            <div class="bar" style="top: 1184px; width: 540px"></div>
+            <div class="bar" style="top: 1260px; width: 720px"></div>
+            <div class="bar" style="top: 1314px; width: 610px"></div>
+            <div class="bar" style="top: 1368px; width: 420px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const DUR = 3;
+
+      /* ---------- deterministic particle field (middle band only) ---------- */
+      const dotsEl = document.getElementById("dots");
+      for (let i = 0; i < 38; i++) {
+        const fx = (i * 0.618034) % 1;
+        const fy = (i * 0.414214 + 0.13) % 1;
+        const d = document.createElement("div");
+        d.className = "dot";
+        d.style.left = 170 + fx * 740 + "px";
+        d.style.top = 420 + fy * 1060 + "px";
+        d.style.opacity = (0.18 + ((i * 7) % 5) * 0.08).toFixed(2);
+        dotsEl.appendChild(d);
+      }
+      tl.fromTo("#dots", { y: 40 }, { y: -110, duration: DUR, ease: "none" }, 0);
+      tl.fromTo(
+        "#glow-a",
+        { x: -40, y: 30 },
+        { x: 60, y: -50, duration: DUR, ease: "sine.inOut" },
+        0,
+      );
+      tl.fromTo(
+        "#glow-b",
+        { x: 50, y: -20 },
+        { x: -40, y: 70, duration: DUR, ease: "sine.inOut" },
+        0,
+      );
+
+      /* ---------- discrete-text-sequence: the typed question ---------- */
+      const QUESTION = "Gemini 4 Argon có gì mới?";
+      const CHUNKS = ["G", "em", "in", "i ", "4 ", "Ar", "go", "n ", "có", " g", "ì ", "mớ", "i?"];
+      const SEQUENCE = [{ t: 0, text: "" }];
+      {
+        let acc = "";
+        let t = 0.28;
+        CHUNKS.forEach((c, i) => {
+          acc += c;
+          SEQUENCE.push({ t: t, text: acc });
+          t += i === 7 ? 0.14 : 0.066;
+        });
+      }
+      const T_TYPED = SEQUENCE[SEQUENCE.length - 1].t; // ~1.14s
+      const T_ENTER = 1.24;
+      function textAt(time) {
+        for (let i = SEQUENCE.length - 1; i >= 0; i--) {
+          if (time >= SEQUENCE[i].t) return SEQUENCE[i].text;
+        }
+        return "";
+      }
+
+      const ptext = document.getElementById("ptext");
+      const caret = document.getElementById("caret");
+      const placeholder = document.getElementById("placeholder");
+      const probe = document.getElementById("probe");
+      const outer = document.getElementById("zoom-outer");
+      const inner = document.getElementById("zoom-inner");
+
+      /* ---------- camera-cursor-tracking + coordinate-target-zoom ---------- */
+      const W = 1080;
+      const H = 1920;
+      const TEXT_X = 162; // stage x where the typed text starts
+      const CARET_TARGET = 0.72 * W; // tracking engages past this screen x
+      const BOX_LEFT = 110;
+
+      function caretXAt(time) {
+        // camera follows a slightly lagged caret so per-keystroke jumps read as a glide
+        let sum = 0;
+        for (let k = 0; k < 6; k++) {
+          probe.textContent = textAt(Math.max(0, time - k * 0.035));
+          sum += probe.offsetWidth;
+        }
+        return TEXT_X + sum / 6 + 10;
+      }
+      function camA(time) {
+        const S = 1.28 + 0.03 * Math.min(1, time / T_ENTER);
+        const initial = (60 - W / 2) / S - (BOX_LEFT - W / 2); // Phase 1: box left edge at screen x=60
+        const tracking = (CARET_TARGET - W / 2) / S - (caretXAt(time) - W / 2);
+        return { S: S, x: Math.min(initial, tracking), y: -(745 - H / 2) };
+      }
+      const CAM_B = { S: 1.0, x: 0, y: -(815 - H / 2) }; // whole prompt box + status
+      const CAM_C = { S: 1.16, x: 0, y: -(1090 - H / 2) }; // push into the result
+      const B0 = T_ENTER,
+        B1 = 1.9,
+        C1 = 3.0;
+      const easeB = gsap.parseEase("power2.inOut");
+      const easeC = gsap.parseEase("power2.inOut");
+      const lerp = (a, b, p) => a + (b - a) * p;
+      let camAEnd = null;
+
+      function cameraAt(time) {
+        if (time <= B0) return camA(time);
+        if (!camAEnd) camAEnd = camA(B0);
+        if (time <= B1) {
+          const p = easeB((time - B0) / (B1 - B0));
+          return {
+            S: lerp(camAEnd.S, CAM_B.S, p),
+            x: lerp(camAEnd.x, CAM_B.x, p),
+            y: lerp(camAEnd.y, CAM_B.y, p),
+          };
+        }
+        const p = easeC(Math.min(1, (time - B1) / (C1 - B1)));
+        return {
+          S: lerp(CAM_B.S, CAM_C.S, p),
+          x: lerp(CAM_B.x, CAM_C.x, p),
+          y: lerp(CAM_B.y, CAM_C.y, p),
+        };
+      }
+
+      /* ---------- one driver: text states, caret, camera ---------- */
+      const driver = { t: 0 };
+      tl.to(
+        driver,
+        {
+          t: DUR,
+          duration: DUR,
+          ease: "none",
+          onUpdate: () => {
+            const t = driver.t;
+            const txt = textAt(t);
+            ptext.textContent = txt;
+            placeholder.style.display = txt.length ? "none" : "inline-block";
+            // caret: blinks before typing, solid while typing, blinks on the finished ask, gone after Enter
+            let on = 1;
+            if (t < SEQUENCE[1].t || t > T_TYPED + 0.04) on = Math.sin(t * Math.PI * 2 * 3.4) > -0.2 ? 1 : 0;
+            if (t >= T_ENTER) on = 0;
+            caret.style.opacity = on;
+            const c = cameraAt(t);
+            gsap.set(outer, { scale: c.S });
+            gsap.set(inner, { x: c.x, y: c.y });
+          },
+        },
+        0,
+      );
+
+      /* ---------- submit: press dip on the send control ---------- */
+      tl.to("#send", { scale: 0.84, backgroundColor: "#7c3aed", duration: 0.08, ease: "power2.in" }, T_ENTER - 0.06);
+      tl.to("#send", { scale: 1, duration: 0.28, ease: "back.out(3)" }, T_ENTER + 0.02);
+
+      /* ---------- card-morph-anchor: the prompt box grows into the result card ---------- */
+      const boxEl = document.getElementById("box");
+      const edgeEl = document.getElementById("box-edge");
+      const morph = { inset: 630, r: 36 };
+      const paintBox = () => {
+        boxEl.style.clipPath = `inset(0px 0px ${morph.inset}px 0px round ${morph.r}px)`;
+        edgeEl.style.transform = `translateY(${630 - morph.inset}px)`;
+      };
+      // step 1: box opens downward to host the status theater
+      tl.to(morph, { inset: 410, duration: 0.42, ease: "power3.out", onUpdate: paintBox }, T_ENTER + 0.02);
+      // step 2: the same box morphs into the full result card (shape + paint in one ease)
+      tl.to(morph, { inset: 0, r: 28, duration: 0.7, ease: "power2.inOut", onUpdate: paintBox }, 1.95);
+      tl.to(
+        "#box",
+        {
+          backgroundColor: "#141026",
+          borderColor: "rgba(167,139,250,0.55)",
+          duration: 0.7,
+          ease: "power2.inOut",
+        },
+        1.95,
+      );
+      tl.to("#box-edge", { backgroundColor: "rgba(167,139,250,0.55)", duration: 0.7, ease: "power2.inOut" }, 1.95);
+      tl.to("#chip", { backgroundColor: "rgba(6,182,212,0.22)", color: "#a5f3fc", duration: 0.5, ease: "sine.inOut" }, 1.95);
+
+      /* ---------- agent-progress-theater: three status rows, spinner -> tick ---------- */
+      const ROW_IN = [1.34, 1.5, 1.66];
+      const ROW_DONE = [1.52, 1.68, 1.84];
+      ROW_IN.forEach((tin, i) => {
+        const row = "#srow-" + i;
+        tl.fromTo(
+          row,
+          { clipPath: "inset(0% 100% 0% 0%)", x: 26 },
+          { clipPath: "inset(0% 0% 0% 0%)", x: 0, duration: 0.22, ease: "power3.out", immediateRender: false },
+          tin,
+        );
+        const spin = document.querySelector(row + " .spin");
+        const rot = { a: 0 };
+        tl.fromTo(
+          rot,
+          { a: 0 },
+          {
+            a: 720,
+            duration: ROW_DONE[i] - tin + 0.6,
+            ease: "none",
+            immediateRender: false,
+            onUpdate: () => spin.setAttribute("transform", `rotate(${rot.a} 18 18)`),
+          },
+          tin,
+        );
+        tl.set(row + " .spin", { attr: { opacity: 0 } }, ROW_DONE[i]);
+        tl.fromTo(
+          row + " .tick",
+          { attr: { "stroke-dashoffset": 30 } },
+          { attr: { "stroke-dashoffset": 0 }, duration: 0.14, ease: "power2.out", immediateRender: false },
+          ROW_DONE[i],
+        );
+        tl.to(row + " span", { color: "#94a3b8", duration: 0.12, ease: "none" }, ROW_DONE[i]);
+      });
+
+      /* ---------- zoom-through seam: status block -> result heading ---------- */
+      const ZT = 1.92;
+      tl.to("#status", { scale: 1.2, filter: "blur(10px)", duration: 0.2, ease: "power3.in" }, ZT);
+      tl.to("#status", { opacity: 0.15, duration: 0.2, ease: "none" }, ZT);
+      tl.set("#status", { opacity: 0 }, ZT + 0.2);
+      tl.set("#res-head", { opacity: 0.15, scale: 0.75, filter: "blur(10px)" }, ZT + 0.2);
+      tl.to("#res-head", { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.5, ease: "expo.out" }, ZT + 0.2);
+      // shimmer sweep across the heading
+      tl.fromTo(
+        "#res-title",
+        { backgroundPosition: "100% 0%" },
+        { backgroundPosition: "0% 0%", duration: 0.85, ease: "sine.inOut", immediateRender: false },
+        2.15,
+      );
+
+      /* ---------- the answer streams in, line by line ---------- */
+      tl.fromTo(
+        ".bar",
+        { scaleX: 0 },
+        { scaleX: 1, duration: 0.3, ease: "power2.out", stagger: 0.07 },
+        2.25,
+      );
+
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>
