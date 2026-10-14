@@ -48,6 +48,7 @@ export function parseTracks(html, baseDir, fallbackDir) {
     const volume = num(attr(tag, "data-volume"), 1);
     if (volume === 0) continue;
     tracks.push({
+      id: attr(tag, "id") ?? null,
       src: resolveSrc(src, baseDir, fallbackDir),
       start: num(attr(tag, "data-start"), 0),
       duration: num(attr(tag, "data-duration"), null),

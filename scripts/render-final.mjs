@@ -163,7 +163,9 @@ export function audioHash(project, composition = "index.html") {
   const tracks = compTracks(root, comp);
   const missing = [...new Set(tracks.map((t) => t.src).filter((s) => !existsSync(s)))];
   if (missing.length) throw new Error(`audio src not found:\n  ${missing.join("\n  ")}`);
-  const h = createHash("sha256").update(JSON.stringify(tracks.map((t) => ({ ...t, src: posix(root, t.src) }))));
+  // The element id names the tag, not the sound: leave it out so renaming an id is not a sound change
+  // and sidecars written before tracks carried an id still match.
+  const h = createHash("sha256").update(JSON.stringify(tracks.map(({ id, ...t }) => ({ ...t, src: posix(root, t.src) }))));
   for (const t of tracks) h.update(`\n${shaFile(t.src)}`);
   return h.digest("hex");
 }

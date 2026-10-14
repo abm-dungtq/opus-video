@@ -31,7 +31,7 @@ import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
 import { parsePlan, parseTable } from "./check-preflight.mjs";
-import { parseTracks, resolveSrc } from "./audio-mix.mjs";
+import { parseTracks } from "./audio-mix.mjs";
 
 // check-preflight.mjs imports checkSync from this file: the cycle is safe only while every use of
 // an imported binding stays inside a function (never at module level).
@@ -128,19 +128,6 @@ function leadCache(dir, run) {
   };
 }
 
-// id of the <audio>/<video> tag behind a track (matched by resolved src and data-start).
-function tagId(html, track, baseDir, fallbackDir) {
-  const flat = html.replace(/<!--[\s\S]*?-->/g, " ").replace(/\r?\n/g, " ");
-  const attr = (tag, name) => { const m = tag.match(new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i")); return m ? (m[1] ?? m[2] ?? m[3]) : undefined; };
-  for (const [tag, kind] of flat.matchAll(/<(audio|video)\b[^>]*>/gi)) {
-    const src = attr(tag, "src");
-    if (!src || resolveSrc(src, baseDir, fallbackDir) !== track.src || Number(attr(tag, "data-start") ?? 0) !== track.start) continue;
-    const id = attr(tag, "id");
-    return id ? `<${kind.toLowerCase()} id="${id}">` : `<${kind.toLowerCase()} src="${src}">`;
-  }
-  return "<audio>";
-}
-
 export const isLegacy = (fm) => !String(fm.direction || "").trim() && !(Number(fm.brief_version) >= 2);
 export const MISSING = 'PLAN.md không có ## Sự kiện (Thời điểm | Sự kiện | Âm thanh); ghi "không có SFX gắn sự kiện" khi không có tiếng gắn sự kiện';
 
@@ -191,7 +178,7 @@ export function checkSync({ dir = ".", html, run = spawnSync } = {}) {
       } catch (err) { add({ ...base, level: "FAIL", detail: `không đo được: ${err.message}` }); continue; }
       const delta = Math.round((onsetOf(track, lead) - e.t) * 1000);
       const level = syncVerdict(delta);
-      const fix = level === "PASS" ? null : `data-start="${(e.t - Math.max(0, lead - track.mediaStart) / track.rate).toFixed(3)}" cho ${tagId(htmlText, track, dirname(htmlPath), dir)}`;
+      const fix = level === "PASS" ? null : `data-start="${(e.t - Math.max(0, lead - track.mediaStart) / track.rate).toFixed(3)}" cho ${track.id ? `<audio id="${track.id}">` : `<audio src="${e.sound}">`}`;
       add({ ...base, level, delta_ms: delta, lead_s: lead, fix, detail: `lệch ${signed(delta)} ms (đầu file im ${Math.round(lead * 1000)} ms)` });
     }
   } finally { cache.save(); }

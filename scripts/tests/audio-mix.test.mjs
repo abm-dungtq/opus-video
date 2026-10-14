@@ -22,9 +22,13 @@ const HTML = `
 test("parseTracks: audio + unmuted video, defaults, skips muted, volume 0 and comments", () => {
   const t = parseTracks(HTML, BASE);
   assert.equal(t.length, 3);
-  assert.deepEqual(t[0], { src: "/proj/assets/vo.mp3", start: 1.5, duration: 4, volume: 1, mediaStart: 0, rate: 1, group: "voiceover" });
-  assert.deepEqual(t[1], { src: "/proj/assets/bgm.mp3", start: 0, duration: 10, volume: 0.3, mediaStart: 2, rate: 1, group: null });
-  assert.deepEqual(t[2], { src: "/proj/assets/talk.mp4", start: 3, duration: 6, volume: 1, mediaStart: 0, rate: 1.25, group: null });
+  assert.deepEqual(t[0], { id: "vo", src: "/proj/assets/vo.mp3", start: 1.5, duration: 4, volume: 1, mediaStart: 0, rate: 1, group: "voiceover" });
+  assert.deepEqual(t[1], { id: "bgm", src: "/proj/assets/bgm.mp3", start: 0, duration: 10, volume: 0.3, mediaStart: 2, rate: 1, group: null });
+  assert.deepEqual(t[2], { id: "talk", src: "/proj/assets/talk.mp4", start: 3, duration: 6, volume: 1, mediaStart: 0, rate: 1.25, group: null });
+});
+
+test("parseTracks: a tag without an id gives id null", () => {
+  assert.equal(parseTracks(`<audio src="assets/a.mp3" data-start="1"></audio>`, BASE)[0].id, null);
 });
 
 test("parseTracks: a <video> written over several lines", () => {
@@ -34,7 +38,7 @@ test("parseTracks: a <video> written over several lines", () => {
     data-start="0.5" data-duration="60.18" data-has-audio="true" data-volume="0.8"></video>`;
   const t = parseTracks(html, BASE);
   assert.equal(t.length, 1);
-  assert.deepEqual(t[0], { src: "/proj/assets/video/clip.mp4", start: 0.5, duration: 60.18, volume: 0.8, mediaStart: 0, rate: 1, group: null });
+  assert.deepEqual(t[0], { id: "pip-video", src: "/proj/assets/video/clip.mp4", start: 0.5, duration: 60.18, volume: 0.8, mediaStart: 0, rate: 1, group: null });
 });
 
 test("buildArgs: per-track filters, adelay in ms, amix without normalize, length bounded by samples and -t", () => {

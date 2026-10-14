@@ -73,6 +73,15 @@ test("hashes: data-volume moves only audio_hash; a <div> or an image outside the
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test("hashes: renaming an <audio> id leaves audio_hash as it was, so older sidecars stay valid", () => {
+  const { dir, p, edit } = fixture();
+  try {
+    const a0 = audioHash(p);
+    edit('id="bgm"', 'id="music"');
+    assert.equal(audioHash(p), a0);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test("sidecar: write/read round trip, missing → null, malformed → throws", () => {
   const dir = mkdtempSync(join(tmpdir(), "sidecar-"));
   try {
