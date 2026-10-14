@@ -639,7 +639,7 @@ Cảnh con là các file nhúng qua `data-composition-src` (đệ quy). Composit
 | Cổng final báo `build/RECIPES.md is older than PLAN.md` | Sửa PLAN sau khi gom công thức | Chạy lại `recipe-pack.mjs --project ./`, đọc lại công thức mới |
 | `poi-fetch --address` thoát 1, báo `network error: fetch failed` | DNS của máy không phân giải `openstreetmap.org` | Chạy bằng `--lat` và `--lon` (mục 12.8) |
 | `source-ingest` thoát 2, báo `pdftotext not found` | Máy chưa có poppler | Cài poppler rồi chạy lại |
-| Cổng plan báo `PLAN.md has no "## Sự kiện" table` | Dự án có `direction:` mà `PLAN.md` chưa có bảng sự kiện | Thêm bảng `Thời điểm \| Sự kiện \| Âm thanh`, hoặc một dòng `không có SFX gắn sự kiện` khi video không có tiếng gắn với hình (mục 13.1) |
+| Cổng plan báo `PLAN.md has no "## Sự kiện" table` hoặc `"## Sự kiện" không có hàng sự kiện nào` | Dự án có `direction:` mà `PLAN.md` chưa có bảng sự kiện, hoặc mục để trống, chỉ có `TODO` hay chỉ có tiêu đề bảng | Thêm bảng `Thời điểm \| Sự kiện \| Âm thanh`, hoặc một dòng `không có SFX gắn sự kiện` khi video không có tiếng gắn với hình (mục 13.1) |
 | `sfx-sync` hay cổng final in `SYNC FAIL` | Tiếng SFX vang lệch khỏi sự kiện quá ngưỡng, thường do file có đoạn im lặng ở đầu | Chạy `sfx-sync.mjs --project ./ --fix`, sửa `data-start` theo đề xuất rồi chạy lại (mục 13.1) |
 | `sfx-sync` báo `"<file>" không có trong index.html` | Ô Âm thanh không khớp `src` trong HTML, SFX có `data-volume="0"`, hoặc SFX nằm trong composition con | Ghi đúng `src` như trong `index.html`; SFX trong composition con thì chuyển ra `index.html` hoặc kiểm bằng tai (mục 13.1) |
 | `check-preflight` in WARN `… cần giữ ≥ <n>s` | Chữ trên hình rời đi trước khi đọc kịp | Chữ thật sự ở lại thì ghi `(giữ đến <t>s)` hoặc `(giữ đến hết)` trong ô Hình; chữ thật sự rời sớm thì kéo dài beat hoặc rút chữ (mục 13.2) |
@@ -902,7 +902,7 @@ Dự án cũ (BRIEF không có `direction:` và không có `brief_version: 2`) k
 | 11.75s | Thẻ kết quả bung ra | assets/sfx/impact.mp3 |
 ```
 
-`Thời điểm` là số giây trên timeline gốc, `Âm thanh` ghi đúng `src` trong `index.html`. Video không có tiếng gắn với hình thì thay bảng bằng một dòng `không có SFX gắn sự kiện`; dòng này chỉ cho ra WARN.
+`Thời điểm` là số giây trên timeline gốc, `Âm thanh` ghi đúng `src` trong `index.html`. Video không có tiếng gắn với hình thì thay bảng bằng một dòng `không có SFX gắn sự kiện`; dòng này chỉ cho ra WARN. Dòng đó chỉ có nghĩa khi bảng không có hàng: bảng có hàng thì các hàng vẫn được đo. Mục để trống, chỉ có `TODO` hay chỉ có tiêu đề bảng bị coi là chưa viết và bị chặn như khi thiếu mục.
 
 ```bash
 node $OV/scripts/sfx-sync.mjs --project ./ --fix

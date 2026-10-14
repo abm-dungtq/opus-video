@@ -45,6 +45,24 @@ test("parseEvents: a time may carry its provenance label (đo) or (đề xuất)
   assert.equal(r.events[3].raw, "4s (gần đúng)");
 });
 
+test("parseEvents: an empty section, TODO or a header-only table is an error; a no-SFX line beside a filled table does not hide the rows", () => {
+  for (const text of ["# PLAN\n\n## Sự kiện\n\n## QA\nx\n", "## Sự kiện\nTODO\n", "## Sự kiện\n| Thời điểm | Sự kiện | Âm thanh |\n|---|---|---|\n"]) {
+    const r = parseEvents(text);
+    assert.match(r.error || "", /không có hàng sự kiện/, text);
+    assert.equal(r.none, false);
+    assert.equal(r.missing, false);
+    assert.deepEqual(r.events, []);
+  }
+  const mixed = parseEvents("## Sự kiện\nCác cảnh còn lại không có SFX gắn sự kiện.\n\n| Thời điểm | Sự kiện | Âm thanh |\n|---|---|---|\n| 2.0s | Nhấn | assets/sfx/send.mp3 |\n");
+  assert.equal(mixed.none, false);
+  assert.equal(mixed.events.length, 1);
+  assert.equal(mixed.error, undefined);
+  const dashes = parseEvents("## Sự kiện\n| Thời điểm | Sự kiện | Âm thanh |\n|---|---|---|\n| 3 | Logo | — |\n");
+  assert.equal(dashes.error, undefined);
+  assert.deepEqual(dashes.events, []);
+  assert.equal(dashes.none, false);
+});
+
 test("leadFromSilence: leading silence only", () => {
   assert.equal(leadFromSilence("[silencedetect @ 0x1] silence_start: 0\n[silencedetect @ 0x1] silence_end: 0.12 | silence_duration: 0.12\n"), 0.12);
   assert.equal(leadFromSilence("[silencedetect @ 0x1] silence_start: 0.3\n[silencedetect @ 0x1] silence_end: 0.5 | silence_duration: 0.2\n"), 0);
@@ -82,6 +100,22 @@ test("CLI: missing ## Sự kiện fails a creative project, warns a legacy one; 
     assert.equal(r.none, true);
     assert.deepEqual(r.lines, []);
     assert.deepEqual(r.errors, []);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("CLI: an empty ## Sự kiện fails a creative project and warns a legacy one", () => {
+  const d = tmp();
+  try {
+    const run = () => { throw new Error("ffmpeg must not run"); };
+    writeFileSync(join(d, "BRIEF.md"), "---\ndirection: A2\n---\n");
+    writeFileSync(join(d, "PLAN.md"), "# PLAN\n\n## Sự kiện\nTODO\n");
+    let c = capture();
+    assert.equal(main(["--project", d], { ...c.io, run }), 1);
+    assert.match(c.buf.out, /^FAIL {2}SYNC {3}PLAN\.md "## Sự kiện" không có hàng/m);
+    writeFileSync(join(d, "BRIEF.md"), "---\naspect: 9:16\n---\n");
+    c = capture();
+    assert.equal(main(["--project", d], { ...c.io, run }), 0);
+    assert.match(c.buf.out, /^WARN {2}SYNC {3}PLAN\.md "## Sự kiện" không có hàng/m);
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 

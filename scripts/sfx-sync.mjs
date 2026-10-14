@@ -8,7 +8,8 @@
 // PLAN.md "## Sự kiện": a table `Thời điểm | Sự kiện | Âm thanh`; Thời điểm in seconds on the root
 //   timeline (6.5, 6.5s, 6,5s, optionally followed by "(đo)" or "(đề xuất)"); Âm thanh is the
 //   src as written in the HTML, or "—" for no sound.
-//   A section line "không có SFX gắn sự kiện" (no table) is valid and only prints a WARN.
+//   A section line "không có SFX gắn sự kiện" is valid (one WARN) only when the table has no rows.
+//   An empty section, TODO or a header-only table FAILs (WARN for a legacy project).
 // Sound heard at: data-start + max(0, leading silence − data-media-start) / data-playback-rate.
 //   Leading silence: silencedetect at (file peak − 20 dB), so quiet files are not read as silent;
 //   cached per file sha256 in <project>/assets/sfx-onsets.json.
@@ -49,17 +50,27 @@ const NO_SOUND = /^(?:|—|–|-)$/;
 // early or 185 ms late. Sign: deltaMs = (heard − event) × 1000, positive = sound late.
 export const WINDOWS = { pass: { early: -45, late: 125 }, warn: { early: -90, late: 185 } };
 
-// PLAN.md text → { events: [{ t, label, sound }], none, missing } (+ error when the table lacks
-// a column). Rows whose sound is empty or a dash are dropped. t is NaN when unreadable.
+export const EMPTY = 'PLAN.md "## Sự kiện" không có hàng sự kiện nào; ghi bảng Thời điểm | Sự kiện | Âm thanh có ít nhất một hàng, hoặc dòng "không có SFX gắn sự kiện"';
+
+// PLAN.md text → { events: [{ t, label, sound }], none, missing } (+ error). See parseEventsBody.
 export function parseEvents(planText) {
-  const body = parsePlan(planText).sections[SECTION];
+  return parseEventsBody(parsePlan(planText).sections[SECTION]);
+}
+
+// Body of "## Sự kiện" (undefined when the section is missing) → { events, none, missing, error? }.
+// The no-SFX line counts only when the table has no rows; with rows it is just a note. A section
+// with no table (empty, TODO), a header-only table or a table missing a column is an error. A
+// table whose rows all have "—" as sound is valid and gives no events. Rows whose sound is empty
+// or a dash are dropped. t is NaN when unreadable.
+export function parseEventsBody(body) {
   if (body === undefined) return { events: [], none: false, missing: true };
-  const none = fold(body).includes(NONE);
   const table = parseTable(body);
-  if (!table.headers.length) return { events: [], none, missing: false };
+  if (table.rows.length === 0 && fold(body).includes(NONE)) return { events: [], none: true, missing: false };
+  if (!table.headers.length) return { events: [], none: false, missing: false, error: EMPTY };
   const col = (re) => table.headers.findIndex((h) => re.test(h));
   const ti = col(/thoi diem/), li = col(/su kien/), si = col(/am thanh/);
-  if (ti < 0 || li < 0 || si < 0) return { events: [], none, missing: false, error: 'PLAN.md "## Sự kiện" table needs the columns Thời điểm | Sự kiện | Âm thanh' };
+  if (ti < 0 || li < 0 || si < 0) return { events: [], none: false, missing: false, error: 'PLAN.md "## Sự kiện" table needs the columns Thời điểm | Sự kiện | Âm thanh' };
+  if (table.rows.length === 0) return { events: [], none: false, missing: false, error: EMPTY };
   const events = [];
   for (const r of table.rows) {
     const sound = String(r[si] || "").replace(/`/g, "").trim();
@@ -68,7 +79,7 @@ export function parseEvents(planText) {
     const m = fold(String(r[ti] || "")).replace(/\s*\((?:do|de xuat)\)$/, "").match(/^(\d+(?:[.,]\d+)?)\s*s?$/);
     events.push({ t: m ? Number(m[1].replace(",", ".")) : NaN, label: String(r[li] || "").trim(), sound, ...(m ? {} : { raw: String(r[ti] || "").trim() }) });
   }
-  return { events, none, missing: false };
+  return { events, none: false, missing: false };
 }
 
 // silencedetect stderr → seconds of silence at the head of the file (0 when the first silence

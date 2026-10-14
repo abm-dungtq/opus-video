@@ -36,7 +36,8 @@
 //     build/RECIPES.md (recipe-pack.mjs) newer than PLAN.md.
 //   - PLAN.md "## Sự kiện": a table Thời điểm | Sự kiện | Âm thanh (seconds on the root timeline,
 //     src as in the HTML, "—" for no sound), or a line "không có SFX gắn sự kiện" (WARN only).
-//     plan: a missing section FAILs. final: a missing section only WARNs (the table asks for a
+//     plan: a missing section, or one with no event row (empty, TODO, header-only table) FAILs;
+//     the no-SFX line counts only when the table has no rows. final: a missing section only WARNs (the table asks for a
 //     measurement; a delivered project can still re-render), and sfx-sync.mjs measures each event:
 //     its FAIL lines (sound outside ITU-R BT.1359-1 −90…+185 ms) block, its WARN lines warn.
 // Readable hold, both stages, every project, WARN only (thresholds not yet calibrated): a "## Cảnh"
@@ -57,7 +58,7 @@ import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
 import { loadDirections, classifySeams, tokenExists, upstream, wordBudget } from "./directions.mjs";
 import { measureMotion, motionVerdict } from "./qc-mp4.mjs";
-import { checkSync } from "./sfx-sync.mjs";
+import { checkSync, parseEventsBody } from "./sfx-sync.mjs";
 
 // make-demo needs the 9:16 composition named, else hyperframes renders the 16:9 index.html.
 const VERTICAL_HINT = "make-demo.mjs --animatic --aspect 9x16 --composition compositions/main-9x16.html (or --hyperframes ../<project-9x16> for a separate 9:16 project)";
@@ -234,7 +235,11 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
   if (stage !== "final") {
     const events = plan.sections[EVENTS_SECTION];
     if (events === undefined) errors.push(EVENTS_MISSING);
-    else if (fold(events).includes("khong co sfx gan su kien")) warnings.push('PLAN.md "## Sự kiện": không có SFX gắn sự kiện (sfx-sync has nothing to measure)');
+    else {
+      const ev = parseEventsBody(events);
+      if (ev.error) errors.push(ev.error);
+      else if (ev.none) warnings.push('PLAN.md "## Sự kiện": không có SFX gắn sự kiện (sfx-sync has nothing to measure)');
+    }
   }
 
   if (stage === "final") {

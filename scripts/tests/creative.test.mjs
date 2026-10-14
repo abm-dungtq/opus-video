@@ -223,6 +223,14 @@ test("preflight plan: a creative PLAN needs ## Sự kiện; the no-SFX line pass
     r = preflight({ project: d });
     assert.equal(r.pass, true, JSON.stringify(r.errors));
     assert.ok(r.warnings.some((w) => w.includes("không có SFX gắn sự kiện")), JSON.stringify(r.warnings));
+    writeFileSync(join(d, "PLAN.md"), plan.replace("## QA", "## Sự kiện\nTODO\n\n## QA"));
+    r = preflight({ project: d });
+    assert.equal(r.pass, false);
+    assert.ok(r.errors.some((e) => e.includes("không có hàng")), JSON.stringify(r.errors));
+    writeFileSync(join(d, "PLAN.md"), plan.replace("## QA", "## Sự kiện\nkhông có SFX gắn sự kiện\n\n| Thời điểm | Sự kiện | Âm thanh |\n|---|---|---|\n| 2.0s | Nhấn | assets/sfx/x.mp3 |\n\n## QA"));
+    r = preflight({ project: d });
+    assert.equal(r.pass, true, JSON.stringify(r.errors));
+    assert.ok(!r.warnings.some((w) => w.includes("không có SFX gắn sự kiện")), JSON.stringify(r.warnings));
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 
