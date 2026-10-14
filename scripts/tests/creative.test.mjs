@@ -14,7 +14,7 @@ import { check as preflight } from "../check-preflight.mjs";
 import { motionVerdict, parseMotion } from "../qc-mp4.mjs";
 import { planTokens, buildRecipes } from "../recipe-pack.mjs";
 import { upstream } from "../directions.mjs";
-import { setFrontmatter, setSection, main as pitchMain, init as pitchInit, renderResult } from "../make-pitch.mjs";
+import { setFrontmatter, setSection, main as pitchMain, init as pitchInit, renderResult, styleframeMd } from "../make-pitch.mjs";
 import { writeDemoMd, winArgs } from "../make-demo.mjs";
 import { check as vietPro } from "../check-viet-pro.mjs";
 import { fakeVp, RECORD } from "./fixtures/fake-vp.mjs";
@@ -242,6 +242,45 @@ test("make-pitch render: exit 4 when a styleframe fails MOTION, 0 otherwise", ()
   assert.equal(r.code, 4);
   assert.match(r.msg, /FAIL {2}styleframe 2/);
   assert.doesNotMatch(r.msg, /gửi PITCH\.md/);
+});
+
+test("make-pitch choose with a brand kit: palette, brand path, voice_id only when empty", () => {
+  const d = tmp(), quiet = () => {};
+  const sha = (p) => createHash("sha256").update(readFileSync(p)).digest("hex");
+  const pick = JSON.stringify({ topic: "t", aspect: "9:16", energy: "vua", duration_s: 15, picks: [{ n: 1, id: "A2", tier: "fit", dir: "pitch/1-x" }] });
+  try {
+    mkdirSync(join(d, "pitch"));
+    writeFileSync(join(d, "pitch", "PICK.json"), pick);
+    writeFileSync(join(d, "BRIEF.md"), "---\naspect: 9:16\n---\n\n# Brief\n");
+    const before = sha(join(d, "BRIEF.md"));
+    assert.equal(pitchMain(["choose", "--project", d, "--pick", "1", "--palette", "thuong-hieu"], quiet, quiet), 2);
+    assert.equal(sha(join(d, "BRIEF.md")), before);
+    writeFileSync(join(d, "brand.json"), JSON.stringify({ name: "Hãng X", voice_id: "abc123", palette: { bg: "#000000", fg: "#ffffff", accent: "#ff0000" } }));
+    assert.equal(pitchMain(["choose", "--project", d, "--pick", "1"], quiet, quiet), 0);
+    let b = readFileSync(join(d, "BRIEF.md"), "utf8");
+    assert.match(b, /^palette: thuong-hieu$/m);
+    assert.match(b, new RegExp(`^brand: .*brand\\.json$`, "m"));
+    assert.match(b, /^voice_id: abc123$/m);
+    assert.match(b, /- Thương hiệu: Hãng X \(/);
+    writeFileSync(join(d, "BRIEF.md"), "---\naspect: 9:16\nvoice_id: keep1\n---\n\n# Brief\n");
+    assert.equal(pitchMain(["choose", "--project", d, "--pick", "1"], quiet, quiet), 0);
+    b = readFileSync(join(d, "BRIEF.md"), "utf8");
+    assert.match(b, /^voice_id: keep1$/m);
+    assert.doesNotMatch(b, /^voice_id: abc123$/m);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("styleframeMd adds a brand section only with a brand; pickDirections honours exclude", () => {
+  const p = pickDirections({ aspect: "9:16", topic: "t" }, data)[0];
+  const args = { n: 1, pick: p, topic: "t", aspect: "9:16", energy: "vua", data };
+  const md = styleframeMd({ ...args, brand: { brand: { palette: { bg: "#000000", fg: "#ffffff", accent: "#ff0000" } }, dir: "/tmp" } });
+  assert.match(md, /## Thương hiệu/);
+  assert.match(md, /#ff0000/);
+  assert.ok(md.indexOf("## Thương hiệu") < md.indexOf("## Bắt buộc"));
+  assert.doesNotMatch(styleframeMd(args), /## Thương hiệu/);
+  const ex = pickDirections({ aspect: "9:16", topic: "ai agent", exclude: ["A1"] }, data);
+  assert.equal(ex.length, 3);
+  assert.ok(!ex.some((x) => x.id === "A1"));
 });
 
 test("setFrontmatter / setSection helpers", () => {

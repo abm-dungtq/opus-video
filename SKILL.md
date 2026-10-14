@@ -59,7 +59,7 @@ Mỗi dự án có một thư mục riêng:
   renders/
 ```
 
-1. **Brief tối thiểu.** Điền theo `references/brief-template.md` vào `BRIEF.md`. Hỏi người dùng chủ đề, `aspect` (16:9 / 9:16 / both), thời lượng, tài sản thương hiệu (logo, màu, footage). Kỹ thuật dựng (engine, workflow, fps) tự đề xuất. **Không tự điền phong cách, hình chủ đạo, hiệu ứng, chuyển cảnh, SFX**: các trường đó do bước 1b ghi.
+1. **Brief tối thiểu.** Điền theo `references/brief-template.md` vào `BRIEF.md`. Hỏi người dùng chủ đề, `aspect` (16:9 / 9:16 / both), thời lượng, tài sản thương hiệu (logo, màu, footage). Kỹ thuật dựng (engine, workflow, fps) tự đề xuất. **Không tự điền phong cách, hình chủ đạo, hiệu ứng, chuyển cảnh, SFX**: các trường đó do bước 1b ghi. Có `shared-assets/brand.json` (tạo từ `references/brand.example.json`, kiểm bằng `brand.mjs check`) thì `make-pitch` dùng màu, font, logo, voice_id của brand và bỏ các hướng bị cấm.
 
 1b. **Pitch sáng tạo: 3 styleframe, người dùng chọn bằng mắt (BẮT BUỘC với dự án mới: BRIEF có `brief_version: 2`).** Danh mục 8 hướng đạo diễn và 5 nhóm từ khoá ở `references/creative-directions.md` (sinh từ `data/directions.json`; mọi token là tên có thật trong HyperFrames, `directions.mjs check` kiểm).
    - **Chọn 3 hướng tương phản:** `node $OV/scripts/make-pitch.mjs init --project . --topic "<chủ đề>" --aspect <…> --category <motion|explainer|3d|interactive|product|story-music|bat-dong-san> --energy <em|vua|don-dap> --duration <giây>`. Script chọn tất định một hướng *khớp chủ đề nhất*, một hướng *liền mạch không cắt*, một hướng *táo bạo*, tạo `pitch/<n>-<slug>/` (project HyperFrames trống) kèm `STYLEFRAME.md` và `RECIPES.md` cho từng hướng.
@@ -202,6 +202,8 @@ Cần bản đăng theo từng nơi thì xuất từ bản final bằng `node $O
 | `scripts/directions.mjs` | Bước 0/1b: `check` (token có thật trong HyperFrames, cũng chạy trong setup-check), `pick` (3 hướng tương phản), `compat` (cảnh báo phối sai), `doc --write` |
 | `scripts/make-pitch.mjs` | Bước 1b: `init` (3 project styleframe + STYLEFRAME.md + RECIPES.md), `render` (3 clip, sheet.jpg, PITCH.md menu số), `choose` (ghi BRIEF, exit 3 khi phối sai) |
 | `scripts/recipe-pack.mjs` | Bước 6 (và 1b): gom blueprint/rule/seam theo PLAN.md hoặc theo hướng thành `build/RECIPES.md` |
+| `scripts/brand.mjs` | Bước 1/1b: `check` brand kit (màu #rrggbb, hướng bị cấm có thật, file logo/font tồn tại); `make-pitch` tự đọc |
+| `references/brand.example.json` | Mẫu brand kit; chép thành `shared-assets/brand.json` rồi sửa (đường dẫn tính từ file đó) |
 | `references/pattern-library.md` | Bước 3: công thức theo 6 nhóm video |
 | `references/script-workflow.md` | Bước 2 và 9: cổng viet-pro đầy đủ, kỹ thuật theo loại video, kiểm chứng, lint, TikTok viral, `CAPTIONS.md` |
 | `scripts/check-viet-pro.mjs` | Bước 2 (`--stage script`, trước voice/render) và bước 9 (`--stage delivery`): biên bản `## viet_pro`, `script-table.v1.md` + compare, lint viet-pro từng file và `SCRIPT.md`, caption FB + TikTok; `voice_source: clip` lint phụ đề + chữ trên hình thay kịch bản; `--jev-audit` tuỳ chọn (chỉ WARN) |

@@ -1,0 +1,11 @@
+{
+  "name": "Tên thương hiệu",
+  "logo": "logos/logo.svg",
+  "watermark": "logos/watermark.png",
+  "fonts": { "heading": "fonts/Heading.ttf", "body": "fonts/Body.ttf" },
+  "palette": { "bg": "#0B0D12", "fg": "#F4F1EA", "accent": "#3B82F6", "accent2": "#F59E0B" },
+  "voice_id": "",
+  "tts_model": "eleven_v4",
+  "banned_directions": [],
+  "notes": "Đường dẫn tính từ thư mục chứa brand.json. Chép file này thành shared-assets/brand.json rồi sửa."
+}

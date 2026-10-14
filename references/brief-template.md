@@ -24,6 +24,7 @@ direction: <A1..A8>
 direction_swaps: <none | transition=lao-xuyen-tam; style=…>
 energy: <em | vua | don-dap>
 palette: <toi | sang | thuong-hieu>
+brand: <đường dẫn brand.json>   # make-pitch choose ghi khi có brand.json
 word_budget: <số từ tối đa của toàn bộ lời đọc>
 music_only_s: <số giây tối thiểu chỉ có nhạc và hình>
 creative_selection: <user | auto>

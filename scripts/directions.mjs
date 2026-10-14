@@ -128,8 +128,8 @@ export function scoreDirection(d, { category = "", aspect = "", energy = "", top
 }
 
 export function pickDirections(opts = {}, data = loadDirections()) {
-  const { aspect = "", topic = "" } = opts;
-  const pool = data.directions.filter((d) => !aspect || d.aspects.includes(aspect));
+  const { aspect = "", topic = "", exclude = [] } = opts;
+  const pool = data.directions.filter((d) => (!aspect || d.aspects.includes(aspect)) && !exclude.includes(d.id));
   const ranked = pool.map((d) => ({ d, ...scoreDirection(d, opts), tie: hash(`${fold(topic)}|${d.id}`) }))
     .sort((a, b) => b.score - a.score || a.tie - b.tie);
   const chosen = [];

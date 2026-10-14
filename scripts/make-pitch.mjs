@@ -5,11 +5,15 @@
 //   node make-pitch.mjs init   --project . --topic "<chủ đề>" --aspect <16:9|9:16|both>
 //                              [--category <motion|explainer|3d|interactive|product|story-music|bat-dong-san>]
 //                              [--energy em|vua|don-dap] [--duration <s, default BRIEF duration_s, else 15>]
+//                              [--brand <brand.json>]
 //   node make-pitch.mjs render --project .
 //   node make-pitch.mjs choose --project . (--pick <1|2|3> | --auto) [--style id] [--visual id]
 //                              [--effect id] [--transition id] [--sfx id] [--energy e]
-//                              [--palette toi|sang|thuong-hieu] [--accept-warnings]
+//                              [--palette toi|sang|thuong-hieu] [--brand <brand.json>] [--accept-warnings]
 //   node make-pitch.mjs --help | -h
+// init/choose read brand.json (project, then ../shared-assets) when present (brand.mjs): banned
+//   directions are dropped from the pick, STYLEFRAME.md gets the brand colours, logo and fonts,
+//   choose defaults to palette thuong-hieu, writes brand: and fills voice_id when BRIEF has none.
 // init: directions.mjs pick → pitch/PICK.json; for each pick a HyperFrames project
 //   pitch/<n>-<slug>/ (`hyperframes init --example blank`, portrait for 9:16/both, landscape for
 //   16:9) holding STYLEFRAME.md (what to build in ~3 s) and RECIPES.md (recipe-pack for that
@@ -35,6 +39,7 @@ import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
 import { loadDirections, pickDirections, compatWarnings, resolveSelection, wordBudget, upstream, DIMENSIONS, DIM_VI, TIER_VI } from "./directions.mjs";
 import { buildRecipes } from "./recipe-pack.mjs";
+import { findBrand, validateBrand, brandAbs } from "./brand.mjs";
 import { contactSheet, winArgs } from "./make-demo.mjs";
 import { measureMotion, motionVerdict } from "./qc-mp4.mjs";
 
@@ -70,7 +75,18 @@ export function setSection(text, name, content) {
   return re.test(text) ? text.replace(re, block) : `${text.trimEnd()}\n\n${block}`;
 }
 
-export function styleframeMd({ n, pick, topic, aspect, energy, data }) {
+function brandMd(found) {
+  if (!found) return "";
+  const p = found.brand.palette || {};
+  const files = [["Logo", "logo"], ["Font heading", "fonts.heading"], ["Font body", "fonts.body"]].map(([label, key]) => [label, brandAbs(found, key)]).filter(([, v]) => v);
+  return `## Thương hiệu
+- Màu: nền \`${p.bg}\` · chữ \`${p.fg}\` · nhấn \`${p.accent}\`${p.accent2 ? ` · nhấn phụ \`${p.accent2}\`` : ""}
+${files.map(([label, v]) => `- ${label}: \`${v}\``).join("\n")}${files.length ? "\n" : ""}- Dùng đúng 4 màu này; logo xuất hiện ở cảnh cuối, không đặt ở góc.
+
+`;
+}
+
+export function styleframeMd({ n, pick, topic, aspect, energy, data, brand = null }) {
   const d = pick.direction;
   const [w, h] = SIZE[aspect] || SIZE["9:16"];
   const sel = resolveSelection(d, {}, data);
@@ -86,10 +102,10 @@ ${d.styleframe_vi}
 - Luật chống slideshow: ${d.anti_slideshow_vi}
 - Style: ${sel.style.kind} \`${sel.style.name}\` · Blueprint: ${sel.blueprints.map((b) => `\`${b}\``).join(", ")} · Rule: ${sel.rules.map((r) => `\`${r}\``).join(", ")} · Seam: ${sel.seams.map((s) => `\`${s}\``).join(", ")}
 
-## Bắt buộc
+${brandMd(brand)}## Bắt buộc
 1. Đọc hết \`RECIPES.md\` cùng thư mục trước khi viết \`index.html\`; dựng bằng đúng các cơ chế trong đó.
 2. Dùng chữ thật của chủ đề (tên sản phẩm, con số, câu hook ngắn), không lorem ipsum, không bịa số liệu.
-3. Font có đủ dấu tiếng Việt (Be Vietnam Pro hoặc font preset đã kiểm dấu).
+3. ${brand ? "Font heading của brand nếu có đủ dấu tiếng Việt; không thì Be Vietnam Pro." : "Font có đủ dấu tiếng Việt (Be Vietnam Pro hoặc font preset đã kiểm dấu)."}
 4. Không đặt chữ/khung trang trí ở 4 góc (dấu hiệu video AI); ${aspect === "16:9" ? "giữ chủ thể trong vùng an toàn 90%" : "9:16: không đặt chữ ở 12% trên và 20% dưới (vùng UI TikTok)"}.
 5. Chuyển động liên tục suốt 3 giây, không có đoạn đứng yên quá 0,5 giây; không thẻ trượt lên rồi mờ dần.
 6. Không cần âm thanh. Đây là bản mẫu để người dùng chọn bằng mắt; bản được chọn sẽ thành cảnh mở đầu của video thật.
@@ -107,7 +123,13 @@ export function init(o, data, up = upstream()) {
   const project = resolve(o.project);
   const energy = o.energy || "vua";
   if (!data.energy[energy]) return { code: 2, msg: `--energy must be ${Object.keys(data.energy).join(", ")}` };
-  const picks = pickDirections({ category: o.category || "", aspect: o.aspect, energy, topic: o.topic }, data);
+  let brand = null;
+  try { brand = findBrand(project, o.brand || ""); } catch (e) { return { code: 2, msg: e.message }; }
+  if (brand) {
+    const { errors } = validateBrand(brand.brand, brand.dir, data);
+    if (errors.length) return { code: 2, msg: `${brand.path}:\n${errors.map((e) => `ERROR ${e}`).join("\n")}` };
+  }
+  const picks = pickDirections({ category: o.category || "", aspect: o.aspect, energy, topic: o.topic, exclude: (brand && brand.brand.banned_directions) || [] }, data);
   if (!up.anim || !up.faceless || !up.creative) return { code: 1, msg: "make-pitch: HyperFrames skills (hyperframes-animation, hyperframes-creative, faceless-explainer) not found; run setup-check.mjs" };
   const briefPath = join(project, "BRIEF.md");
   const briefFm = existsSync(briefPath) ? frontmatter(readFileSync(briefPath, "utf8")) : {};
@@ -127,12 +149,12 @@ export function init(o, data, up = upstream()) {
       if (r.status !== 0 || !existsSync(join(dir, "index.html"))) return { code: 1, msg: `hyperframes init failed for ${name}` };
       scaffold = sha(join(dir, "index.html"));
     }
-    writeFileSync(join(dir, "STYLEFRAME.md"), styleframeMd({ n: p.n, pick: p, topic: o.topic, aspect: o.aspect, energy, data }));
+    writeFileSync(join(dir, "STYLEFRAME.md"), styleframeMd({ n: p.n, pick: p, topic: o.topic, aspect: o.aspect, energy, data, brand }));
     const sel = resolveSelection(p.direction, {}, data);
     writeFileSync(join(dir, "RECIPES.md"), buildRecipes({ blueprints: sel.blueprints, rules: sel.rules, seams: sel.seams, direction: p.direction, style: sel.style }, data, up));
     rows.push({ n: p.n, id: p.id, tier: p.tier, dir: posix(relative(project, dir)), why: p.why, scaffold });
   }
-  writeFileSync(join(pitch, "PICK.json"), JSON.stringify({ topic: o.topic, aspect: o.aspect, category: o.category || "", energy, duration_s: Number(o.duration) || Number(briefFm.duration_s) || 15, picks: rows }, null, 2) + "\n");
+  writeFileSync(join(pitch, "PICK.json"), JSON.stringify({ topic: o.topic, aspect: o.aspect, category: o.category || "", energy, duration_s: Number(o.duration) || Number(briefFm.duration_s) || 15, ...(brand ? { brand: brand.path } : {}), picks: rows }, null, 2) + "\n");
   return { code: 0, msg: `make-pitch: 3 hướng → ${rows.map((r) => `${r.n}. ${r.id} (${r.dir})`).join(" · ")}\nNext: viết index.html 3 giây cho từng thư mục theo STYLEFRAME.md + RECIPES.md, rồi chạy make-pitch.mjs render --project .` };
 }
 
@@ -211,6 +233,9 @@ function choose(o, data) {
   const energy = o.energy || info.energy || direction.energy[0];
   if (!data.energy[energy]) return { code: 2, msg: `--energy must be ${Object.keys(data.energy).join(", ")}` };
   if (o.palette && !data.palette[o.palette]) return { code: 2, msg: `--palette must be ${Object.keys(data.palette).join(", ")}` };
+  let brand = null;
+  try { brand = findBrand(project, o.brand || info.brand || ""); } catch (e) { return { code: 2, msg: e.message }; }
+  if (o.palette === "thuong-hieu" && !brand) return { code: 2, msg: "--palette thuong-hieu cần brand.json (chép references/brand.example.json thành shared-assets/brand.json)" };
   const swaps = Object.fromEntries(DIMENSIONS.filter((d) => o[d]).map((d) => [d, o[d]]));
   const warnings = compatWarnings(direction, swaps, energy, data);
   if (warnings.some((w) => w.startsWith("không có từ khoá"))) return { code: 2, msg: warnings.join("\n") };
@@ -227,7 +252,9 @@ function choose(o, data) {
     direction: direction.id,
     direction_swaps: Object.entries(swaps).map(([k, v]) => `${k}=${v}`).join("; ") || "none",
     energy,
-    palette: o.palette || fm.palette || "",
+    palette: o.palette || fm.palette || (brand ? "thuong-hieu" : ""),
+    brand: brand ? brand.path : "",
+    voice_id: !fm.voice_id && brand && brand.brand.voice_id ? brand.brand.voice_id : "",
     word_budget: budget.words,
     music_only_s: budget.music_only_s,
     creative_selection: o.auto ? "auto" : "user",
@@ -244,6 +271,7 @@ function choose(o, data) {
     `- Nhịp: ${data.energy[energy].ten_vi} · Ngân sách lời: ≤ ${budget.words} từ, ≥ ${budget.music_only_s}s chỉ có nhạc và hình`,
     `- Luật chống slideshow: ${direction.anti_slideshow_vi}`,
     `- Styleframe làm cảnh mở đầu: \`${row.dir}/index.html\``,
+    ...(brand ? [`- Thương hiệu: ${brand.brand.name || "(chưa đặt tên)"} (${brand.path})`] : []),
     ...(warnings.length ? [`- Cảnh báo phối đã được người dùng chấp nhận: ${warnings.join("; ")}`] : []),
   ].join("\n"));
   writeFileSync(briefPath, brief);
