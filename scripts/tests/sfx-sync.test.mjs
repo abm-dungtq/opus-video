@@ -119,6 +119,38 @@ test("CLI: an empty ## Sự kiện fails a creative project and warns a legacy o
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 
+test("cache: a cache that cannot be written is a WARN after the measurement, and a written cache leaves no .tmp behind", () => {
+  const run = (cmd, args) => ({ status: 0, stderr: args.includes("volumedetect") ? "max_volume: -3.0 dB" : "" });
+  const project = (assetsIsFile) => {
+    const d = tmp();
+    if (assetsIsFile) writeFileSync(join(d, "assets"), "");
+    mkdirSync(join(d, "sfx"));
+    writeFileSync(join(d, "sfx", "a.wav"), "RIFF");
+    writeFileSync(join(d, "BRIEF.md"), "---\ndirection: A2\n---\n");
+    writeFileSync(join(d, "PLAN.md"), "# PLAN\n\n## Sự kiện\n| Thời điểm | Sự kiện | Âm thanh |\n|---|---|---|\n| 2.0 | nhấn | sfx/a.wav |\n");
+    writeFileSync(join(d, "index.html"), '<audio id="a" src="sfx/a.wav" data-start="2.0"></audio>\n');
+    return d;
+  };
+  const d = project(true);
+  try {
+    const r = checkSync({ dir: d, run });
+    assert.equal(r.lines[0].level, "PASS");
+    assert.deepEqual(r.errors, []);
+    assert.equal(r.warnings.length, 1, JSON.stringify(r.warnings));
+    assert.match(r.warnings[0], /không ghi được assets\/sfx-onsets\.json/);
+    assert.equal(existsSync(join(d, "assets", "sfx-onsets.json.tmp")), false);
+    const c = capture();
+    assert.equal(main(["--project", d], { ...c.io, run }), 0);
+    assert.match(c.buf.out, /^WARN {2}SYNC {3}không ghi được/m);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+  const ok = project(false);
+  try {
+    checkSync({ dir: ok, run });
+    assert.equal(existsSync(join(ok, "assets", "sfx-onsets.json")), true);
+    assert.equal(existsSync(join(ok, "assets", "sfx-onsets.json.tmp")), false);
+  } finally { rmSync(ok, { recursive: true, force: true }); }
+});
+
 test("CLI: bad usage and missing PLAN.md exit 2", () => {
   const d = tmp();
   try {

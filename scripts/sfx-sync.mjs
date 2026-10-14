@@ -26,7 +26,7 @@
 //   and a missing "## Sự kiện" is one WARN. A creative project without the section FAILs.
 // Exit: 0 no FAIL · 1 at least one FAIL · 2 bad usage, or PLAN.md / the HTML is missing.
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -135,10 +135,20 @@ function leadCache(dir, run) {
       dirty = true;
       return cache[key];
     },
+    // Atomic write (temp file + rename). Returns null, or the error message when the cache cannot
+    // be written: the measurements are done, so the caller only warns.
     save() {
-      if (!dirty) return;
-      mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(path, JSON.stringify(cache, null, 2) + "\n");
+      if (!dirty) return null;
+      const tmp = `${path}.tmp`;
+      try {
+        mkdirSync(dirname(path), { recursive: true });
+        writeFileSync(tmp, JSON.stringify(cache, null, 2) + "\n");
+        renameSync(tmp, path);
+        return null;
+      } catch (e) {
+        try { rmSync(tmp, { force: true }); } catch { /* the temp file never existed */ }
+        return e.message;
+      }
     },
   };
 }
@@ -196,7 +206,10 @@ export function checkSync({ dir = ".", html, run = spawnSync } = {}) {
       const fix = level === "PASS" ? null : `data-start="${(e.t - Math.max(0, lead - track.mediaStart) / track.rate).toFixed(3)}" cho ${track.id ? `<audio id="${track.id}">` : `<audio src="${e.sound}">`}`;
       add({ ...base, level, delta_ms: delta, lead_s: lead, fix, detail: `lệch ${signed(delta)} ms (đầu file im ${Math.round(lead * 1000)} ms)` });
     }
-  } finally { cache.save(); }
+  } finally {
+    const e = cache.save();
+    if (e) out.warnings.push(`không ghi được ${ONSET_CACHE}: ${e} (đã đo xong, lần sau đo lại)`);
+  }
   return out;
 }
 
