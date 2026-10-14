@@ -17,3 +17,10 @@ test("pickVoice: an empty or placeholder BRIEF value does not win", () => {
   assert.equal(pickVoice({ brief: { voice_id: "<voice_id>" }, env }).voice, "envVoice");
   assert.equal(pickVoice({ brief: { voice_id: "  briefVoice  # note" }, env }).voice, "briefVoice");
 });
+
+test("pickVoice: a BRIEF voice equal to the template default is unset, so the machine env still applies", () => {
+  const env = { OPUS_VIDEO_VOICE_ID: "envVoice", OPUS_VIDEO_TTS_MODEL: "envModel" };
+  const brief = { voice_id: DEFAULT_VOICE, tts_model: DEFAULT_TTS_MODEL };
+  assert.deepEqual(pickVoice({ brief, env }), { voice: "envVoice", model: "envModel", from: { voice: "OPUS_VIDEO_VOICE_ID", model: "OPUS_VIDEO_TTS_MODEL" } });
+  assert.deepEqual(pickVoice({ brief }).from, { voice: "default", model: "default" });
+});

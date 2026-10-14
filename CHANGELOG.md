@@ -37,7 +37,7 @@ Why: a one-line brief ("15s, công nghệ cao cấp") produced four title cards 
 - The seam check no longer flags ordinary prose that contains "hiện".
 - On Windows, `make-pitch` and `render-final` quote the `npx` arguments.
 
-- `eleven.mjs` `tts`/`audio-meta` now take the voice and TTS model from `BRIEF.md` (`voice_id`, `tts_model`) before `OPUS_VIDEO_VOICE_ID`/`OPUS_VIDEO_TTS_MODEL`; `--voice`/`--model` still win. The chosen source is printed.
+- `eleven.mjs` `tts`/`audio-meta` now take the voice and TTS model from `BRIEF.md` (`voice_id`, `tts_model`) before `OPUS_VIDEO_VOICE_ID`/`OPUS_VIDEO_TTS_MODEL`; `--voice`/`--model` still win. A BRIEF value equal to the default is the template's and does not hide the env. The chosen source is printed.
 
 ## 2026-10-13: post-render tools
 

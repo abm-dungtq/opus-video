@@ -11,10 +11,11 @@ const briefValue = (v) => {
 
 // Voice and TTS model for a project: --voice/--model, then BRIEF.md voice_id/tts_model (the project's
 // choice, e.g. written by make-pitch from the brand kit), then OPUS_VIDEO_VOICE_ID/OPUS_VIDEO_TTS_MODEL
-// on this machine, then the defaults. `from` names the winning source so the run can print it.
+// on this machine, then the defaults. A BRIEF value equal to the default is the template's, not a
+// choice (same rule as make-pitch), so it does not hide the machine env. `from` names the winner.
 export function pickVoice({ args = {}, brief = {}, env = {} } = {}) {
   const one = (arg, flag, key, envKey, dflt) =>
-    arg ? [arg, flag] : briefValue(brief[key]) ? [briefValue(brief[key]), "BRIEF.md"] : env[envKey] ? [env[envKey], envKey] : [dflt, "default"];
+    arg ? [arg, flag] : briefValue(brief[key]) && briefValue(brief[key]) !== dflt ? [briefValue(brief[key]), "BRIEF.md"] : env[envKey] ? [env[envKey], envKey] : [dflt, "default"];
   const [voice, vf] = one(args.voice, "--voice", "voice_id", "OPUS_VIDEO_VOICE_ID", DEFAULT_VOICE);
   const [model, mf] = one(args.model, "--model", "tts_model", "OPUS_VIDEO_TTS_MODEL", DEFAULT_TTS_MODEL);
   return { voice, model, from: { voice: vf, model: mf } };
