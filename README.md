@@ -2,15 +2,16 @@
 
 **Agent skill dựng video tiếng Việt từ một brief tới file MP4 giao khách.** Bạn nói chủ đề; agent dựng 3 hướng hình ảnh để bạn chọn, viết kịch bản, tạo giọng, dựng, kiểm tra rồi xuất bản giao 16:9, 9:16 hoặc cả hai. Mỗi bước có cổng kiểm tra chặn lại khi chưa đạt.
 
+[![Release](https://img.shields.io/badge/release-v1.1.0-orange.svg)](https://github.com/abm-dungtq/opus-video/releases/tag/v1.1.0)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Node ≥ 22](https://img.shields.io/badge/node-%E2%89%A5%2022-339933.svg)
 ![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Antigravity-6f42c1.svg)
 ![OS](https://img.shields.io/badge/OS-macOS%20%C2%B7%20Linux%20%C2%B7%20WSL%20%C2%B7%20Windows-555.svg)
-![Tests](https://img.shields.io/badge/tests-245%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-274%20passing-brightgreen.svg)
 
 Chạy trên **Claude Code, OpenAI Codex, Google Antigravity (app và CLI)** và mọi agent đọc được thư mục skill có `SKILL.md`.
 
-[Video demo](#video-demo) · [Có gì mới](#có-gì-mới-2026-10-14) · [Cách hoạt động](#cách-hoạt-động) · [Cài đặt](#1-cài-đặt-nhanh-khuyên-dùng) · [Dùng](#6-dùng) · [Script](#7-script) · [Xử lý sự cố](#10-xử-lý-sự-cố)
+[Video demo](#video-demo) · [Có gì mới](#có-gì-mới) · [Cách hoạt động](#cách-hoạt-động) · [Cài đặt](#1-cài-đặt-nhanh-khuyên-dùng) · [Dùng](#6-dùng) · [Script](#7-script) · [Xử lý sự cố](#10-xử-lý-sự-cố)
 
 ## Video demo
 
@@ -47,7 +48,34 @@ Các video dưới đây do opus-video dựng. Bấm vào ảnh để mở file 
   </tr>
 </table>
 
-## Có gì mới (2026-10-14)
+## Có gì mới
+
+### v1.1.0 (2026-10-14): ba cổng cho chuyển động
+
+Ba lỗi trước đây lọt qua mọi cổng kiểm tra: tiếng SFX vang lệch khỏi khoảnh khắc trên hình, chữ biến mất trước khi người xem đọc kịp, và mỗi lần sửa phải render lại cả video mà không ghi lại đã sửa gì. Bản này thêm một cổng cho mỗi lỗi. Ý tưởng lấy từ tài liệu *Motion Engineering with Opus 5.5* của beamnxw (MIT); ngưỡng nào cũng có nguồn.
+
+**1. Tiếng khớp hình (`sfx-sync.mjs`)**
+
+- `PLAN.md` của dự án sáng tạo có thêm bảng `## Sự kiện`: lúc nào trên hình xảy ra gì và tiếng nào đi kèm (ví dụ `6.5 | nhấn nút Gửi | click.mp3`). Cổng plan chặn khi thiếu bảng; dự án không có SFX gắn sự kiện ghi một dòng `không có SFX gắn sự kiện`.
+- Nhiều file SFX mở đầu bằng một đoạn im lặng, nên `data-start` chỉ là lúc file bắt đầu chứ chưa phải lúc nghe thấy tiếng. Script đo đoạn im lặng đó bằng ffmpeg, lấy ngưỡng theo đỉnh của chính file (đỉnh − 20 dB) để file nhỏ tiếng không bị coi là im lặng cả bài.
+- Độ lệch được so với cửa sổ của ITU-R BT.1359-1: từ −45 đến +125 ms là PASS, tới −90 / +185 ms là WARN, ngoài nữa là FAIL. Mỗi sự kiện ra một dòng, ví dụ `PASS SYNC 6.5s nhấn nút Gửi ← click.mp3 lệch +30 ms (đầu file im 30 ms)`.
+- `--fix` in giá trị `data-start` đúng để dán vào HTML, không tự sửa file. Cổng final tự chạy bước này và chặn tiếng lệch quá ngưỡng.
+
+**2. Chữ đủ lâu để đọc**
+
+- `check-preflight` đếm số từ của chữ trên hình (phần trong ngoặc kép ở cột Hình của `## Cảnh`) và in WARN khi chữ rời đi trước `số từ / 2,5 + 0,5 giây`, tối thiểu 1 giây. Tốc độ 2,5 từ/giây lấy từ viet-pro; 0,5 giây để mắt tìm tới chữ là giả định, sẽ chỉnh khi đo thêm dự án.
+- Chữ ở lại sang beat sau thì ghi `(giữ đến 9.5s)` hoặc `(giữ đến hết)` trong ô Hình, cổng sẽ đo tới mốc đó.
+- Cổng này chỉ cảnh báo, không chặn.
+
+**3. Sửa theo vòng (`REVISIONS.md`)**
+
+- Khi bạn góp ý, agent ghi mỗi chỗ sửa thành một mục 4 trường: **Vị trí** (giây trên timeline gốc), **Lỗi thấy**, **Đổi**, **Giữ nguyên** (các mốc không được động tới). Tối đa 5 mục một vòng; nhiều hơn thì agent hỏi mục nào để vòng sau. Mẫu ở `references/revisions.md`.
+- Mỗi mục được kiểm bằng `hyperframes snapshot --at` đúng những giây đó, không render lại cả video. Hết vòng mới render lại animatic một lần để bạn duyệt.
+- Cổng final cảnh báo khi một vòng quá 5 mục hoặc một mục thiếu trường.
+
+Dự án cũ (BRIEF không có `direction:` và `brief_version: 2`) không bị chặn thêm: với chúng, cả ba cổng chỉ in WARN.
+
+### v1.0.0 (2026-10-14): chọn hình trước, dữ liệu thật
 
 Bản trước dựng ra video kiểu trình chiếu: vài thẻ tiêu đề trượt lên rồi mờ đi. Bản này đổi thứ tự làm việc: chọn hình trước, viết lời sau, và mọi bước đều được đo bằng máy.
 
@@ -59,11 +87,8 @@ Bản trước dựng ra video kiểu trình chiếu: vài thẻ tiêu đề tr�
 - **Dữ liệu thật thay số gõ tay.** `poi-fetch.mjs` lấy trường, chợ, bệnh viện, trạm xe… quanh một địa chỉ từ OpenStreetMap, kèm phút đi bộ. `source-ingest.mjs` lưu nguyên văn bài báo, PDF, trang arXiv vào `SOURCES.md` để đối chiếu từng con số trên hình.
 - **Brand kit dùng chung.** `shared-assets/brand.json` (mẫu ở `references/brand.example.json`) giữ màu, font, logo, giọng đọc và các hướng không dùng; `make-pitch` tự đọc.
 - **Giọng theo dự án.** `voice_id` trong `BRIEF.md` đứng trên giọng mặc định của máy; script in ra giọng lấy từ đâu.
-- **SFX khớp hình.** `PLAN.md` có bảng `## Sự kiện` ghi lúc nào trên hình có tiếng. `sfx-sync.mjs` đo đoạn im lặng đầu mỗi file SFX, so lúc tiếng thật sự vang với sự kiện theo ITU-R BT.1359-1 và đề xuất `data-start` mới khi lệch. Cổng final chặn tiếng lệch quá ngưỡng.
-- **Chữ đủ lâu để đọc.** `check-preflight` in WARN khi chữ trên hình rời đi trước `số từ / 2,5 + 0,5 giây` (tối thiểu 1 giây). Chữ ở lại qua beat sau thì ghi `(giữ đến <t>s)` trong ô Hình.
-- **Sửa theo vòng.** Góp ý ghi vào `REVISIONS.md`, mỗi mục 4 trường và tối đa 5 mục một vòng. Mỗi mục kiểm bằng ảnh chụp tại đúng giây, hết vòng mới render lại animatic.
 
-Danh sách đầy đủ ở [CHANGELOG.md](CHANGELOG.md).
+Danh sách đầy đủ ở [CHANGELOG.md](CHANGELOG.md); các bản đóng gói ở [Releases](https://github.com/abm-dungtq/opus-video/releases).
 
 ## Cách hoạt động
 
@@ -71,11 +96,11 @@ Skill này là phần điều phối và không tự render. Nó nối các bư�
 
 1. **Chọn hướng bằng mắt:** `make-pitch.mjs` dựng 3 styleframe khoảng 3 giây bằng chính chủ đề của người dùng theo 3 hướng đạo diễn khác nhau; người dùng chọn một, kèm đổi từ khoá nếu muốn. Styleframe được chọn thành cảnh mở đầu, kịch bản viết sau và không vượt ngân sách lời của hướng.
 2. **Kịch bản:** viết bằng [viet-pro](https://github.com/abm-dungtq/viet-pro-codex) ở mức đầy đủ (đọc hết review/editorial, lượt Humanizer có ghi chép, lint), có kiểm chứng dữ kiện. `check-viet-pro.mjs` chặn khi chưa đạt; `eleven.mjs` tự chạy lại cổng và không tạo giọng (exit 4) khi chưa đạt.
-3. **Plan:** `PLAN.md` (mục tiêu, ý đồ sáng tạo, bảng cảnh, âm thanh, engine, mốc khung hình demo, QA) phải qua `check-preflight.mjs --stage plan` trước khi tạo giọng và dựng. Mỗi beat nêu blueprint hoặc rule có thật và cách nối sang beat sau; nối bằng mờ dần bị chặn.
+3. **Plan:** `PLAN.md` (mục tiêu, ý đồ sáng tạo, bảng cảnh, âm thanh, engine, mốc khung hình demo, QA) phải qua `check-preflight.mjs --stage plan` trước khi tạo giọng và dựng. Mỗi beat nêu blueprint hoặc rule có thật và cách nối sang beat sau; nối bằng mờ dần bị chặn. Bảng `## Sự kiện` ghi lúc nào trên hình có tiếng; chữ trên hình được kiểm có giữ đủ lâu để đọc.
 4. **Âm thanh:** ElevenLabs. Giọng `eleven_v4` có timestamp từng từ, SFX `eleven_text_to_sound_v2`, nhạc nền `music_v2_5`.
 5. **Dựng:** [HyperFrames](https://hyperframes.dev) là mặc định, theo công thức gom bằng `recipe-pack.mjs`. Remotion hoặc Canvas khi dự án cần.
 6. **Clip nháp và khung hình demo:** `make-demo.mjs --animatic` render clip nháp và cắt đúng các mốc trong plan; người dùng duyệt chuyển động (`DEMO.md`) rồi mới được render bản cuối. `render-final.mjs` là đường duy nhất ra bản giao (`--quality delivery`) và chặn (exit 5) khi thiếu plan, demo, duyệt, hoặc khi clip nháp đứng yên kiểu slideshow.
-7. **QA:** `qc-mp4.mjs` (kỹ thuật và độ chuyển động), lint, check, vùng an toàn 9:16, Gemini (qua `agy`) xem video và chấm, tối đa 3 vòng. Kèm caption Facebook + TikTok qua viet-pro.
+7. **QA:** `sfx-sync.mjs` (tiếng khớp hình), `qc-mp4.mjs` (kỹ thuật và độ chuyển động), lint, check, vùng an toàn 9:16, Gemini (qua `agy`) xem video và chấm, tối đa 3 vòng. Kèm caption Facebook + TikTok qua viet-pro.
 8. **Footage thật (beta):** `cut.mjs` tìm khoảng lặng và ghép clip theo danh sách cắt.
 9. **Dữ liệu thật và brand kit:** `poi-fetch.mjs` lấy tiện ích quanh một địa chỉ từ OpenStreetMap kèm khoảng cách và phút đi bộ; `source-ingest.mjs` lưu văn bản gốc của bài báo, PDF, trang abstract arXiv vào `SOURCES.md` để kiểm số liệu; `brand.mjs` kiểm brand kit dùng chung (màu, font, logo, giọng đọc).
 10. **Clip người dùng làm trục + nền dựng mới:** clip có sẵn lời nói chạy trong khung PiP trên nền bản đồ hay phối cảnh, hiệu ứng bám từng chữ. BRIEF ghi `voice_source: clip`: cổng viet-pro lint phụ đề và chữ trên hình thay cho kịch bản TTS. Phụ đề sinh từ bản chép lời Whisper cùng bảng sửa lỗi nghe máy người dùng duyệt. Nội dung là của người dùng nên không gắn nhãn rào đón ("minh họa", "theo lời người nói"…) lên hình; `video-lint` báo lỗi khi gặp. Xem `references/clip-master-canvas.md`.
@@ -226,10 +251,10 @@ Agent nào cũng có thể chọn skill tự động khi bạn nói muốn làm 
 | 2 | Kịch bản viet-pro đầy đủ | `check-viet-pro.mjs` → `PASS` (bắt buộc với tiếng Việt) |
 | 3 | Storyboard, tra case mẫu | |
 | 4 | Chọn engine | |
-| **4b** | **`PLAN.md`** (mẫu ở `references/plan-demo.md`) | `check-preflight.mjs --stage plan` → `PASS` |
+| **4b** | **`PLAN.md`** (mẫu ở `references/plan-demo.md`), có bảng `## Sự kiện` | `check-preflight.mjs --stage plan` → `PASS`; WARN khi chữ giữ không đủ lâu |
 | 5 | Giọng, SFX, nhạc nền | `eleven.mjs` exit 4 nếu cổng viet-pro chặn |
 | 6 | Dựng | |
-| **6b** | **Clip nháp animatic** (`make-demo.mjs --animatic`) → người dùng duyệt → `DEMO.md` `approval:` | `check-preflight.mjs --stage final` → `PASS` |
+| **6b** | **Clip nháp animatic** (`make-demo.mjs --animatic`) → người dùng duyệt → `DEMO.md` `approval:`; góp ý ghi vào `REVISIONS.md` | `check-preflight.mjs --stage final` → `PASS` (gồm `sfx-sync`) |
 | 7 | Render nháp (`hyperframes render --quality looks`); **bản cuối chỉ bằng `render-final.mjs`** | exit 5 nếu thiếu plan/demo/duyệt |
 | 8 | QA (tối đa 3 vòng), bắt đầu bằng `qc-mp4.mjs` | `QA.md`, không có dòng `FAIL` |
 | 9 | Caption Facebook + TikTok | `check-viet-pro.mjs --stage delivery` → `PASS` |

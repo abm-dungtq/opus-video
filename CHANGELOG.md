@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026-10-14: picture-event sync, readable hold, revision loop
+## v1.1.0 (2026-10-14): picture-event sync, readable hold, revision loop
 
 Why: three faults slipped past every existing gate. A sound effect could ring after the moment it belongs to (a click heard after the button is pressed), because many SFX files start with silence and `data-start` only marks where the file begins. On-screen text could leave before a viewer can read it. And each fix meant re-rendering the whole video, with no record of what had changed.
 
@@ -25,7 +25,7 @@ Why: three faults slipped past every existing gate. A sound effect could ring af
 ### Compatibility
 - Legacy projects (no `direction:` and no `brief_version: 2`) are not blocked by anything new: `sfx-sync` turns every FAIL into a WARN for them and `check-preflight` does not run it. `bds-ban-do-pip-9x16` and `abm-intro` give the same output and exit code before and after this change.
 
-## 2026-10-14: creative direction, brand kit, real data
+## v1.0.0 (2026-10-14): creative direction, brand kit, real data
 
 Why: a one-line brief ("15s, công nghệ cao cấp") produced four title cards sliding up and fading. Causes found: step 1 told the agent to fill the style itself; the script was written before any visual idea (one sentence = one card); the general-video path built without HyperFrames recipes; the demo gate showed stills, which cannot reveal a slide swap; no gate looked at motion. Property and news videos also needed real numbers (nearby amenities, source text) instead of typed-in ones.
 
