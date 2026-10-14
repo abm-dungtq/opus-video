@@ -4,7 +4,7 @@
 // every agent: the menu is plain text in PITCH.md plus file paths (no runtime-specific picker).
 //   node make-pitch.mjs init   --project . --topic "<chủ đề>" --aspect <16:9|9:16|both>
 //                              [--category <motion|explainer|3d|interactive|product|story-music|bat-dong-san>]
-//                              [--energy em|vua|don-dap] [--duration 15]
+//                              [--energy em|vua|don-dap] [--duration <s, default BRIEF duration_s, else 15>]
 //   node make-pitch.mjs render --project .
 //   node make-pitch.mjs choose --project . (--pick <1|2|3> | --auto) [--style id] [--visual id]
 //                              [--effect id] [--transition id] [--sfx id] [--energy e]
@@ -44,14 +44,18 @@ const sha = (file) => createHash("sha256").update(readFileSync(file)).digest("he
 export const REPLY_KEY = { style: "phong cách", visual: "hình", effect: "hiệu ứng", transition: "chuyển cảnh", sfx: "âm thanh" };
 const SIZE = { "9:16": [1080, 1920], "16:9": [1920, 1080], both: [1080, 1920] };
 
-// Set frontmatter keys in a markdown text (adds the block when missing). Values are single-line.
+// Set frontmatter keys in a markdown text (adds the block when missing). Values are single-line;
+// null deletes the key, undefined/"" leave it as is. Duplicated keys collapse to one line.
 export function setFrontmatter(text, values) {
   const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
   let lines = m ? m[1].split(/\r?\n/) : [];
   for (const [k, v] of Object.entries(values)) {
-    if (v === undefined || v === null || v === "") continue;
+    if (v === undefined || v === "") continue;
+    const re = new RegExp(`^${k}:`);
+    const i = lines.findIndex((l) => re.test(l));
+    lines = lines.filter((l, j) => j === i || !re.test(l));
+    if (v === null) { if (i >= 0) lines.splice(i, 1); continue; }
     const line = `${k}: ${String(v).replace(/\r?\n/g, " ")}`;
-    const i = lines.findIndex((l) => new RegExp(`^${k}:`).test(l));
     if (i >= 0) lines[i] = line; else lines.push(line);
   }
   const body = m ? text.slice(m[0].length) : text;
@@ -104,6 +108,8 @@ export function init(o, data, up = upstream()) {
   if (!data.energy[energy]) return { code: 2, msg: `--energy must be ${Object.keys(data.energy).join(", ")}` };
   const picks = pickDirections({ category: o.category || "", aspect: o.aspect, energy, topic: o.topic }, data);
   if (!up.anim || !up.faceless || !up.creative) return { code: 1, msg: "make-pitch: HyperFrames skills (hyperframes-animation, hyperframes-creative, faceless-explainer) not found; run setup-check.mjs" };
+  const briefPath = join(project, "BRIEF.md");
+  const briefFm = existsSync(briefPath) ? frontmatter(readFileSync(briefPath, "utf8")) : {};
   const pitch = join(project, "pitch");
   mkdirSync(pitch, { recursive: true });
   // Keep the scaffold hash of styleframes that already exist, so render can still spot an unwritten one.
@@ -125,7 +131,7 @@ export function init(o, data, up = upstream()) {
     writeFileSync(join(dir, "RECIPES.md"), buildRecipes({ blueprints: sel.blueprints, rules: sel.rules, seams: sel.seams, direction: p.direction, style: sel.style }, data, up));
     rows.push({ n: p.n, id: p.id, tier: p.tier, dir: posix(relative(project, dir)), why: p.why, scaffold });
   }
-  writeFileSync(join(pitch, "PICK.json"), JSON.stringify({ topic: o.topic, aspect: o.aspect, category: o.category || "", energy, duration_s: Number(o.duration) || 15, picks: rows }, null, 2) + "\n");
+  writeFileSync(join(pitch, "PICK.json"), JSON.stringify({ topic: o.topic, aspect: o.aspect, category: o.category || "", energy, duration_s: Number(o.duration) || Number(briefFm.duration_s) || 15, picks: rows }, null, 2) + "\n");
   return { code: 0, msg: `make-pitch: 3 hướng → ${rows.map((r) => `${r.n}. ${r.id} (${r.dir})`).join(" · ")}\nNext: viết index.html 3 giây cho từng thư mục theo STYLEFRAME.md + RECIPES.md, rồi chạy make-pitch.mjs render --project .` };
 }
 
@@ -201,10 +207,11 @@ function choose(o, data) {
   if (warnings.some((w) => w.startsWith("không có từ khoá"))) return { code: 2, msg: warnings.join("\n") };
   if (warnings.length && !o["accept-warnings"]) return { code: 3, msg: `${warnings.map((w) => `WARN  ${w}`).join("\n")}\nchoose: hỏi người dùng một lần; nếu họ vẫn giữ lựa chọn thì chạy lại với --accept-warnings` };
   const sel = resolveSelection(direction, swaps, data);
-  const budget = wordBudget(energy, info.duration_s, data);
   const briefPath = join(project, "BRIEF.md");
   let brief = existsSync(briefPath) ? readFileSync(briefPath, "utf8") : "";
   const fm = frontmatter(brief);
+  const budget = wordBudget(energy, Number(fm.duration_s) || info.duration_s, data);
+  const aspectWarn = fm.aspect && fm.aspect !== info.aspect ? `\nWARN aspect BRIEF ${fm.aspect} ≠ pitch ${info.aspect}` : "";
   brief = setFrontmatter(brief, {
     aspect: fm.aspect || info.aspect,
     duration_s: fm.duration_s || info.duration_s,
@@ -216,6 +223,7 @@ function choose(o, data) {
     music_only_s: budget.music_only_s,
     creative_selection: o.auto ? "auto" : "user",
     styleframe: `${row.dir}/index.html`,
+    creative_override: null,
   });
   brief = setSection(brief, "creative_direction", [
     `- Hướng: ${direction.id} — ${direction.ten_vi} (${o.auto ? "agent tự chọn theo yêu cầu chạy không dừng" : `người dùng chọn phương án ${n}`})`,
@@ -230,7 +238,7 @@ function choose(o, data) {
     ...(warnings.length ? [`- Cảnh báo phối đã được người dùng chấp nhận: ${warnings.join("; ")}`] : []),
   ].join("\n"));
   writeFileSync(briefPath, brief);
-  return { code: 0, msg: `make-pitch: BRIEF.md ← direction ${direction.id}, energy ${energy}, word_budget ${budget.words}, music_only_s ${budget.music_only_s}${Object.keys(swaps).length ? `, swaps ${Object.entries(swaps).map(([k, v]) => `${k}=${v}`).join(", ")}` : ""}\nNext: bước 2 viết kịch bản viet-pro theo ngân sách lời này (hình dẫn, lời theo).` };
+  return { code: 0, msg: `make-pitch: BRIEF.md ← direction ${direction.id}, energy ${energy}, word_budget ${budget.words}, music_only_s ${budget.music_only_s}${Object.keys(swaps).length ? `, swaps ${Object.entries(swaps).map(([k, v]) => `${k}=${v}`).join(", ")}` : ""}${aspectWarn}\nNext: bước 2 viết kịch bản viet-pro theo ngân sách lời này (hình dẫn, lời theo).` };
 }
 
 function parseArgs(argv) {

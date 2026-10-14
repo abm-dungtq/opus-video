@@ -215,6 +215,26 @@ test("winArgs quotes npx arguments with spaces only on Windows", () => {
   assert.deepEqual(winArgs(["-o", "/a b/1.mp4"], false), ["-o", "/a b/1.mp4"]);
 });
 
+test("make-pitch choose: word budget follows the BRIEF duration; old creative_override is cleared", () => {
+  const d = tmp();
+  try {
+    mkdirSync(join(d, "pitch"));
+    writeFileSync(join(d, "pitch", "PICK.json"), JSON.stringify({ topic: "t", aspect: "9:16", energy: "vua", duration_s: 15, picks: [{ n: 1, id: "A2", tier: "fit", dir: "pitch/1-x" }] }));
+    writeFileSync(join(d, "BRIEF.md"), "---\naspect: 16:9\nduration_s: 30\ncreative_override: dự án cũ chỉ có footage\n---\n\n# Brief\n");
+    const out = [];
+    assert.equal(pitchMain(["choose", "--project", d, "--pick", "1"], (m) => out.push(m), (m) => out.push(m)), 0);
+    const b = readFileSync(join(d, "BRIEF.md"), "utf8");
+    assert.match(b, /^word_budget: 52$/m);
+    assert.doesNotMatch(b, /^creative_override:/m);
+    assert.match(out.join("\n"), /WARN aspect BRIEF 16:9 ≠ pitch 9:16/);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("setFrontmatter: null deletes a key; duplicated keys collapse to one", () => {
+  assert.equal(setFrontmatter("---\na: 1\nb: 2\n---\n", { a: null }), "---\nb: 2\n---\n");
+  assert.equal(setFrontmatter("---\na: 1\nb: 2\na: 3\n---\n", { a: 9 }), "---\na: 9\nb: 2\n---\n");
+});
+
 test("setFrontmatter / setSection helpers", () => {
   assert.equal(setFrontmatter("", { a: 1 }), "---\na: 1\n---\n");
   assert.equal(setFrontmatter("---\na: 1\nb: 2\n---\nbody\n", { a: 3, c: "" }), "---\na: 3\nb: 2\n---\n\nbody\n");
