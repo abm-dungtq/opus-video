@@ -28,7 +28,8 @@
 //     blur-crossfade, …) only when the direction has allow_soft.
 //   - Rows whose Lời đọc cell is empty / "—" / "(nhạc)" / "không lời" add up to at least
 //     BRIEF `music_only_s` seconds (default from the direction's energy, 2s).
-//   - final: DEMO.md `animatic: <mp4>` (make-demo.mjs --animatic) newer than PLAN.md whose
+//   - final: DEMO.md `animatic: <mp4>` (make-demo.mjs --animatic) newer than PLAN.md, index.html
+//     and compositions/*.html, whose
 //     motion passes qc-mp4 MOTION (FAIL when ≥60% near-still frames and 90th-pct YDIF < 1.5), and
 //     build/RECIPES.md (recipe-pack.mjs) newer than PLAN.md.
 // Exit: 0 pass · 1 blocked · 2 bad usage.
@@ -150,6 +151,7 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
     if (!anim) errors.push("DEMO.md has no `animatic:` — run make-demo.mjs --animatic so the user approves motion, not stills");
     else if (!existsSync(animPath)) errors.push(`DEMO.md animatic ${anim} not found`);
     else if (statSync(animPath).mtimeMs < planTime) errors.push(`animatic ${anim} is older than PLAN.md; re-run make-demo.mjs --animatic`);
+    else if (newerThan(dir, statSync(animPath).mtimeMs).length) errors.push(`${newerThan(dir, statSync(animPath).mtimeMs).join(", ")} newer than the animatic ${anim}; the user approved older motion, re-run make-demo.mjs --animatic`);
     else {
       let m;
       try { m = motion(animPath); } catch (e) { errors.push(`cannot measure motion of ${anim}: ${e.message}`); }
@@ -165,6 +167,13 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
     else if (statSync(recipes).mtimeMs < planTime) errors.push("build/RECIPES.md is older than PLAN.md; re-run recipe-pack.mjs");
   }
   return out;
+}
+
+// index.html and compositions/*.html edited after `time` (the build the user has not seen).
+function newerThan(dir, time) {
+  const comp = join(dir, "compositions");
+  const files = ["index.html", ...(existsSync(comp) ? readdirSync(comp).filter((f) => f.endsWith(".html")).map((f) => `compositions/${f}`) : [])];
+  return files.filter((f) => existsSync(join(dir, f)) && statSync(join(dir, f)).mtimeMs > time);
 }
 
 export function animaticOf(text) {

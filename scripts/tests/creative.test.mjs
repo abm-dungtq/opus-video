@@ -129,6 +129,15 @@ test("preflight final: needs a moving animatic and build/RECIPES.md newer than P
     assert.ok(ffmpeg(["-f", "lavfi", "-i", "testsrc2=s=360x640:d=3:r=30", "-pix_fmt", "yuv420p", join(d, "demo", "animatic.mp4")]));
     r = preflight({ project: d, stage: "final" });
     assert.equal(r.pass, true, JSON.stringify(r.errors));
+    past(join(d, "demo", "animatic.mp4"), 50);
+    mkdirSync(join(d, "compositions"), { recursive: true });
+    writeFileSync(join(d, "compositions", "beat-2.html"), "<div></div>");
+    r = preflight({ project: d, stage: "final" });
+    assert.ok(r.errors.some((e) => e.includes("compositions/beat-2.html") && e.includes("newer than the animatic")), JSON.stringify(r.errors));
+    past(join(d, "compositions", "beat-2.html"), 60);
+    writeFileSync(join(d, "index.html"), "<html></html>");
+    r = preflight({ project: d, stage: "final" });
+    assert.ok(r.errors.some((e) => e.includes("index.html") && e.includes("newer than the animatic")), JSON.stringify(r.errors));
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 
