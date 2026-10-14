@@ -639,6 +639,10 @@ Cảnh con là các file nhúng qua `data-composition-src` (đệ quy). Composit
 | Cổng final báo `build/RECIPES.md is older than PLAN.md` | Sửa PLAN sau khi gom công thức | Chạy lại `recipe-pack.mjs --project ./`, đọc lại công thức mới |
 | `poi-fetch --address` thoát 1, báo `network error: fetch failed` | DNS của máy không phân giải `openstreetmap.org` | Chạy bằng `--lat` và `--lon` (mục 12.8) |
 | `source-ingest` thoát 2, báo `pdftotext not found` | Máy chưa có poppler | Cài poppler rồi chạy lại |
+| Cổng plan báo `PLAN.md has no "## Sự kiện" table` | Dự án có `direction:` mà `PLAN.md` chưa có bảng sự kiện | Thêm bảng `Thời điểm \| Sự kiện \| Âm thanh`, hoặc một dòng `không có SFX gắn sự kiện` khi video không có tiếng gắn với hình (mục 13.1) |
+| `sfx-sync` hay cổng final in `SYNC FAIL` | Tiếng SFX vang lệch khỏi sự kiện quá ngưỡng, thường do file có đoạn im lặng ở đầu | Chạy `sfx-sync.mjs --project ./ --fix`, sửa `data-start` theo đề xuất rồi chạy lại (mục 13.1) |
+| `sfx-sync` báo `"<file>" không có trong index.html` | Ô Âm thanh không khớp `src` trong HTML, SFX có `data-volume="0"`, hoặc SFX nằm trong composition con | Ghi đúng `src` như trong `index.html`; SFX trong composition con thì chuyển ra `index.html` hoặc kiểm bằng tai (mục 13.1) |
+| `check-preflight` in WARN `… cần giữ ≥ <n>s` | Chữ trên hình rời đi trước khi đọc kịp | Chữ thật sự ở lại thì ghi `(giữ đến <t>s)` hoặc `(giữ đến hết)` trong ô Hình; chữ thật sự rời sớm thì kéo dài beat hoặc rút chữ (mục 13.2) |
 
 ## 12. Hướng sáng tạo, brand kit và dữ liệu thật
 
@@ -877,3 +881,97 @@ Lỗi thường gặp:
 - `no text extracted`: trang không có văn bản đọc được. Thử bản PDF hoặc một nguồn khác cho cùng dữ kiện.
 - `pdftotext not found`: cài poppler (`brew install poppler` trên macOS) rồi chạy lại. Các nguồn lấy được trước đó vẫn có mục trong `SOURCES.md`.
 - `not a URL, .pdf file or arxiv:<id>`: tham số không phải URL đầy đủ, file `.pdf` hay `arxiv:<id>`.
+
+## 13. Khớp tiếng, giữ chữ và vòng sửa
+
+Chương này nói về ba kiểm tra thêm vào ngày 2026-10-14. Mỗi kiểm tra bắt một lỗi mà các cổng trước không thấy: tiếng SFX vang lệch khỏi khoảnh khắc trên hình, chữ biến mất trước khi người xem đọc kịp, mỗi lần sửa phải render lại cả video mà không có ghi chép đã sửa gì.
+
+Dự án cũ (BRIEF không có `direction:` và không có `brief_version: 2`) không bị chặn thêm: mọi dòng FAIL của `sfx-sync` đổi thành WARN. Kiểm tra giữ chữ và kiểm tra `REVISIONS.md` chỉ in WARN với mọi dự án.
+
+### 13.1 Khớp SFX với sự kiện trên hình
+
+**Dùng khi nào.** Bước 4b khi viết `PLAN.md`, rồi bước 6 sau khi đặt SFX vào `index.html`. Nhiều file SFX có một đoạn im lặng ở đầu, nên `data-start` đặt đúng lúc nút được nhấn vẫn cho tiếng click vang trễ.
+
+`PLAN.md` của dự án có `direction:` cần mục `## Sự kiện`, mỗi khoảnh khắc trên hình có gắn tiếng là một dòng:
+
+```markdown
+## Sự kiện
+| Thời điểm | Sự kiện | Âm thanh |
+|---|---|---|
+| 2.12s | Nút gửi lún xuống | assets/sfx/send.mp3 |
+| 11.75s | Thẻ kết quả bung ra | assets/sfx/impact.mp3 |
+```
+
+`Thời điểm` là số giây trên timeline gốc, `Âm thanh` ghi đúng `src` trong `index.html`. Video không có tiếng gắn với hình thì thay bảng bằng một dòng `không có SFX gắn sự kiện`; dòng này chỉ cho ra WARN.
+
+```bash
+node $OV/scripts/sfx-sync.mjs --project ./ --fix
+node $OV/scripts/sfx-sync.mjs --project ./ --write-qa
+```
+
+Script đo đoạn im lặng đầu mỗi file SFX bằng ffmpeg. Ngưỡng im lặng lấy theo đỉnh của chính file trừ 20 dB, nên file nhỏ tiếng không bị coi là im lặng cả file. Kết quả đo được lưu theo sha256 ở `assets/sfx-onsets.json`, lần chạy sau không gọi ffmpeg lại. Lúc tiếng thật sự vang bằng `data-start` cộng đoạn im lặng (trừ `data-media-start`, chia `data-playback-rate`). Mỗi sự kiện in một dòng:
+
+```text
+PASS  SYNC   2.12s Nút gửi lún xuống ← assets/sfx/send.mp3 lệch +0 ms (đầu file im 0 ms)
+```
+
+Số lệch dương là tiếng trễ hơn hình. Ngưỡng theo ITU-R BT.1359-1: tiếng sớm tới 45 ms hoặc trễ tới 125 ms là PASS, sớm tới 90 ms hoặc trễ tới 185 ms là WARN, xa hơn là FAIL. `--fix` in thêm dòng `đề xuất: data-start="…"` cho từng dòng chưa PASS và không sửa HTML. `--write-qa` ghi các dòng vào `QA.md`, `--json` in mảng kết quả.
+
+Cổng final của `check-preflight.mjs` (cũng là cổng của `render-final.mjs`) chạy cùng phép đo này với dự án có `direction:`: dòng FAIL chặn, dòng WARN chỉ cảnh báo. Ở cổng plan, thiếu mục `## Sự kiện` thì chặn; ở cổng final, thiếu mục này chỉ WARN, để dự án đã giao vẫn render lại được.
+
+| Mã thoát | Nghĩa |
+|---|---|
+| 0 | Không có dòng FAIL |
+| 1 | Có ít nhất một dòng FAIL |
+| 2 | Sai cú pháp, hoặc thiếu `PLAN.md` hay file HTML |
+
+Lỗi thường gặp:
+
+- `SYNC FAIL … lệch +270 ms (đầu file im 120 ms)`: file có đoạn im lặng ở đầu. Sửa `data-start` theo dòng `đề xuất` rồi chạy lại.
+- `"assets/sfx/x.mp3" không có trong index.html (hoặc data-volume="0"; SFX trong composition con chưa được kiểm)`: ô Âm thanh không khớp `src`, SFX bị tắt tiếng, hoặc SFX nằm trong composition con. Script chỉ đọc `index.html` (hay file truyền bằng `--html`), vì `data-start` trong composition con tính theo đồng hồ của composition đó.
+- `thời điểm "…" không đọc được`: ô Thời điểm phải là số giây, ví dụ `6.5`, `6.5s` hoặc `6,5s`.
+- Đổi cách đo đoạn im lặng thì xoá `assets/sfx-onsets.json` để đo lại.
+
+### 13.2 Giữ chữ đủ lâu để đọc
+
+**Dùng khi nào.** Bước 4b, khi bảng `## Cảnh` có chữ trên hình. Chữ trên hình là chuỗi trong ngoặc kép ở cột Hình; chuỗi trong cột Lời đọc không tính.
+
+```bash
+node $OV/scripts/check-preflight.mjs --project ./ --stage plan
+```
+
+Mỗi chữ cần ở trên hình ít nhất `số từ / 2,5 + 0,5 giây`, tối thiểu 1 giây. Tốc độ 2,5 từ mỗi giây lấy từ tài liệu kịch bản video của viet-pro. Thời gian mắt tìm tới chữ 0,5 giây là giả định, chưa đo. Vì ngưỡng chưa được hiệu chỉnh, kiểm tra này chỉ in WARN ở cả cổng plan lẫn cổng final với mọi dự án. Nó không đổi mã thoát:
+
+```text
+WARN  PLAN.md "## Cảnh" row 4: chữ trên hình "Từ kế hoạch đến kiểm thử" (11 từ) cần giữ ≥ 4.9s, beat dài 3.6s
+```
+
+Không có mốc thì cổng coi chữ rời đi lúc hết beat. Chữ còn ở lại qua các beat sau thì ghi mốc trong ô Hình: `(giữ đến 15s)` theo giây trên timeline gốc, hoặc `(giữ đến hết)` khi chữ ở tới cuối video. Cổng đo từ đầu beat tới mốc đó. Câu như "giữ hình khoảng 1 giây cuối" không phải mốc.
+
+Lỗi thường gặp:
+
+- WARN `cần giữ ≥` cho chữ thật ra vẫn ở trên hình: thêm `(giữ đến <t>s)` hoặc `(giữ đến hết)`.
+- WARN cho chữ thật sự rời sớm: kéo dài beat hoặc rút bớt chữ.
+- Một hàng có nhiều chuỗi thì số từ là tổng các chuỗi. Câu WARN nêu chuỗi dài nhất của hàng.
+
+### 13.3 Vòng sửa khoanh vùng với `REVISIONS.md`
+
+**Dùng khi nào.** Bước 6b, khi người dùng xem animatic hoặc bản final và xin sửa. Mục đích là sửa đúng chỗ và kiểm từng chỗ bằng ảnh chụp mà không render lại cả video. Ghi chép của từng vòng được giữ lại. Mẫu và luật đầy đủ ở [revisions.md](../references/revisions.md).
+
+Mỗi loạt góp ý là một vòng `## Vòng <n>` trong `REVISIONS.md`, tiêu đề chép nguyên văn lời người dùng. Mỗi vòng có tối đa 5 mục `### R<n>`, mỗi mục đủ bốn dòng `Vị trí:`, `Lỗi thấy:`, `Đổi:`, `Giữ nguyên:`. `Vị trí` ghi giây trên timeline gốc.
+
+Sửa xong một mục thì kiểm ngay trên composition hiện tại, không cần render:
+
+```bash
+npx --yes hyperframes@0.8.144 snapshot ./ --at 6.2,6.5,7.0 --no-end
+npx --yes hyperframes@0.8.144 check --at-transitions
+```
+
+Thêm vào `--at` các mốc ghi ở `Giữ nguyên`. Bản 0.8.144 không có cờ `--range` cho `snapshot` hay `check`. Hết vòng thì chạy một lần `make-demo.mjs --project ./ --animatic`; người dùng duyệt animatic mới, ảnh chụp và đoạn cắt không được tính là duyệt.
+
+`check-preflight.mjs --stage final` đọc `REVISIONS.md` khi file có mặt và in WARN, không chặn:
+
+- `REVISIONS.md <vòng>: <n> mục, tối đa 5 mỗi vòng`: tách bớt mục sang vòng sau, hỏi người dùng mục nào để sau.
+- `REVISIONS.md R<n>: thiếu <trường>`: bổ sung dòng còn thiếu trước khi giao.
+
+Mã thoát của `check-preflight` không đổi: 0 đạt, 1 bị chặn, 2 sai cú pháp.

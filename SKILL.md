@@ -162,9 +162,9 @@ Mỗi dự án có một thư mục riêng:
 6b. **Khung hình demo (BẮT BUỘC trước video cuối).** Làm theo `references/plan-demo.md`:
    - Dự án có `direction:`: `node $OV/scripts/make-demo.mjs --project . --animatic` (bản 9:16: thêm `--aspect 9x16` và `--composition compositions/main-9x16.html`, hoặc `--hyperframes <project-9x16>` nếu là project riêng; cổng final chặn `animatic_9x16` có khung ngang). Script render clip nháp toàn bộ `demo/animatic.mp4`, cắt đúng các mốc trong `PLAN.md`, ghép `demo/contact-sheet.jpg` và ghi `DEMO.md` (`animatic:` + `approval: pending`). Dự án `creative_override` chụp ảnh tĩnh như cũ (bỏ `--animatic`).
    - Tự xem từng khung (đủ dấu, không tràn chữ, vùng an toàn, đúng nội dung cảnh) và chạy `qc-mp4.mjs demo/animatic.mp4 --project . --draft` (MOTION không được FAIL), rồi **gửi clip nháp + contact sheet cho người dùng duyệt** và dừng chờ trả lời. Người dùng duyệt chuyển động, không chỉ ảnh tĩnh.
-   - Người dùng xin sửa thì ghi `REVISIONS.md` theo `references/revisions.md`: kiểm từng mục bằng `snapshot --at`, hết vòng mới chạy lại `make-demo --animatic`.
-   - Có góp ý thì sửa và chụp lại. Người dùng đồng ý thì ghi `approval: <ai>, <khi nào>, "<lời đồng ý>"` vào `DEMO.md`. Chỉ khi người dùng đã nói rõ là chạy không dừng mới được ghi `approval: auto — <lý do và lời người dùng>`.
+   - Có góp ý thì ghi `REVISIONS.md` theo `references/revisions.md`, kiểm từng mục bằng `snapshot --at`, hết vòng mới chạy lại `make-demo --animatic`. Người dùng đồng ý thì ghi `approval: <ai>, <khi nào>, "<lời đồng ý>"` vào `DEMO.md`. Chỉ khi người dùng đã nói rõ là chạy không dừng mới được ghi `approval: auto — <lý do và lời người dùng>`.
    - Kiểm: `node $OV/scripts/check-preflight.mjs --project . --stage final` phải `PASS`.
+   - Với dự án có `direction:`, cổng final đo từng SFX theo bảng `## Sự kiện` trong `PLAN.md`. Gặp dòng `SYNC FAIL` thì chạy `node $OV/scripts/sfx-sync.mjs --project . --fix` và sửa `data-start` theo đề xuất.
 
 7. **Render.**
    - Bản nháp/QA, 16:9: `hyperframes render --quality looks --output renders/<name>-16x9.mp4`
@@ -222,6 +222,7 @@ Cần bản đăng theo từng nơi thì xuất từ bản final bằng `node $O
 | `scripts/render-final.mjs` | Bước 7: render bản giao (`--quality delivery`) chỉ khi cổng final PASS (exit 5 nếu chặn), mix lại tiếng bằng `audio-mix.mjs` và ghi `<output>.render.json`; `--audio-only <cũ.mp4>` chỉ thay tiếng, giữ hình (exit 6 nếu không thay được) |
 | `scripts/audio-mix.mjs` | Bước 7 (do `render-final` gọi): dựng lại tiếng của composition thành một WAV bằng ffmpeg từ các thuộc tính audio tĩnh; `--dry-run` in lệnh ffmpeg |
 | `scripts/qc-mp4.mjs` | Bước 8: kiểm kỹ thuật file MP4 (khổ hình, thời lượng, khung đen, đứng hình, khoảng lặng, loudness, true peak, bitrate, MOTION chống slideshow); `--write-qa` ghi vào `QA.md`, exit 1 khi có FAIL |
+| `scripts/sfx-sync.mjs` | Bước 6b và 8: đo lúc SFX thật sự vang so với `## Sự kiện` trong `PLAN.md`, ngưỡng theo ITU-R BT.1359-1; `--fix` in đề xuất `data-start` (không sửa HTML); `--write-qa` ghi vào `QA.md` |
 | `scripts/export.mjs` | Sau bước 9: bản giao theo nơi đăng (`zalo`, `youtube`, `tiktok`, `facebook`) kèm thumbnail từ khung demo đã duyệt; exit 5 nếu cổng final chặn |
 | `scripts/skill-paths.mjs` | Tìm skill trên mọi agent (Claude Code, Codex, Antigravity, workspace) |
 | `scripts/replace-in-file.mjs` | Thay chuỗi trong file bằng regex, chạy được mọi hệ điều hành (thay `sed -i`) |

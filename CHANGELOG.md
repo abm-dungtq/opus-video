@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-10-14: picture-event sync, readable hold, revision loop
+
+Why: three faults slipped past every existing gate. A sound effect could ring after the moment it belongs to (a click heard after the button is pressed), because many SFX files start with silence and `data-start` only marks where the file begins. On-screen text could leave before a viewer can read it. And each fix meant re-rendering the whole video, with no record of what had changed.
+
+### New script
+- `scripts/sfx-sync.mjs`: reads the `## Sự kiện` table in PLAN.md (`Thời điểm | Sự kiện | Âm thanh`, seconds on the root timeline), finds each sound in `index.html` (or `--html`), measures the file's leading silence with ffmpeg at the file's own peak − 20 dB (so a quiet file is not read as all silence) and compares the moment the sound is heard with the event. One `LEVEL SYNC` line per event. `--fix` prints the `data-start` that would put the sound on the event and never edits the HTML; `--write-qa` appends to `QA.md`; `--json` prints an array. Measurements are cached per file sha256 in `assets/sfx-onsets.json`. Exit 0 no FAIL, 1 a FAIL, 2 bad usage or missing PLAN.md / HTML. Sounds inside a sub-composition are reported, not measured.
+
+### New rules in `check-preflight`
+- Creative projects (`direction:`): the plan stage requires a `## Sự kiện` section, either the table or the line `không có SFX gắn sự kiện` (WARN only). The final stage runs `sfx-sync`: FAIL lines block, WARN lines warn, a missing section only warns so a delivered project can still re-render.
+- Readable hold, both stages, every project, WARN only: quoted on-screen text in the picture column of `## Cảnh` must stay up at least `max(1 s, words / 2.5 + 0.5 s)`. A cell may state `(giữ đến <t>s)` or `(giữ đến hết)` when the text stays past its beat; the hold is then measured to that mark.
+- `REVISIONS.md`, final stage, every project, WARN only: a round with more than 5 fixes, or a fix missing one of `Vị trí`, `Lỗi thấy`, `Đổi`, `Giữ nguyên`.
+
+### Thresholds and sources
+- Sync windows from ITU-R BT.1359-1 (sound minus picture): PASS from −45 to +125 ms, WARN from −90 to +185 ms, FAIL beyond.
+- Reading speed 2.5 words/s from viet-pro `references/publishing/video-script.md`. The 0.5 s eye-landing time is an assumption, marked as such in the code. The hold rule stays a WARN until more projects are measured: on the Gemini 4 Argon project the closing title and tagline (9 new words) stay about 2.2–2.8 s against a 4.1 s threshold, and read fine in the frames.
+- Calibration on a copy of that project: all five SFX PASS when the event times are their `data-start`; `keys.mp3` measured 30 ms of leading silence, the quiet `send.mp3` (peak −32 dB) 0 ms.
+
+### Docs
+- `references/revisions.md`: the revision-round template (four fields, at most five fixes per round, check each fix with `hyperframes snapshot --at`, one animatic per round; HyperFrames 0.8.144 has no `--range`).
+- `references/plan-demo.md` (event table, hold marks, measured vs proposed marks), `references/edit-method.md` (times are on the root timeline), `references/pattern-library.md` (card 10, Launch Clip), `references/audio-pipeline.md`, `references/qa-checklist.md`, SKILL.md steps 6 and 6b, README and chapter 13 of `docs/huong-dan-chuyen-sau.md`.
+- README test command is now the quoted glob `node --test "…/scripts/tests/*.test.mjs"`; the directory form exits 1 on Node 24 even when no test fails.
+
+### Compatibility
+- Legacy projects (no `direction:` and no `brief_version: 2`) are not blocked by anything new: `sfx-sync` turns every FAIL into a WARN for them and `check-preflight` does not run it. `bds-ban-do-pip-9x16` and `abm-intro` give the same output and exit code before and after this change.
+
 ## 2026-10-14: creative direction, brand kit, real data
 
 Why: a one-line brief ("15s, công nghệ cao cấp") produced four title cards sliding up and fading. Causes found: step 1 told the agent to fill the style itself; the script was written before any visual idea (one sentence = one card); the general-video path built without HyperFrames recipes; the demo gate showed stills, which cannot reveal a slide swap; no gate looked at motion. Property and news videos also needed real numbers (nearby amenities, source text) instead of typed-in ones.

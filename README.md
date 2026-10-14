@@ -59,6 +59,9 @@ Bản trước dựng ra video kiểu trình chiếu: vài thẻ tiêu đề tr�
 - **Dữ liệu thật thay số gõ tay.** `poi-fetch.mjs` lấy trường, chợ, bệnh viện, trạm xe… quanh một địa chỉ từ OpenStreetMap, kèm phút đi bộ. `source-ingest.mjs` lưu nguyên văn bài báo, PDF, trang arXiv vào `SOURCES.md` để đối chiếu từng con số trên hình.
 - **Brand kit dùng chung.** `shared-assets/brand.json` (mẫu ở `references/brand.example.json`) giữ màu, font, logo, giọng đọc và các hướng không dùng; `make-pitch` tự đọc.
 - **Giọng theo dự án.** `voice_id` trong `BRIEF.md` đứng trên giọng mặc định của máy; script in ra giọng lấy từ đâu.
+- **SFX khớp hình.** `PLAN.md` có bảng `## Sự kiện` ghi lúc nào trên hình có tiếng. `sfx-sync.mjs` đo đoạn im lặng đầu mỗi file SFX, so lúc tiếng thật sự vang với sự kiện theo ITU-R BT.1359-1 và đề xuất `data-start` mới khi lệch. Cổng final chặn tiếng lệch quá ngưỡng.
+- **Chữ đủ lâu để đọc.** `check-preflight` in WARN khi chữ trên hình rời đi trước `số từ / 2,5 + 0,5 giây` (tối thiểu 1 giây). Chữ ở lại qua beat sau thì ghi `(giữ đến <t>s)` trong ô Hình.
+- **Sửa theo vòng.** Góp ý ghi vào `REVISIONS.md`, mỗi mục 4 trường và tối đa 5 mục một vòng. Mỗi mục kiểm bằng ảnh chụp tại đúng giây, hết vòng mới render lại animatic.
 
 Danh sách đầy đủ ở [CHANGELOG.md](CHANGELOG.md).
 
@@ -247,6 +250,7 @@ Mọi script đều có `--help` / `-h` (in phần mô tả đầu file, thoát 
 | `scripts/make-pitch.mjs` | Bước 1b: `init` 3 project styleframe theo chủ đề, `render` 3 clip + `sheet.jpg` + `PITCH.md` (menu số; exit 4 khi styleframe FAIL MOTION), `choose` ghi hướng người dùng chọn vào `BRIEF.md` |
 | `scripts/recipe-pack.mjs` | Gom blueprint/rule/seam (PLAN.md hoặc một hướng) thành `build/RECIPES.md` để dựng theo công thức thật |
 | `scripts/check-preflight.mjs` | Cổng plan (`--stage plan`) và demo + duyệt (`--stage final`); cổng sáng tạo khi BRIEF có `direction:` |
+| `scripts/sfx-sync.mjs` | Đo lúc SFX thật sự vang so với bảng `## Sự kiện` của `PLAN.md` (ngưỡng ITU-R BT.1359-1); `--fix` in đề xuất `data-start`, `--write-qa` ghi vào `QA.md` |
 | `scripts/make-demo.mjs` | Chụp khung hình demo theo `PLAN.md` (`hyperframes snapshot`, hoặc render nháp + ffmpeg cho composition 9:16), ghi `DEMO.md`; `--animatic` render clip nháp toàn bộ + contact sheet; `--from-video <mp4>` cắt khung từ bản nháp người dùng đã xem |
 | `scripts/render-final.mjs` | Render bản giao `--quality delivery` sau khi cổng final PASS (exit 5 nếu chặn) |
 | `scripts/replace-in-file.mjs` | Thay chuỗi bằng regex, thay cho `sed -i` (khác nhau giữa macOS và Linux) |
@@ -273,8 +277,10 @@ Mọi script đều có `--help` / `-h` (in phần mô tả đầu file, thoát 
 ## 9. Test
 
 ```bash
-node --test ~/.claude/skills/opus-video/scripts/tests/
+node --test "$HOME/.claude/skills/opus-video/scripts/tests/*.test.mjs"
 ```
+
+Giữ dấu ngoặc kép để Node tự mở glob. Trên Node 24, dạng thư mục (`node --test …/scripts/tests/`) thoát 1 dù không có test nào hỏng.
 
 Test cần project thật sẽ tự bỏ qua khi không tìm thấy project đó. Có thể trỏ tới project của bạn bằng `OPUS_VIDEO_SMOKE_DIR` và `OPUS_VIDEO_ABM_DIR`.
 

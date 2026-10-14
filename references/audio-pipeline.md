@@ -50,6 +50,16 @@ node $OV/scripts/eleven.mjs audio-meta --script SCRIPT.md --hyperframes . [--bgm
    Model `eleven_text_to_sound_v2`, dài 0,5–30 giây, `--influence 0.3` (tăng lên nếu muốn bám mô tả hơn).
 3. Mỗi video ngắn dùng 2–6 SFX. Mỗi cue gắn với một hành động hình ảnh, không rắc SFX cho có.
 
+### Khớp SFX với hình
+
+Nhiều file SFX có một đoạn im lặng ở đầu, nên đặt `data-start` đúng lúc hình chuyển vẫn có thể làm tiếng vang trễ. Dự án có `direction:` ghi mỗi khoảnh khắc trên hình có gắn tiếng vào bảng `## Sự kiện` của `PLAN.md` (mẫu ở `references/plan-demo.md`). Sau khi đặt SFX vào composition, chạy:
+
+```bash
+node $OV/scripts/sfx-sync.mjs --project . --fix
+```
+
+Script đo đoạn im lặng đầu mỗi file và so lúc tiếng thật sự vang với thời điểm sự kiện theo ngưỡng ITU-R BT.1359-1 (tiếng sớm tối đa 45 ms, trễ tối đa 125 ms thì PASS). Dòng chưa PASS kèm đề xuất `data-start`; script không sửa HTML. Cổng final của `check-preflight.mjs` chạy cùng phép đo này và chặn dòng FAIL. Cách đọc bảng và công thức ở `references/plan-demo.md`.
+
 ## 3. Nhạc nền
 
 ```bash
