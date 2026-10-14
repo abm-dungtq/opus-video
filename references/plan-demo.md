@@ -38,6 +38,13 @@ Người xem là ai, xem xong làm gì. Thời lượng, khổ hình (16:9 / 9:1
 ## Âm thanh
 Giọng (voice id/model), nhạc nền (prompt, âm lượng), SFX theo beat, ngôn ngữ.
 
+## Sự kiện
+| Thời điểm | Sự kiện | Âm thanh |
+|---|---|---|
+| 2.0s | Nút gửi lún xuống | assets/sfx/send.mp3 |
+| 6.5s | Kết quả bung ra | assets/sfx/pop.mp3 |
+| 13.5s | Nhạc lắng, logo đứng yên | — |
+
 ## Engine
 HyperFrames <workflow> (hoặc Remotion/Canvas) và lý do; composition nào cho khổ nào; dựng từ build/RECIPES.md.
 
@@ -57,12 +64,29 @@ Lệnh sẽ chạy ở bước 8 (lint, check, video-lint, qc-mp4 MOTION, judge)
 
 Cổng plan kiểm: đủ 6 mục, bảng Cảnh có ít nhất một dòng, số mốc demo ≥ số cảnh, và có mục 9:16 khi `aspect: both`. Sửa plan sau khi đã chụp demo thì phải chụp lại (frame cũ hơn `PLAN.md` bị chặn).
 
+**Bảng `## Sự kiện`** ghi mỗi khoảnh khắc trên hình có gắn tiếng:
+
+- `Thời điểm` là số giây trên timeline gốc (`6.5`, `6.5s` hoặc `6,5s`), không phải giây trong composition con.
+- `Âm thanh` ghi đúng `src` trong `index.html`; `—` khi sự kiện không có tiếng. Video không có SFX gắn sự kiện thì thay bảng bằng một dòng `không có SFX gắn sự kiện` (chỉ in WARN).
+- `scripts/sfx-sync.mjs --project .` đo đoạn im lặng đầu mỗi file SFX (ngưỡng = đỉnh của file − 20 dB, cache theo sha256 ở `assets/sfx-onsets.json`) rồi cộng vào `data-start` để ra lúc tiếng thật sự vang: `data-start + max(0, im lặng − data-media-start) / data-playback-rate`.
+- Lệch = lúc tiếng vang − thời điểm sự kiện; số dương là tiếng trễ hơn hình. Ngưỡng theo ITU-R BT.1359-1:
+
+  | Mức | Tiếng sớm | Tiếng trễ |
+  |---|---|---|
+  | PASS | đến 45 ms | đến 125 ms |
+  | WARN | đến 90 ms | đến 185 ms |
+  | FAIL | hơn 90 ms | hơn 185 ms |
+
+- `--fix` chỉ in `đề xuất: data-start="…"` cho từng dòng chưa PASS; không ghi vào HTML. `--write-qa` ghi các dòng vào `QA.md`.
+- Chỉ đọc `index.html` (hoặc `--html`): SFX nằm trong composition con báo FAIL "không có trong".
+
 **Cổng sáng tạo** (khi BRIEF có `direction:`; dự án chỉ cắt footage đặt `creative_override: <lý do ≥10 ký tự>`):
 
 - Có `## Ý đồ sáng tạo` với các dòng `Hướng:`, `Chuyển cảnh:`, `Luật chống slideshow:`.
 - Bảng `## Cảnh` có cột **Blueprint/Rule** và **Nối sang beat sau**. Mỗi hàng nêu ít nhất một blueprint/rule có thật trong `hyperframes-animation` (tên bịa bị chặn); toàn bảng có ít nhất 2 token khác nhau.
 - Mọi hàng trừ hàng cuối nêu seam trong từ vựng ở `references/creative-directions.md`. `fade`, `crossfade`, `cut`, "hiện", "mờ dần"… bị chặn; seam mềm (`focus-pull`, `blur-crossfade`, `cross-warp-morph`…) chỉ dùng được với hướng có `allow_soft` (A7, A8).
 - Các hàng có Lời đọc `—`, `(nhạc)` hoặc `không lời` cộng lại ≥ `music_only_s` của BRIEF (hình dẫn, lời theo).
+- Có `## Sự kiện` (bảng `Thời điểm | Sự kiện | Âm thanh`, hoặc dòng `không có SFX gắn sự kiện`); thiếu thì stage plan chặn. Stage final chạy `sfx-sync`: dòng FAIL chặn, dòng WARN chỉ cảnh báo, thiếu mục này chỉ WARN.
 - Stage final thêm: `DEMO.md` có `animatic:` (make-demo `--animatic`) mới hơn PLAN và không bị qc-mp4 MOTION chấm FAIL; `build/RECIPES.md` (recipe-pack) mới hơn PLAN.
 
 ## 2. Chụp khung hình demo
