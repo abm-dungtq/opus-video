@@ -248,3 +248,15 @@ test("no --output and several new MP4s in renders/ → exit 2", () => {
     assert.match(errs.join("\n"), /2 new MP4s in renders\/ \(a\.mp4, b\.mp4\).*pass --output/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("render-final quotes npx arguments with spaces through winArgs on Windows", () => {
+  const seen = [];
+  const spawn = (cmd, args, opts) => { if (cmd === "npx") seen.push({ args, shell: opts.shell }); return { status: cmd === "npx" ? 1 : 0 }; };
+  const run = (win) => renderFinal(["--project", "/p", "--", "--output", "renders/my file.mp4"], { checkImpl: PASS, spawn, win, err: () => {}, log: () => {} });
+  run(true);
+  assert.ok(seen[0].args.includes('"renders/my file.mp4"'), JSON.stringify(seen[0]));
+  assert.equal(seen[0].shell, true);
+  run(false);
+  assert.ok(seen[1].args.includes("renders/my file.mp4"));
+  assert.equal(seen[1].shell, false);
+});

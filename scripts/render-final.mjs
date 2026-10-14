@@ -37,6 +37,7 @@ import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { check, report } from "./check-preflight.mjs";
 import { parseTracks, resolveSrc, dynamicAudio, main as audioMix } from "./audio-mix.mjs";
+import { winArgs } from "./make-demo.mjs";
 
 export const PREFLIGHT_EXIT = 5;
 export const AUDIO_ONLY_EXIT = 6;
@@ -269,9 +270,9 @@ function missingTools(spawn) {
   });
 }
 
-function fullRender({ root, fwd, spawn, err }) {
+function fullRender({ root, fwd, spawn, err, win }) {
   const started = Date.now() - 1000;
-  const x = spawn("npx", ["hyperframes", "render", "--quality", "delivery", ...fwd], { cwd: root, stdio: "inherit", shell: process.platform === "win32" });
+  const x = spawn("npx", winArgs(["hyperframes", "render", "--quality", "delivery", ...fwd], win), { cwd: root, stdio: "inherit", shell: win });
   if ((x.status ?? 1) !== 0) return x.status ?? 1;
   const format = fwdValue(fwd, null, "--format");
   if ((format && format !== "mp4") || fwd.some((a) => a === "--batch" || a.startsWith("--batch="))) {
@@ -326,7 +327,7 @@ function audioOnly({ root, old, fwd, spawn, err, log }) {
 
 const AUDIO_ONLY_FWD = new Set(["-c", "--composition", "-o", "--output"]);
 
-export function main(argv = process.argv.slice(2), { checkImpl = check, spawn = spawnSync, err = console.error, log = console.log } = {}) {
+export function main(argv = process.argv.slice(2), { checkImpl = check, spawn = spawnSync, err = console.error, log = console.log, win = process.platform === "win32" } = {}) {
   if (wantsHelp(argv.slice(0, argv.includes("--") ? argv.indexOf("--") : argv.length))) { process.stdout.write(helpText(import.meta.url)); return 0; }
   const sep = argv.indexOf("--");
   const own = sep >= 0 ? argv.slice(0, sep) : argv;
@@ -360,7 +361,7 @@ export function main(argv = process.argv.slice(2), { checkImpl = check, spawn = 
   if (!r.pass) return PREFLIGHT_EXIT;
   const missing = missingTools(spawn);
   if (missing.length) { err(`render-final: cannot run ${missing.join(" and ")}; install ffmpeg (it ships ffprobe) before the final render`); return 2; }
-  return old !== undefined ? audioOnly({ root, old, fwd, spawn, err, log }) : fullRender({ root, fwd, spawn, err });
+  return old !== undefined ? audioOnly({ root, old, fwd, spawn, err, log }) : fullRender({ root, fwd, spawn, err, win });
 }
 
 if (process.argv[1] && realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) process.exit(main());
