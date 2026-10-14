@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<!--
+  opus-video composition skeleton (HyperFrames 0.8.144 + GSAP).
+  Create with `node scripts/composition.mjs init --project <dir>`, then run
+  `node scripts/timing.mjs --project <dir>`: it rewrites the window.TIMING block below from
+  PLAN.md "## Cảnh" and the voice words.json files. Never edit seconds in that block by hand;
+  re-run timing.mjs after every voice change.
+  Every time comes from TIMING: W(sid, phrase) is the moment a phrase is spoken in scene sid,
+  WE(sid, phrase) the moment it ends, B(n) quarter note n of the measured beat grid.
+  Layout reads the frame size from --W/--H; ratio-specific layout goes in html[data-ratio="..."].
+  Adapted from the motion-video skill of AgentKit (MIT).
+-->
+<html lang="vi" data-resolution="landscape" data-ratio="16x9">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>opus-video</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      /* Fonts must be local files under assets/fonts so renders are deterministic. */
+      @font-face { font-family: "Be Vietnam Pro"; src: url("assets/fonts/BeVietnamPro-Regular.ttf") format("truetype"); font-weight: 400; font-display: block; }
+      @font-face { font-family: "Be Vietnam Pro"; src: url("assets/fonts/BeVietnamPro-SemiBold.ttf") format("truetype"); font-weight: 600; font-display: block; }
+      :root { --bg: #0a0a0f; --ink: #f5f5f7; --accent: #8ab4ff; --W: 1920px; --H: 1080px; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; background: var(--bg); }
+      #root { position: relative; width: var(--W); height: var(--H); overflow: hidden; background: var(--bg); color: var(--ink); font-family: "Be Vietnam Pro", sans-serif; font-weight: 600; }
+      .layer { position: absolute; left: 0; top: 0; width: var(--W); height: var(--H); }
+      .abs { position: absolute; }
+      .scene { opacity: 0; visibility: hidden; }
+      .hl { line-height: 1.15; }
+      .hl .w { display: inline-block; }
+      .draw { stroke-dasharray: 1; stroke-dashoffset: 1; }
+      #flash { background: #fff; opacity: 0; pointer-events: none; }
+      #fade { background: #000; opacity: 1; pointer-events: none; }
+      .odo { display: inline-flex; font-variant-numeric: tabular-nums; }
+      .odo-d { display: inline-block; height: 1em; line-height: 1; overflow: hidden; }
+      .odo-s { display: block; }
+      .odo-s i { display: block; height: 1em; font-style: normal; }
+      /* ratio overrides: html[data-ratio="9x16"] { ... } and html[data-ratio="1x1"] { ... } */
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="10" data-width="1920" data-height="1080">
+      <div id="bg" class="layer"></div>
+      <div id="pulse" class="layer">
+        <div id="stage" class="layer">
+          <!-- one .scene per row of PLAN.md "## Cảnh"; the WINDOWS table in the script maps selector -> scene id -> transition -->
+          <section id="sc1" class="scene layer">
+            <div class="abs hl" style="left: 120px; top: 380px; font-size: 120px">Tiêu đề</div>
+          </section>
+          <section id="sc2" class="scene layer">
+            <div class="abs hl" style="left: 120px; top: 380px; font-size: 96px">Ý thứ nhất</div>
+          </section>
+        </div>
+      </div>
+      <div id="flash" class="layer"></div>
+      <div id="fade" class="layer"></div>
+      <!-- sound: <audio id="vo-01" src="assets/voice/01.mp3" data-start="…" data-duration="…" data-track-index="10" data-volume="1" data-audio-group="voiceover"></audio> -->
+    </div>
+
+    <script>
+      /* TIMING:BEGIN */
+      window.TIMING = {fps:30, duration:10, scenes:{}, beat0:0, beatLen:0.5, kick:[], drops:[]};
+      /* TIMING:END */
+    </script>
+    <script>
+      (() => {
+        const T = window.TIMING;
+        const tl = gsap.timeline({ paused: true });
+        window.__timelines = window.__timelines || {};
+        window.__timelines["main"] = tl;
+
+        // ---------- lookups: every time comes from TIMING, never from wall clock ----------
+        const $ = (s, r = document) => r.querySelector(s);
+        const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+        const SC = T.scenes || {};
+        // Same folding as check-preflight.mjs: strip diacritics, đ -> d, lower case, single spaces.
+        const fold = (s) => s.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/gi, "d").toLowerCase().replace(/\s+/g, " ").trim();
+        // Match key: folded, punctuation dropped ("nguồn," and "nguồn" are the same word).
+        const key = (s) => fold(String(s)).replace(/[^\p{L}\p{N} ]+/gu, "").replace(/\s+/g, " ").trim();
+        const B = (n) => {
+          if (!(T.beatLen > 0)) throw new Error("B() cần beat-grid.mjs");
+          return T.beat0 + T.beatLen * n; // time of quarter note n
+        };
+        const isKick = (n) => (T.kick || []).some(([a, b]) => n >= a && n < b);
+        // [first word, last word] of the nth occurrence of a phrase in a scene: consecutive spoken
+        // words, joined by one space, must equal the folded phrase. null (and one warning) on a miss.
+        const hit = (sid, phrase, nth) => {
+          const want = key(phrase);
+          const ws = (SC[sid]?.lines || []).flatMap((l) => l.words).map((w) => ({ w, k: key(w[0]) })).filter((x) => x.k);
+          let seen = 0;
+          for (let i = 0; want && i < ws.length; i++) {
+            let s = "";
+            for (let j = i; j < ws.length && s.length < want.length; j++) {
+              s = s ? `${s} ${ws[j].k}` : ws[j].k;
+              if (s === want && ++seen === nth) return [ws[i].w, ws[j].w];
+            }
+          }
+          console.warn(`W miss: ${sid} ${phrase}`);
+          return null;
+        };
+        const sceneStart = (sid) => SC[sid]?.start ?? 0;
+        const W = (sid, phrase, nth = 1) => { const h = hit(sid, phrase, nth); return h ? h[0][1] : sceneStart(sid); }; // phrase onset
+        const WE = (sid, phrase, nth = 1) => { const h = hit(sid, phrase, nth); return h ? h[1][2] : sceneStart(sid); }; // phrase end
+        // seeded PRNG: Math.random would make every render different
+        const rng = (seed) => () => {
+          seed = (seed + 0x6d2b79f5) | 0;
+          let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+
+        // ---------- build the DOM before any tween ----------
+        // headline words become spans for staggered entrances; inline accents (<em>, <b>) keep their tag
+        const splitWords = (el) =>
+          Array.from(el.childNodes).forEach((n) => {
+            if (n.nodeType === 1) return n.namespaceURI === "http://www.w3.org/2000/svg" ? undefined : splitWords(n);
+            if (n.nodeType !== 3) return;
+            const frag = document.createDocumentFragment();
+            n.textContent.split(/([ \t\r\n]+)/).forEach((p) => {
+              if (!p) return;
+              if (/^[ \t\r\n]+$/.test(p)) return frag.append(" ");
+              const s = document.createElement("span");
+              s.className = "w";
+              s.textContent = p;
+              frag.append(s);
+            });
+            n.replaceWith(frag);
+          });
+        $$(".hl").forEach(splitWords);
+        // odometer: <span class="odo" data-value="40%"></span> gets one 0-9 reel per digit
+        $$(".odo").forEach((o) => {
+          o.setAttribute("data-layout-allow-overflow", ""); // reels clip on purpose
+          const reel = Array.from({ length: 20 }, (_, i) => `<i>${i % 10}</i>`).join("");
+          if (o.dataset.value == null) console.warn("[odo] missing data-value", o);
+          o.innerHTML = Array.from(o.dataset.value ?? "").map((ch) => (/\d/.test(ch) ? `<span class="odo-d"><span class="odo-s">${reel}</span></span>` : `<span>${ch}</span>`)).join("");
+        });
+
+        // ---------- animation vocabulary ----------
+        const pop = (e, t, o = {}) => tl.fromTo(e, { autoAlpha: 0, scale: o.from ?? 0.4 }, { autoAlpha: 1, scale: 1, duration: o.d ?? 0.45, ease: o.ease ?? "back.out(2.2)", stagger: o.stagger ?? 0 }, t);
+        const rise = (e, t, o = {}) => tl.fromTo(e, { autoAlpha: 0, y: o.y ?? 40 }, { autoAlpha: 1, y: 0, duration: o.d ?? 0.5, ease: o.ease ?? "power3.out", stagger: o.stagger ?? 0 }, t);
+        const draw = (e, t, d = 0.6, ease = "power2.inOut") => tl.fromTo(e, { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: d, ease }, t);
+        const slideX = (e, t, o = {}) => tl.fromTo(e, { autoAlpha: 0, x: o.x ?? -80 }, { autoAlpha: 1, x: 0, duration: o.d ?? 0.5, ease: o.ease ?? "expo.out", stagger: o.stagger ?? 0 }, t);
+        const flipIn = (e, t, o = {}) => tl.fromTo(e, { autoAlpha: 0, rotationX: o.rot ?? -80, transformPerspective: 1200, transformOrigin: "50% 100%" }, { autoAlpha: 1, rotationX: 0, duration: o.d ?? 0.6, ease: o.ease ?? "back.out(1.4)", stagger: o.stagger ?? 0 }, t);
+        const fadeOut = (e, t, o = {}) => tl.to(e, { autoAlpha: 0, y: o.y ?? 0, duration: o.d ?? 0.3, ease: "power2.in" }, t);
+        // bump: a quick scale accent on a word or a beat
+        const bump = (e, t, o = {}) => {
+          tl.to(e, { scale: o.s ?? 1.08, duration: 0.08, ease: "power2.out" }, t);
+          tl.to(e, { scale: 1, duration: 0.3, ease: "power2.out" }, t + 0.08);
+        };
+        // typeIn: stepped clip reveal, one step per character
+        const typeIn = (e, t, o = {}) => {
+          const el = typeof e === "string" ? $(e) : e;
+          const n = Math.max(1, el.textContent.replace(/\s+/g, " ").trim().length), d = o.d ?? n * 0.035;
+          tl.fromTo(el, { clipPath: "inset(-20% 100% -20% 0%)" }, { clipPath: "inset(-20% 0% -20% 0%)", duration: d, ease: `steps(${n})` }, t);
+          tl.set(el, { clipPath: "none" }, t + d);
+        };
+        // odo: reels roll into the value from data-value; the last digit spins one extra turn
+        const odo = (e, t, o = {}) => {
+          const el = typeof e === "string" ? $(e) : e;
+          const digits = Array.from(el.dataset.value ?? "").filter((c) => /\d/.test(c)).map(Number);
+          $$(".odo-s", el).forEach((s, i) => {
+            const idx = digits[i] + (i === digits.length - 1 ? 10 : 0);
+            tl.fromTo(s, { yPercent: 0 }, { yPercent: -idx * 5, duration: (o.d ?? 1.1) + i * 0.08, ease: o.ease ?? "power3.out" }, t);
+          });
+        };
+        // juicy vocabulary: anticipation, impact, smear, follow-through
+        const FR = 1 / (T.fps || 30); // one frame
+        // slam: lands oversized and blurred on t, squashes, settles. { soft: true } is the calmer version
+        const slam = (e, t, o = {}) => {
+          const q = o.soft ? 0.5 : 1, t0 = Math.max(0, t - (o.d ?? 0.22)); // a tween before 0 would shift the whole timeline
+          tl.fromTo(e, { autoAlpha: 0, scale: o.from ?? (o.soft ? 1.25 : 1.6), filter: `blur(${12 * q}px)` }, { autoAlpha: 1, scale: 1 - 0.06 * q, filter: "blur(0px)", duration: Math.max(FR, t - t0), ease: "expo.in" }, t0);
+          tl.to(e, { scaleX: 1 + 0.06 * q, scaleY: 1 - 0.08 * q, duration: 3 * FR, ease: "power2.out" }, t);
+          tl.to(e, { scaleX: 1, scaleY: 1, duration: 0.5, ease: o.soft ? "back.out(1.4)" : "elastic.out(1, 0.45)" }, t + 3 * FR);
+          tl.set(e, { filter: "none" }, t + 4 * FR);
+        };
+        // smear: fast travel with skew (motion blur without a filter), then a damped settle
+        const smear = (e, t, o = {}) => {
+          const dx = o.dx ?? -260;
+          tl.fromTo(e, { autoAlpha: 0, x: dx, skewX: dx < 0 ? -18 : 18 }, { autoAlpha: 1, x: 0, skewX: 0, duration: o.d ?? 0.34, ease: "expo.out", stagger: o.stagger ?? 0 }, t);
+        };
+        // lineIn: words rise out of an overflow:hidden line mask with overlap
+        const lineIn = (e, t, o = {}) => tl.fromTo(e, { yPercent: 110, rotate: o.rot ?? 4 }, { yPercent: 0, rotate: 0, duration: o.d ?? 0.6, ease: "expo.out", stagger: { each: o.each ?? 0.06, ease: "power1.in" } }, t);
+        // settleCam: slow camera push over a hold so no frame is dead (finite, seek-safe)
+        const settleCam = (e, t0, t1, amt = 0.035) => tl.fromTo(e, { scale: 1 }, { scale: 1 + amt, duration: Math.max(0.1, t1 - t0), ease: "none" }, t0);
+        // shake: seeded, decaying; x/y only so layout never reflows
+        const shake = (e, t, o = {}) => {
+          const r = rng(o.seed ?? 7), n = o.n ?? 6, amp = o.amp ?? 14;
+          for (let i = 0; i < n; i++) {
+            const k = amp * (1 - i / n);
+            tl.to(e, { x: (r() - 0.5) * 2 * k, y: (r() - 0.5) * 2 * k, duration: FR, ease: "none" }, t + i * FR);
+          }
+          tl.to(e, { x: 0, y: 0, duration: 2 * FR, ease: "power2.out" }, t + n * FR);
+        };
+        const flash = (t, a = 0.45) => {
+          // fromTo with explicit values: overlapping flashes render the same whatever the seek order
+          tl.fromTo("#flash", { opacity: 0 }, { opacity: a, duration: 0.03, ease: "none", immediateRender: false }, t);
+          tl.fromTo("#flash", { opacity: a }, { opacity: 0, duration: 0.35, ease: "power2.out", immediateRender: false }, t + 0.03);
+        };
+        const intro = (sc, t) => {
+          const ws = $$(".hl .w", sc);
+          if (ws.length) tl.fromTo(ws, { autoAlpha: 0, yPercent: 60 }, { autoAlpha: 1, yPercent: 0, duration: 0.42, ease: "power3.out", stagger: 0.05 }, t + 0.05);
+        };
+
+        // ---------- beat reactions: pulse the stage on kick downbeats (only with a measured grid) ----------
+        tl.fromTo("#fade", { opacity: 1 }, { opacity: 0, duration: 0.3 }, 0);
+        const beatAt = (t) => Math.round((t - T.beat0) / T.beatLen);
+        if (T.beatLen > 0) {
+          for (let n = 0; B(n) < T.duration; n++) {
+            if (!isKick(n) || n % 4) continue;
+            tl.to("#pulse", { scale: 1.01, duration: 0.05, ease: "power1.out" }, B(n));
+            tl.to("#pulse", { scale: 1, duration: 0.33, ease: "power2.out" }, B(n) + 0.05);
+          }
+        }
+
+        // ---------- scene windows: [selector, scene id, transition in] ----------
+        // Scene ids are s<#> from PLAN.md "## Cảnh". A scene missing from TIMING (timing.mjs not run
+        // yet) gets an even share of the duration so the skeleton still plays.
+        const WINDOWS = [
+          ["#sc1", "s1", "none"],
+          ["#sc2", "s2", "up"],
+        ];
+        const winStart = (i) => SC[WINDOWS[i][1]]?.start ?? (T.duration * i) / WINDOWS.length;
+        WINDOWS.forEach(([sel, sid, kind], i) => {
+          const sc = $(sel);
+          const t0 = winStart(i);
+          const t1 = i < WINDOWS.length - 1 ? winStart(i + 1) : T.duration;
+          if (kind === "none") tl.set(sc, { autoAlpha: 1 }, t0);
+          else if (kind === "up") tl.fromTo(sc, { autoAlpha: 0, y: 110 }, { autoAlpha: 1, y: 0, duration: 0.5, ease: "power3.out" }, t0);
+          else if (kind === "fade") tl.fromTo(sc, { autoAlpha: 0 }, { autoAlpha: 1, duration: 1.2, ease: "power1.inOut" }, t0);
+          if (i < WINDOWS.length - 1) tl.to(sc, { autoAlpha: 0, duration: 0.2, ease: "power2.in" }, t1 - 0.2);
+          const onDrop = T.beatLen > 0 && (T.drops || []).some((n) => Math.abs(B(n) - t0) < 0.38); // the drop flash below covers it
+          if (i > 0 && !onDrop) flash(t0, T.beatLen > 0 && isKick(beatAt(t0)) ? 0.3 : 0.14);
+          intro(sc, t0);
+        });
+        if (T.beatLen > 0) (T.drops || []).forEach((n) => flash(B(n), 0.8));
+
+        // ---------- per-scene choreography: key every reveal to a spoken phrase ----------
+        // e.g. { const sid = "s2"; pop("#sc2 .hl", W(sid, "mã nguồn") - 0.1); }
+
+        tl.to("#fade", { opacity: 1, duration: 1.0, ease: "power1.in" }, T.duration - 1.0);
+        tl.set({}, {}, T.duration); // pin the timeline length to the video duration
+      })();
+    </script>
+  </body>
+</html>
