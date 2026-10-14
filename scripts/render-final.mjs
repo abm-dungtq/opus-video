@@ -21,8 +21,8 @@
 // --audio-only <old>: new music, SFX or volumes without re-rendering the picture. Same preflight,
 // then needs <old>.render.json whose source_sha256 matches <old>, and the same picture: visual_hash
 // covers the composition and its sub-scenes without <audio> and data-volume, non-HTML files under
-// compositions/, assets/ except voice/ sfx/ bgm/, and every local file they reference (src,
-// <link href>, url(), also ../ outside the project). Copies <old>'s video stream, muxes the new
+// compositions/, assets/ except voice/ sfx/ bgm/ and the sfx-sync cache sfx-onsets.json, and every
+// local file they reference (src, <link href>, url(), also ../ outside the project). Copies <old>'s video stream, muxes the new
 // mix into --output (required, not <old>), writes a sidecar with mode "audio-only".
 // Sound unchanged: says so, exit 0, no new file. Work files go next to the output, not to /tmp.
 // Exit: the render's exit code · 1 mix or remux failed · 2 bad usage or ffmpeg/ffprobe missing ·
@@ -38,6 +38,7 @@ import { wantsHelp, helpText } from "./cli-help.mjs";
 import { check, report } from "./check-preflight.mjs";
 import { parseTracks, resolveSrc, dynamicAudio, main as audioMix } from "./audio-mix.mjs";
 import { winArgs } from "./make-demo.mjs";
+import { ONSET_CACHE } from "./sfx-sync.mjs";
 
 export const PREFLIGHT_EXIT = 5;
 export const AUDIO_ONLY_EXIT = 6;
@@ -148,7 +149,8 @@ export function visualHash(project, composition = "index.html") {
   // non-HTML files under compositions/ (styles, scripts) can change the picture without a reference
   for (const f of walk(join(root, "compositions"))) if (!f.endsWith(".html")) add(f, shaFile(f));
   for (const f of walk(join(root, "assets"))) {
-    if (!SOUND_DIRS.some((d) => posix(root, f).startsWith(`assets/${d}/`))) add(f, shaFile(f));
+    const rel = posix(root, f);
+    if (rel !== ONSET_CACHE && !SOUND_DIRS.some((d) => rel.startsWith(`assets/${d}/`))) add(f, shaFile(f));
   }
   const files = [...refs].sort(byName);
   const missing = files.filter((p) => !existsSync(p) || !statSync(p).isFile());

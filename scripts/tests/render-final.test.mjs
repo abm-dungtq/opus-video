@@ -73,6 +73,17 @@ test("hashes: data-volume moves only audio_hash; a <div> or an image outside the
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test("hashes: the sfx-sync onset cache under assets/ is not picture", () => {
+  const { dir, p } = fixture();
+  try {
+    const v0 = visualHash(p);
+    writeFileSync(join(p, "assets/sfx-onsets.json"), '{\n  "abc": { "lead": 0.03, "max_db": -2 }\n}\n');
+    assert.equal(visualHash(p), v0);
+    writeFileSync(join(p, "assets/other.json"), "{}");
+    assert.notEqual(visualHash(p), v0, "other files under assets/ still count as picture");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test("hashes: renaming an <audio> id leaves audio_hash as it was, so older sidecars stay valid", () => {
   const { dir, p, edit } = fixture();
   try {

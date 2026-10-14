@@ -37,6 +37,9 @@ import { parseTracks } from "./audio-mix.mjs";
 // check-preflight.mjs imports checkSync from this file: the cycle is safe only while every use of
 // an imported binding stays inside a function (never at module level).
 
+// Leading-silence cache, relative to the project. render-final's visual_hash skips it: it is
+// measurement data, not picture.
+export const ONSET_CACHE = "assets/sfx-onsets.json";
 const SECTION = "su kien";
 const NONE = "khong co sfx gan su kien";
 const NO_SOUND = /^(?:|—|–|-)$/;
@@ -104,7 +107,7 @@ export function measureLead(file, run = spawnSync) {
 
 // Cached leadings keyed by file sha256; one ffmpeg measurement per distinct file content.
 function leadCache(dir, run) {
-  const path = join(dir, "assets", "sfx-onsets.json");
+  const path = join(dir, ONSET_CACHE);
   let cache = {};
   if (existsSync(path)) {
     try { const c = JSON.parse(readFileSync(path, "utf8")); if (c && typeof c === "object" && !Array.isArray(c)) cache = c; } catch { /* unreadable cache: measure again and overwrite */ }
