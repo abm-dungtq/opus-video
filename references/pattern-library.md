@@ -134,6 +134,42 @@ Công cụ được nhắc đến (`/tmp/ov-stats.json`): Remotion 89 bài (ch�
 
 **Câu prompt khung:** "Dàn dựng câu nói '{lời}' thành kinetic typography {N} giây, 1080×1080. Mỗi từ khoá có một vai trò hình học và câu cuối đứng trên cấu trúc mà các từ trước đã dựng. Reveal theo cụm từ của giọng đọc ElevenLabs (`words.json`), có một nhịp lặng 400 ms. Dùng glyph path thật và mask chuyển cảnh từ chữ cũ. Kiểm tra 8 frame xem câu có đọc đúng thứ tự không."
 
+## Tin nóng dọc 9:16
+
+**Khi nào dùng:** một tin vừa ra (ra mắt sản phẩm, quyết định chính sách, con số mới công bố) cần lên TikTok/Reels/Shorts trong ngày. Một tin, một con số chính, người xem lướt qua vẫn nắm được. Case gần nhất: `y:l3d1c-632524` (quảng cáo ra mắt cho một trang tin, cắt 30/15/6 giây ở cả 16:9 và 9:16 từ cùng một codebase). Corpus chưa có case tin nóng đúng nghĩa (từ khoá "breaking news" không ra kết quả).
+
+**Engine gợi ý:** HyperFrames với `motion-graphics`, thêm `embedded-captions` khi có lời đọc. Hướng gợi ý ở bước 1b: A3 "Chữ khổng lồ đập theo nhịp trống" khi tin nằm ở một từ khoá, A2 "Gõ lệnh, máy bung kết quả tức thì" khi tin là một công cụ hay kết quả AI.
+
+**Nhịp và thời lượng:** 15–30 giây. Hook trong 1 giây đầu: từ khoá hoặc con số chính xuất hiện ngay frame đầu, không có logo hay tiêu đề mở. Cắt theo lưới 120 BPM như case trên. Phụ đề co vừa vùng an toàn 9:16 để không nằm dưới nút của TikTok.
+
+**Kỹ thuật lặp lại nhiều:**
+- Mỗi con số trên hình có một mục nguồn trong `SOURCES.md`, lấy qua `source-ingest.mjs` từ bài gốc. Số chính xác đặt trên hình, lời đọc dùng số tròn.
+- Từ khoá đập vào theo beat, từ sau húc văng từ trước (blueprint `kinetic-type-beats`, rule `kinetic-beat-slam`). Một từ khoá chạy qua các lựa chọn rồi khoá lại thành tiêu đề (blueprint `ticker-takeover`).
+- Tin về công cụ AI: khung lệnh gõ câu hỏi thật rồi kết quả bung ra từ chính khung đó (blueprint `prompt-type-submit-generate`, rule `discrete-text-sequence`).
+- Duyệt bằng contact sheet khoảng 20 still trước khi render video, như case `y:l3d1c-632524`.
+
+**Lỗi hay gặp / banned:** đọc lại nguyên tiêu đề báo; lấy ảnh chụp màn hình bài báo làm nền suốt video; nhãn "nguồn: …" trên hình (nguồn nằm ở `SOURCES.md` và caption bài đăng); con số không có mục trong `SOURCES.md`; mở bằng logo hay câu chào.
+
+**Câu prompt khung:** "Làm video tin nóng dọc 9:16, {N} giây (15–30), về {tin}. Giây đầu là {từ khoá hoặc con số} đập vào giữa khung trên beat đầu tiên. Mọi con số lấy từ `SOURCES.md` (đã chạy `source-ingest.mjs` với {URL}). Cắt theo lưới 120 BPM, phụ đề trong vùng an toàn 9:16, lời đọc tiếng Việt ElevenLabs `eleven_v4`. Không đọc tiêu đề báo, không dùng ảnh chụp bài báo làm nền, không ghi nhãn nguồn trên hình. Render contact sheet 20 still để duyệt trước."
+
+## Giải thích theo ngách 9:16
+
+**Khi nào dùng:** giải thích một khái niệm của một ngách (tài chính cá nhân, luật đất đai, một kỹ thuật lập trình, một bệnh thường gặp) cho người xem điện thoại. Chỉ một khái niệm mỗi video. Case gần nhất: `y:verbove-268381` (explainer một canvas, một hình không bao giờ cắt, 8–12 trạng thái, xuất cả 9:16, lưới 120 BPM). Corpus không có case khớp "niche explainer".
+
+**Engine gợi ý:** HyperFrames với `general-video`. Hướng gợi ý ở bước 1b: A6 "Biểu đồ tự vẽ, số nhảy thật" khi khái niệm dựa trên số liệu, A1 "Một khối biến hình liên hoàn" khi là quy trình, A5 "Bay xuyên không gian 3D" khi khái niệm có nhiều tầng.
+
+**Nhịp và thời lượng:** 30–60 giây. Có ít nhất một beat chỉ có nhạc và hình (lời đọc `—`) để người xem kịp nhìn. Mỗi trạng thái đứng trên màn hình đủ lâu để đọc.
+
+**Kỹ thuật lặp lại nhiều:**
+- Một hình xuyên suốt đổi dáng theo từng ý thay vì đổi thẻ (blueprint `fixed-anchor-cycle`, rule `card-morph-anchor`), giống luật "một hình, không bao giờ cắt" của case `y:verbove-268381`.
+- Biểu đồ tự vẽ theo lời đọc, vạch đọc quét làm số nhảy (blueprint `dataviz-countup`, rule `chart-scrub-readout`, rule `counting-dynamic-scale`, rule `svg-path-draw`).
+- Khái niệm nhiều tầng: máy quay bay sâu vào cùng một không gian (blueprint `camera-journey`, rule `3d-camera-flight`, rule `depth-of-field-blur`).
+- Số liệu lấy từ `SOURCES.md` như nhóm Tin nóng; khái niệm không có số thì vẫn phải có nguồn cho định nghĩa.
+
+**Lỗi hay gặp / banned:** gạch đầu dòng hiện lần lượt; 4 câu thành 4 thẻ; giải thích hai khái niệm trong một video; lời đọc phủ kín từ đầu đến cuối, không có beat chỉ nhạc; thuật ngữ ngách không giải nghĩa ngay lần đầu xuất hiện.
+
+**Câu prompt khung:** "Làm video giải thích dọc 9:16, {N} giây (30–60), về một khái niệm: {khái niệm} cho {người xem}. Một hình xuyên suốt đổi dáng qua từng ý, không có thẻ gạch đầu dòng. Có ít nhất một beat {M} giây chỉ nhạc và hình. Số liệu lấy từ `SOURCES.md`. Lời đọc tiếng Việt ElevenLabs `eleven_v4`, phụ đề khớp `words.json`. Render still từng trạng thái, kiểm tra chữ trong vùng an toàn 9:16 rồi mới xuất."
+
 ## Thẻ kỹ thuật
 
 Mỗi thẻ là một kỹ thuật lặp lại trong các prompt dài nhất của corpus (> 1500 ký tự), viết lại ngắn gọn. Dòng `HyperFrames:` chỉ dùng tên có thật trong `hyperframes-animation` (blueprint, rule), `hyperframes-creative/frame-presets` và registry (`hyperframes catalog`).
@@ -196,3 +232,5 @@ Tên trong bảng đều có thật (blueprint/rule trong `hyperframes-animation
 | Tự sự / music video | `music-to-video` | `camera-journey`, `spatial-pan-stations` | `kinetic-beat-slam`, `multi-phase-camera` | "beat sync" (`beat-freeze-cut`) | `broadside`, `biennale-yellow` |
 | 3D / không gian | `general-video` | `camera-journey`, `zoom-out-workspace-reveal` | `3d-camera-flight`, `orbit-3d-entry`, `depth-of-field-blur` | "three.js 3d scene" (`three-orbiting-cards`) | `code-editorial` |
 | Kinetic typography | `motion-graphics` (thêm `embedded-captions` khi có giọng đọc) | `kinetic-type-beats`, `typewriter-reveal` | `kinetic-beat-slam`, `discrete-text-sequence`, `asr-keyword-glow` | "kinetic typography" (`kinetic-type-swap`) | `editorial-forest`, `broadside` |
+| Tin nóng dọc 9:16 | `motion-graphics` (thêm `embedded-captions` khi có giọng đọc) | `kinetic-type-beats`, `ticker-takeover`, `prompt-type-submit-generate` | `kinetic-beat-slam`, `discrete-text-sequence` | "news ticker" (`ticker-takeover`) | `bold-poster`, `broadside` |
+| Giải thích theo ngách 9:16 | `general-video` | `fixed-anchor-cycle`, `dataviz-countup`, `camera-journey` | `card-morph-anchor`, `chart-scrub-readout`, `counting-dynamic-scale`, `3d-camera-flight` | "chart count up" (`count-up`) | `cobalt-grid`, `blue-professional` |

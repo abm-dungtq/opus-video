@@ -59,6 +59,7 @@ Vẫn là viet-pro, chỉ cụ thể hoá cho kênh ngắn:
 
 Bắt buộc khi loại video là explainer/giáo dục hoặc phản bác ngộ nhận, hoặc khi kịch bản có bất kỳ số liệu nào.
 
+- Có nguồn là URL hoặc PDF thì chạy `source-ingest.mjs` trước (`node $OV/scripts/source-ingest.mjs --project . <url|file.pdf|arxiv:<id>>`). Đọc `sources/<slug>.txt`, viết ý chính có trích câu gốc. Mọi số liệu trong kịch bản phải trỏ về một mục trong `SOURCES.md`.
 - Làm theo `$VP/references/research/lead.md` để tìm nguồn và `$VP/references/review/fact-check.md` để xếp mức rủi ro, verify và xử lý claim chưa verify được (hedge, cite hoặc bỏ).
 - Ghi nguồn vào `<project>/SOURCES.md`, mỗi claim một dòng: `claim — nguồn (tên, URL, ngày truy cập) — trạng thái đã verify/hedge/bỏ`.
 - Số chính xác đặt trên text hiển thị ("72,4%"); lời đọc dùng số tròn ("gần ba phần tư").
