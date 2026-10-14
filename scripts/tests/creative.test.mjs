@@ -208,6 +208,20 @@ test("make-pitch render: refuses a styleframe that is still the blank hyperframe
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 
+test("make-pitch render: missing ffmpeg/ffprobe exits 1 before rendering anything", () => {
+  const d = tmp();
+  try {
+    mkdirSync(join(d, "pitch", "1-x"), { recursive: true });
+    writeFileSync(join(d, "pitch", "1-x", "index.html"), "<!doctype html><div class=styleframe></div>\n");
+    writeFileSync(join(d, "pitch", "PICK.json"), JSON.stringify({ topic: "t", aspect: "9:16", energy: "vua", duration_s: 15, picks: [{ n: 1, id: "A2", tier: "fit", dir: "pitch/1-x" }] }));
+    const errs = [];
+    const code = noTools(() => pitchMain(["render", "--project", d], () => {}, (m) => errs.push(m)));
+    assert.equal(code, 1, errs.join("\n"));
+    assert.match(errs.join("\n"), /ffmpeg/);
+    assert.ok(!existsSync(join(d, "pitch", "1.mp4")));
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
 test("make-pitch init: reports missing HyperFrames skills before scaffolding anything", () => {
   const d = tmp();
   try {

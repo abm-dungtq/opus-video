@@ -28,10 +28,10 @@
 //   direction_swaps, energy, palette, word_budget, music_only_s, creative_selection (user|auto),
 //   styleframe; and a "## creative_direction" body section. --auto = option 1, recorded as auto
 //   (only when the user asked to run without stopping).
-// Exit: 0 ok · 1 render/init failed · 2 bad usage · 3 compat warnings to confirm · 4 a styleframe
+// Exit: 0 ok · 1 render/init failed or ffmpeg/ffprobe missing · 2 bad usage · 3 compat warnings to confirm · 4 a styleframe
 //   fails MOTION (render; PITCH.md is still written), rebuild it.
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, realpathSync, rmSync } from "node:fs";
 import { join, resolve, relative } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -181,18 +181,25 @@ function render(o, data) {
   const pickPath = join(pitch, "PICK.json");
   if (!existsSync(pickPath)) return { code: 2, msg: "pitch/PICK.json not found; run make-pitch.mjs init first" };
   const info = JSON.parse(readFileSync(pickPath, "utf8"));
-  const posters = [], lines = [];
   for (const r of info.picks) {
     const dir = join(project, r.dir);
     if (!existsSync(join(dir, "index.html"))) return { code: 2, msg: `${r.dir}/index.html not found` };
     if (r.scaffold && sha(join(dir, "index.html")) === r.scaffold) return { code: 2, msg: `${r.dir}/index.html is still the blank hyperframes scaffold (styleframe chưa viết); write it from STYLEFRAME.md + RECIPES.md first` };
+  }
+  const missing = ["ffmpeg", "ffprobe"].filter((t) => spawnSync(t, ["-version"], { stdio: "ignore" }).status !== 0);
+  if (missing.length) return { code: 1, msg: `${missing.join(" and ")} not found; install ffmpeg (brew install ffmpeg) and re-run make-pitch.mjs render` };
+  const posters = [], lines = [];
+  for (const r of info.picks) {
+    const dir = join(project, r.dir);
     const mp4 = join(pitch, `${r.n}.mp4`);
     const x = spawnSync("npx", winArgs(["hyperframes", "render", "--quality", "draft", "-o", mp4]), { cwd: dir, stdio: "inherit", shell: WIN, env: { ...process.env, HYPERFRAMES_SKIP_SKILLS: "1" } });
     if (x.status !== 0 || !existsSync(mp4)) return { code: 1, msg: `render failed for ${r.dir}` };
     const probe = spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", mp4], { encoding: "utf8" });
     const dur = Number(String(probe.stdout).trim()) || 3;
     const png = join(pitch, `${r.n}.png`);
+    rmSync(png, { force: true });
     spawnSync("ffmpeg", ["-v", "error", "-y", "-ss", String((dur * 0.6).toFixed(2)), "-i", mp4, "-frames:v", "1", png], { stdio: "inherit" });
+    if (!existsSync(png)) return { code: 1, msg: `ffmpeg could not cut a poster from pitch/${r.n}.mp4 (${dur}s)` };
     posters.push(png);
     let motion = null;
     try { motion = measureMotion(mp4); } catch { /* reported below as unmeasured */ }
