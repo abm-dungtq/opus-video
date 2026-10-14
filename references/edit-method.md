@@ -74,6 +74,10 @@ Một câu chỉ có một ý hình. Câu dài hai ý thì tách thành hai fram
 - Bố cục ngang phải dàn lại cho khổ dọc, không kéo giãn.
 - Sau assemble, so thời lượng index với tổng voice cộng phần giữ hình. Lệch > 0,15s mà không có chủ đích thì xem lại.
 
+## Thời điểm luôn tính trên timeline gốc
+
+Mọi thời điểm trong PLAN, `## Sự kiện`, DEMO và REVISIONS là giây trên timeline gốc. Thời điểm bên trong composition con ghi thành `<giây bắt đầu composition> + <giây bên trong>` rồi cộng ra giây gốc. Ví dụ composition con bắt đầu ở 12s và nút được nhấn ở giây 1.5 bên trong thì ghi `12 + 1.5 = 13.5s`.
+
 ## SFX thưa
 
 - Chỉ đặt tiếng ở nhịp có nghĩa: vào cảnh, logo, con số dừng, nút nhấn. Không đặt cho mọi chuyển động.

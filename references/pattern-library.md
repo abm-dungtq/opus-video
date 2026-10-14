@@ -220,6 +220,12 @@ Case: không có trong corpus (`weak matches`); mẫu chạy thật là dự án
 HyperFrames: blueprint `camera-journey` · rule `svg-path-draw` · `catalog --query "map pin route"`
 Dữ liệu: tiện ích quanh dự án (trường, chợ, siêu thị, ga/trạm xe buýt, bệnh viện, công viên) lấy thật từ OpenStreetMap bằng `scripts/poi-fetch.mjs`, ghi vào `SOURCES.md`; hướng đạo diễn A8 "Bản đồ dẫn đường bám lời nói".
 
+### Thẻ 10 — Launch Clip: một thao tác trên sản phẩm
+Cả clip chỉ có một hành động duy nhất: con trỏ đi tới nút, nhấn, rồi kết quả hiện ra. Ba mốc nhấn, hiện và đọc được ghi trong bảng `## Sự kiện` của PLAN.md (giây trên timeline gốc). Kết quả đứng yên trên hình cho tới khi người xem đọc xong, không trôi sang cảnh khác giữa chừng. Tiếng click phải khớp lúc nhấn, kiểm bằng `scripts/sfx-sync.mjs`. Ảnh bìa lấy từ một khung demo đã được duyệt, không dựng riêng.
+Hướng phù hợp: A2 "Gõ lệnh, máy bung kết quả tức thì", A4 "Một máy quay lướt qua bàn làm việc".
+Nguồn: "Motion Engineering with Opus 5.5, beamnxw (MIT)".
+HyperFrames: blueprint `cursor-ui-demo` · rule `context-sensitive-cursor`
+
 ## Bảng nối nhóm → HyperFrames
 
 Tên trong bảng đều có thật (blueprint/rule trong `hyperframes-animation`, preset trong `hyperframes-creative/frame-presets`, block lấy từ output của câu `catalog --query` cùng dòng).

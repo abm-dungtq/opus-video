@@ -162,6 +162,7 @@ Mỗi dự án có một thư mục riêng:
 6b. **Khung hình demo (BẮT BUỘC trước video cuối).** Làm theo `references/plan-demo.md`:
    - Dự án có `direction:`: `node $OV/scripts/make-demo.mjs --project . --animatic` (bản 9:16: thêm `--aspect 9x16` và `--composition compositions/main-9x16.html`, hoặc `--hyperframes <project-9x16>` nếu là project riêng; cổng final chặn `animatic_9x16` có khung ngang). Script render clip nháp toàn bộ `demo/animatic.mp4`, cắt đúng các mốc trong `PLAN.md`, ghép `demo/contact-sheet.jpg` và ghi `DEMO.md` (`animatic:` + `approval: pending`). Dự án `creative_override` chụp ảnh tĩnh như cũ (bỏ `--animatic`).
    - Tự xem từng khung (đủ dấu, không tràn chữ, vùng an toàn, đúng nội dung cảnh) và chạy `qc-mp4.mjs demo/animatic.mp4 --project . --draft` (MOTION không được FAIL), rồi **gửi clip nháp + contact sheet cho người dùng duyệt** và dừng chờ trả lời. Người dùng duyệt chuyển động, không chỉ ảnh tĩnh.
+   - Người dùng xin sửa thì ghi `REVISIONS.md` theo `references/revisions.md`: kiểm từng mục bằng `snapshot --at`, hết vòng mới chạy lại `make-demo --animatic`.
    - Có góp ý thì sửa và chụp lại. Người dùng đồng ý thì ghi `approval: <ai>, <khi nào>, "<lời đồng ý>"` vào `DEMO.md`. Chỉ khi người dùng đã nói rõ là chạy không dừng mới được ghi `approval: auto — <lý do và lời người dùng>`.
    - Kiểm: `node $OV/scripts/check-preflight.mjs --project . --stage final` phải `PASS`.
 
@@ -214,6 +215,7 @@ Cần bản đăng theo từng nơi thì xuất từ bản final bằng `node $O
 | `references/audio-pipeline.md` | Bước 5: voice, SFX, nhạc nền, mix, bản quyền |
 | `references/qa-checklist.md` | Bước 8: đo bằng lệnh, xem frame, nghe |
 | `references/plan-demo.md` | Bước 4b, 6b, 7: mẫu `PLAN.md`, chụp và duyệt demo, `DEMO.md`, render bản cuối |
+| `references/revisions.md` | Bước 6b và sau bản final: mẫu `REVISIONS.md` 4 trường, tối đa 5 mục mỗi vòng, kiểm từng mục bằng `snapshot --at`, hết vòng chạy lại animatic |
 | `scripts/setup-check.mjs` | Bước 0: đủ công cụ, skill, key chưa (`READY` / `NOT READY` + lệnh sửa theo hệ điều hành) |
 | `scripts/check-preflight.mjs` | Bước 4b (`--stage plan`) và 6b (`--stage final`): cổng plan + demo + duyệt; cổng sáng tạo (Ý đồ sáng tạo, blueprint/rule có thật, seam mỗi beat, beat không lời, animatic không đứng yên, RECIPES.md) |
 | `scripts/make-demo.mjs` | Bước 6b: chụp khung hình demo theo `PLAN.md`, ghi `DEMO.md`; `--animatic` render clip nháp toàn bộ + contact sheet (bắt buộc với dự án có `direction:`); `--from-video` cắt từ bản nháp người dùng đã xem |

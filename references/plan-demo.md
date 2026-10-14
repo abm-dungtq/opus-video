@@ -78,6 +78,7 @@ Cổng plan kiểm: đủ 6 mục, bảng Cảnh có ít nhất một dòng, s�
   | FAIL | hơn 90 ms | hơn 185 ms |
 
 - `--fix` chỉ in `đề xuất: data-start="…"` cho từng dòng chưa PASS; không ghi vào HTML. `--write-qa` ghi các dòng vào `QA.md`.
+- **Nhãn nguồn của mốc:** mốc lấy từ `audio_meta.json` hoặc đo trên file là mốc **đo được**; mốc chọn theo cảm nhận là mốc **đề xuất**. Khi cần phân biệt thì ghi `(đo)` hoặc `(đề xuất)` sau thời điểm, ví dụ `6.5s (đề xuất)`. Mốc đề xuất phải được kiểm bằng `hyperframes snapshot . --at <t>` trước khi đặt tiếng vào.
 - Chỉ đọc `index.html` (hoặc `--html`): SFX nằm trong composition con báo FAIL "không có trong".
 
 **Cổng sáng tạo** (khi BRIEF có `direction:`; dự án chỉ cắt footage đặt `creative_override: <lý do ≥10 ký tự>`):
