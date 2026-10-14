@@ -15,15 +15,15 @@
 //   - --from-video <mp4>: cut the frames from a draft render the user already watched (no new
 //     render). The MP4 must be newer than index.html and compositions/*.html, so it shows the current
 //     composition. DEMO.md records the source, so the approval can cite that draft.
-//   - --animatic: render the whole composition at `--quality draft` to demo/animatic.mp4 (or
-//     demo/9x16/animatic.mp4), keep it, cut the PLAN.md frames from it and tile them into
+//   - --animatic: render the whole composition at `--quality draft`, scaled to 540 px on the short
+//     side, to demo/animatic.mp4 (or demo/9x16/animatic.mp4), keep it, cut the PLAN.md frames from it and tile them into
 //     contact-sheet.jpg. DEMO.md gets `animatic: <path>` (`animatic_9x16:` with --aspect 9x16).
 //     The user approves this MOTION draft, not just stills; check-preflight --stage final requires
 //     it for creative projects (BRIEF `direction:`) and measures its motion (qc-mp4 MOTION).
 //     Works with --composition and --hyperframes.
 // Exit: 0 frames captured · 1 capture failed · 2 bad usage / PLAN.md missing timestamps.
 
-import { existsSync, readFileSync, writeFileSync, readdirSync, rmSync, mkdirSync, mkdtempSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, readdirSync, rmSync, mkdirSync, mkdtempSync, realpathSync, statSync, renameSync } from "node:fs";
 import { join, resolve, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -99,10 +99,13 @@ export function main(argv = process.argv.slice(2)) {
 
   let animatic = "";
   if (o.animatic) {
-    const mp4 = join(outDir, "animatic.mp4");
-    const args = ["hyperframes", "render", ...(o.composition ? ["-c", o.composition] : []), "--quality", "draft", "-o", mp4];
+    const mp4 = join(outDir, "animatic.mp4"), full = join(outDir, "animatic.full.mp4");
+    const args = ["hyperframes", "render", ...(o.composition ? ["-c", o.composition] : []), "--quality", "draft", "-o", full];
     const r = run("npx", args, { cwd: hf });
-    if (r.status !== 0 || !existsSync(mp4)) { console.error("make-demo: animatic render failed"); return 1; }
+    if (r.status !== 0 || !existsSync(full)) { console.error("make-demo: animatic render failed"); return 1; }
+    const scaled = spawnSync("ffmpeg", ["-nostdin", "-v", "error", "-y", "-i", full, "-vf", "scale='if(gt(iw,ih),-2,540)':'if(gt(iw,ih),540,-2)'", "-c:v", "libx264", "-crf", "26", "-preset", "veryfast", "-c:a", "aac", "-b:a", "128k", mp4], { stdio: "inherit" });
+    if (scaled.status === 0 && existsSync(mp4)) rmSync(full, { force: true });
+    else { renameSync(full, mp4); console.error("WARN animatic kept at full size (ffmpeg scale failed)"); }
     try { cutFrames(mp4, times, outDir); } catch (e) { console.error(`make-demo: ${e.message}`); return 1; }
     animatic = relative(project, mp4).split("\\").join("/");
   } else if (o.fromVideo) {

@@ -17,7 +17,8 @@
 //   - WARN only (never fails): voice words > duration × 3 (BRIEF `duration_s:` or `duration:`, ~2.5–3 words/s);
 //     engagement-bait phrases; first-hand claims ("mình đã thử…") to confirm with the user.
 //   - BRIEF `word_budget: N` (written by make-pitch.mjs choose from the direction's energy; picture
-//     leads, words follow): voice words in script/*.txt above N fail the gate.
+//     leads, words follow): voice words in script/*.txt above N fail the gate (when absent but
+//     `direction:` is set, derived from the direction's energy and duration).
 // BRIEF frontmatter `voice_source: clip` (the voice is the user's own clip, no TTS script):
 //   - no script-table.md / script-table.v1.md / compare; no voice word-count, bait or first-hand
 //     WARNs (the words are the user's, not ours);
@@ -54,6 +55,7 @@ import { parseScript, readStamp, textHash } from "./script-md.mjs";
 import { loadKey } from "./jev-client.mjs";
 import { audit } from "./jev-audit.mjs";
 import { findSkill } from "./skill-paths.mjs";
+import { wordBudget } from "./directions.mjs";
 
 export const REQUIRED_FIELDS = ["mode", "files_read", "humanizer", "lint"];
 export const BAIT = /đừng (?:vội )?lướt|xem (?:hết|đến cuối|tới cuối)|99\s?% (?:mọi )?người|bạn sẽ không (?:thể )?tin|sự thật (?:gây sốc|ít ai biết)|không ai nói (?:cho )?bạn|bí mật (?:mà )?(?:ít ai|không ai)|like,? share|follow (?:ngay )?để không bỏ lỡ|comment\s+["“]?[^\s"”]+["”]?\s+để nhận|thả tim nếu|tag (?:ngay )?(?:một )?người bạn/giu;
@@ -217,8 +219,8 @@ export function check({ project = ".", stage = "script", vp = defaultVp(), compa
   const voiceText = clip ? "" : voice.map((v) => readFileSync(v.path, "utf8")).join("\n");
   const fm = frontmatter(brief);
   const duration = Number(fm.duration_s || fm.duration);
-  const budget = Number(fm.word_budget);
-  if (voiceText && budget > 0 && words(voiceText) > budget) errors.push(`voice has ${words(voiceText)} words, BRIEF word_budget is ${budget} (hình dẫn, lời theo: cắt lời hoặc chuyển ý sang hình/beat không lời)`);
+  const budget = Number(fm.word_budget) || (fm.direction && !fm.creative_override && !clip ? wordBudget(fm.energy || "vua", duration || 15).words : 0);
+  if (voiceText && budget > 0 && words(voiceText) > budget) errors.push(`VOICE_OVER_BUDGET: voice has ${words(voiceText)} words, BRIEF word_budget is ${budget} (hình dẫn, lời theo: cắt lời hoặc chuyển ý sang hình/beat không lời)`);
   if (voiceText && duration > 0 && words(voiceText) > duration * 3) warnings.push(`voice has ${words(voiceText)} words for ${duration}s (> ~3 words/s; viet-pro video-script.md: ~2.5–3)`);
   const spoken = clip ? "" : voiceText || table || "";
   for (const m of new Set([...spoken.matchAll(BAIT)].map((x) => x[0]))) warnings.push(`engagement-bait phrase in the script: "${m}"`);

@@ -211,5 +211,14 @@ test("check-viet-pro: BRIEF word_budget blocks a script that talks over the pict
     writeFileSync(join(d, "BRIEF.md"), `---\nlanguage: vi\nduration: 15\nword_budget: 26\n---\n\n${RECORD()}\n`);
     r = vietPro({ project: d, vp });
     assert.equal(r.pass, true, JSON.stringify(r.errors));
+    // No word_budget but a direction: the budget comes from the direction's energy and duration (vua, 15 s → 26).
+    const long = Array.from({ length: 8 }, () => "Sếp hỏi số liệu tuần.").join(" ");
+    const longTable = `| Thời điểm | Voice-over | Visual |\n|---|---|---|\n| 0-15s | ${long} | TV |\n`;
+    writeFileSync(join(d, "BRIEF.md"), `---\nlanguage: vi\nduration_s: 15\ndirection: A1\nenergy: vua\n---\n\n${RECORD()}\n`);
+    writeFileSync(join(d, "script-table.md"), longTable);
+    writeFileSync(join(d, "script-table.v1.md"), longTable);
+    writeFileSync(join(d, "script", "01.txt"), `${long}\n`);
+    r = vietPro({ project: d, vp });
+    assert.ok(r.errors.some((e) => e.includes("VOICE_OVER_BUDGET") && e.includes("26")), JSON.stringify(r.errors));
   } finally { rmSync(vp, { recursive: true, force: true }); rmSync(d, { recursive: true, force: true }); }
 });
