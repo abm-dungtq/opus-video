@@ -14,6 +14,12 @@
 //                        (tags, attributes and <title> blanked), plus local *.js files the HTML
 //                        loads via <script src> (not *.min.js); comments, Error(…) and console.*
 //                        lines are skipped, and so is any line containing `hedge-ok`.
+//   SLIDESHOW_MOTION     WARN (early hint): the timeline scripts (inline <script> + local *.js)
+//                        animate ≥12 properties/style writes and fewer than 15% go beyond
+//                        opacity/translate (scale, rotate, perspective, skew, clip-path, filter,
+//                        blur, strokeDash…), with no HyperShader / THREE / WebGL. Static code is
+//                        easy to game, so the blocking check is qc-mp4 MOTION on the render and
+//                        check-preflight --stage final on the animatic.
 // Exit: 0 clean or warnings only · 1 any ERROR · 2 bad usage or tool failure.
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -124,6 +130,30 @@ for (const file of files) {
     add(severity, "FONT_TOO_SMALL", file, lineAt(text, m.index),
       `${m[0]} = ${px.toFixed(1)}px < ${floor.toFixed(1)}px on a ${W}x${H} canvas`);
   }
+}
+
+// Motion audit (early hint, WARN only): what the timeline scripts animate. Script bodies only
+// (inline <script> and local *.js), comments stripped, so CSS in <style> does not count. Counts
+// GSAP keys and imperative style writes. Static code is easy to game (a background canvas or one
+// scale() tween passes), so the blocking check measures motion on the render: qc-mp4 MOTION and
+// check-preflight --stage final on the animatic.
+const BASIC_KEYS = ["opacity", "autoAlpha", "x", "y", "xPercent", "yPercent"];
+const RICH_KEYS = ["scale", "scaleX", "scaleY", "rotation", "rotate", "rotationX", "rotationY", "rotateX", "rotateY", "rotationZ", "z", "skewX", "skewY", "clipPath", "webkitClipPath", "filter", "strokeDashoffset", "strokeDasharray", "drawSVG", "morphSVG", "motionPath", "borderRadius", "transformPerspective"];
+const BASIC_CALLS = /translate[XY]?\(|translate3d\(|\.style\.opacity\b/g;
+const RICH_CALLS = /scale[XYZ3d]*\(|rotate[XYZ3d]*\(|perspective\(|skew[XY]?\(|\.style\.(?:clipPath|filter|borderRadius)\b|clip-path|stroke-?[dD]ashoffset|blur\(/g;
+const SIGNATURES = /\bHyperShader\b|\bTHREE\.|getContext\(\s*["']webgl2?["']/;
+function motionProfile(src) {
+  const keys = (list) => list.reduce((n, k) => n + (src.match(new RegExp(`(?:[{,]\\s*|\\n\\s*)["']?${k}["']?\\s*:`, "g")) || []).length, 0);
+  const basic = keys(BASIC_KEYS) + (src.match(BASIC_CALLS) || []).length;
+  const rich = keys(RICH_KEYS) + (src.match(RICH_CALLS) || []).length;
+  const total = basic + rich;
+  return { basic, rich, total, poor: total >= 12 && rich / total < 0.15 && !SIGNATURES.test(src) };
+}
+const scriptBodies = (raw) => [...raw.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]).join("\n");
+{
+  const p = motionProfile(stripComments([...files.map((f) => scriptBodies(readFileSync(f, "utf8"))), ...scripts.map((f) => readFileSync(f, "utf8"))].join("\n")));
+  if (p.poor) add("WARN", "SLIDESHOW_MOTION", indexPath, 0,
+    `timeline animates ${p.total} properties, only ${p.rich} beyond opacity/translate (${Math.round((p.rich / p.total) * 100)}% < 15%), no shader/3D: likely the slide-up-and-fade look. Build each beat from build/RECIPES.md; qc-mp4 MOTION will block a static render`);
 }
 
 // Locate `id="x"` for a `#x` selector so runtime findings still point at a line.

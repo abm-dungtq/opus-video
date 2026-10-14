@@ -19,43 +19,64 @@ Viết sau `STORYBOARD.md` và lựa chọn engine. Mỗi mục `##` phải có 
 ## Mục tiêu
 Người xem là ai, xem xong làm gì. Thời lượng, khổ hình (16:9 / 9:16 / both), kênh đăng.
 
+## Ý đồ sáng tạo
+- Hướng: A2 — Gõ lệnh, máy bung kết quả tức thì (người dùng chọn phương án 1)
+- Style: Data Drift (hoặc preset), tông màu
+- Hình chủ đạo: một khung lệnh duy nhất (prompt-type-submit-generate)
+- Hiệu ứng: discrete-text-sequence, agent-progress-theater
+- Chuyển cảnh: zoom-through, card-morph-anchor
+- SFX: crisp mechanical keycap click, clean glass UI confirmation pop
+- Luật chống slideshow: mọi beat mọc ra từ khung lệnh; camera đẩy vào kết quả thay vì đổi thẻ
+
 ## Cảnh
-| # | Thời điểm | Lời đọc (tóm tắt) | Hình / hiệu ứng | Âm thanh |
-|---|---|---|---|---|
-| 1 | 0–6s | Hook: … | Logo bật lên, key text "…" | whoosh |
-| 2 | 6–15s | … | Terminal gõ lệnh cài | click, nhạc vào |
+| # | Thời điểm | Lời đọc | Hình / hiệu ứng | Blueprint/Rule | Nối sang beat sau | Âm thanh |
+|---|---|---|---|---|---|---|
+| 1 | 0–2s | — | Khung lệnh gõ yêu cầu (styleframe đã duyệt) | prompt-type-submit-generate | card-morph-anchor | keycap click |
+| 2 | 2–6s | "…" | Khung giãn thành bảng tiến trình | agent-progress-theater | zoom-through vào bước cuối | soft pop |
+| 3 | 6–15s | "…" | Logo khoá giữa khung | cta-morph-press | — | glass pop |
 
 ## Âm thanh
 Giọng (voice id/model), nhạc nền (prompt, âm lượng), SFX theo beat, ngôn ngữ.
 
 ## Engine
-HyperFrames <workflow> (hoặc Remotion/Canvas) và lý do; composition nào cho khổ nào.
+HyperFrames <workflow> (hoặc Remotion/Canvas) và lý do; composition nào cho khổ nào; dựng từ build/RECIPES.md.
 
 ## Khung hình demo
-- 3 — logo và key text cảnh 1 đọc rõ, đủ dấu tiếng Việt
-- 10 — terminal cảnh 2, chữ lệnh không tràn
+- 1 — khung lệnh đang gõ, chữ không tràn, đủ dấu
+- 4 — bảng tiến trình
+- 14 — logo nằm ngoài vùng UI
 (ít nhất một mốc mỗi cảnh; mốc tính bằng giây trên timeline bản 16:9 / bản chính)
 
 ## Khung hình demo 9:16
 - 3 — logo nằm trong vùng an toàn
-- 10 — terminal dàn lại theo chiều dọc
 (chỉ bắt buộc khi BRIEF.md `aspect: both`)
 
 ## QA
-Lệnh sẽ chạy ở bước 8 (lint, check, video-lint, judge) và tiêu chí đạt.
+Lệnh sẽ chạy ở bước 8 (lint, check, video-lint, qc-mp4 MOTION, judge) và tiêu chí đạt.
 ```
 
 Cổng plan kiểm: đủ 6 mục, bảng Cảnh có ít nhất một dòng, số mốc demo ≥ số cảnh, và có mục 9:16 khi `aspect: both`. Sửa plan sau khi đã chụp demo thì phải chụp lại (frame cũ hơn `PLAN.md` bị chặn).
+
+**Cổng sáng tạo** (khi BRIEF có `direction:`; dự án chỉ cắt footage đặt `creative_override: <lý do ≥10 ký tự>`):
+
+- Có `## Ý đồ sáng tạo` với các dòng `Hướng:`, `Chuyển cảnh:`, `Luật chống slideshow:`.
+- Bảng `## Cảnh` có cột **Blueprint/Rule** và **Nối sang beat sau**. Mỗi hàng nêu ít nhất một blueprint/rule có thật trong `hyperframes-animation` (tên bịa bị chặn); toàn bảng có ít nhất 2 token khác nhau.
+- Mọi hàng trừ hàng cuối nêu seam trong từ vựng ở `references/creative-directions.md`. `fade`, `crossfade`, `cut`, "hiện", "mờ dần"… bị chặn; seam mềm (`focus-pull`, `blur-crossfade`, `cross-warp-morph`…) chỉ dùng được với hướng có `allow_soft` (A7, A8).
+- Các hàng có Lời đọc `—`, `(nhạc)` hoặc `không lời` cộng lại ≥ `music_only_s` của BRIEF (hình dẫn, lời theo).
+- Stage final thêm: `DEMO.md` có `animatic:` (make-demo `--animatic`) mới hơn PLAN và không bị qc-mp4 MOTION chấm FAIL; `build/RECIPES.md` (recipe-pack) mới hơn PLAN.
 
 ## 2. Chụp khung hình demo
 
 Sau khi dựng xong (bước 6), **trước** bản giao cuối:
 
 ```bash
-node $OV/scripts/make-demo.mjs --project .                                          # bản chính → demo/
-node $OV/scripts/make-demo.mjs --project . --aspect 9x16 --composition compositions/main-9x16.html   # 9:16 cùng project → demo/9x16/
-node $OV/scripts/make-demo.mjs --project . --aspect 9x16 --hyperframes ../<project-9x16>              # 9:16 là project riêng
+node $OV/scripts/make-demo.mjs --project . --animatic                              # dự án sáng tạo (BRIEF direction): clip nháp toàn bộ + khung + contact sheet
+node $OV/scripts/make-demo.mjs --project .                                          # bản chính → demo/ (chỉ ảnh tĩnh, dự án creative_override)
+node $OV/scripts/make-demo.mjs --project . --aspect 9x16 --composition compositions/main-9x16.html [--animatic]   # 9:16 cùng project → demo/9x16/
+node $OV/scripts/make-demo.mjs --project . --aspect 9x16 --hyperframes ../<project-9x16> [--animatic]             # 9:16 là project riêng
 ```
+
+- `--animatic` render toàn bộ composition ở `--quality draft` thành `demo/animatic.mp4`, cắt các khung trong PLAN.md từ chính clip đó và ghép `demo/contact-sheet.jpg`. `DEMO.md` ghi `animatic: demo/animatic.mp4`. **Gửi clip này cho người dùng** (không chỉ ảnh tĩnh): lỗi "lật slide" chỉ thấy được khi xem chuyển động.
 
 - Mặc định dùng `npx hyperframes snapshot` tại đúng các mốc trong PLAN.md.
 - `--composition` render bản nháp (`--quality draft`) rồi cắt PNG bằng ffmpeg, vì snapshot không chọn được composition.

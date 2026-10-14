@@ -38,9 +38,13 @@ Người dùng đưa clip quay thật cần cắt gọn (talking-head, phỏng v
 
 **Clip làm trục + nền dựng mới** (clip đi thực địa, giới thiệu nhà đất, địa điểm đặt trong khung PiP trên bản đồ hoặc phối cảnh, hiệu ứng bám lời người nói): làm theo `references/clip-master-canvas.md`. BRIEF đặt `voice_source: clip`; khi đó cổng viet-pro lint `script/captions.txt` (sinh bằng `scripts/captions-from-transcript.mjs` từ bảng sửa lời người dùng đã duyệt) và `script/on-screen.txt` thay cho kịch bản TTS. PLAN.md viết ngay sau bản chép lời.
 
+Dự án footage chỉ cắt gọn, không dựng hình mới: ghi `creative_override: <lý do ≥10 ký tự>` vào BRIEF thay cho bước 1b. Clip làm trục + nền dựng mới vẫn nên qua bước 1b (hướng A8 hợp với bản đồ/PiP).
+
 **Nội dung của người dùng là nội dung thật:** không gắn lên hình các nhãn rào đón như "minh họa", "không đúng tỉ lệ", "theo người đăng", "theo lời người nói", "video độc lập", "~" trước số. Số liệu vẫn chỉ lấy từ clip hoặc brief, nguồn ghi trong file dữ liệu. `video-lint` báo `HEDGE_LABEL`.
 
-**Ba cổng không được bỏ:** kịch bản viet-pro (bước 2) → **PLAN.md** (bước 4b) → **khung hình demo đã duyệt** (bước 6b). Bản giao cuối chỉ được render bằng `render-final.mjs`, script này chặn (exit 5) khi thiếu plan, thiếu demo hoặc demo chưa được duyệt.
+**Bốn cổng không được bỏ:** **hướng đạo diễn người dùng chọn bằng mắt** (bước 1b) → kịch bản viet-pro (bước 2) → **PLAN.md** (bước 4b) → **clip nháp (animatic) đã duyệt** (bước 6b). Bản giao cuối chỉ được render bằng `render-final.mjs`, script này chặn (exit 5) khi thiếu plan, thiếu demo, demo chưa được duyệt, hoặc (dự án có `direction:`) thiếu animatic, animatic đứng yên kiểu slideshow, thiếu `build/RECIPES.md`.
+
+**Vì sao có bước 1b:** người dùng không chuyên không tự nghĩ ra được từ vựng motion design, còn agent khi phải tự điền phong cách sẽ chọn kiểu an toàn nhất (nền tối + thẻ chữ trượt lên/mờ dần, mỗi câu một thẻ). Vì vậy phong cách do người dùng **chọn bằng mắt** trên 3 styleframe dựng bằng chính nội dung của họ, kịch bản viết **sau** khi đã có hướng (hình dẫn, lời theo), và các cổng máy chặn kiểu slideshow ở PLAN, ở code dựng và ở video render.
 
 ## Quy trình 9 bước
 
@@ -55,11 +59,19 @@ Mỗi dự án có một thư mục riêng:
   renders/
 ```
 
-1. **Brief.** Điền theo `references/brief-template.md` vào `BRIEF.md`. Chỉ hỏi người dùng những gì không suy ra được (chủ đề, `aspect` 16:9 / 9:16 / both, thời lượng). Các trường khác tự đề xuất.
+1. **Brief tối thiểu.** Điền theo `references/brief-template.md` vào `BRIEF.md`. Hỏi người dùng chủ đề, `aspect` (16:9 / 9:16 / both), thời lượng, tài sản thương hiệu (logo, màu, footage). Kỹ thuật dựng (engine, workflow, fps) tự đề xuất. **Không tự điền phong cách, hình chủ đạo, hiệu ứng, chuyển cảnh, SFX**: các trường đó do bước 1b ghi.
+
+1b. **Pitch sáng tạo: 3 styleframe, người dùng chọn bằng mắt (BẮT BUỘC).** Danh mục 8 hướng đạo diễn và 5 nhóm từ khoá ở `references/creative-directions.md` (sinh từ `data/directions.json`; mọi token là tên có thật trong HyperFrames, `directions.mjs check` kiểm).
+   - **Chọn 3 hướng tương phản:** `node $OV/scripts/make-pitch.mjs init --project . --topic "<chủ đề>" --aspect <…> --category <motion|explainer|3d|interactive|product|story-music> --energy <em|vua|don-dap> --duration <giây>`. Script chọn tất định một hướng *khớp chủ đề nhất*, một hướng *liền mạch không cắt*, một hướng *táo bạo*, tạo `pitch/<n>-<slug>/` (project HyperFrames trống) kèm `STYLEFRAME.md` và `RECIPES.md` cho từng hướng.
+   - **Dựng 3 styleframe ~3 giây** bằng chính chữ/khái niệm của người dùng: mỗi `pitch/<n>-*/index.html` viết theo `STYLEFRAME.md` và đọc hết `RECIPES.md` trước khi viết. Không lorem ipsum, không bịa số, không chữ ở 4 góc, chuyển động liên tục.
+   - **Render và trình bày:** `node $OV/scripts/make-pitch.mjs render --project .` → `pitch/1..3.mp4`, `pitch/sheet.jpg` (3 khung xếp 1·2·3), `pitch/PITCH.md` (menu số, 2 núm nhịp/tông màu, 3–4 từ khoá đổi được mỗi nhóm, nhãn tiếng Việt). Tự xem sheet và từng clip trước (chữ tràn, dấu, vùng an toàn; MOTION `FAIL` thì dựng lại), rồi **gửi PITCH.md + sheet.jpg + 3 clip cho người dùng và dừng chờ**. Trên Antigravity có thể nhúng ảnh/clip vào chat; trên mọi agent, menu số trong PITCH.md là đủ.
+   - **Ghi lựa chọn:** người dùng trả lời `2` hoặc `2, chuyển cảnh: lao-xuyen-tam, nhịp: em`. Chạy `node $OV/scripts/make-pitch.mjs choose --project . --pick 2 [--transition lao-xuyen-tam] [--energy em] [--style …] [--visual …] [--effect …] [--sfx …] [--palette …]`. Exit **3** = phối không hợp: hỏi người dùng **một lần** kèm lý do; họ vẫn giữ thì chạy lại với `--accept-warnings`. Script ghi vào `BRIEF.md`: `direction`, `direction_swaps`, `energy`, `palette`, `word_budget`, `music_only_s`, `creative_selection`, `styleframe` và mục `## creative_direction`.
+   - **Chạy không dừng:** chỉ khi người dùng nói rõ, dùng `choose --auto` (hướng 1, ghi `creative_selection: auto`) và vẫn gửi PITCH.md trong báo cáo cuối.
+   - Styleframe được chọn là **cảnh mở đầu** của video thật (dựng tiếp ở bước 6), không phải đồ bỏ đi.
 
 2. **Kịch bản: cổng viet-pro đầy đủ (BẮT BUỘC với mọi lời đọc/chữ trên hình tiếng Việt, kể cả video TikTok viral).** Làm theo `references/script-workflow.md`. `VP` = thư mục skill `viet-pro` (`setup-check.mjs` in đường dẫn; Claude Code `~/.claude/skills/viet-pro`, Codex `~/.agents/skills/viet-pro`). Chạy viet-pro ở mức **Chuẩn** (brief → soạn → rà sự thật/ngôn ngữ → bản cuối), không dùng mức Nhanh. Làm đủ (a)–(e) theo đúng thứ tự:
    - **(a) Đọc hết, không đọc lướt:** `$VP/SKILL.md`; toàn bộ `$VP/references/review/` (`lead.md`, `anti-ai.md`, `humanizer-patterns.md`, `natural.md`, `punctuation.md`, `capitalization.md`, `consistency.md`, `fact-check.md`); toàn bộ `$VP/references/editorial/` (`lead.md`, `hook-close.md`, `rhythm.md`, `story-core.md`, `debunk.md`, `emphasis.md`, `metaphor.md`, `reframe.md`, `technical.md`); và file kênh `$VP/references/publishing/video-script.md` (TikTok/Reels/Shorts/YouTube). Người dùng yêu cầu đọc đủ nên ở đây `humanizer-patterns.md` luôn được đọc toàn bộ, không chỉ khi có cụm dấu hiệu.
-   - **(b) Soạn** bảng 3 cột `Thời điểm | Voice-over (văn nói) | Visual / text trên hình` theo `video-script.md`, khoảng 2,5–3 từ/giây (60 giây ≈ 150–180 từ, đếm trước khi chốt). Chọn kỹ thuật theo loại video ở bảng trong `script-workflow.md`. Explainer, phản bác ngộ nhận hoặc có số liệu thì **bắt buộc kiểm chứng** theo `$VP/references/review/fact-check.md`, ghi `SOURCES.md`. Lưu bản nháp đầu thành `script-table.v1.md`.
+   - **(b) Soạn** bảng 3 cột `Thời điểm | Voice-over (văn nói) | Visual / text trên hình` theo `video-script.md`. **Hình dẫn, lời theo:** cột Visual viết theo hướng đã chọn ở bước 1b (`## creative_direction`: hình chủ đạo, luật chống slideshow), có ít nhất `music_only_s` giây chỉ nhạc và hình (Voice-over `—`), và toàn bộ lời đọc không vượt `word_budget` trong BRIEF (15 giây ≈ 22–30 từ tuỳ nhịp; cổng chặn nếu vượt). Không chia "mỗi câu một cảnh". Chọn kỹ thuật theo loại video ở bảng trong `script-workflow.md`. Explainer, phản bác ngộ nhận hoặc có số liệu thì **bắt buộc kiểm chứng** theo `$VP/references/review/fact-check.md`, ghi `SOURCES.md`. Lưu bản nháp đầu thành `script-table.v1.md`.
    - **(c) Lượt Humanizer/anti-AI có ghi chép:** rà theo `$VP/references/review/anti-ai.md` và đủ 25 pattern trong `humanizer-patterns.md`; pattern mạnh 1–5 sửa từ một lần xuất hiện, pattern yếu 6–25 chỉ sửa khi thành cụm. Liệt kê **từng pattern tìm thấy → câu gốc → cách sửa** (hoặc ghi rõ "không thấy pattern 1–5"). Tối đa hai vòng sửa. Sau đó đối chiếu dữ kiện: `node $VP/scripts/compare-preserved-content.mjs script-table.v1.md script-table.md --keep "<tên riêng>"` (MISMATCH phải xử lý).
    - **(d) Lint:** lưu bản cuối thành `script-table.md` (**không** đặt `script.md`, vì macOS coi `script.md` và `SCRIPT.md` là một file), tách lời vào `script/NN.txt` (mỗi file một câu đọc), rồi chạy `node $VP/scripts/lint-vietnamese-content.mjs script-table.md script/*.txt`. Sửa **hết ERROR** và mọi WARN đúng là lỗi văn phong (`oxford-comma`, `em-dash` trong lời đọc, `ai-label`, `chatbot-residue`, `staged-opener`, `contrast-formula-repeat`, `dramatic-closer-repeat`, `title-case`). Chỉ được giữ WARN do cú pháp bảng (`double-space`, gạch nối khoảng thời gian trong cột Thời điểm) hoặc tên riêng, và phải ghi lý do. Workflow HyperFrames chuyên biệt thì xuất thêm `SCRIPT.md` (`## Line N — … (Frame N)`).
    - **(e) Ghi biên bản** vào `BRIEF.md` (khuyên dùng) hoặc `script-table.md`, dưới heading `## viet_pro`:
@@ -82,9 +94,9 @@ Mỗi dự án có một thư mục riêng:
      - **Giọng người thật:** văn nói xưng "mình" với "bạn", câu ngắn chủ động, đọc thành tiếng phải trôi. Không trộn tiếng Anh khi không cần (`natural.md`), không chồng từ kiểu "đột phá, liền mạch, mạnh mẽ" (#12, #16). Số nói tròn, số chính xác đưa lên chữ trên hình.
      - **Không bịa trải nghiệm:** không viết "mình đã dùng 3 tháng", "mình test thử thấy…" hay kể chuyện ngôi thứ nhất nếu người dùng không cung cấp trải nghiệm đó (viet-pro: không bịa nhân vật, trải nghiệm, kết quả). Tự chứng minh (`story-core.md` 3.2) chỉ dùng với trải nghiệm thật của người dùng.
      - **CTA:** tối đa một hành động cụ thể và chỉ khi brief cần (`video-script.md`, `repurpose-matrix.md`). Không dùng câu mồi tương tác sáo như "like share follow", "comment 'X' để nhận", "follow để không bỏ lỡ", "tag một người bạn". Có thể kết bằng dữ kiện hoặc hành động thật ("mở Output, chọn Dashboards, hỏi đúng câu sếp vừa hỏi").
-     - `check-viet-pro.mjs` cảnh báo (WARN) khi gặp câu mồi, lời kể trải nghiệm ngôi thứ nhất hoặc lời đọc quá ~3 từ/giây; agent đọc từng cảnh báo và sửa hoặc ghi lý do giữ.
+     - `check-viet-pro.mjs` cảnh báo (WARN) khi gặp câu mồi, lời kể trải nghiệm ngôi thứ nhất hoặc lời đọc quá ~3 từ/giây; agent đọc từng cảnh báo và sửa hoặc ghi lý do giữ. Vượt `word_budget` của BRIEF là **FAIL**.
 
-3. **Storyboard.** Viết `STORYBOARD.md` từ bảng của viet-pro, cộng thêm khối `<structure>` trong brief: BPM, beat, mỗi beat một hành động, cột SFX. Trước khi viết, tra case gần nhất (**một lần mỗi dự án**, không chạy lại theo từng cảnh):
+3. **Storyboard.** Viết `STORYBOARD.md` từ bảng của viet-pro và hướng đã chọn, cộng thêm khối `<structure>` trong brief: BPM, beat, mỗi beat một hành động, cột blueprint/rule, cột seam nối sang beat sau, cột SFX (ưu tiên bảng SFX của hướng). Trước khi viết, tra case gần nhất (**một lần mỗi dự án**, không chạy lại theo từng cảnh):
    - **Chuẩn hoá brief:** tự viết `BRIEF.case-query.json` trong thư mục dự án, bằng **tiếng Anh**, chỉ lấy thông tin có trong brief của người dùng, **không bịa**. Trường nào brief không nói thì ghi `"not stated"`. `aspect` lấy đúng từ `BRIEF.md`.
      ```json
      {"video_type":"…","purpose":"…","topic":"…","industry":"…","aspect":"16:9|9:16|both",
@@ -116,7 +128,8 @@ Mỗi dự án có một thư mục riêng:
 
 4. **Engine.** Chọn theo `references/engine-selection.md`. Mặc định là HyperFrames. Ghi `engine`, `workflow`, `engine_reason` vào `BRIEF.md`. Nhiều biến thể của cùng một mẫu thì dùng `render --batch` của HyperFrames, không chuyển sang Remotion.
 
-4b. **Plan (BẮT BUỘC).** Viết `PLAN.md` theo mẫu trong `references/plan-demo.md`: Mục tiêu · Cảnh (bảng, mỗi cảnh một dòng) · Âm thanh · Engine · Khung hình demo (mỗi cảnh ít nhất một mốc giây cần xem) · Khung hình demo 9:16 (khi `aspect: both`) · QA.
+4b. **Plan (BẮT BUỘC).** Viết `PLAN.md` theo mẫu trong `references/plan-demo.md`: Mục tiêu · **Ý đồ sáng tạo** (Hướng, Style, Hình chủ đạo, Hiệu ứng, Chuyển cảnh, SFX, Luật chống slideshow) · Cảnh (bảng 7 cột: `# | Thời điểm | Lời đọc | Hình / hiệu ứng | Blueprint/Rule | Nối sang beat sau | Âm thanh`) · Âm thanh · Engine · Khung hình demo (mỗi cảnh ít nhất một mốc giây cần xem) · Khung hình demo 9:16 (khi `aspect: both`) · QA.
+   - Cổng sáng tạo chặn: blueprint/rule không có thật, hàng không nêu cách dựng, seam `fade`/`crossfade`/`cut`, seam mềm khi hướng không cho phép, tổng beat không lời < `music_only_s`.
    - **Cổng:** `node $OV/scripts/check-preflight.mjs --project . --stage plan` phải `PASS` (exit 0) **trước** khi tạo voice (bước 5) và dựng (bước 6).
    - Gửi tóm tắt plan cho người dùng. Người dùng đổi ý thì sửa `PLAN.md` và chạy lại cổng.
 
@@ -132,7 +145,9 @@ Mỗi dự án có một thư mục riêng:
    - Nhạc nền: `eleven.mjs music`. Nếu exit 3 (`MUSIC_UNAVAILABLE`) thì dùng `media-use resolve --type bgm`.
    - **Không** dùng TTS của media-use cho tiếng Việt.
 
-6. **Dựng.** Đọc `references/edit-method.md` trước khi viết STORYBOARD; chép mục "Sàn chất lượng" và "Kỷ luật GSAP" vào prompt frame worker.
+6. **Dựng.** Đọc `references/edit-method.md` trước khi viết STORYBOARD; chép mục "Sàn chất lượng", "Chống slideshow" và "Kỷ luật GSAP" vào prompt frame worker.
+   - **Bắt buộc gom công thức:** `node $OV/scripts/recipe-pack.mjs --project .` → `build/RECIPES.md` (blueprint, rule, seam mà PLAN.md khai, lấy nguyên văn từ HyperFrames). Đọc hết trước khi viết HTML; với frame worker thì chép vào prompt. Áp dụng cả khi dựng tay `general-video`. Cổng final chặn khi file này thiếu hoặc cũ hơn PLAN.md.
+   - Cảnh mở đầu dựng tiếp từ styleframe đã chọn (`styleframe:` trong BRIEF.md).
    - HyperFrames: gọi skill `hyperframes`. Vì đã có `BRIEF.md`, nó sẽ đi vào workflow ghi ở `workflow:`.
    - **Bắt buộc** chạy `hyperframes catalog --query "<hiệu ứng>"` trước khi tự viết hiệu ứng, và ưu tiên block hoặc blueprint đã chọn ở bước 3.
    - Workflow có frame preset (`build-frame.mjs`): kiểm tra font preset có đủ dấu tiếng Việt (`engine-selection.md`). Thiếu thì đổi sang Be Vietnam Pro và copy file font vào `assets/fonts/`.
@@ -144,8 +159,8 @@ Mỗi dự án có một thư mục riêng:
    - Áp dụng banned list trong brief.
 
 6b. **Khung hình demo (BẮT BUỘC trước video cuối).** Làm theo `references/plan-demo.md`:
-   - Chụp đúng các mốc trong `PLAN.md`: `node $OV/scripts/make-demo.mjs --project .` (bản 9:16: thêm `--aspect 9x16` và `--composition compositions/main-9x16.html`, hoặc `--hyperframes <project-9x16>` nếu là project riêng). Script ghi `demo/`, `demo/9x16/` và `DEMO.md` với `approval: pending`.
-   - Tự xem từng khung (đủ dấu, không tràn chữ, vùng an toàn, đúng nội dung cảnh), rồi **gửi các khung hình cho người dùng duyệt** và dừng chờ trả lời.
+   - Dự án có `direction:`: `node $OV/scripts/make-demo.mjs --project . --animatic` (bản 9:16: thêm `--aspect 9x16` và `--composition compositions/main-9x16.html`, hoặc `--hyperframes <project-9x16>` nếu là project riêng). Script render clip nháp toàn bộ `demo/animatic.mp4`, cắt đúng các mốc trong `PLAN.md`, ghép `demo/contact-sheet.jpg` và ghi `DEMO.md` (`animatic:` + `approval: pending`). Dự án `creative_override` chụp ảnh tĩnh như cũ (bỏ `--animatic`).
+   - Tự xem từng khung (đủ dấu, không tràn chữ, vùng an toàn, đúng nội dung cảnh) và chạy `qc-mp4.mjs demo/animatic.mp4 --project .` (MOTION không được FAIL), rồi **gửi clip nháp + contact sheet cho người dùng duyệt** và dừng chờ trả lời. Người dùng duyệt chuyển động, không chỉ ảnh tĩnh.
    - Có góp ý thì sửa và chụp lại. Người dùng đồng ý thì ghi `approval: <ai>, <khi nào>, "<lời đồng ý>"` vào `DEMO.md`. Chỉ khi người dùng đã nói rõ là chạy không dừng mới được ghi `approval: auto — <lý do và lời người dùng>`.
    - Kiểm: `node $OV/scripts/check-preflight.mjs --project . --stage final` phải `PASS`.
 
@@ -157,7 +172,7 @@ Mỗi dự án có một thư mục riêng:
    - Sau khi render, `render-final.mjs` thay tiếng bằng bản mix của `audio-mix.mjs` (ffmpeg), trừ khi composition có tiếng động (`data-fx-chain`, `data-automation`, tween volume…) thì giữ bản mix của HyperFrames. Script ghi kèm `<output>.render.json`.
    - **Chỉ đổi nhạc, SFX hay mức âm** thì không render lại hình: `node $OV/scripts/render-final.mjs --project ./ --audio-only renders/<cũ>.mp4 -- --output renders/<mới>.mp4` (9:16: thêm `-c compositions/main-9x16.html`). File âm thanh mới để trong `assets/voice/`, `assets/sfx/` hoặc `assets/bgm/`. Exit **6** là không đổi tiếng được (thiếu sidecar, hình đã đổi, tiếng động…), khi đó render đầy đủ.
 
-8. **QA.** Mọi bản render đều chạy `node $OV/scripts/qc-mp4.mjs renders/<name>.mp4 --project ./ --write-qa` trước; còn dòng FAIL (exit 1) thì sửa rồi render lại, WARN thì xem và ghi lý do vào `QA.md`. Sau đó làm theo `references/qa-checklist.md` § "Vòng QA tự xem video": lint + check → `video-lint.mjs` → render vN → `judge.mjs check`, từ v2 thêm `pair`. Ghi kết quả vào `QA.md`. Tối đa 3 vòng, sau đó dừng lại và báo người dùng kèm bằng chứng.
+8. **QA.** Mọi bản render đều chạy `node $OV/scripts/qc-mp4.mjs renders/<name>.mp4 --project ./ --write-qa` trước; còn dòng FAIL (exit 1) thì sửa rồi render lại, WARN thì xem và ghi lý do vào `QA.md`. Dòng `MOTION` FAIL (dự án có `direction:`) nghĩa là video gần như đứng yên kiểu slideshow: dựng lại các beat theo `build/RECIPES.md`, không nới ngưỡng. Sau đó làm theo `references/qa-checklist.md` § "Vòng QA tự xem video": lint + check → `video-lint.mjs` → render vN → `judge.mjs check`, từ v2 thêm `pair`. Ghi kết quả vào `QA.md`. Tối đa 3 vòng, sau đó dừng lại và báo người dùng kèm bằng chứng.
 
 9. **Caption khi giao (BẮT BUỘC với video tiếng Việt).** Viết hai caption, **Facebook cá nhân** và **TikTok**, qua đúng quy trình viet-pro đầy đủ như bước 2 (đọc thêm `$VP/references/publishing/facebook.md` và `$VP/references/publishing/repurpose-matrix.md`; soạn → lượt Humanizer có ghi chép → lint). Lưu chung một file `CAPTIONS.md` gồm hai mục `## Facebook cá nhân` và `## TikTok`; chi tiết ở mục 5 của `references/script-workflow.md`.
    - Cùng insight và số liệu với kịch bản, không thêm claim mới. Hook viết lại theo kênh, không copy câu mở của video.
@@ -183,6 +198,10 @@ Cần bản đăng theo từng nơi thì xuất từ bản final bằng `node $O
 | File | Dùng khi |
 |---|---|
 | `references/brief-template.md` | Bước 1: khung brief và ví dụ 15 giây |
+| `references/creative-directions.md` | Bước 1b: 8 hướng đạo diễn, 2 núm, 5 nhóm từ khoá đổi được, từ vựng chuyển cảnh (sinh từ `data/directions.json`) |
+| `scripts/directions.mjs` | Bước 0/1b: `check` (token có thật trong HyperFrames, cũng chạy trong setup-check), `pick` (3 hướng tương phản), `compat` (cảnh báo phối sai), `doc --write` |
+| `scripts/make-pitch.mjs` | Bước 1b: `init` (3 project styleframe + STYLEFRAME.md + RECIPES.md), `render` (3 clip, sheet.jpg, PITCH.md menu số), `choose` (ghi BRIEF, exit 3 khi phối sai) |
+| `scripts/recipe-pack.mjs` | Bước 6 (và 1b): gom blueprint/rule/seam theo PLAN.md hoặc theo hướng thành `build/RECIPES.md` |
 | `references/pattern-library.md` | Bước 3: công thức theo 6 nhóm video |
 | `references/script-workflow.md` | Bước 2 và 9: cổng viet-pro đầy đủ, kỹ thuật theo loại video, kiểm chứng, lint, TikTok viral, `CAPTIONS.md` |
 | `scripts/check-viet-pro.mjs` | Bước 2 (`--stage script`, trước voice/render) và bước 9 (`--stage delivery`): biên bản `## viet_pro`, `script-table.v1.md` + compare, lint viet-pro từng file và `SCRIPT.md`, caption FB + TikTok; `voice_source: clip` lint phụ đề + chữ trên hình thay kịch bản; `--jev-audit` tuỳ chọn (chỉ WARN) |
@@ -191,17 +210,17 @@ Cần bản đăng theo từng nơi thì xuất từ bản final bằng `node $O
 | `references/qa-checklist.md` | Bước 8: đo bằng lệnh, xem frame, nghe |
 | `references/plan-demo.md` | Bước 4b, 6b, 7: mẫu `PLAN.md`, chụp và duyệt demo, `DEMO.md`, render bản cuối |
 | `scripts/setup-check.mjs` | Bước 0: đủ công cụ, skill, key chưa (`READY` / `NOT READY` + lệnh sửa theo hệ điều hành) |
-| `scripts/check-preflight.mjs` | Bước 4b (`--stage plan`) và 6b (`--stage final`): cổng plan + demo + duyệt |
-| `scripts/make-demo.mjs` | Bước 6b: chụp khung hình demo theo `PLAN.md`, ghi `DEMO.md`; `--from-video` cắt từ bản nháp người dùng đã xem |
+| `scripts/check-preflight.mjs` | Bước 4b (`--stage plan`) và 6b (`--stage final`): cổng plan + demo + duyệt; cổng sáng tạo (Ý đồ sáng tạo, blueprint/rule có thật, seam mỗi beat, beat không lời, animatic không đứng yên, RECIPES.md) |
+| `scripts/make-demo.mjs` | Bước 6b: chụp khung hình demo theo `PLAN.md`, ghi `DEMO.md`; `--animatic` render clip nháp toàn bộ + contact sheet (bắt buộc với dự án có `direction:`); `--from-video` cắt từ bản nháp người dùng đã xem |
 | `scripts/render-final.mjs` | Bước 7: render bản giao (`--quality delivery`) chỉ khi cổng final PASS (exit 5 nếu chặn), mix lại tiếng bằng `audio-mix.mjs` và ghi `<output>.render.json`; `--audio-only <cũ.mp4>` chỉ thay tiếng, giữ hình (exit 6 nếu không thay được) |
 | `scripts/audio-mix.mjs` | Bước 7 (do `render-final` gọi): dựng lại tiếng của composition thành một WAV bằng ffmpeg từ các thuộc tính audio tĩnh; `--dry-run` in lệnh ffmpeg |
-| `scripts/qc-mp4.mjs` | Bước 8: kiểm kỹ thuật file MP4 (khổ hình, thời lượng, khung đen, đứng hình, khoảng lặng, loudness, true peak, bitrate); `--write-qa` ghi vào `QA.md`, exit 1 khi có FAIL |
+| `scripts/qc-mp4.mjs` | Bước 8: kiểm kỹ thuật file MP4 (khổ hình, thời lượng, khung đen, đứng hình, khoảng lặng, loudness, true peak, bitrate, MOTION chống slideshow); `--write-qa` ghi vào `QA.md`, exit 1 khi có FAIL |
 | `scripts/export.mjs` | Sau bước 9: bản giao theo nơi đăng (`zalo`, `youtube`, `tiktok`, `facebook`) kèm thumbnail từ khung demo đã duyệt; exit 5 nếu cổng final chặn |
 | `scripts/skill-paths.mjs` | Tìm skill trên mọi agent (Claude Code, Codex, Antigravity, workspace) |
 | `scripts/replace-in-file.mjs` | Thay chuỗi trong file bằng regex, chạy được mọi hệ điều hành (thay `sed -i`) |
 | `scripts/eleven.mjs` | `doctor`, `voice-info`, `models`, `tts`, `sfx`, `music`, `probe-models`, `audio-meta`; `tts`/`audio-meta` qua cổng viet-pro (`scripts/voice-gate.mjs`, exit 4) |
 | `references/edit-method.md` | Bước 3 và 6: chức năng câu → hình, sàn chất lượng, GSAP, SFX |
-| `scripts/video-lint.mjs` | Bước 8: lowercase, chữ nhỏ, vùng UI 9:16, nhãn rào đón (`HEDGE_LABEL`) |
+| `scripts/video-lint.mjs` | Bước 8: lowercase, chữ nhỏ, vùng UI 9:16, nhãn rào đón (`HEDGE_LABEL`), báo sớm `SLIDESHOW_MOTION` (WARN) |
 | `scripts/judge.mjs` | Bước 8: `check`/`pair`; exit 3–4 → QA ảnh tĩnh |
 | `references/footage-lane.md` | Nhánh footage thật (beta): transcribe, probe, EDL, ghép |
 | `scripts/cut.mjs` | `probe` (khoảng lặng an toàn), `apply-edl` (ghép theo danh sách cắt) |

@@ -15,7 +15,15 @@
 //   LOUDNESS   WARN integrated loudness (ebur128) outside [-16, -12] LUFS
 //   TRUE_PEAK  WARN above -1 dBFS · FAIL above 0 dBFS
 //   BITRATE    WARN above 12 Mbit/s (not compressed yet, run export.mjs)
-// --project <dir>  read <dir>/BRIEF.md frontmatter (aspect, duration_s).
+//   MOTION     frame-to-frame change (signalstats YDIF at 360px wide, 30 fps): `still` = share of
+//              frames with YDIF < 0.5, `peak` = 90th percentile YDIF. A slideshow is static AND
+//              never moves hard. Calibration (2026-10-14): slideshow fixture still 70% / peak 1.11;
+//              creative 10s reference 25% / 7.0; three pitch styleframes 52–61% / 2.7–12.
+//              Creative flow (BRIEF `direction:` and no `creative_override`): FAIL when still ≥ 60%
+//              and peak < 1.5 (em: ≥ 75% and < 1.0); WARN when still ≥ 45% or peak < 2.0 (em: ≥ 60%
+//              or < 1.2). Otherwise WARN at the FAIL line only. Fix by building beats with
+//              continuous motion (build/RECIPES.md).
+// --project <dir>  read <dir>/BRIEF.md frontmatter (aspect, duration_s, direction, energy).
 // --write-qa       append a "## qc-mp4 <file> <YYYY-MM-DD HH:mm>" block to <project>/QA.md
 //                  (created if missing); needs --project.
 // --json           print the result array as JSON instead of lines.
@@ -32,8 +40,36 @@ import { frontmatter } from "./check-viet-pro.mjs";
 export const LIMITS = {
   blackStart: 0.1, blackTail: 0.2, freezeMin: 2, silenceMin: 1.5, silentFileSlack: 0.25,
   durationTol: 0.1, loudLow: -16, loudHigh: -12, peakWarn: -1, peakFail: 0, bitrateMax: 12e6,
+  stillYdif: 0.5,
+  motionFail: { default: { still: 0.6, peak: 1.5 }, em: { still: 0.75, peak: 1.0 } },
+  motionWarn: { default: { still: 0.45, peak: 2.0 }, em: { still: 0.6, peak: 1.2 } },
 };
+export const MOTION_VF = "scale=360:-2,fps=30,signalstats,metadata=print:key=lavfi.signalstats.YDIF";
 export const SIZES = { "16:9": [1920, 1080], "9:16": [1080, 1920] };
+
+// metadata=print lines "lavfi.signalstats.YDIF=0.12" → { frames, still, ratio, peak } (first frame
+// has no previous frame and is skipped; peak = 90th percentile YDIF); null when nothing printed.
+export function parseMotion(stderr) {
+  const v = [...String(stderr).matchAll(/lavfi\.signalstats\.YDIF=(-?\d+(?:\.\d+)?)/g)].map((m) => Number(m[1])).slice(1);
+  if (!v.length) return null;
+  const still = v.filter((x) => x < LIMITS.stillYdif).length;
+  const sorted = [...v].sort((a, b) => a - b);
+  return { frames: v.length, still, ratio: still / v.length, peak: sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.9))] };
+}
+
+// → { level: PASS|WARN|FAIL, detail } for a motion measurement and BRIEF frontmatter (or null).
+export function motionVerdict(motion, brief) {
+  if (!motion) return { level: "WARN", detail: "không đo được chuyển động (signalstats)" };
+  const creative = !!(brief && brief.direction && !brief.creative_override);
+  const key = brief && String(brief.energy || "").trim() === "em" ? "em" : "default";
+  const fail = LIMITS.motionFail[key], warn = LIMITS.motionWarn[key];
+  const pct = (x) => `${Math.round(x * 100)}%`;
+  const peak = Number(motion.peak) || 0;
+  const detail = `${pct(motion.ratio)} khung gần như đứng yên (${motion.still}/${motion.frames}), đỉnh chuyển động ${peak.toFixed(2)}; ngưỡng ${creative ? `FAIL ≥${pct(fail.still)} và đỉnh <${fail.peak}, WARN ≥${pct(warn.still)} hoặc đỉnh <${warn.peak}` : `WARN ≥${pct(fail.still)} và đỉnh <${fail.peak} (chưa có direction)`}`;
+  if (motion.ratio >= fail.still && peak < fail.peak) return { level: creative ? "FAIL" : "WARN", detail: `${detail} — trông như slideshow, dựng lại beat có chuyển động liền mạch (build/RECIPES.md)` };
+  if (creative && (motion.ratio >= warn.still || peak < warn.peak)) return { level: "WARN", detail };
+  return { level: "PASS", detail };
+}
 
 const num = (s) => (/^-?inf$/i.test(s) ? (s.startsWith("-") ? -Infinity : Infinity) : Number(s));
 const NUM = "(-?inf|-?\\d+(?:\\.\\d+)?(?:e[-+]?\\d+)?)";
@@ -140,6 +176,7 @@ export function evaluate(metrics, brief, duration) {
   const br = Number(m.bitRate);
   if (!(br > 0)) add("BITRATE", "PASS", "không đọc được bit_rate");
   else add("BITRATE", br > L.bitrateMax ? "WARN" : "PASS", `${fmt(br / 1e6)} Mbit/s${br > L.bitrateMax ? " (chưa nén, chạy export.mjs)" : ""}`);
+  if (m.hasVideo && "motion" in m) { const v = motionVerdict(m.motion, brief); add("MOTION", v.level, v.detail); }
   return out;
 }
 
@@ -175,9 +212,10 @@ export function measure(file, run = spawnSync) {
     return String(r.stderr);
   };
   if (v) {
-    const err = ff(["-map", `0:${v.index}`, "-vf", `blackdetect=d=0.2:pix_th=0.1,freezedetect=n=0.003:d=${LIMITS.freezeMin}`, "-an"]);
+    const err = ff(["-map", `0:${v.index}`, "-vf", `blackdetect=d=0.2:pix_th=0.1,freezedetect=n=0.003:d=${LIMITS.freezeMin},${MOTION_VF}`, "-an"]);
     metrics.black = parseBlack(err);
     metrics.freeze = parseFreeze(err, duration);
+    metrics.motion = parseMotion(err);
   }
   if (a) {
     const err = ff(["-map", `0:${a.index}`, "-af", `silencedetect=noise=-50dB:d=${LIMITS.silenceMin},ebur128=peak=true:framelog=verbose`, "-vn"]);
@@ -185,6 +223,14 @@ export function measure(file, run = spawnSync) {
     metrics.ebur = parseEbur(err);
   }
   return { metrics, duration };
+}
+
+// Motion only (one ffmpeg pass) → parseMotion result; throws when ffmpeg fails.
+export function measureMotion(file, run = spawnSync) {
+  const r = run("ffmpeg", ["-hide_banner", "-nostats", "-i", resolve(file), "-an", "-vf", MOTION_VF, "-f", "null", "-"], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
+  if (r.error) throw new Error(`cannot run ffmpeg: ${r.error.message}`);
+  if (r.status !== 0) throw new Error(`ffmpeg failed on ${file}: ${String(r.stderr).trim().split(/\r?\n/).slice(-2).join(" | ")}`);
+  return parseMotion(r.stderr);
 }
 
 export function readBrief(project) {

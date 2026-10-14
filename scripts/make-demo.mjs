@@ -2,7 +2,7 @@
 // make-demo.mjs — capture the demo frames that PLAN.md asks for and (re)write DEMO.md with
 // `approval: pending`. Show the frames to the user, then record their answer in DEMO.md
 // (`approval: <who, when, what>`); render-final.mjs refuses the final render until then.
-//   node make-demo.mjs [--project .] [--hyperframes <dir>] [--composition <file>] [--aspect 9x16]
+//   node make-demo.mjs [--project .] [--hyperframes <dir>] [--composition <file>] [--aspect 9x16] [--animatic]
 //   node make-demo.mjs [--project .] --from-video <draft.mp4> [--aspect 9x16]
 //   node make-demo.mjs --help | -h
 // Timestamps: "## Khung hình demo" (or "## Khung hình demo 9:16" with --aspect 9x16) in PLAN.md.
@@ -15,6 +15,12 @@
 //   - --from-video <mp4>: cut the frames from a draft render the user already watched (no new
 //     render). The MP4 must be newer than index.html and compositions/*.html, so it shows the current
 //     composition. DEMO.md records the source, so the approval can cite that draft.
+//   - --animatic: render the whole composition at `--quality draft` to demo/animatic.mp4 (or
+//     demo/9x16/animatic.mp4), keep it, cut the PLAN.md frames from it and tile them into
+//     contact-sheet.jpg. DEMO.md gets `animatic: <path>` (`animatic_9x16:` with --aspect 9x16).
+//     The user approves this MOTION draft, not just stills; check-preflight --stage final requires
+//     it for creative projects (BRIEF `direction:`) and measures its motion (qc-mp4 MOTION).
+//     Works with --composition and --hyperframes.
 // Exit: 0 frames captured · 1 capture failed · 2 bad usage / PLAN.md missing timestamps.
 
 import { existsSync, readFileSync, writeFileSync, readdirSync, rmSync, mkdirSync, mkdtempSync, realpathSync, statSync } from "node:fs";
@@ -29,14 +35,27 @@ const WIN = process.platform === "win32";
 const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { stdio: "inherit", shell: WIN && cmd === "npx", ...opts });
 
 // Rewrite DEMO.md: keep any free text above "## Frames", replace the frame list, reset approval.
-export function writeDemoMd(project, frames, label, source = "") {
+export function writeDemoMd(project, frames, label, source = "", animatic = "") {
   const p = join(project, "DEMO.md");
   const old = existsSync(p) ? readFileSync(p, "utf8") : "";
-  const head = old.split(/^## Frames/m)[0].replace(/^\s*[-*]?\s*approval:.*$/gim, "").trimEnd() || "# DEMO";
+  const key = label === "9:16" ? "animatic_9x16" : "animatic";
+  const kept = Object.fromEntries([...old.matchAll(/^\s*[-*]?\s*(animatic(?:_9x16)?):\s*(\S.*)$/gim)].map((m) => [m[1].toLowerCase(), m[2].trim()]));
+  if (animatic) kept[key] = animatic; else delete kept[key];
+  const head = old.split(/^## Frames/m)[0].replace(/^\s*[-*]?\s*(?:approval|animatic(?:_9x16)?):.*$/gim, "").trimEnd() || "# DEMO";
   const keep = (old.split(/^## Frames/m)[1] || "").split(/\r?\n/).filter((l) => l.trim() && !l.includes(`(${label})`) && /^\s*-\s/.test(l));
   const list = [...keep, ...frames.map((f) => `- ${f} (${label})`)];
   const head2 = head.replace(/^\s*source:.*$/gim, "").trimEnd();
-  writeFileSync(p, `${head2}\n\n${source ? `source: ${source}\n` : ""}approval: pending\n\n## Frames\n\n${list.join("\n")}\n`);
+  const anim = ["animatic", "animatic_9x16"].filter((k) => kept[k]).map((k) => `${k}: ${kept[k]}\n`).join("");
+  writeFileSync(p, `${head2}\n\n${source ? `source: ${source}\n` : ""}${anim}approval: pending\n\n## Frames\n\n${list.join("\n")}\n`);
+}
+
+// Tile PNG frames side by side into one JPEG (best effort; returns false when ffmpeg fails).
+export function contactSheet(pngs, out) {
+  if (!pngs.length) return false;
+  const args = ["-v", "error", "-y", ...pngs.flatMap((f) => ["-i", f]), "-filter_complex",
+    `${pngs.map((_, i) => `[${i}:v]scale=-2:640[v${i}]`).join(";")};${pngs.map((_, i) => `[v${i}]`).join("")}hstack=inputs=${pngs.length}`, "-frames:v", "1", "-q:v", "3", out];
+  if (pngs.length === 1) args.splice(args.indexOf("-filter_complex"), 2, "-vf", "scale=-2:640");
+  return spawnSync("ffmpeg", args, { stdio: "ignore" }).status === 0;
 }
 
 // One PNG per timestamp, cut from an MP4 with ffmpeg.
@@ -54,9 +73,11 @@ function parseArgs(argv) {
     const a = argv[i];
     if (["--project", "--hyperframes", "--composition", "--aspect"].includes(a)) o[a.slice(2)] = argv[++i];
     else if (a === "--from-video") o.fromVideo = argv[++i];
+    else if (a === "--animatic") o.animatic = true;
     else return { bad: `unknown argument ${a}` };
   }
   if (o.fromVideo && o.composition) return { bad: "--from-video and --composition are exclusive" };
+  if (o.fromVideo && o.animatic) return { bad: "--from-video and --animatic are exclusive (an animatic is a fresh full draft render)" };
   if (o.aspect && o.aspect !== "9x16") return { bad: "--aspect only accepts 9x16" };
   return o;
 }
@@ -76,7 +97,15 @@ export function main(argv = process.argv.slice(2)) {
   for (const f of readdirSync(outDir)) if (/^frame-.*\.png$/i.test(f)) rmSync(join(outDir, f));
   const hf = resolve(o.hyperframes || project);
 
-  if (o.fromVideo) {
+  let animatic = "";
+  if (o.animatic) {
+    const mp4 = join(outDir, "animatic.mp4");
+    const args = ["hyperframes", "render", ...(o.composition ? ["-c", o.composition] : []), "--quality", "draft", "-o", mp4];
+    const r = run("npx", args, { cwd: hf });
+    if (r.status !== 0 || !existsSync(mp4)) { console.error("make-demo: animatic render failed"); return 1; }
+    try { cutFrames(mp4, times, outDir); } catch (e) { console.error(`make-demo: ${e.message}`); return 1; }
+    animatic = relative(project, mp4).split("\\").join("/");
+  } else if (o.fromVideo) {
     const mp4 = resolve(o.fromVideo);
     if (!existsSync(mp4)) { console.error(`make-demo: ${o.fromVideo} not found`); return 2; }
     const comp = existsSync(join(hf, "compositions")) ? readdirSync(join(hf, "compositions")).filter((f) => f.endsWith(".html")).map((f) => join(hf, "compositions", f)) : [];
@@ -97,8 +126,10 @@ export function main(argv = process.argv.slice(2)) {
     finally { rmSync(tmp, { recursive: true, force: true }); }
   }
   const frames = readdirSync(outDir).filter((f) => /^frame-.*\.png$/i.test(f)).sort().map((f) => relative(project, join(outDir, f)).split("\\").join("/"));
-  writeDemoMd(project, frames, o.aspect ? "9:16" : "main", o.fromVideo ? relative(project, resolve(o.fromVideo)).split("\\").join("/") : "");
-  console.log(`make-demo: ${frames.length} frames → ${relative(project, outDir) || "."}/ · DEMO.md approval reset to pending`);
+  writeDemoMd(project, frames, o.aspect ? "9:16" : "main", o.fromVideo ? relative(project, resolve(o.fromVideo)).split("\\").join("/") : "", animatic);
+  const sheet = join(outDir, "contact-sheet.jpg");
+  const sheetOk = contactSheet(frames.map((f) => join(project, f)), sheet);
+  console.log(`make-demo: ${frames.length} frames → ${relative(project, outDir) || "."}/${animatic ? ` · animatic ${animatic}` : ""}${sheetOk ? ` · ${relative(project, sheet).split("\\").join("/")}` : ""} · DEMO.md approval reset to pending`);
   console.log("Next: show these frames (and demo/contact-sheet.jpg if present) to the user, then write their answer as `approval: …` in DEMO.md.");
   return 0;
 }

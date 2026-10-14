@@ -166,7 +166,7 @@ Agent nào cũng có thể chọn skill tự động khi bạn nói muốn làm 
 | 8 | QA (tối đa 3 vòng) | `QA.md` |
 | 9 | Caption Facebook + TikTok | `check-viet-pro.mjs --stage delivery` → `PASS` |
 
-Kết quả nằm trong thư mục dự án: `BRIEF.md`, `script-table.md`, `STORYBOARD.md`, `PLAN.md`, `demo/*.png`, `DEMO.md`, `renders/*.mp4`, `QA.md`, `CAPTIONS.md`.
+Kết quả nằm trong thư mục dự án: `pitch/PITCH.md` + `pitch/sheet.jpg`, `BRIEF.md`, `script-table.md`, `STORYBOARD.md`, `PLAN.md`, `demo/*.png`, `DEMO.md`, `renders/*.mp4`, `QA.md`, `CAPTIONS.md`.
 
 Agent không tự đăng video hay caption lên mạng xã hội.
 
@@ -178,8 +178,11 @@ Mọi script đều có `--help` / `-h` (in phần mô tả đầu file, thoát 
 |---|---|
 | `scripts/setup-check.mjs` | Kiểm đủ công cụ, skill, key; in lệnh sửa theo hệ điều hành |
 | `scripts/skill-paths.mjs` | Tìm skill trong thư mục của mọi agent (dùng chung cho các script khác) |
-| `scripts/check-preflight.mjs` | Cổng plan (`--stage plan`) và demo + duyệt (`--stage final`) |
-| `scripts/make-demo.mjs` | Chụp khung hình demo theo `PLAN.md` (`hyperframes snapshot`, hoặc render nháp + ffmpeg cho composition 9:16), ghi `DEMO.md`; `--from-video <mp4>` cắt khung từ bản nháp người dùng đã xem |
+| `scripts/directions.mjs` | 8 hướng đạo diễn và từ khoá (`data/directions.json`): `check` token có thật trong HyperFrames, `pick` 3 hướng tương phản, `compat` cảnh báo phối sai, `doc --write` sinh `references/creative-directions.md` |
+| `scripts/make-pitch.mjs` | Bước 1b: `init` 3 project styleframe theo chủ đề, `render` 3 clip + `sheet.jpg` + `PITCH.md` (menu số), `choose` ghi hướng người dùng chọn vào `BRIEF.md` |
+| `scripts/recipe-pack.mjs` | Gom blueprint/rule/seam (PLAN.md hoặc một hướng) thành `build/RECIPES.md` để dựng theo công thức thật |
+| `scripts/check-preflight.mjs` | Cổng plan (`--stage plan`) và demo + duyệt (`--stage final`); cổng sáng tạo khi BRIEF có `direction:` |
+| `scripts/make-demo.mjs` | Chụp khung hình demo theo `PLAN.md` (`hyperframes snapshot`, hoặc render nháp + ffmpeg cho composition 9:16), ghi `DEMO.md`; `--animatic` render clip nháp toàn bộ + contact sheet; `--from-video <mp4>` cắt khung từ bản nháp người dùng đã xem |
 | `scripts/render-final.mjs` | Render bản giao `--quality delivery` sau khi cổng final PASS (exit 5 nếu chặn) |
 | `scripts/replace-in-file.mjs` | Thay chuỗi bằng regex, thay cho `sed -i` (khác nhau giữa macOS và Linux) |
 | `scripts/eleven.mjs` | `doctor`, `tts`, `sfx`, `music`, `audio-meta` (cầu nối sang workflow HyperFrames) |

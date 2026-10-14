@@ -21,13 +21,14 @@ Vì vậy khi một bước hỏng, câu hỏi đầu tiên là bước đó thu
 
 ### 1.2 Cổng là cưỡng chế, không phải lời khuyên
 
-Ba cổng không được bỏ qua, theo thứ tự:
+Bốn cổng không được bỏ qua, theo thứ tự:
 
 | Cổng | Script | Chặn cái gì |
 |---|---|---|
-| Kịch bản viet-pro (bước 2) | `check-viet-pro.mjs` | Tạo giọng và render khi kịch bản chưa qua quy trình viet-pro đầy đủ |
-| Plan (bước 4b) | `check-preflight.mjs --stage plan` | Tạo giọng và dựng khi chưa có `PLAN.md` đủ mục |
-| Demo đã duyệt (bước 6b) | `check-preflight.mjs --stage final` | Render bản giao khi chưa có khung hình demo mới hơn plan và lời duyệt |
+| Hướng đạo diễn chọn bằng mắt (bước 1b) | `make-pitch.mjs` + `check-preflight.mjs` | Plan và dựng khi BRIEF chưa có `direction:` (người dùng chọn 1 trong 3 styleframe theo chủ đề), trừ dự án footage có `creative_override` |
+| Kịch bản viet-pro (bước 2) | `check-viet-pro.mjs` | Tạo giọng và render khi kịch bản chưa qua quy trình viet-pro đầy đủ, hoặc lời đọc vượt `word_budget` (hình dẫn, lời theo) |
+| Plan (bước 4b) | `check-preflight.mjs --stage plan` | Tạo giọng và dựng khi chưa có `PLAN.md` đủ mục; với dự án có `direction:`: thiếu `## Ý đồ sáng tạo`, blueprint/rule bịa, beat nối bằng `fade`/`crossfade`, thiếu beat chỉ có nhạc |
+| Clip nháp đã duyệt (bước 6b) | `check-preflight.mjs --stage final` | Render bản giao khi chưa có khung hình demo mới hơn plan và lời duyệt; với dự án có `direction:`: thiếu `animatic`, animatic đứng yên kiểu slideshow (qc-mp4 MOTION), thiếu `build/RECIPES.md` |
 
 Hai script khác tự gọi lại cổng nên không thể đi đường vòng. `eleven.mjs tts` và `audio-meta` chạy cổng viet-pro qua `voice-gate.mjs` trước khi gọi API, chặn thì thoát mã 4. `render-final.mjs` chạy `check-preflight --stage final` trước khi render, chặn thì thoát mã 5. Bản giao cuối chỉ có một đường ra là `render-final.mjs`.
 

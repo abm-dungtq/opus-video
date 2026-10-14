@@ -1,6 +1,10 @@
 # Brief template
 
-Điền brief này vào `<project>/BRIEF.md` trước khi dựng. Thứ tự các khối lấy theo cấu trúc chung của những prompt Opus 5.5 hiệu quả nhất trong corpus (xem `pattern-library.md`). Chỉ hỏi người dùng các trường không suy ra được: chủ đề, aspect, thời lượng. Các trường còn lại tự đề xuất rồi ghi rõ là "đề xuất".
+Điền brief này vào `<project>/BRIEF.md` trước khi dựng. Thứ tự các khối lấy theo cấu trúc chung của những prompt Opus 5.5 hiệu quả nhất trong corpus (xem `pattern-library.md`).
+
+**Hỏi người dùng (bước 1):** chủ đề, aspect, thời lượng, tài sản thương hiệu (logo, màu, footage). Kỹ thuật dựng (engine, workflow, fps, BPM) agent tự đề xuất và ghi rõ là "đề xuất".
+
+**Không tự đề xuất phong cách.** Phong cách, hình chủ đạo, hiệu ứng, chuyển cảnh và SFX do người dùng chọn **bằng mắt** ở bước 1b (`make-pitch.mjs`: 3 styleframe theo chủ đề). `make-pitch.mjs choose` ghi các trường `direction` … `styleframe` và mục `## creative_direction`; agent không gõ tay các trường này. Chỉ khi người dùng nói rõ là chạy không dừng thì mới dùng `choose --auto` (ghi `creative_selection: auto`). Dự án chỉ cắt footage, không dựng hình mới, có thể đặt `creative_override: <lý do ≥10 ký tự>` thay cho bước 1b.
 
 ```markdown
 ---
@@ -14,6 +18,15 @@ language: vi
 voice_source: <tts | clip>   # clip: lời nói lấy từ clip của người dùng, cổng viet-pro lint phụ đề + chữ trên hình
 voice_id: eGSd0uV8dNQnZuEEX9lu
 tts_model: eleven_v4
+# ↓ make-pitch.mjs choose ghi (bước 1b); không gõ tay
+direction: <A1..A8>
+direction_swaps: <none | transition=lao-xuyen-tam; style=…>
+energy: <em | vua | don-dap>
+palette: <toi | sang | thuong-hieu>
+word_budget: <số từ tối đa của toàn bộ lời đọc>
+music_only_s: <số giây tối thiểu chỉ có nhạc và hình>
+creative_selection: <user | auto>
+styleframe: pitch/<n>-<slug>/index.html
 ---
 
 <inputs>
@@ -28,23 +41,25 @@ tts_model: eleven_v4
 - Quy trình bắt buộc: build → render → inspect → refine. Không dừng ở storyboard, ảnh tĩnh hay kế hoạch.
 </deliverables>
 
+## creative_direction
+(make-pitch.mjs choose ghi mục này: hướng, style, blueprint/rule, chuyển cảnh, SFX, ngân sách lời, luật chống slideshow, styleframe mở đầu)
+
 <art_direction>
-- Bảng màu (3–5 mã hex): nền #…, chữ #…, nhấn #…
-- Font: 1 sans chính (vd. Be Vietnam Pro, Inter, Geist; phải có đủ dấu tiếng Việt) + tuỳ chọn 1 serif/mono
-- Cảm giác: <2–4 tính từ>
-- Banned: crossfade vô cớ, glow/bokeh trang trí, particle thừa, chữ chiếm quá nửa khung, thời gian chết > 1s, giao diện kiểu template
+- Bảng màu (3–5 mã hex) lấy theo style/preset của hướng đã chọn và `palette`: nền #…, chữ #…, nhấn #…
+- Font: 1 sans chính có đủ dấu tiếng Việt (vd. Be Vietnam Pro) + tuỳ chọn 1 serif/mono
+- Banned: thẻ trượt lên rồi mờ dần, cảnh cũ mờ hết rồi cảnh mới mới hiện (exit-then-enter), crossfade vô cớ, glow/bokeh trang trí, particle thừa, chữ/khung trang trí ở 4 góc, thời gian chết > 1s, giao diện kiểu template
 </art_direction>
 
 <structure>
-- BPM: <vd. 100–120> · tổng beat: <duration_s × BPM / 60>
-- Storyboard (mỗi beat có 1 hành động):
-  | Thời điểm | Voice-over | Hình / chữ trên hình | Chuyển động | SFX |
-  | 0.00–3.00 | hook | … | … | whoosh |
+- BPM: <vd. 100–128> · tổng beat: <duration_s × BPM / 60>
+- Storyboard theo **hình** trước, lời gắn vào sau (mỗi beat có 1 hành động; có beat chỉ nhạc và hình):
+  | Thời điểm | Voice-over | Hình (blueprint/rule) | Nối sang beat sau (seam) | SFX |
+  | 0.00–1.50 | — | … | zoom-through | whoosh |
 </structure>
 
 <audio>
-- Lời đọc: lấy từ script-table.md (viet-pro), khoảng 2,5–3 từ/giây
-- SFX cue: <thời điểm → mô tả tiếng Anh ngắn>
+- Lời đọc: lấy từ script-table.md (viet-pro), không vượt `word_budget`
+- SFX cue: <thời điểm → mô tả tiếng Anh ngắn>, ưu tiên bảng SFX của hướng đã chọn
 - Nhạc nền: <mood, BPM, không lời>, ducking dưới giọng (xem audio-pipeline.md)
 </audio>
 
@@ -53,18 +68,26 @@ Xem `qa-checklist.md`. Ghi kết quả vào `<project>/QA.md`.
 </qa>
 ```
 
-## Ví dụ: explainer 15 giây
+## Ví dụ: explainer 15 giây (hướng A6, liền mạch)
 
 ```markdown
 ---
 workflow: general-video
 engine: hyperframes
-engine_reason: explainer không footage, typography + sơ đồ đơn giản; dựng tay để giữ voice ElevenLabs tiếng Việt
-aspect: both
+engine_reason: explainer không footage; dựng tay để giữ voice ElevenLabs tiếng Việt, công thức lấy từ build/RECIPES.md
+aspect: 9:16
 duration_s: 15
 fps: 30
 voice_id: eGSd0uV8dNQnZuEEX9lu
 tts_model: eleven_v4
+direction: A6
+direction_swaps: transition=lao-xuyen-tam
+energy: vua
+palette: sang
+word_budget: 26
+music_only_s: 2
+creative_selection: user
+styleframe: pitch/1-live-data-simulation/index.html
 ---
 
 <inputs>
@@ -73,30 +96,18 @@ tts_model: eleven_v4
 - Tài sản: không
 </inputs>
 
-<deliverables>
-- renders/sky-16x9.mp4 (1920×1080) và renders/sky-9x16.mp4 (1080×1920), 30 fps, 15 giây
-- Project HyperFrames trong thư mục dự án
-- build → render → inspect → refine
-</deliverables>
-
-<art_direction>
-- Màu: nền #0B1B2B, chữ #F4F1EA, nhấn #4DA3FF, phụ #FFB347
-- Font: Be Vietnam Pro 800 cho tiêu đề, 500 cho chữ phụ
-- Cảm giác: trong trẻo, khoa học, gọn
-- Banned: glow, particle trang trí, chữ chạy marquee
-</art_direction>
-
 <structure>
-- BPM 100 → 25 beat
-  | 0.0–3.0 | Hook: "Vì sao trời lại xanh?" | chữ lớn rơi vào khung, bầu trời gradient | mask reveal | whoosh |
-  | 3.0–9.0 | Ánh sáng trắng gồm nhiều màu… | tia sáng tách phổ, chạm phân tử khí | line draw | soft click |
-  | 9.0–13.0 | Màu xanh bị tán xạ mạnh nhất | sóng xanh dội khắp khung | scale + ripple | — |
-  | 13.0–15.0 | Chốt + CTA | "Tán xạ Rayleigh" + follow | type-on | impact nhẹ |
+- BPM 110
+  | 0.0–1.5 | — | một tia sáng trắng tự vẽ xuyên khung (svg-path-draw) | zoom-through vào tia sáng | whoosh |
+  | 1.5–6.0 | "Ánh sáng trắng là cả dải màu…" | tia tách phổ ngay trên đường vừa vẽ (dataviz-countup, svg-path-draw) | zoom-through vào dải xanh | soft click |
+  | 6.0–11.0 | "Màu xanh bị không khí hắt đi mạnh nhất" | vạch đọc quét dải phổ, cột xanh vọt cao nhất (chart-scrub-readout) | push-slide theo hướng tia | — |
+  | 11.0–13.0 | — | các tia xanh tán khắp khung thành bầu trời (stat-bars-and-fills) | zoom-through ra ngoài | rising tone |
+  | 13.0–15.0 | "Vì vậy trời màu xanh." | bầu trời giữ yên, chữ chốt khoá lại (counting-dynamic-scale) | — | soft impact |
 </structure>
 
 <audio>
-- Lời đọc khoảng 40 từ (viet-pro)
-- SFX: 0.2s whoosh, 3.2s soft click, 13.0s soft impact
-- Nhạc nền: calm curious ambient, 100 BPM, instrumental
+- Lời đọc 20 từ (≤ word_budget 26), có 3,5 giây chỉ nhạc và hình
+- SFX: 0.0s whoosh, 1.6s soft click, 11.0s rising tone, 13.0s soft impact
+- Nhạc nền: calm curious ambient, 110 BPM, instrumental
 </audio>
 ```

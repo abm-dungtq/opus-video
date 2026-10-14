@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-10-14: creative direction — pick by eye, picture leads, slideshow blocked
+
+Why: a one-line brief ("15s, công nghệ cao cấp") produced four title cards sliding up and fading. Causes found: step 1 told the agent to fill the style itself; the script was written before any visual idea (one sentence = one card); the general-video path built without HyperFrames recipes; the demo gate showed stills, which cannot reveal a slide swap; no gate looked at motion.
+
+### Added
+- `data/directions.json`: 8 creative directions (A1–A8: one-shape morph, prompt → live artifact, kinetic type with beat invert, continuous camera + cursor, 3D flythrough, live data, editorial marker, map/PiP), two knobs (energy, palette) and 5 swappable keyword groups (style, visual, effect, transition, sfx) with Vietnamese labels. Every token is a real HyperFrames blueprint, rule, preset, visual style or seam.
+- `scripts/directions.mjs`: `check` (token existence against the installed HyperFrames; also run by `setup-check`), `pick` (deterministic, one direction per tier: fit / continuous / bold; topic keywords match whole words), `compat` (clash warnings, exit 3), `doc --write` → `references/creative-directions.md`.
+- `scripts/make-pitch.mjs` (SKILL.md step 1b): `init` scaffolds 3 HyperFrames styleframe projects with `STYLEFRAME.md` + `RECIPES.md`; `render` makes 3 draft clips, `sheet.jpg`, `PITCH.md` (numbered menu, works on every agent) and measures their motion; `choose` writes `direction`, `direction_swaps`, `energy`, `palette`, `word_budget`, `music_only_s`, `creative_selection`, `styleframe` and `## creative_direction` into `BRIEF.md`. Smoke run: 3 × 3 s styleframes rendered in 26 s.
+- `scripts/recipe-pack.mjs`: inlines the blueprint/rule/seam recipes named in PLAN.md (or a direction) into `build/RECIPES.md`, build rules first.
+- `make-demo.mjs --animatic`: full draft render kept as `demo/animatic.mp4`, frames cut from it, `contact-sheet.jpg`, `animatic:` in DEMO.md.
+- `qc-mp4.mjs` MOTION: share of near-still frames (YDIF < 0.5 at 360 px, 30 fps) and 90th-percentile YDIF. Creative projects FAIL at ≥ 60 % still and peak < 1.5. Calibration: the real slideshow render 70 % / 1.12 (FAIL), the creative 10 s reference 25 % / 7.0 (PASS).
+- Tests: `creative.test.mjs` (14 tests) with fixtures `slideshow/` (the real Gemini 4 Argon TikTok project, must be blocked) and `creative-good/` (must pass).
+
+### Changed
+- `check-preflight.mjs`: creative gate when BRIEF has `direction:` (or `creative_override: <reason>` to skip): `## Ý đồ sáng tạo`, Blueprint/Rule column with real tokens (≥ 2 distinct), a seam into every next beat (fade/crossfade/cut banned, soft seams only for `allow_soft` directions), music-only beats ≥ `music_only_s`; final stage adds a moving animatic and `build/RECIPES.md` newer than PLAN.md.
+- `check-viet-pro.mjs`: voice words above BRIEF `word_budget` fail the gate.
+- `video-lint.mjs`: `SLIDESHOW_MOTION` early WARN. It stays a WARN on purpose: the real slideshow fixture uses `scale()`, `rotate()` and a background canvas, so static code analysis cannot tell it apart; the blocking check is MOTION on the render.
+- SKILL.md: step 1 asks only for the minimal brief; new step 1b; step 2 writes the script after the direction (picture leads); 4b, 6, 6b, 8 and the reference table follow the new gates. `brief-template.md`, `plan-demo.md` (7-column scene table), `edit-method.md` (all 22 blueprints, anti-slideshow rules, the 4 cut-catalog seams), README and `docs/huong-dan-chuyen-sau.md` updated.
+- Existing test fixtures set `creative_override` (they predate the creative gate).
+
 ## 2026-10-13: post-render tools
 
 ### Added

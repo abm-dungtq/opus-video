@@ -7,7 +7,10 @@
 //   Node.js ≥ 22, git, ffmpeg + ffprobe, the hyperframes CLI ≥ 0.8.144 (via npx),
 //   skills found on any agent host (see skill-paths.mjs): viet-pro (+ its self-tests),
 //   hyperframes core (hyperframes, hyperframes-*, media-use) and every HyperFrames workflow that
-//   opus-video routes to, and ELEVENLABS_API_KEY + OPUS_VIDEO_VOICE_ID (presence only).
+//   opus-video routes to, ELEVENLABS_API_KEY + OPUS_VIDEO_VOICE_ID (presence only), and
+//   data/directions.json: every creative-direction token names a real blueprint/rule/preset/
+//   style/seam in the installed HyperFrames (directions.mjs check; skipped while
+//   hyperframes-animation is missing).
 // Optional (WARN, never fails): agy (judge.mjs video QA), TYPESAFE_API_KEY (Jev), a Remotion
 //   skill (only for engine: remotion).
 // Keys are read from the environment, else the opus-video env file in ~/.config; values are
@@ -21,6 +24,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { findSkill, skillRoots } from "./skill-paths.mjs";
+import { checkData, loadDirections } from "./directions.mjs";
 
 export const MIN_NODE = 22;
 export const MIN_HYPERFRAMES = "0.8.144";
@@ -57,7 +61,7 @@ const version = (cmd, args = ["--version"]) => {
   return r.status === 0 ? `${r.stdout || ""}${r.stderr || ""}`.trim().split("\n")[0] : null;
 };
 
-export function runChecks({ findSkillImpl = findSkill, versionImpl = version, keys = envKeys() } = {}) {
+export function runChecks({ findSkillImpl = findSkill, versionImpl = version, keys = envKeys(), directionsImpl = () => checkData(loadDirections()) } = {}) {
   const items = [];
   const add = (level, name, detail, fixCmd) => items.push({ level, name, detail, fix: level === "ok" ? undefined : fixCmd });
 
@@ -83,6 +87,10 @@ export function runChecks({ findSkillImpl = findSkill, versionImpl = version, ke
     add(d ? "ok" : "missing", `skill ${s}`, d || "not installed", fix("hyperframes"));
   }
   for (const k of ["ELEVENLABS_API_KEY", "OPUS_VIDEO_VOICE_ID"]) add(keys.has(k) ? "ok" : "missing", k, keys.has(k) ? "present" : "absent", FIX.keys);
+  if (findSkillImpl("hyperframes-animation")) {
+    const d = directionsImpl();
+    add(d.pass ? "ok" : "missing", "creative directions", d.pass ? `data/directions.json: ${d.tokens} token có thật` : `${d.errors.length} token không có trong HyperFrames: ${d.errors[0]}`, "HyperFrames đổi tên: sửa data/directions.json theo `node scripts/directions.mjs check`, rồi `directions.mjs doc --write`");
+  }
 
   add(versionImpl("agy", ["--version"]) ? "ok" : "warn", "agy (optional)", "Gemini video judge for judge.mjs; without it QA uses still frames", "install Antigravity CLI and sign in: https://antigravity.google");
   add(keys.has("TYPESAFE_API_KEY") ? "ok" : "warn", "TYPESAFE_API_KEY (optional)", keys.has("TYPESAFE_API_KEY") ? "present" : "absent — Jev ranking/audit off", "add TYPESAFE_API_KEY=… to the env file");

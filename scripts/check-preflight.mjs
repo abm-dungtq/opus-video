@@ -16,6 +16,20 @@
 //     resets it to pending whenever it captures new frames.
 //   - WARN only: a composition file (index.html, compositions/*.html) newer than the newest
 //     demo frame (the demo may not show the current build).
+// Creative gate (SKILL.md step 1b; data/directions.json), both stages, unless BRIEF.md frontmatter
+//   has `creative_override: <reason ≥10 chars>` (printed as a WARN):
+//   - BRIEF.md `direction: <A1..A8>` naming a direction in data/directions.json.
+//   - PLAN.md "## Ý đồ sáng tạo" with lines for Hướng, Chuyển cảnh and Luật chống slideshow.
+//   - "## Cảnh" table has a Blueprint/Rule column and a "Nối sang beat sau" (seam) column.
+//     Every row cites ≥1 blueprint or rule that exists in hyperframes-animation; ≥2 distinct
+//     tokens overall. Every row but the last names a seam from the vocabulary in
+//     data/directions.json: banned seams (fade, crossfade, cut, …) fail; soft seams (focus-pull,
+//     blur-crossfade, …) only when the direction has allow_soft.
+//   - Rows whose Lời đọc cell is empty / "—" / "(nhạc)" / "không lời" add up to at least
+//     BRIEF `music_only_s` seconds (default from the direction's energy, 2s).
+//   - final: DEMO.md `animatic: <mp4>` (make-demo.mjs --animatic) newer than PLAN.md whose
+//     motion passes qc-mp4 MOTION (FAIL when ≥60% near-still frames and 90th-pct YDIF < 1.5), and
+//     build/RECIPES.md (recipe-pack.mjs) newer than PLAN.md.
 // Exit: 0 pass · 1 blocked · 2 bad usage.
 
 import { existsSync, readFileSync, readdirSync, statSync, openSync, readSync, closeSync, realpathSync } from "node:fs";
@@ -23,10 +37,22 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
+import { loadDirections, classifySeams, tokenExists, upstream, wordBudget } from "./directions.mjs";
+import { measureMotion, motionVerdict } from "./qc-mp4.mjs";
 
 const PLACEHOLDER = /^(?:…|\.{3}|todo|tbd|-|n\/a|chưa|pending|<[^>]*>)$/i;
 export const SECTIONS = { goal: "muc tieu", scenes: "canh", audio: "am thanh", engine: "engine", demo: "khung hinh demo", qa: "qa" };
+export const CREATIVE_SECTION = "y do sang tao";
 const fold = (s) => s.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/gi, "d").toLowerCase().replace(/\s+/g, " ").trim();
+
+// Markdown table → { headers: [folded], rows: [[cell]] } (separator row dropped).
+export function parseTable(body) {
+  const lines = (body || "").split(/\r?\n/).filter((l) => /^\s*\|/.test(l));
+  const cells = (l) => l.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+  const real = lines.filter((l) => !/^\s*\|[\s|:-]+\|\s*$/.test(l));
+  if (!real.length) return { headers: [], rows: [] };
+  return { headers: cells(real[0]).map(fold), rows: real.slice(1).map(cells) };
+}
 
 // PLAN.md → { sections: { foldedHeading: body }, scenes: n, demo: [seconds], demo916: [seconds] | null }
 export function parsePlan(text) {
@@ -40,6 +66,105 @@ export function parsePlan(text) {
   const times = (body) => (body || "").split(/\r?\n/).map((l) => l.match(/^\s*[-*]\s*(\d+(?:[.,]\d+)?)\s*s?\b/)).filter(Boolean).map((m) => Number(m[1].replace(",", ".")));
   const k916 = Object.keys(sections).find((k) => k.startsWith(SECTIONS.demo) && /9\s*[:x]\s*16/.test(k));
   return { sections, scenes, demo: times(sections[SECTIONS.demo]), demo916: k916 ? times(sections[k916]) : null };
+}
+
+const MUSIC_ONLY = /^(?:|-|—|–|\(?nhac\)?|\(?chi nhac\)?|khong loi|\(khong loi\)|\(im lang\)|im lang|music only)$/;
+// "0–1.5s", "1.5 - 3s", "0.0s - 4.9s" → seconds (0 when unreadable)
+export function spanSeconds(cell) {
+  const m = String(cell || "").replace(/,/g, ".").match(/(\d+(?:\.\d+)?)\s*s?\s*[-–—→]\s*(\d+(?:\.\d+)?)/);
+  return m ? Math.max(0, Number(m[2]) - Number(m[1])) : 0;
+}
+const col = (headers, re) => headers.findIndex((h) => re.test(h));
+
+// Creative gate on PLAN.md + BRIEF.md. Pushes into errors/warnings; returns a summary or null.
+export function checkCreative({ dir, plan, brief, stage, errors, warnings, data = loadDirections(), up = upstream(), motion = measureMotion }) {
+  const fm = frontmatter(brief);
+  if (fm.creative_override) {
+    if (fm.creative_override.trim().length < 10) errors.push("BRIEF.md creative_override needs a reason of at least 10 characters");
+    else warnings.push(`creative gate skipped: creative_override "${fm.creative_override.trim()}"`);
+    return null;
+  }
+  const id = String(fm.direction || "").trim().toUpperCase().split(/\s/)[0];
+  if (!id) { errors.push("BRIEF.md has no `direction:` — run step 1b (directions.mjs pick → make-pitch.mjs init/render → make-pitch.mjs choose), or set `creative_override: <lý do ≥10 ký tự>` for a footage-only project"); return null; }
+  const direction = data.directions.find((d) => d.id === id);
+  if (!direction) { errors.push(`BRIEF.md direction "${id}" is not in data/directions.json`); return null; }
+  const out = { direction: id, tokens: [], seams: 0, musicOnly: 0 };
+
+  const creative = plan.sections[CREATIVE_SECTION];
+  if (creative === undefined) errors.push('PLAN.md has no "## Ý đồ sáng tạo" section (Hướng · Style · Hình chủ đạo · Hiệu ứng · Chuyển cảnh · SFX · Luật chống slideshow)');
+  else {
+    const lines = creative.split(/\r?\n/).map(fold);
+    for (const [key, label] of [["huong", "Hướng"], ["chuyen canh", "Chuyển cảnh"], ["chong slideshow", "Luật chống slideshow"]]) {
+      if (!lines.some((l) => new RegExp(`^[-*]?\\s*[^:]*${key}[^:]*:\\s*\\S`).test(l))) errors.push(`PLAN.md "## Ý đồ sáng tạo" needs a "${label}: …" line`);
+    }
+  }
+
+  const t = parseTable(plan.sections[SECTIONS.scenes]);
+  const bp = col(t.headers, /blueprint|\brule\b/);
+  const sm = col(t.headers, /noi sang|seam|chuyen canh/);
+  const vo = col(t.headers, /loi doc|^loi\b|voice/);
+  const tm = col(t.headers, /thoi diem|thoi gian|^t$|time/);
+  if (bp < 0) errors.push('PLAN.md "## Cảnh" needs a "Blueprint/Rule" column (template in references/plan-demo.md)');
+  if (sm < 0) errors.push('PLAN.md "## Cảnh" needs a "Nối sang beat sau" column naming the seam into the next beat');
+  if (bp >= 0) {
+    const all = new Set();
+    t.rows.forEach((r, i) => {
+      const words = [...new Set((r[bp] || "").replace(/`/g, " ").match(/[a-z0-9]+(?:-[a-z0-9]+)+/g) || [])];
+      const real = words.filter((w) => tokenExists({ kind: "blueprint", name: w }, data, up) || tokenExists({ kind: "rule", name: w }, data, up));
+      const fake = words.filter((w) => !real.includes(w));
+      for (const w of fake) errors.push(`PLAN.md "## Cảnh" row ${i + 1}: "${w}" is not a blueprint or rule in hyperframes-animation`);
+      if (!words.length) errors.push(`PLAN.md "## Cảnh" row ${i + 1} cites no blueprint/rule (each beat names how it is built)`);
+      real.forEach((w) => all.add(w));
+    });
+    out.tokens = [...all];
+    if (t.rows.length && all.size < 2) errors.push(`PLAN.md "## Cảnh" cites ${all.size} distinct blueprint/rule token(s); need at least 2`);
+  }
+  if (sm >= 0) {
+    t.rows.slice(0, -1).forEach((r, i) => {
+      const seams = classifySeams(r[sm], data);
+      const banned = seams.filter((s) => s.class === "banned");
+      const ok = seams.filter((s) => s.class === "continuous" || (s.class === "soft" && direction.allow_soft));
+      const soft = seams.filter((s) => s.class === "soft" && !direction.allow_soft);
+      if (banned.length) errors.push(`PLAN.md "## Cảnh" row ${i + 1}: seam "${banned.map((s) => s.token).join(", ")}" is a slide swap (banned); use a seam from references/creative-directions.md`);
+      else if (soft.length && !ok.length) errors.push(`PLAN.md "## Cảnh" row ${i + 1}: soft seam "${soft.map((s) => s.token).join(", ")}" is only allowed for directions with allow_soft (${id} has none)`);
+      else if (!ok.length) errors.push(`PLAN.md "## Cảnh" row ${i + 1}: no known seam in "${r[sm] || ""}" (e.g. ${direction.seams.join(", ")})`);
+      else out.seams++;
+    });
+  }
+  if (vo >= 0 && tm >= 0) {
+    out.musicOnly = t.rows.filter((r) => MUSIC_ONLY.test(fold(r[vo] || ""))).reduce((s, r) => s + spanSeconds(r[tm]), 0);
+    const need = Number(fm.music_only_s) || wordBudget(fm.energy || direction.energy[0], fm.duration_s, data).music_only_s;
+    if (out.musicOnly + 1e-6 < need) errors.push(`PLAN.md "## Cảnh" has ${out.musicOnly.toFixed(1)}s without voice; need ≥ ${need}s of music-and-picture beats (Lời đọc "—" or "(nhạc)")`);
+  } else if (t.rows.length) errors.push('PLAN.md "## Cảnh" needs "Thời điểm" and "Lời đọc" columns to measure the music-only beats');
+
+  if (stage === "final") {
+    const planTime = statSync(join(dir, "PLAN.md")).mtimeMs;
+    const demoMd = join(dir, "DEMO.md");
+    const anim = existsSync(demoMd) ? animaticOf(readFileSync(demoMd, "utf8")) : "";
+    const animPath = anim ? resolve(dir, anim) : "";
+    if (!anim) errors.push("DEMO.md has no `animatic:` — run make-demo.mjs --animatic so the user approves motion, not stills");
+    else if (!existsSync(animPath)) errors.push(`DEMO.md animatic ${anim} not found`);
+    else if (statSync(animPath).mtimeMs < planTime) errors.push(`animatic ${anim} is older than PLAN.md; re-run make-demo.mjs --animatic`);
+    else {
+      let m;
+      try { m = motion(animPath); } catch (e) { errors.push(`cannot measure motion of ${anim}: ${e.message}`); }
+      if (m !== undefined) {
+        const v = motionVerdict(m, fm);
+        out.motion = { ...m, level: v.level };
+        if (v.level === "FAIL") errors.push(`animatic ${anim}: ${v.detail}`);
+        else if (v.level === "WARN") warnings.push(`animatic ${anim}: ${v.detail}`);
+      }
+    }
+    const recipes = join(dir, "build", "RECIPES.md");
+    if (!existsSync(recipes)) errors.push("build/RECIPES.md not found — run recipe-pack.mjs --project . and build from it (step 6)");
+    else if (statSync(recipes).mtimeMs < planTime) errors.push("build/RECIPES.md is older than PLAN.md; re-run recipe-pack.mjs");
+  }
+  return out;
+}
+
+export function animaticOf(text) {
+  const m = text.match(/^\s*[-*]?\s*animatic:\s*(\S.*)$/im);
+  return m ? m[1].trim() : "";
 }
 
 export function isPng(file) {
@@ -80,6 +205,7 @@ export function check({ project = ".", stage = "plan" } = {}) {
   const brief = existsSync(join(dir, "BRIEF.md")) ? readFileSync(join(dir, "BRIEF.md"), "utf8") : "";
   const both = /^both$/i.test((frontmatter(brief).aspect || "").trim());
   if (both && !(plan.demo916 && plan.demo916.length)) errors.push('BRIEF.md aspect: both — PLAN.md needs "## Khung hình demo 9:16" with timestamps');
+  out.creative = checkCreative({ dir, plan, brief, stage, errors, warnings });
 
   if (stage === "final") {
     const planTime = statSync(planPath).mtimeMs;

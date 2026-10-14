@@ -1,6 +1,8 @@
 # Phương pháp biên tập (video thương hiệu / explainer không mặt)
 
-Đọc trước khi viết STORYBOARD. Chép mục 2 và 4 vào prompt cho frame worker.
+Đọc trước khi viết STORYBOARD. Chép mục "Sàn chất lượng", "Chống slideshow" và "Kỷ luật GSAP" vào prompt cho frame worker.
+
+**Dựng từ công thức, không dựng từ tính từ.** Trước khi viết HTML ở bước 6, chạy `node $OV/scripts/recipe-pack.mjs --project .` và đọc hết `build/RECIPES.md` (với frame worker: chép vào prompt). File này gom đúng các blueprint, rule và seam mà PLAN.md đã khai, kể cả khi đi đường dựng tay `general-video` (đường này không chạy `frame-packets.mjs` nên dễ biến từ khoá thành thẻ trượt lên/mờ dần). Cảnh mở đầu dựng tiếp từ styleframe người dùng đã chọn (`styleframe:` trong BRIEF.md).
 
 ## Chức năng câu → cách xử lý hình
 
@@ -14,8 +16,31 @@
 | So sánh | hai cột / hai làn | hai bên chạy song song | blueprint `comparison-split` |
 | Bằng chứng xã hội | ảnh thật, logo đối tác (có nhãn) | hiện theo hàng, giữ ≥ 1,4s | blueprint `grid-card-assemble` |
 | CTA | nút + URL | chấm nở thành nút, nhấn, giữ ~1s | blueprint `cta-morph-press` |
+| AI nhận lệnh, trả kết quả | khung lệnh + kết quả | gõ chữ, gửi, kết quả mọc ra từ khung | blueprint `prompt-type-submit-generate` |
+| AI đang làm việc | bảng tiến trình | trạng thái chạy rồi tích xanh hàng loạt | blueprint `agent-progress-theater` |
+| Chỉnh một thông số | bảng điều khiển + vật thể | kéo núm, vật thể đổi theo ngay | blueprint `panel-edit-live-sync` |
+| Thao tác trên giao diện | UI thật + con trỏ | con trỏ rê, bấm, kéo có lực | blueprint `cursor-ui-demo` |
+| Đi qua nhiều ý trong một thế giới | không gian rộng/3D | camera bay liên tục giữa các trạm | blueprint `camera-journey` |
+| Từ chi tiết ra toàn cảnh | cận cảnh → toàn bộ | kéo lùi giảm tốc liên tục | blueprint `zoom-out-workspace-reveal` |
+| Nhiều trạng thái của một thứ | một vật thể neo ở tâm | quanh nó đổi theme/nhãn theo beat | blueprint `fixed-anchor-cycle` |
+| Lựa chọn bị gạt đi | băng chữ chạy | ý chính lao vào đẩy văng các lựa chọn | blueprint `ticker-takeover` |
+| Quá tải → lời giải | nhiều mảnh vây quanh | lời giải ở tâm đẩy mọi thứ ra mép | blueprint `overwhelm-surround` |
+| Hệ sinh thái / kết nối | các nút quanh một tâm | tia nối lần lượt bật sáng | blueprint `constellation-hub` |
+| Sản phẩm trên thiết bị | khung thiết bị | màn hình đổi trạng thái trong khung | blueprint `device-surface-showcase` |
+| Lời nói thành sản phẩm | bản chép lời cuộn | câu được chọn bung thành vật phẩm | blueprint `transcript-scroll-artifact-reveal` |
+| Video chuyển sang chữ | khung video | video co lại nhường chỗ cho chữ chốt | blueprint `video-text-pivot` |
+| Tiêu đề mở cảnh | chữ lớn | lộ ra sau mask | blueprint `titlecard-reveal` |
+| Câu gõ ra từng chữ | dòng chữ | gõ từng ký tự theo lời | blueprint `typewriter-reveal` |
 
 Một câu chỉ có một ý hình. Câu dài hai ý thì tách thành hai frame.
+
+## Chống slideshow (bắt buộc với dự án có `direction:`)
+
+1. **Không dồn hết lên đầu cảnh.** Đừng đặt toàn bộ phần tử của beat ở t=0 rồi đứng yên. Viết beat thành chuỗi thời điểm (vd. `0.0–1.2s` khung giãn → `1.2–2.8s` bước 1 tích xanh), phần tử lộ dần theo `words.json`, phần lớn rơi vào nửa sau của beat (faceless-explainer `motion-language.md`).
+2. **Không exit-rồi-enter.** Cấm cảnh cũ mờ về 0 rồi cảnh mới mới hiện ("jump cut with a dip", hyperframes-animation `transitions/overview.md`). Hai cảnh chồng nhau trong seam đã khai ở cột "Nối sang beat sau".
+3. **Bốn seam liền mạch** (faceless-explainer `cut-catalog.md`): `zoom-through` (phóng 1→1,2 + nhoè ~10px rồi cảnh sau từ 0,75→1), `inverse-zoom-through` (lùi 1→0,8, cảnh sau từ 1,25→1), `cut-the-curve` (hai ease `power4` đối xứng, cùng hướng, khớp vận tốc), `waterfall-cut` (từng từ rút đi, từng từ trào vào). Ngoài ra: morph tại chỗ (`card-morph-anchor`, `scale-swap-transition`), camera (`multi-phase-camera`, `viewport-change`), shader `@hyperframes/shader-transitions` (`domain-warp`, `gravitational-lens`, `whip-pan`, `sdf-iris`…), và `beat-cut` (cắt đúng downbeat kèm đảo cực màu). Từ vựng đầy đủ ở `creative-directions.md`.
+4. **Mỗi beat có một chuyển động bậc cao** (morph kích thước/bo góc, camera, mask/clip-path, 3D, vẽ path, shader), không chỉ `opacity` + `y`. `video-lint` báo sớm `SLIDESHOW_MOTION`; `qc-mp4` MOTION chặn bản render đứng yên (≥60% khung gần như không đổi và không có cú chuyển động mạnh nào).
+5. **Beat không lời là beat hình**: các đoạn `(nhạc)` trong PLAN.md phải tự kể bằng hình (morph, camera bay, chữ đập theo beat), không để khung trống chờ lời.
 
 ## Sàn chất lượng
 
