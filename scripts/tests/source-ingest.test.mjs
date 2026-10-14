@@ -152,5 +152,9 @@ test("htmlToText: table cells, rows and adjacent divs never glue numbers or sent
   assert.ok(lines.includes("Năm | Tăng") && lines.includes("2023 | 15%") && lines.includes("2024 | 20%"), t);
   assert.ok(lines.includes("Giá đất tăng 20% trong năm 2024 theo báo cáo.") && lines.includes("Giao dịch giảm 30% so với cùng kỳ."), t);
   assert.ok(lines.includes("Quận 1") && lines.includes("120 triệu/m²"), t);
-  assert.ok(lines.includes("x 1 2"), t);
+  assert.ok(lines.includes("x12"), t);
+});
+
+test("htmlToText: inline tags inside a number or word leave no gap", () => {
+  assert.equal(htmlToText("<p>Tăng <b>20</b>% trong <i>10</i> giờ, <a href='x'>xem</a> <span>thêm</span></p>"), "Tăng 20% trong 10 giờ, xem thêm");
 });
