@@ -155,7 +155,7 @@ Người dùng chọn một hướng rồi đổi từng nhóm bằng mã từ k
 
 ## Từ vựng chuyển cảnh (cột "Nối sang beat sau" trong PLAN.md)
 
-- **Bị chặn:** `fade`, `fade-in`, `fade-out`, `crossfade`, `dissolve`, `opacity`, `none`, `cut`, `dip`, `color-dip`, `hiện`, `mờ dần`, `hiện dần`, `trượt lên`.
+- **Bị chặn:** `fade`, `fade-in`, `fade-out`, `crossfade`, `dissolve`, `opacity`, `none`, `cut`, `dip`, `color-dip`, `mờ dần`, `hiện dần`, `trượt lên`.
 - **Mềm** (chỉ hướng có `allow_soft`): `focus-pull`, `blur-crossfade`, `cross-warp-morph`, `thermal-distortion`, `light-leak`.
 - **Liền mạch:** `zoom-through` (cut-catalog), `inverse-zoom-through` (cut-catalog), `cut-the-curve` (cut-catalog), `waterfall-cut` (cut-catalog), `card-morph-anchor` (rule), `scale-swap-transition` (rule), `theme-crossfade-morph` (rule), `multi-phase-camera` (rule), `viewport-change` (rule), `push-slide` (css), `squeeze` (css), `circle-iris` (css), `diagonal-split` (css), `gravity-drop` (css), `staggered-blocks` (css), `grid-dissolve` (css), `morph-circle` (css), `zoom-out` (css), `sdf-iris` (shader), `domain-warp` (shader), `gravitational-lens` (shader), `whip-pan` (shader), `cinematic-zoom` (shader), `ridged-burn` (shader), `swirl-vortex` (shader), `chromatic-split` (shader), `beat-cut` (native), `match-cut` (native).
 - Nguồn công thức: `cut-catalog` → `faceless-explainer/references/cut-catalog.md`; `rule` → `hyperframes-animation/rules/<id>.md`; `css`/`shader` → `hyperframes-animation/transitions/`; `native` → mô tả trong `data/directions.json`.

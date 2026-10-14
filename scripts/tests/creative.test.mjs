@@ -74,6 +74,8 @@ test("classifySeams: banned slide swaps, soft seams, continuous seams, unknown t
   assert.ok(c("zoom-through rồi fade").includes("banned"));
   assert.ok(!c("zoom-throughx").includes("continuous"));
   assert.ok(c("push-slide-fade").includes("banned"));
+  assert.ok(!c("zoom-through, số xuất hiện").includes("banned"));
+  assert.ok(c("zoom-through, nhãn hiện dần").includes("banned"));
   assert.deepEqual(classifySeams("zoom-through", data), [{ token: "zoom-through", class: "continuous" }]);
 });
 

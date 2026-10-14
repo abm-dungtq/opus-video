@@ -12,7 +12,7 @@
     "thuong-hieu": { "ten_vi": "Màu thương hiệu", "mo_ta_vi": "Lấy màu từ logo/brand kit người dùng đưa" }
   },
   "seam_classes": {
-    "banned": ["fade", "fade-in", "fade-out", "crossfade", "dissolve", "opacity", "none", "cut", "dip", "color-dip", "hiện", "mờ dần", "hiện dần", "trượt lên"],
+    "banned": ["fade", "fade-in", "fade-out", "crossfade", "dissolve", "opacity", "none", "cut", "dip", "color-dip", "mờ dần", "hiện dần", "trượt lên"],
     "soft": ["focus-pull", "blur-crossfade", "cross-warp-morph", "thermal-distortion", "light-leak"]
   },
   "seams": [
