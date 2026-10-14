@@ -13,7 +13,9 @@
 // TIMING = { fps, duration, scenes: { s<#>: { start, end, lines: [{ id, words: [[text, start,
 //   end]] }] } }, beat0, beatLen, kick, drops }, seconds rounded to 3 decimals. duration is the
 //   root composition's data-duration; fps comes from hyperframes.json (default 30); beat0, beatLen,
-//   kick, drops come from assets/bgm/*.beats.json when present (defaults 0, 0.5, [], []).
+//   kick, drops come from assets/bgm/*.beats.json when present (defaults 0, 0, [], []: B() refuses an unmeasured grid).
+// WARN when a voice track (data-start + data-duration) ends past the root data-duration; the
+//   duration is never changed.
 // Output: the text between the TIMING:BEGIN and TIMING:END comments of the HTML is replaced, and
 //   <dir>/timing.json holds the same object. The markers come from composition.mjs init; a file
 //   without them (a project not started from the skeleton) is refused and never edited.
@@ -30,7 +32,7 @@ import { wantsHelp, helpText } from "./cli-help.mjs";
 import { SECTIONS, fold, parsePlan, parseTable, spanBounds } from "./check-preflight.mjs";
 import { parseTracks } from "./audio-mix.mjs";
 
-export const DEFAULTS = { fps: 30, beat0: 0, beatLen: 0.5, kick: [], drops: [] };
+export const DEFAULTS = { fps: 30, beat0: 0, beatLen: 0, kick: [], drops: [] };
 export const NO_MARKERS = "index.html không có TIMING:BEGIN/END (tạo bằng composition.mjs init)";
 const MARK_BEGIN = /\/\*\s*TIMING:BEGIN\s*\*\//g;
 const MARK_END = /\/\*\s*TIMING:END\s*\*\//g;
@@ -53,7 +55,7 @@ function readWords(src) {
 
 // Spoken words of a composition on the root timeline.
 // dir: project directory; html: HTML path relative to dir (default index.html).
-// Returns { words: [{ id, text, start, end }] sorted by start, warnings: [text] }.
+// Returns { words: [{ id, text, start, end }] sorted by start, tracks: the voice tracks, warnings: [text] }.
 export function voiceWords(dir, html = "index.html") {
   const root = resolve(dir);
   const htmlPath = resolve(root, html);
@@ -71,7 +73,7 @@ export function voiceWords(dir, html = "index.html") {
     }
   }
   words.sort((a, b) => a.start - b.start);
-  return { words, warnings };
+  return { words, tracks, warnings };
 }
 
 // PLAN.md text → [{ sid, start, end, spoken }] in table order. Throws on a missing table or an
@@ -138,6 +140,11 @@ export function buildTiming({ dir, html = "index.html" }) {
     line.words.push([w.text, r3(w.start), r3(w.end)]);
   }
   if (outside) warnings.push(`${outside} từ nằm ngoài mọi cảnh của "## Cảnh"`);
+  // A voice past the root duration is cut off in renders; the duration is the author's call.
+  for (const t of voice.tracks) {
+    const end = t.duration != null ? t.start + t.duration : null;
+    if (end != null && end > duration + 1e-6) warnings.push(`${t.id ?? t.src} kết thúc ${end.toFixed(3)}s, root data-duration ${r3(duration)}s`);
+  }
 
   const lines = [];
   for (const s of scenes) {

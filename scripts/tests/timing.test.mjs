@@ -35,7 +35,8 @@ test("fixture: first word of s2 sits at data-start + its start in words.json", (
     assert.deepEqual(t.scenes.s1, { start: 0, end: 2.5, lines: [] });
     assert.equal(t.duration, 8);
     assert.equal(t.fps, 30);
-    assert.deepEqual([t.beat0, t.beatLen, t.kick, t.drops], [0, 0.5, [], []]);
+    assert.deepEqual([t.beat0, t.beatLen, t.kick, t.drops], [0, 0, [], []]);
+    assert.doesNotMatch(buf.out, /kết thúc/);
     assert.match(buf.out, /^TIMING s2 2\.500–5\.800 words=7$/m);
     assert.match(buf.out, /^TIMING s1 0\.000–2\.500 words=0$/m);
     assert.match(buf.out, /^WARN s3 không có từ nào trong words\.json$/m);
@@ -80,6 +81,20 @@ test("HTML without markers exits 1 and is not edited", () => {
     assert.match(buf.err, new RegExp(NO_MARKERS.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")));
     assert.equal(readFileSync(join(dir, "index.html"), "utf8"), legacy);
     assert.equal(existsSync(join(dir, "timing.json")), false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("a voice track ending past the root duration warns; the duration is left alone", () => {
+  const dir = project();
+  try {
+    const html = readFileSync(join(dir, "index.html"), "utf8").replace('data-start="2.5" data-duration="3"', 'data-start="2.5" data-duration="8.9"');
+    writeFileSync(join(dir, "index.html"), html);
+    const { buf, io } = capture();
+    assert.equal(main(["--project", dir], io), 0);
+    assert.match(buf.out, /^WARN vo-01 kết thúc 11\.400s, root data-duration 8s$/m);
+    const after = readFileSync(join(dir, "index.html"), "utf8");
+    assert.match(after, /data-composition-id="main" data-start="0" data-duration="8"/);
+    assert.equal(JSON.parse(readFileSync(join(dir, "timing.json"), "utf8")).duration, 8);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -162,11 +177,16 @@ function runSkeleton(timing) {
   return { window, warns };
 }
 
-test("skeleton runs with the empty default TIMING; B works on the default grid", () => {
+test("skeleton runs with the empty default TIMING; B refuses the unmeasured grid", () => {
   const { window, warns } = runSkeleton(null);
   assert.ok(window.__timelines.main);
-  assert.equal(window.__probe.B(4), 2);
+  assert.throws(() => window.__probe.B(4), /B\(\) cần beat-grid\.mjs/);
   assert.deepEqual(warns, []);
+});
+
+test("skeleton B follows a measured grid", () => {
+  const { window } = runSkeleton({ fps: 30, duration: 10, scenes: {}, beat0: 0.12, beatLen: 0.5, kick: [[0, 16]], drops: [8] });
+  assert.equal(window.__probe.B(4), 2.12);
 });
 
 test("skeleton W/WE match a folded phrase across punctuation; a miss warns and falls back", () => {

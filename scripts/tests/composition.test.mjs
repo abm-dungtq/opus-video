@@ -28,7 +28,7 @@ test("skeleton: TIMING markers once each, default TIMING, timeline registered", 
   const html = readFileSync(SKELETON, "utf8");
   assert.equal(html.split("\n").filter((l) => l.includes("TIMING:BEGIN")).length, 1);
   assert.equal(html.split("\n").filter((l) => l.includes("TIMING:END")).length, 1);
-  assert.match(html, /window\.TIMING = \{fps:30, duration:10, scenes:\{\}, beat0:0, beatLen:0\.5, kick:\[\], drops:\[\]\};/);
+  assert.match(html, /window\.TIMING = \{fps:30, duration:10, scenes:\{\}, beat0:0, beatLen:0, kick:\[\], drops:\[\]\};/);
   assert.match(html, /window\.__timelines\["main"\] = tl;/);
   assert.match(html, /<html[^>]*data-ratio="16x9"/);
 });
