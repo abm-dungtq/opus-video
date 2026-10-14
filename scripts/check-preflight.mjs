@@ -44,6 +44,9 @@
 //   max(1s, words / 2.5 + 0.5s) — 2.5 words/s from viet-pro's speech rate, 0.5s eye-landing is
 //   an assumption. Quotes in the Lời đọc column do not count. A cell may state `(giữ đến <t>s)` /
 //   `(giữ đến hết)`; the hold is then measured to that mark.
+// REVISIONS.md (references/revisions.md), final stage, every project, WARN only, when the file
+//   exists: a round ("## … Vòng …", diacritics optional) with more than 5 "### R<n>" fixes, or a
+//   fix missing one of the lines Vị trí: · Lỗi thấy: · Đổi: · Giữ nguyên:.
 // Exit: 0 pass · 1 blocked · 2 bad usage.
 
 import { existsSync, readFileSync, readdirSync, statSync, openSync, readSync, closeSync, realpathSync } from "node:fs";
@@ -310,6 +313,48 @@ export function approvalOf(text) {
   return m ? m[1].trim() : "";
 }
 
+// REVISIONS.md fields every "### R<n>" fix must carry (references/revisions.md).
+const REVISION_FIELDS = ["Vị trí", "Lỗi thấy", "Đổi", "Giữ nguyên"];
+const MAX_FIXES_PER_ROUND = 5;
+
+// WARN sentences for a REVISIONS.md text: rounds ("## …Vòng…") over five fixes, fixes missing a field.
+export function checkRevisions(text) {
+  const warnings = [];
+  const rounds = [];
+  let round = null, fix = null;
+  const closeFix = () => {
+    if (!fix) return;
+    for (const f of REVISION_FIELDS) if (!fix.fields.has(fold(f))) warnings.push(`REVISIONS.md ${fix.name}: thiếu ${f}`);
+    fix = null;
+  };
+  for (const raw of String(text).split(/\r?\n/)) {
+    const line = raw.trim();
+    const h2 = line.match(/^##\s+(.+)$/);
+    if (h2) {
+      closeFix();
+      round = fold(h2[1]).includes("vong") ? { name: h2[1].trim(), fixes: 0 } : null;
+      if (round) rounds.push(round);
+      continue;
+    }
+    const h3 = line.match(/^###\s+(R\d+)\b/i);
+    if (h3) {
+      closeFix();
+      fix = { name: h3[1], fields: new Set() };
+      if (round) round.fixes++;
+      continue;
+    }
+    if (/^#{1,3}\s/.test(line)) { closeFix(); continue; }
+    if (!fix) continue;
+    const label = fold(line.replace(/^[-*]\s*/, "").replace(/\*\*/g, "")).match(/^([^:]+?)\s*:/);
+    if (label) fix.fields.add(label[1]);
+  }
+  closeFix();
+  for (const r of rounds) {
+    if (r.fixes > MAX_FIXES_PER_ROUND) warnings.push(`REVISIONS.md ${r.name}: ${r.fixes} mục, tối đa ${MAX_FIXES_PER_ROUND} mỗi vòng (references/revisions.md)`);
+  }
+  return warnings;
+}
+
 export function check({ project = ".", stage = "plan", sync = checkSync } = {}) {
   const dir = resolve(project);
   const errors = [], warnings = [];
@@ -360,6 +405,8 @@ export function check({ project = ".", stage = "plan", sync = checkSync } = {}) 
       .map((f) => join(dir, f)).filter(existsSync);
     const changed = comps.filter((f) => statSync(f).mtimeMs > newest);
     if (newest && changed.length) warnings.push(`composition changed after the demo (${changed.map((f) => f.slice(dir.length + 1)).join(", ")}); re-run make-demo.mjs if the look changed`);
+    const revisions = join(dir, "REVISIONS.md");
+    if (existsSync(revisions)) warnings.push(...checkRevisions(readFileSync(revisions, "utf8")));
   }
   out.pass = errors.length === 0;
   return out;

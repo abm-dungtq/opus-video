@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { check, parsePlan, isPng, readableHold, holdWarnings, parseTable, spanBounds, spanSeconds } from "../check-preflight.mjs";
+import { check, checkRevisions, parsePlan, isPng, readableHold, holdWarnings, parseTable, spanBounds, spanSeconds } from "../check-preflight.mjs";
 import { main as renderFinal, PREFLIGHT_EXIT } from "../render-final.mjs";
 import { writeDemoMd } from "../make-demo.mjs";
 
@@ -245,5 +245,52 @@ test("make-demo --from-video cuts PLAN.md frames from an approved draft and reco
     const stale = spawnSync("node", [script, "--project", dir, "--from-video", mp4], { encoding: "utf8" });
     assert.equal(stale.status, 2);
     assert.match(stale.stderr, /older than index\.html/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+const REVISION = (n, skip = "") => `### R${n}
+- Vị trí: 6.5s (khung 195 ở 30 fps), cảnh 2
+- Lỗi thấy: con trỏ đè lên nhãn kết quả
+- Đổi: con trỏ rời nút trong 6.8–7.0s, dừng cách nhãn 24 px
+- Giữ nguyên: lúc nhấn 6.5s, lúc hiện kết quả 7.0s, chữ, tiếng
+- Kiểm: snapshot --at 6.4,6.5,7.0,7.4 · check --at-transitions
+`.split("\n").filter((l) => !skip || !l.includes(skip)).join("\n");
+const ROUND = '# REVISIONS\n\n## Vòng 1 (2026-10-14 15:00) — lời người dùng: "con trỏ che chữ"\n\n';
+
+test("checkRevisions: the reference template gives no WARN", () => {
+  assert.deepEqual(checkRevisions(ROUND + REVISION(1)), []);
+});
+
+test("checkRevisions: a round with six fixes warns once", () => {
+  const text = ROUND + [1, 2, 3, 4, 5, 6].map((n) => REVISION(n)).join("\n");
+  const w = checkRevisions(text);
+  assert.equal(w.length, 1);
+  assert.match(w[0], /^REVISIONS\.md Vòng 1 .*: 6 mục, tối đa 5 mỗi vòng \(references\/revisions\.md\)$/);
+  // Rounds are counted separately; headings match without diacritics.
+  const split = ROUND + [1, 2, 3].map((n) => REVISION(n)).join("\n") + "\n## Vong 2\n\n" + [4, 5, 6].map((n) => REVISION(n)).join("\n");
+  assert.deepEqual(checkRevisions(split), []);
+});
+
+test("checkRevisions: a fix missing Giữ nguyên warns once, diacritics optional", () => {
+  assert.deepEqual(checkRevisions(ROUND + REVISION(1, "Giữ nguyên")), ["REVISIONS.md R1: thiếu Giữ nguyên"]);
+  const plain = ROUND + "### R2\n- Vi tri: 3s\n- Loi thay: chu mo\n- Doi: tang tuong phan\n- Giu nguyen: tieng\n";
+  assert.deepEqual(checkRevisions(plain), []);
+});
+
+test("final stage: REVISIONS.md warnings only when the file exists, never blocking", () => {
+  const dir = proj();
+  try {
+    past(join(dir, "PLAN.md"));
+    demo(dir, 2);
+    writeFileSync(join(dir, "DEMO.md"), "approval: user ok 2026-10-12\n");
+    let r = check({ project: dir, stage: "final" });
+    assert.equal(r.pass, true);
+    assert.equal(r.warnings.filter((w) => w.startsWith("REVISIONS.md")).length, 0);
+    writeFileSync(join(dir, "REVISIONS.md"), ROUND + REVISION(1, "Lỗi thấy"));
+    r = check({ project: dir, stage: "final" });
+    assert.equal(r.pass, true);
+    assert.deepEqual(r.warnings.filter((w) => w.startsWith("REVISIONS.md")), ["REVISIONS.md R1: thiếu Lỗi thấy"]);
+    r = check({ project: dir, stage: "plan" });
+    assert.equal(r.warnings.filter((w) => w.startsWith("REVISIONS.md")).length, 0);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
