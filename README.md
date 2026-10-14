@@ -12,7 +12,7 @@ Skill này là phần điều phối và không tự render. Nó nối các bư�
 6. **Clip nháp và khung hình demo:** `make-demo.mjs --animatic` render clip nháp và cắt đúng các mốc trong plan; người dùng duyệt chuyển động (`DEMO.md`) rồi mới được render bản cuối. `render-final.mjs` là đường duy nhất ra bản giao (`--quality delivery`) và chặn (exit 5) khi thiếu plan, demo, duyệt, hoặc khi clip nháp đứng yên kiểu slideshow.
 7. **QA:** `qc-mp4.mjs` (kỹ thuật và độ chuyển động), lint, check, vùng an toàn 9:16, Gemini (qua `agy`) xem video và chấm, tối đa 3 vòng. Kèm caption Facebook + TikTok qua viet-pro.
 8. **Footage thật (beta):** `cut.mjs` tìm khoảng lặng và ghép clip theo danh sách cắt.
-9. **Dữ liệu thật và brand kit:** `poi-fetch.mjs` lấy tiện ích quanh một địa chỉ từ OpenStreetMap kèm khoảng cách và phút đi bộ; `source-ingest.mjs` lưu văn bản gốc của bài báo, PDF, arXiv vào `SOURCES.md` để kiểm số liệu; `brand.mjs` kiểm brand kit dùng chung (màu, font, logo, giọng đọc).
+9. **Dữ liệu thật và brand kit:** `poi-fetch.mjs` lấy tiện ích quanh một địa chỉ từ OpenStreetMap kèm khoảng cách và phút đi bộ; `source-ingest.mjs` lưu văn bản gốc của bài báo, PDF, trang abstract arXiv vào `SOURCES.md` để kiểm số liệu; `brand.mjs` kiểm brand kit dùng chung (màu, font, logo, giọng đọc).
 10. **Clip người dùng làm trục + nền dựng mới:** clip có sẵn lời nói chạy trong khung PiP trên nền bản đồ hay phối cảnh, hiệu ứng bám từng chữ. BRIEF ghi `voice_source: clip`: cổng viet-pro lint phụ đề và chữ trên hình thay cho kịch bản TTS. Phụ đề sinh từ bản chép lời Whisper cùng bảng sửa lỗi nghe máy người dùng duyệt. Nội dung là của người dùng nên không gắn nhãn rào đón ("minh họa", "theo lời người nói"…) lên hình; `video-lint` báo lỗi khi gặp. Xem `references/clip-master-canvas.md`.
 
 Mẫu dựng được chắt lọc từ 813 video làm bằng Opus 5.5 (xem `data/SOURCES.md`).
@@ -201,7 +201,7 @@ Mọi script đều có `--help` / `-h` (in phần mô tả đầu file, thoát 
 | `scripts/cut.mjs` | `probe` tìm khoảng lặng an toàn; `apply-edl` ghép footage theo danh sách cắt JSON |
 | `scripts/brand.mjs` | `check` brand kit dùng chung (`shared-assets/brand.json`, mẫu ở `references/brand.example.json`); `make-pitch` tự đọc |
 | `scripts/poi-fetch.mjs` | Tiện ích thật quanh một địa chỉ hoặc toạ độ từ OpenStreetMap, khoảng cách và phút đi bộ, ghi vào `SOURCES.md` |
-| `scripts/source-ingest.mjs` | Lưu văn bản gốc của URL, PDF, arXiv vào `sources/` và ghi mục nguồn vào `SOURCES.md`; PDF cần `pdftotext` (poppler) |
+| `scripts/source-ingest.mjs` | Lưu văn bản gốc của URL, PDF, trang abstract arXiv (toàn văn thì truyền `https://arxiv.org/pdf/<id>`) vào `sources/` và ghi mục nguồn vào `SOURCES.md`; PDF cần `pdftotext` (poppler) |
 
 ## 8. Cập nhật và gỡ
 

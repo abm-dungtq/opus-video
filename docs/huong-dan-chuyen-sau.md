@@ -852,7 +852,7 @@ node $OV/scripts/poi-fetch.mjs --project ./ --lat <vĩ độ> --lon <kinh độ>
 
 ### 12.9 `source-ingest.mjs`, lấy văn bản gốc để kiểm số liệu
 
-**Dùng khi nào.** Bước 2, khi kịch bản dựa trên bài báo, trang web, PDF hay bài arXiv, nhất là tin nóng và explainer có số liệu. Chạy trước khi soạn, để lượt kiểm chứng của viet-pro có câu gốc mà đối chiếu.
+**Dùng khi nào.** Bước 2, khi kịch bản dựa trên bài báo, trang web, PDF hay trang abstract arXiv, nhất là tin nóng và explainer có số liệu. Chạy trước khi soạn, để lượt kiểm chứng của viet-pro có câu gốc mà đối chiếu.
 
 ```bash
 node $OV/scripts/source-ingest.mjs --project ./ <url> [<url-khác>] [bao-cao.pdf] [arxiv:<id>]
@@ -862,6 +862,7 @@ node $OV/scripts/source-ingest.mjs --project ./ <url> [<url-khác>] [bao-cao.pdf
 - Script không tóm tắt. Câu ứng viên chỉ là chỗ cần đọc lại; agent đọc `sources/<slug>.txt` và tự viết ý chính có trích câu gốc. Mọi số liệu trong kịch bản phải trỏ về một mục trong `SOURCES.md`.
 - Chạy lại cùng URL hay file thì mục cũ được thay, không thêm mục mới. `--max-candidates` đổi số câu ứng viên (mặc định 8).
 - PDF đọc bằng `pdftotext` của poppler. URL trả về PDF cũng được xử lý như file PDF.
+- `arxiv:<id>` chỉ lấy trang abstract (`https://arxiv.org/abs/<id>`): tiêu đề, tác giả, tóm tắt, không có thân bài. Cần số liệu trong bảng hay trong bài thì truyền thêm URL PDF `https://arxiv.org/pdf/<id>`.
 
 | Mã thoát | Nghĩa |
 |---|---|

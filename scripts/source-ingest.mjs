@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// source-ingest.mjs — fetch the source text behind a script (article URL, PDF file, arXiv id) into
+// source-ingest.mjs — fetch the source text behind a script (article URL, PDF file, arXiv abstract page) into
 // <project>/sources/ and index it in SOURCES.md, so the viet-pro fact check
 // (viet-pro/references/review/fact-check.md) has the original wording to check every number against.
 // No AI summary: the agent reads sources/<slug>.txt and writes the key points itself.
@@ -12,6 +12,8 @@
 //   old entry instead of adding a new one.
 // URLs: User-Agent opus-video-ingest/1.0, 30 s timeout, redirects followed; a PDF content-type is
 //   handled like a PDF file. PDF text comes from `pdftotext -layout` (poppler).
+// arxiv:<id> fetches the abstract page (arxiv.org/abs/<id>) only; for the paper's full text, tables and
+//   numbers pass the PDF URL https://arxiv.org/pdf/<id>.
 // Exit: 0 every source ingested · 1 some source failed (the others are still written) ·
 //   2 bad usage, or a PDF without pdftotext installed (brew install poppler).
 
