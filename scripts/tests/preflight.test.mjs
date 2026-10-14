@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { check, parsePlan, isPng } from "../check-preflight.mjs";
+import { check, parsePlan, isPng, readableHold, holdWarnings, parseTable } from "../check-preflight.mjs";
 import { main as renderFinal, PREFLIGHT_EXIT } from "../render-final.mjs";
 import { writeDemoMd } from "../make-demo.mjs";
 
@@ -51,6 +51,39 @@ test("parsePlan: scenes from the table, timestamps from the demo list (diacritic
   assert.deepEqual(p.demo, [2, 9.5, 15]);
   assert.equal(p.demo916, null);
   assert.deepEqual(parsePlan(PLAN("- 1\n", "\n## Khung hinh demo 9:16\n- 3\n- 4\n")).demo916, [3, 4]);
+});
+
+const HEAD = "| # | Thời điểm | Lời đọc | Hình / hiệu ứng | Âm thanh |\n|---|---|---|---|---|\n";
+const SHORT_ROW = '| 1 | 0–1.5s | Hook | Chữ "Từ kế hoạch đến kiểm thử" hiện ra | whoosh |';
+
+test("readableHold: words / 2.5 + 0.5s, never under 1s", () => {
+  assert.equal(readableHold(0), 1.0);
+  assert.equal(readableHold(5), 2.5);
+  assert.equal(readableHold(10), 4.5);
+});
+
+test("holdWarnings: quoted on-screen text shorter than its reading time warns", () => {
+  const w = holdWarnings(parseTable(HEAD + SHORT_ROW));
+  assert.equal(w.length, 1);
+  assert.match(w[0], /row 1/);
+  assert.match(w[0], /\(6 từ\)/);
+  assert.ok(w[0].includes("cần giữ ≥ 2.9s"), w[0]);
+  assert.ok(w[0].includes("beat dài 1.5s"), w[0]);
+  assert.deepEqual(holdWarnings(parseTable(HEAD + SHORT_ROW.replace("0–1.5s", "0–4s"))), []);
+});
+
+test("holdWarnings: quotes in the voice-over column are not on-screen text", () => {
+  const row = '| 1 | 0–1s | "Từ kế hoạch đến kiểm thử, mọi bước đều rõ" | Logo bật lên | whoosh |';
+  assert.deepEqual(holdWarnings(parseTable(HEAD + row)), []);
+});
+
+test("plan stage: a brief without direction still gets the hold WARN and passes", () => {
+  const dir = proj({ plan: PLAN().replace("| 1 | 0–7s | Hook | Logo bật lên | whoosh |", SHORT_ROW) });
+  try {
+    const r = check({ project: dir });
+    assert.equal(r.pass, true, r.errors.join("\n"));
+    assert.ok(r.warnings.some((w) => w.includes("cần giữ ≥ 2.9s")), r.warnings.join("\n"));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test("plan stage: missing PLAN.md, missing or placeholder sections, too few timestamps", () => {

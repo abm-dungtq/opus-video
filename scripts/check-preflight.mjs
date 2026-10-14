@@ -39,6 +39,10 @@
 //     plan: a missing section FAILs. final: a missing section only WARNs (the table asks for a
 //     measurement; a delivered project can still re-render), and sfx-sync.mjs measures each event:
 //     its FAIL lines (sound outside ITU-R BT.1359-1 −90…+185 ms) block, its WARN lines warn.
+// Readable hold, both stages, every project, WARN only (thresholds not yet calibrated): a "## Cảnh"
+//   row whose quoted text ("…", “…”, «…») in the Hình column stays up shorter than
+//   max(1s, words / 2.5 + 0.5s) — 2.5 words/s from viet-pro's speech rate, 0.5s eye-landing is
+//   an assumption. Quotes in the Lời đọc column do not count.
 // Exit: 0 pass · 1 blocked · 2 bad usage.
 
 import { existsSync, readFileSync, readdirSync, statSync, openSync, readSync, closeSync, realpathSync } from "node:fs";
@@ -100,6 +104,41 @@ export function spanSeconds(cell) {
   return m ? Math.max(0, Number(m[2]) - Number(m[1])) : 0;
 }
 const col = (headers, re) => headers.findIndex((h) => re.test(h));
+
+// Readable hold for on-screen text (WARN only, every project: the thresholds are not yet
+// calibrated on delivered videos).
+// Tốc độ nói của viet-pro (references/publishing/video-script.md: 2,5–3 từ/giây); đọc chữ trên hình lấy mức chậm.
+export const READ_WPS = 2.5;
+// Giả định: thời gian mắt tìm tới chữ, chưa hiệu chỉnh.
+export const EYE_LAND_S = 0.5;
+export const MIN_HOLD_S = 1.0;
+const QUOTED = /"([^"]+)"|“([^”]+)”|«([^»]+)»/g;
+
+// Seconds a piece of on-screen text with `words` words must stay up.
+export function readableHold(words) {
+  return Math.max(MIN_HOLD_S, words / READ_WPS + EYE_LAND_S);
+}
+
+// parseTable output of "## Cảnh" → WARN lines for rows whose quoted text in the picture column
+// ("Hình / hiệu ứng") leaves before it can be read. Lời đọc quotes are not on-screen text;
+// rows with an unreadable Thời điểm cell are skipped.
+export function holdWarnings(table) {
+  const pic = col(table.headers, /hinh/);
+  const tm = col(table.headers, /thoi diem|thoi gian|^t$|time/);
+  if (pic < 0 || tm < 0) return [];
+  const out = [];
+  table.rows.forEach((r, i) => {
+    const len = spanSeconds(r[tm]);
+    if (!len) return;
+    const quotes = [...String(r[pic] || "").matchAll(QUOTED)].map((m) => (m[1] ?? m[2] ?? m[3]).trim()).filter(Boolean);
+    if (!quotes.length) return;
+    const words = quotes.reduce((n, q) => n + q.split(/\s+/).filter(Boolean).length, 0);
+    const need = readableHold(words);
+    if (len >= need) return;
+    out.push(`PLAN.md "## Cảnh" row ${i + 1}: chữ trên hình "${quotes[0].slice(0, 40)}" (${words} từ) cần giữ ≥ ${need.toFixed(1)}s, beat dài ${Number(len.toFixed(2))}s`);
+  });
+  return out;
+}
 
 // Creative gate on PLAN.md + BRIEF.md. Pushes into errors/warnings; returns a summary or null.
 export function checkCreative({ dir, plan, brief, stage, errors, warnings, data = loadDirections(), up = upstream(), motion = measureMotion, probe = probeSize, sync = checkSync }) {
@@ -271,6 +310,7 @@ export function check({ project = ".", stage = "plan", sync = checkSync } = {}) 
   const both = /^both$/i.test((frontmatter(brief).aspect || "").trim());
   if (both && !(plan.demo916 && plan.demo916.length)) errors.push('BRIEF.md aspect: both — PLAN.md needs "## Khung hình demo 9:16" with timestamps');
   out.creative = checkCreative({ dir, plan, brief, stage, errors, warnings, sync });
+  warnings.push(...holdWarnings(parseTable(plan.sections[SECTIONS.scenes])));
 
   if (stage === "final") {
     const planTime = statSync(planPath).mtimeMs;
