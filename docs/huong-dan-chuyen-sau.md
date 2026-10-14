@@ -51,14 +51,17 @@ Bố cục chuẩn theo [SKILL.md](../SKILL.md). Bảng dưới đây ghi rõ ai
 | `script/NN.txt` | agent | 2 | Mỗi file một câu đọc. Đây là văn bản duy nhất `eleven.mjs tts` nhận |
 | `SCRIPT.md` | agent | 2 | Chỉ khi dùng workflow HyperFrames chuyên biệt. Mỗi frame phải trùng từng chữ với `script/NN.txt` |
 | `BRIEF.case-query.json` | agent | 3 | Brief chuẩn hoá bằng tiếng Anh để tra case, trường nào brief không nói thì ghi `"not stated"` |
+| `pitch/` | `make-pitch.mjs`, agent viết `index.html` | 1b | 3 project styleframe, `PICK.json`, `1..3.mp4`, `sheet.jpg`, `PITCH.md` (mục 12.1) |
+| `sources/`, `SOURCES.md` | `source-ingest.mjs`, `poi-fetch.mjs`, agent | 2 | Văn bản gốc và mục nguồn; `poi-fetch` thêm mục `## POI (OpenStreetMap)` và dòng ghi công trong `CREDITS.md` ở gốc dự án (mục 12.8, 12.9) |
 | `STORYBOARD.md` | agent | 3 | Lưới beat, mỗi beat một hành động, cột SFX |
 | `PLAN.md` | agent | 4b | Mẫu ở [plan-demo.md](../references/plan-demo.md) |
 | `assets/voice/NN.mp3` | `eleven.mjs` | 5 | Kèm `NN.mp3.words.json` (mốc từng từ) và `NN.mp3.gate.json` (dấu kiểm cổng) |
 | `audio_meta.json`, `audio_engine_meta.json` | `eleven.mjs audio-meta` | 5 | Chỉ ở workflow HyperFrames chuyên biệt. Không xoá sidecar `audio_engine_meta.json` |
 | `assets/sfx/`, `assets/bgm/` | `eleven.mjs` hoặc `media-use resolve` | 5 | |
 | `assets/CREDITS.md` | agent | 5 | Nguồn và license của mọi tài sản |
+| `build/RECIPES.md` | `recipe-pack.mjs` | 6 | Công thức HyperFrames mà PLAN khai. Cổng final đòi file này mới hơn `PLAN.md` |
 | `index.html`, `compositions/` | HyperFrames, frame worker | 6 | `compositions/main-9x16.html` khi dựng tay cả hai khổ |
-| `demo/`, `demo/9x16/` | `make-demo.mjs` | 6b | PNG chụp đúng mốc trong `PLAN.md` |
+| `demo/`, `demo/9x16/` | `make-demo.mjs` | 6b | PNG chụp đúng mốc trong `PLAN.md`; với `--animatic` có thêm `animatic.mp4` và `contact-sheet.jpg` |
 | `DEMO.md` | `make-demo.mjs`, rồi agent | 6b | Script ghi `approval: pending`. Agent chỉ ghi lời duyệt sau khi người dùng trả lời |
 | `renders/` | `hyperframes render`, `render-final.mjs` | 7 | Bản nháp và bản giao |
 | `qc/` | `judge.mjs` | 8 | Kết quả chấm và khung hình của lỗi hard |
@@ -99,6 +102,7 @@ Frontmatter quyết định hành vi của nhiều script về sau:
 - `voice_source: clip` chuyển cổng viet-pro sang chế độ lint phụ đề và chữ trên hình thay cho kịch bản TTS (mục 6).
 - `aspect: both` buộc `PLAN.md` có thêm mục khung hình demo 9:16.
 - `duration_s:` được cổng viet-pro dùng để cảnh báo khi lời đọc quá khoảng 3 từ mỗi giây.
+- `brief_version: 2` đánh dấu dự án mới: phải qua bước 1b trước kịch bản. Người dùng chọn hướng bằng mắt trên 3 styleframe, `make-pitch.mjs choose` ghi `direction`, `word_budget` và các trường liên quan (mục 12.1). Agent không tự điền phong cách, hình chủ đạo, hiệu ứng, chuyển cảnh hay SFX.
 
 ### Bước 2. Kịch bản và cổng viet-pro
 
@@ -120,7 +124,7 @@ node $OV/scripts/check-viet-pro.mjs --project .
 | Mã thoát | Nghĩa |
 |---|---|
 | 0 | `PASS`, hoặc `SKIP` khi `language:` không phải tiếng Việt |
-| 1 | `BLOCKED`: thiếu biên bản hay trường bắt buộc, `files_read` thiếu file, thiếu `script-table.v1.md`, compare báo MISMATCH, hoặc lint còn ERROR ở `script-table.md`, `script/*.txt`, lời đọc trong `SCRIPT.md` |
+| 1 | `BLOCKED`: thiếu biên bản hay trường bắt buộc, `files_read` thiếu file, thiếu `script-table.v1.md`, compare báo MISMATCH, lint còn ERROR ở `script-table.md`, `script/*.txt`, lời đọc trong `SCRIPT.md`, hoặc lời đọc vượt `word_budget` (mục 12.2) |
 | 2 | Sai cú pháp hoặc không tìm thấy viet-pro (chỉ định bằng `--vp <thư mục>` hoặc biến `VIET_PRO_DIR`) |
 
 Cổng chỉ in WARN, không chặn, khi gặp câu mồi tương tác, lời kể trải nghiệm ngôi thứ nhất cần người dùng xác nhận, hoặc lời đọc dài quá thời lượng. Agent phải đọc từng WARN và sửa hoặc ghi lý do giữ.
@@ -149,7 +153,7 @@ Mặc định là HyperFrames. Bảng chọn workflow và các trường hợp d
 node $OV/scripts/check-preflight.mjs --project . --stage plan
 ```
 
-Mã thoát: 0 đạt, 1 bị chặn, 2 sai cú pháp. Cổng phải đạt trước khi tạo giọng và dựng. Agent gửi tóm tắt plan cho người dùng; người dùng đổi ý thì sửa `PLAN.md` và chạy lại cổng.
+Mã thoát: 0 đạt, 1 bị chặn, 2 sai cú pháp. Cổng phải đạt trước khi tạo giọng và dựng. Dự án có `direction:` còn qua cổng sáng tạo: mục `## Ý đồ sáng tạo`, cột Blueprint/Rule, seam nối từng beat và các beat chỉ có nhạc (mục 12.3). Agent gửi tóm tắt plan cho người dùng; người dùng đổi ý thì sửa `PLAN.md` và chạy lại cổng.
 
 ### Bước 5. Âm thanh
 
@@ -157,6 +161,7 @@ Chỉ bắt đầu khi cổng viet-pro và cổng plan đều đã đạt. Thứ
 
 ### Bước 6. Dựng
 
+- Chạy `recipe-pack.mjs --project ./` để có `build/RECIPES.md` và đọc hết trước khi viết HTML (mục 12.4). Cảnh mở đầu dựng tiếp từ styleframe ghi ở `styleframe:` trong BRIEF.
 - HyperFrames: gọi skill `hyperframes`. Vì đã có `BRIEF.md`, nó đi vào workflow ghi ở `workflow:`.
 - Bắt buộc chạy `hyperframes catalog --query "<hiệu ứng>"` trước khi tự viết hiệu ứng, ưu tiên block hay blueprint đã chọn ở bước 3.
 - Chép mục "Sàn chất lượng" và "Kỷ luật GSAP" của [edit-method.md](../references/edit-method.md) vào prompt của frame worker.
@@ -180,7 +185,7 @@ Agent tự xem từng khung (đủ dấu, không tràn chữ, đúng vùng an to
 node $OV/scripts/check-preflight.mjs --project . --stage final
 ```
 
-Ngoài các điều kiện của cổng plan, cổng final đòi `demo/` có đủ PNG thật cho mọi mốc (và `demo/9x16/` khi cần), mọi khung mới hơn `PLAN.md` và `DEMO.md` có lời duyệt thật. Composition sửa sau lần chụp demo cuối chỉ là WARN; nếu thay đổi nhìn thấy được thì chụp lại và xin duyệt lại.
+Ngoài các điều kiện của cổng plan, cổng final đòi `demo/` có đủ PNG thật cho mọi mốc (và `demo/9x16/` khi cần), mọi khung mới hơn `PLAN.md` và `DEMO.md` có lời duyệt thật. Với dự án cũ, composition sửa sau lần chụp demo cuối chỉ là WARN; nếu thay đổi nhìn thấy được thì chụp lại và xin duyệt lại. Dự án có `direction:` chụp bằng `--animatic` để người dùng duyệt chuyển động. Cổng chặn khi `index.html` hay `compositions/*.html` mới hơn animatic (mục 12.5).
 
 ### Bước 7. Render
 
@@ -623,3 +628,249 @@ Cảnh con là các file nhúng qua `data-composition-src` (đệ quy). Composit
 | `export.mjs` thoát 2 vì file ra đã có | Script không ghi đè `<tên>-<target>.mp4` hay `<tên>-thumb.jpg` | Đổi tên hoặc xoá file cũ có chủ đích rồi chạy lại |
 | `compress-final.sh` báo file ra đã có | Script không ghi đè | Đổi tên file ra hoặc xoá file cũ có chủ đích |
 | `sweep-after-final.sh` dừng, không xoá gì | Nhiều video mà không file nào tên `final` hay `delivery` | Chỉ định file cần giữ bằng `--keep renders/<file>` |
+| Cổng plan hoặc final báo ``BRIEF.md has no `direction:` `` | BRIEF có `brief_version: 2` nhưng chưa qua bước 1b | Chạy `make-pitch.mjs init`, `render`, gửi pitch cho người dùng, rồi `choose` (mục 12.1). Dự án chỉ cắt footage thì ghi `creative_override` |
+| `check-viet-pro` báo `VOICE_OVER_BUDGET` | Lời đọc trong `script/*.txt` nhiều hơn `word_budget` | Cắt lời hoặc chuyển ý sang hình và beat chỉ có nhạc. Đổi nhịp để nới ngân sách chỉ khi người dùng đồng ý (mục 12.2) |
+| Cổng plan báo `soft seam "…" is only allowed for directions with allow_soft` | Seam mềm như `focus-pull` dùng với hướng không cho phép | Thay bằng seam liền mạch của hướng, xem [creative-directions.md](../references/creative-directions.md) |
+| Cổng final báo `animatic … is older than PLAN.md` | Sửa `PLAN.md` sau khi render animatic | Chạy lại `make-demo.mjs --project ./ --animatic`, gửi lại cho người dùng và ghi lời duyệt mới |
+| Cổng final báo `… newer than the animatic …` | Sửa `index.html` hay `compositions/*.html` sau khi người dùng duyệt animatic | Như dòng trên: render lại animatic và xin duyệt lại (mục 12.5) |
+| `qc-mp4` in `FAIL MOTION`, cổng final báo animatic `trông như slideshow`, hoặc `make-pitch render` thoát 4 | Video gần như đứng yên kiểu slideshow | Dựng lại các beat theo `build/RECIPES.md` (styleframe thì theo `RECIPES.md` của nó), không nới ngưỡng (mục 12.6) |
+| Cổng báo `creative_override needs a reason of at least 10 characters` | Lý do override quá ngắn | Ghi lý do rõ, ít nhất 10 ký tự, hoặc bỏ override và qua bước 1b |
+| Dự án cần dựng hình mới mà cổng in `creative gate skipped: creative_override` | BRIEF còn dòng `creative_override` | Xoá dòng đó và qua bước 1b; `make-pitch.mjs choose` tự xoá override |
+| Cổng final báo `build/RECIPES.md is older than PLAN.md` | Sửa PLAN sau khi gom công thức | Chạy lại `recipe-pack.mjs --project ./`, đọc lại công thức mới |
+| `poi-fetch --address` thoát 1, báo `network error: fetch failed` | DNS của máy không phân giải `openstreetmap.org` | Chạy bằng `--lat` và `--lon` (mục 12.8) |
+| `source-ingest` thoát 2, báo `pdftotext not found` | Máy chưa có poppler | Cài poppler rồi chạy lại |
+
+## 12. Hướng sáng tạo, brand kit và dữ liệu thật
+
+Chương này gom các công cụ của bước 1b và các cổng chống slideshow. Lý do có chúng nằm ở [SKILL.md](../SKILL.md): khi agent tự điền phong cách, nó chọn kiểu an toàn nhất là nền tối và thẻ chữ trượt lên rồi mờ dần, mỗi câu một thẻ. Vì vậy người dùng chọn hướng bằng mắt trên 3 styleframe dựng từ chính chủ đề của họ, kịch bản viết sau khi đã có hướng. Máy chặn kiểu slideshow ở PLAN, ở clip nháp và ở bản render.
+
+Các cổng này chỉ bật khi `BRIEF.md` có `direction:` hoặc `brief_version: 2`. Dự án cũ không có hai dòng đó chỉ nhận một dòng WARN `creative gate skipped: BRIEF.md has no direction: and no brief_version: 2 (dự án cũ)` và đi theo cổng cũ.
+
+### 12.1 Chọn hướng bằng `directions.mjs` và `make-pitch.mjs`
+
+**Dùng khi nào.** Mọi dự án mới (`brief_version: 2`), ngay sau brief tối thiểu ở bước 1 và trước kịch bản. Danh mục 8 hướng, 2 núm (nhịp, tông màu) và 5 nhóm từ khoá đổi được nằm ở [creative-directions.md](../references/creative-directions.md). File đó sinh từ `data/directions.json` bằng `directions.mjs doc --write`, không sửa tay.
+
+`directions.mjs` là công cụ tra cứu, agent ít khi gọi trực tiếp vì `make-pitch.mjs` đã dùng nó bên trong:
+
+```bash
+node $OV/scripts/directions.mjs check                       # mọi token là blueprint, rule, preset, style, seam có thật trong HyperFrames
+node $OV/scripts/directions.mjs pick --category bat-dong-san --aspect 9:16 --topic "<chủ đề>"
+node $OV/scripts/directions.mjs show A8
+node $OV/scripts/directions.mjs compat --direction A8 --energy don-dap
+```
+
+Mã thoát của `directions.mjs`: 0 xong, 1 `check` thấy token không có thật, 2 sai cú pháp, 3 `compat` có cảnh báo phối. `setup-check.mjs` cũng chạy `check`.
+
+`make-pitch.mjs` đi theo bốn bước:
+
+```bash
+node $OV/scripts/make-pitch.mjs init --project ./ --topic "<chủ đề>" --aspect 9:16 --category <nhóm> --energy vua
+# agent viết pitch/<n>-<slug>/index.html cho cả 3 hướng, theo STYLEFRAME.md và RECIPES.md cùng thư mục
+node $OV/scripts/make-pitch.mjs render --project ./
+# gửi pitch/PITCH.md, pitch/sheet.jpg và 3 clip cho người dùng, dừng chờ trả lời
+node $OV/scripts/make-pitch.mjs choose --project ./ --pick 2 --transition lao-xuyen-tam --energy em
+```
+
+- `init` chọn tất định 3 hướng tương phản: một hướng khớp chủ đề nhất, một hướng liền mạch không cắt, một hướng táo bạo. Mỗi hướng có một project HyperFrames trống trong `pitch/`, kèm `STYLEFRAME.md` (dựng gì trong khoảng 3 giây) và `RECIPES.md`. Không truyền `--duration` thì script lấy `duration_s` trong BRIEF, không có thì 15 giây.
+- `render` render 3 clip nháp, cắt một khung cho mỗi clip, ghép `sheet.jpg`, đo chuyển động và ghi `PITCH.md` gồm menu số, hai núm và 3 đến 4 từ khoá đổi được cho mỗi nhóm.
+- Người dùng trả lời bằng một số (`2`), số kèm điều chỉnh (`2, chuyển cảnh: lao-xuyen-tam, nhịp: em`) hoặc `tự chọn`. Từ trong câu trả lời ứng với cờ của `choose`: `phong cách` là `--style`, `hình` là `--visual`, `hiệu ứng` là `--effect`, `chuyển cảnh` là `--transition`, `âm thanh` là `--sfx`, `nhịp` là `--energy`, `màu` là `--palette`.
+- `choose` ghi vào frontmatter `BRIEF.md` các trường `direction`, `direction_swaps`, `energy`, `palette`, `word_budget`, `music_only_s`, `creative_selection`, `styleframe` cùng mục `## creative_direction`. Lệnh cũng xoá dòng `creative_override` nếu có. Agent không gõ tay các trường này.
+- `choose --auto` lấy phương án 1 và ghi `creative_selection: auto`. Chỉ dùng khi người dùng đã nói rõ là chạy không dừng.
+
+Styleframe được chọn là cảnh mở đầu của video thật, dựng tiếp ở bước 6. SKILL.md khuyên viết 3 styleframe bằng 3 agent song song khi runtime cho phép; viết tuần tự thì tính khoảng 15 phút.
+
+| Mã thoát | Nghĩa |
+|---|---|
+| 0 | Xong |
+| 1 | `init` hay `render` lỗi, thiếu ffmpeg hoặc ffprobe, hoặc thiếu skill HyperFrames |
+| 2 | Sai cú pháp, chưa chạy `init`, styleframe chưa viết, từ khoá không có trong danh mục, brand lỗi |
+| 3 | `choose` thấy phối không hợp: hỏi người dùng một lần, họ vẫn giữ thì chạy lại với `--accept-warnings` |
+| 4 | `render` thấy một styleframe gần như đứng yên. `PITCH.md` vẫn được ghi, nhưng chưa gửi cho người dùng |
+
+Lỗi thường gặp:
+
+- `pitch/PICK.json not found; run make-pitch.mjs init first`: chạy `init` trước `render` hay `choose`.
+- `<thư mục>/index.html is still the blank hyperframes scaffold (styleframe chưa viết)`: agent chưa viết styleframe đó. Viết theo `STYLEFRAME.md` rồi render lại.
+- `ffmpeg … not found; install ffmpeg`: cài ffmpeg (kèm ffprobe), chạy `setup-check.mjs`, rồi render lại.
+- `FAIL  styleframe 2 gần như đứng yên (MOTION)` (thoát 4): dựng lại styleframe đó theo `RECIPES.md`, chuyển động phải liên tục suốt clip.
+- `không có từ khoá "<mã>" trong nhóm …` (thoát 2): mã gõ sai. Lấy đúng mã trong `PITCH.md`.
+- `WARN  hướng A8 "…" vốn ở nhịp Êm/Vừa, chọn nhịp Dồn dập có thể làm mất chất của hướng` (thoát 3): báo người dùng một lần, không tự đổi lựa chọn của họ.
+
+### 12.2 `word_budget`, ngân sách lời đọc
+
+**Dùng khi nào.** Từ bước 2 trở đi, với mọi dự án có `direction:`. Nguyên tắc là hình dẫn, lời theo: lời đọc ít đi để hình có chỗ kể.
+
+`choose` tính `word_budget` và `music_only_s` từ nhịp đã chọn và `duration_s` trong BRIEF. Số từ cho mỗi 15 giây và số giây chỉ có nhạc của từng nhịp nằm ở mục `energy` của `data/directions.json`; với 15 giây, ngân sách từ 22 đến 30 từ tuỳ nhịp. Muốn đổi ngân sách thì chạy lại `choose` với nhịp khác hoặc sau khi sửa `duration_s`. Chỉ làm vậy khi người dùng đồng ý, vì nhịp đổi thì chất của hướng cũng đổi.
+
+```bash
+node $OV/scripts/check-viet-pro.mjs --project ./
+```
+
+Cổng viet-pro đếm từ trong mọi `script/*.txt`. Vượt ngân sách là FAIL, cổng thoát 1 với dòng:
+
+```text
+FAIL  VOICE_OVER_BUDGET: voice has <n> words, BRIEF word_budget is <m> (hình dẫn, lời theo: cắt lời hoặc chuyển ý sang hình/beat không lời)
+```
+
+BRIEF thiếu `word_budget` mà có `direction:` thì cổng tự tính từ nhịp và thời lượng. Dự án `creative_override` hoặc `voice_source: clip` không bị tính ngân sách tự động. Cảnh báo cũ về lời đọc quá khoảng 3 từ mỗi giây vẫn còn, nhưng chỉ là WARN.
+
+Cách sửa: cắt câu, gộp ý, hoặc chuyển một ý sang hình và beat chỉ có nhạc. Không nâng `word_budget` bằng tay để lọt cổng.
+
+### 12.3 PLAN sáng tạo và các luật chặn
+
+**Dùng khi nào.** Bước 4b, với dự án có `direction:`. Mẫu `PLAN.md` ở [plan-demo.md](../references/plan-demo.md) có thêm mục `## Ý đồ sáng tạo` và bảng `## Cảnh` 7 cột.
+
+```bash
+node $OV/scripts/check-preflight.mjs --project ./ --stage plan
+```
+
+Mã thoát: 0 đạt, 1 bị chặn, 2 sai cú pháp. Ngoài các luật của cổng plan cũ (bước 4b), cổng sáng tạo chặn khi:
+
+- BRIEF có `brief_version: 2` mà chưa có `direction:`. Dòng FAIL bắt đầu bằng ``BRIEF.md has no `direction:` `` và nhắc chạy bước 1b.
+- `direction:` không có trong `data/directions.json`.
+- `## Ý đồ sáng tạo` thiếu, hoặc thiếu một trong ba dòng `Hướng:`, `Chuyển cảnh:`, `Luật chống slideshow:`.
+- Bảng `## Cảnh` thiếu cột `Blueprint/Rule` hoặc cột `Nối sang beat sau`.
+- Một hàng không nêu blueprint hay rule nào, nêu tên không có trong `hyperframes-animation` (`… is not a blueprint or rule in hyperframes-animation`), hoặc cả bảng có ít hơn 2 token khác nhau.
+- Một hàng (trừ hàng cuối) nối sang beat sau bằng `fade`, `crossfade`, `cut`, "mờ dần", "hiện dần" hay các từ cấm khác (`… is a slide swap (banned)`), không nêu seam nào trong từ vựng (`no known seam in …`), hoặc dùng seam mềm khi hướng không cho phép.
+- Tổng thời lượng các hàng chỉ có nhạc ít hơn `music_only_s`. Hàng chỉ có nhạc là hàng có ô Lời đọc để trống, ghi `(nhạc)`, `không lời` hoặc một dấu gạch dài.
+
+Seam mềm (`focus-pull`, `blur-crossfade`, `cross-warp-morph`…) chỉ dùng được với hướng có `allow_soft`; danh sách hướng và seam ở [creative-directions.md](../references/creative-directions.md). Dùng sai thì cổng in:
+
+```text
+FAIL  PLAN.md "## Cảnh" row 2: soft seam "focus-pull" is only allowed for directions with allow_soft (A2 has none)
+```
+
+Cách sửa: thay bằng một seam liền mạch của hướng. Dòng FAIL `no known seam` liệt kê sẵn các seam của hướng đang dùng.
+
+**`creative_override`.** Dự án chỉ cắt gọn footage, không dựng hình mới, ghi `creative_override: <lý do ít nhất 10 ký tự>` vào frontmatter `BRIEF.md` thay cho bước 1b. Cổng in WARN `creative gate skipped: creative_override "<lý do>"` rồi bỏ qua mọi luật sáng tạo. Lý do ngắn hơn 10 ký tự thì cổng chặn với dòng `BRIEF.md creative_override needs a reason of at least 10 characters`. Khi có override, `qc-mp4` chỉ báo MOTION ở mức WARN và demo không bắt buộc animatic. Clip làm trục kèm nền dựng mới vẫn nên qua bước 1b; hướng A8 hợp với bản đồ và PiP. Chạy `make-pitch.mjs choose` sẽ xoá dòng override.
+
+### 12.4 `recipe-pack.mjs`, gom công thức trước khi dựng
+
+**Dùng khi nào.** Bước 6, sau khi cổng plan đạt và trước khi viết HTML, kể cả khi dựng tay `general-video`. `make-pitch init` cũng tự gọi nó để ghi `RECIPES.md` cho từng styleframe.
+
+```bash
+node $OV/scripts/recipe-pack.mjs --project ./
+node $OV/scripts/recipe-pack.mjs --direction A8 --transition lao-xuyen-tam --out <file.md>
+```
+
+Lệnh đầu đọc blueprint, rule và seam mà `PLAN.md` khai, cộng các token của hướng trong BRIEF, rồi ghi nguyên văn file công thức của HyperFrames vào `build/RECIPES.md`. Agent đọc hết file này trước khi viết HTML; với frame worker thì chép vào prompt.
+
+Mã thoát: 0 đã ghi, 1 không có token nào hoặc thiếu skill HyperFrames, 2 sai cú pháp hoặc mã hướng không có.
+
+Lỗi thường gặp:
+
+- `recipe-pack: no blueprint/rule/seam found`: PLAN chưa có cột Blueprint/Rule và BRIEF chưa có `direction:`.
+- Ở cổng final: `build/RECIPES.md not found` hoặc `build/RECIPES.md is older than PLAN.md; re-run recipe-pack.mjs`. Sửa PLAN thì chạy lại `recipe-pack.mjs`.
+
+### 12.5 Duyệt bằng animatic
+
+**Dùng khi nào.** Bước 6b, với dự án có `direction:`. Ảnh tĩnh không cho thấy kiểu thẻ trượt lên rồi mờ dần, nên người dùng duyệt clip nháp có chuyển động.
+
+```bash
+node $OV/scripts/make-demo.mjs --project ./ --animatic
+node $OV/scripts/qc-mp4.mjs demo/animatic.mp4 --project ./
+```
+
+`--animatic` render toàn bộ composition ở `--quality draft`, thu cạnh ngắn về 540 px, giữ lại thành `demo/animatic.mp4`, cắt các khung theo mốc trong `PLAN.md`, ghép `contact-sheet.jpg` và ghi `animatic:` cùng `approval: pending` vào `DEMO.md`. Dùng được cùng `--composition` và `--hyperframes`. Không dùng chung với `--from-video` (thoát 2). Mã thoát giống mục 6b: 0 đã chụp, 1 chụp lỗi, 2 sai cú pháp hoặc `PLAN.md` thiếu mốc.
+
+Agent tự xem từng khung, chạy `qc-mp4` trên animatic (MOTION không được FAIL), gửi clip nháp và contact sheet cho người dùng rồi dừng chờ. Người dùng đồng ý thì ghi lời duyệt vào `DEMO.md` như bước 6b.
+
+Cổng final (`check-preflight.mjs --project ./ --stage final`, cũng là cổng của `render-final.mjs`) chặn khi:
+
+- `DEMO.md` không có dòng `animatic:`, hoặc file đó không còn.
+- Animatic cũ hơn `PLAN.md`: `animatic demo/animatic.mp4 is older than PLAN.md; re-run make-demo.mjs --animatic`.
+- `index.html` hoặc một file `compositions/*.html` được sửa sau khi render animatic: `<file> newer than the animatic demo/animatic.mp4; the user approved older motion, re-run make-demo.mjs --animatic`. Với dự án cũ, sửa composition sau demo chỉ là WARN; với dự án có `direction:` thì chặn, vì người dùng đã duyệt một chuyển động khác.
+- Animatic bị MOTION chấm FAIL (mục 12.6): `animatic demo/animatic.mp4: <số đo> … trông như slideshow …`.
+
+Cách sửa chung: sửa xong thì chạy lại `make-demo.mjs --animatic`. Lệnh này đưa `approval` về `pending`, nên phải gửi lại clip cho người dùng và ghi lời duyệt mới.
+
+### 12.6 MOTION trong `qc-mp4` và `SLIDESHOW_MOTION` trong `video-lint`
+
+**MOTION** là một dòng trong kết quả `qc-mp4.mjs`. Nó đo mức thay đổi giữa các khung liên tiếp và in hai con số: tỉ lệ khung gần như đứng yên và đỉnh chuyển động (phân vị 90). Slideshow vừa đứng yên nhiều vừa không bao giờ chuyển động mạnh. Với dự án có `direction:` và không có `creative_override`, mặc định FAIL khi tỉ lệ đứng yên từ 60% trở lên và đỉnh dưới 1,5; nhịp `em` có ngưỡng riêng. Dự án khác chỉ nhận WARN ở cùng mức đó. Ngưỡng đầy đủ và số hiệu chỉnh ở `--help` của `qc-mp4.mjs` (hằng `LIMITS`).
+
+```bash
+node $OV/scripts/qc-mp4.mjs renders/<tên>.mp4 --project ./ --write-qa
+```
+
+Cần `--project` để script đọc `direction`, `energy` và `creative_override` trong BRIEF. Dòng FAIL có dạng:
+
+```text
+FAIL MOTION <n>% khung gần như đứng yên (<khung đứng>/<tổng khung>), đỉnh chuyển động <x>; ngưỡng … trông như slideshow, dựng lại beat có chuyển động liền mạch (build/RECIPES.md)
+```
+
+Có FAIL thì `qc-mp4` thoát 1. Cùng phép đo này chạy ở ba chỗ: `make-pitch render` trên styleframe (thoát 4), cổng final trên animatic, `qc-mp4` trên bản render. Cách sửa luôn là dựng lại các beat theo `build/RECIPES.md` cho chuyển động liền mạch, không nới ngưỡng.
+
+**`SLIDESHOW_MOTION`** là WARN sớm của `video-lint.mjs`, chạy trên code chứ chưa cần render: timeline có từ 12 thuộc tính được animate trở lên mà dưới 15% vượt ra ngoài `opacity` và `translate`, đồng thời không dùng HyperShader, THREE hay WebGL. Luật này không chặn và không đổi mã thoát, vì đọc code tĩnh dễ đánh lừa. Thấy WARN này thì xem lại beat trước khi tốn thời gian render; phần chặn thật là MOTION.
+
+### 12.7 Brand kit
+
+**Dùng khi nào.** Làm nhiều video cho cùng một thương hiệu và muốn màu, font, logo, giọng đọc giống nhau từ styleframe đầu tiên.
+
+Chép [brand.example.json](../references/brand.example.json) thành `shared-assets/brand.json` của workspace (hoặc `<dự án>/brand.json`) rồi sửa. File có `name`, `logo`, `watermark`, `fonts.heading`, `fonts.body`, `palette` (`bg`, `fg`, `accent`, `accent2` tuỳ chọn), `voice_id`, `tts_model` và `banned_directions`. Đường dẫn tính từ thư mục chứa `brand.json`.
+
+```bash
+node $OV/scripts/brand.mjs check --project ./
+```
+
+Script tìm theo thứ tự: `--file`, rồi `<dự án>/brand.json`, rồi `<dự án>/../shared-assets/brand.json`. Không có brand thì in gợi ý và thoát 0, vì brand kit là tuỳ chọn.
+
+| Mã thoát | Nghĩa |
+|---|---|
+| 0 | Hợp lệ, hoặc không có brand |
+| 1 | Có ERROR: màu không đúng dạng `#rrggbb`, hoặc `banned_directions` có mã hướng không tồn tại |
+| 2 | Sai cú pháp, JSON hỏng, hoặc `--file` trỏ tới file không có |
+
+File logo, watermark hay font không tìm thấy chỉ là WARN (`logo: file not found: …`); font heading không phải `.ttf`, `.otf` hay `.woff2` cũng là WARN.
+
+`make-pitch` tự đọc brand. `init` bỏ các hướng trong `banned_directions` khỏi danh sách chọn và ghi màu, logo, font vào `STYLEFRAME.md`. `choose` mặc định tông màu `thuong-hieu`, ghi `brand:` vào BRIEF, rồi điền `voice_id`, `tts_model` của brand khi BRIEF chưa có hoặc đang để giá trị mặc định của mẫu. Brand có ERROR thì `init` thoát 2. `--palette thuong-hieu` mà không có brand thì `choose` thoát 2.
+
+### 12.8 `poi-fetch.mjs`, tiện ích thật quanh địa chỉ
+
+**Dùng khi nào.** Video bất động sản hoặc địa điểm (hướng A8, thẻ 9 trong [pattern-library.md](../references/pattern-library.md)) cần trường, chợ, siêu thị, trạm xe, bệnh viện, công viên, trung tâm thương mại quanh dự án, kèm khoảng cách và phút đi bộ có thật.
+
+```bash
+node $OV/scripts/poi-fetch.mjs --project ./ --address "<địa chỉ dự án>"
+node $OV/scripts/poi-fetch.mjs --project ./ --lat <vĩ độ> --lon <kinh độ> --radius 1000 --route
+```
+
+- Dữ liệu lấy từ OpenStreetMap: Nominatim để đổi địa chỉ ra toạ độ, Overpass để tìm tiện ích. `--route` hỏi thêm bộ định tuyến đi bộ OSRM của FOSSGIS để có phút đi bộ theo đường thật; dịch vụ này lỗi thì script in WARN và dùng ước tính.
+- Mặc định bán kính 1500 m, tối đa 5000 m. `--kinds` chọn loại trong `school,market,supermarket,transit,hospital,park,mall`.
+- Script ghi `sources/poi.json` (cache), mục `## POI (OpenStreetMap)` trong `SOURCES.md` và dòng ghi công ODbL trong `CREDITS.md` ở gốc dự án. Chạy lại với cùng tâm, bán kính, `--kinds` và `--route` thì dùng cache, không gọi mạng; `--refresh` để lấy lại.
+- Bảng trong `SOURCES.md` có cả khoảng cách đường thẳng lẫn phút đi bộ kèm quãng đường đi, cùng cột cách tính (ước tính hay OSRM). Số trên hình lấy từ bảng này, PLAN ghi đúng cách tính. Không ghi nguồn lên hình.
+- OSRM nắn điểm ra con đường gần nhất rồi mới tính, nên một nơi rất gần vẫn có thể ra vài phút đi bộ. Nơi cách dưới khoảng 50 m thì viết "ngay cạnh" thay cho số phút.
+- Với `--address`, script in dòng `poi-fetch: geocode "<địa chỉ>" → <tên nơi tìm được> (<vĩ độ>, <kinh độ>)`. Tên đó không phải dự án thì chạy lại bằng `--lat` và `--lon`.
+
+| Mã thoát | Nghĩa |
+|---|---|
+| 0 | Xong |
+| 1 | Lỗi mạng hoặc dịch vụ (in mã HTTP hoặc mã lỗi mạng) |
+| 2 | Sai cú pháp: thiếu `--project`, có cả `--address` lẫn `--lat`/`--lon`, bán kính hay loại không hợp lệ |
+| 4 | Không tìm thấy địa chỉ: `poi-fetch: không tìm thấy địa chỉ "<địa chỉ>"` |
+
+**`--address` cần DNS phân giải được `openstreetmap.org`.** Một số resolver (ví dụ DNS của Tailscale trên máy đã thử) không trả kết quả cho tên miền này, khi đó lệnh thoát 1 với dòng `poi-fetch: network error: fetch failed`, có thể kèm mã như `(ENOTFOUND)`. `--lat`/`--lon` vẫn chạy được, vì Overpass và OSRM nằm ở tên miền khác. Lấy toạ độ từ bản đồ rồi chạy bằng `--lat`/`--lon`, hoặc đổi DNS của máy nếu người dùng quyết.
+
+### 12.9 `source-ingest.mjs`, lấy văn bản gốc để kiểm số liệu
+
+**Dùng khi nào.** Bước 2, khi kịch bản dựa trên bài báo, trang web, PDF hay bài arXiv, nhất là tin nóng và explainer có số liệu. Chạy trước khi soạn, để lượt kiểm chứng của viet-pro có câu gốc mà đối chiếu.
+
+```bash
+node $OV/scripts/source-ingest.mjs --project ./ <url> [<url-khác>] [bao-cao.pdf] [arxiv:<id>]
+```
+
+- Mỗi nguồn thành một file `sources/<slug>.txt` và một mục `## <tiêu đề>` trong `SOURCES.md` gồm URL hoặc file, ngày đăng (để trống khi không rõ), ngày truy cập, đường dẫn văn bản và các "Câu ứng viên" có chữ số hoặc dấu trích dẫn.
+- Script không tóm tắt. Câu ứng viên chỉ là chỗ cần đọc lại; agent đọc `sources/<slug>.txt` và tự viết ý chính có trích câu gốc. Mọi số liệu trong kịch bản phải trỏ về một mục trong `SOURCES.md`.
+- Chạy lại cùng URL hay file thì mục cũ được thay, không thêm mục mới. `--max-candidates` đổi số câu ứng viên (mặc định 8).
+- PDF đọc bằng `pdftotext` của poppler. URL trả về PDF cũng được xử lý như file PDF.
+
+| Mã thoát | Nghĩa |
+|---|---|
+| 0 | Mọi nguồn đã lấy xong |
+| 1 | Có nguồn lỗi; các nguồn khác vẫn được ghi |
+| 2 | Sai cú pháp, hoặc gặp PDF mà máy chưa có `pdftotext` |
+
+Lỗi thường gặp:
+
+- `source-ingest: <nguồn>: HTTP 403` hoặc `fetch failed: …`: trang chặn truy cập tự động hay cần đăng nhập. Lưu bài thành PDF rồi chạy lại với file PDF.
+- `no text extracted`: trang không có văn bản đọc được. Thử bản PDF hoặc một nguồn khác cho cùng dữ kiện.
+- `pdftotext not found`: cài poppler (`brew install poppler` trên macOS) rồi chạy lại. Các nguồn lấy được trước đó vẫn có mục trong `SOURCES.md`.
+- `not a URL, .pdf file or arxiv:<id>`: tham số không phải URL đầy đủ, file `.pdf` hay `arxiv:<id>`.

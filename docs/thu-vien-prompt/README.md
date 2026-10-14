@@ -9,7 +9,7 @@ Muốn hiểu từng bước agent sẽ làm, đọc [hướng dẫn chuyên sâ
 1. Chọn prompt trong bảng mục lục ở cuối trang theo loại video bạn cần.
 2. Chép khối "Prompt mẫu" và thay mọi `{{biến}}`. Bảng biến ngay dưới prompt giải thích từng biến và cho ví dụ. Biến nào bạn chưa có thì xoá cả cụm đó, agent sẽ tự đề xuất và ghi rõ là đề xuất.
 3. Dán vào agent. Prompt mẫu mở đầu bằng `/opus-video` theo cú pháp Claude Code. Codex dùng `$opus-video`; agent khác thì mở đầu bằng "Dùng skill opus-video để" (xem mục 6 của [README.md](../../README.md)).
-4. Trả lời khi agent hỏi chủ đề, khổ hình hoặc thời lượng còn thiếu, rồi duyệt plan và khung hình demo khi agent gửi.
+4. Trả lời khi agent hỏi chủ đề, khổ hình hoặc thời lượng còn thiếu. Với video dựng mới, chọn một trong 3 hướng agent gửi trong `PITCH.md` (mục 31). Sau đó duyệt plan và khung hình demo khi agent gửi.
 
 Khổ hình chỉ nhận ba giá trị: `16:9`, `9:16` hoặc `both`. Với `both`, bản dọc được dàn lại bố cục chứ không cắt từ bản ngang.
 
@@ -96,3 +96,14 @@ Các prompt trong thư viện tuân theo mấy nguyên tắc dưới đây. Khi 
 | 28 | Viết caption Facebook và TikTok | [06-van-hanh-sau-dung.md](06-van-hanh-sau-dung.md) |
 | 29 | QC trước khi giao | [06-van-hanh-sau-dung.md](06-van-hanh-sau-dung.md) |
 | 30 | Dọn file sau khi có bản final | [06-van-hanh-sau-dung.md](06-van-hanh-sau-dung.md) |
+
+### Chọn hướng sáng tạo và dữ liệu thật
+
+| # | Tên | File |
+|---|---|---|
+| 31 | Làm video mới có bước chọn hướng | [07-chon-huong-sang-tao.md](07-chon-huong-sang-tao.md) |
+| 32 | Chọn hướng kèm đổi từ khoá | [07-chon-huong-sang-tao.md](07-chon-huong-sang-tao.md) |
+| 33 | Chạy không dừng, để agent tự chọn hướng | [07-chon-huong-sang-tao.md](07-chon-huong-sang-tao.md) |
+| 34 | Video bất động sản có tiện ích thật quanh dự án | [07-chon-huong-sang-tao.md](07-chon-huong-sang-tao.md) |
+| 35 | Tin nóng từ một bài báo | [07-chon-huong-sang-tao.md](07-chon-huong-sang-tao.md) |
+| 36 | Dự án chỉ cắt footage, bỏ bước chọn hướng | [07-chon-huong-sang-tao.md](07-chon-huong-sang-tao.md) |

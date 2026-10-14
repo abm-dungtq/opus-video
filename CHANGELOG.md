@@ -1,24 +1,41 @@
 # Changelog
 
-## 2026-10-14: creative direction — pick by eye, picture leads, slideshow blocked
+## 2026-10-14: creative direction, brand kit, real data
 
-Why: a one-line brief ("15s, công nghệ cao cấp") produced four title cards sliding up and fading. Causes found: step 1 told the agent to fill the style itself; the script was written before any visual idea (one sentence = one card); the general-video path built without HyperFrames recipes; the demo gate showed stills, which cannot reveal a slide swap; no gate looked at motion.
+Why: a one-line brief ("15s, công nghệ cao cấp") produced four title cards sliding up and fading. Causes found: step 1 told the agent to fill the style itself; the script was written before any visual idea (one sentence = one card); the general-video path built without HyperFrames recipes; the demo gate showed stills, which cannot reveal a slide swap; no gate looked at motion. Property and news videos also needed real numbers (nearby amenities, source text) instead of typed-in ones.
 
-### Added
-- `data/directions.json`: 8 creative directions (A1–A8: one-shape morph, prompt → live artifact, kinetic type with beat invert, continuous camera + cursor, 3D flythrough, live data, editorial marker, map/PiP), two knobs (energy, palette) and 5 swappable keyword groups (style, visual, effect, transition, sfx) with Vietnamese labels. Every token is a real HyperFrames blueprint, rule, preset, visual style or seam.
-- `scripts/directions.mjs`: `check` (token existence against the installed HyperFrames; also run by `setup-check`), `pick` (deterministic, one direction per tier: fit / continuous / bold; topic keywords match whole words), `compat` (clash warnings, exit 3), `doc --write` → `references/creative-directions.md`.
-- `scripts/make-pitch.mjs` (SKILL.md step 1b): `init` scaffolds 3 HyperFrames styleframe projects with `STYLEFRAME.md` + `RECIPES.md`; `render` makes 3 draft clips, `sheet.jpg`, `PITCH.md` (numbered menu, works on every agent) and measures their motion; `choose` writes `direction`, `direction_swaps`, `energy`, `palette`, `word_budget`, `music_only_s`, `creative_selection`, `styleframe` and `## creative_direction` into `BRIEF.md`. Smoke run: 3 × 3 s styleframes rendered in 26 s.
+### Workflow
+- New SKILL.md step 1b: the user picks one of three styleframes built from their own topic, before the script. The chosen styleframe becomes the opening scene. Step 1 asks only for the minimal brief; step 2 writes the script after the direction (picture leads, words follow) within `word_budget`; steps 4b, 6, 6b, 8 and the reference table follow the new gates. SKILL.md suggests writing the three styleframes with parallel agents when the runtime allows (about 15 minutes when written one after another).
+- Step 6 builds from `build/RECIPES.md`; step 6b approves a motion draft (animatic) instead of stills.
+- `data/directions.json`: 8 creative directions (A1 to A8: one-shape morph, prompt to live artifact, kinetic type with beat invert, continuous camera with cursor, 3D flythrough, live data, editorial marker, map/PiP), two knobs (energy, palette) and 5 swappable keyword groups (style, visual, effect, transition, sfx) with Vietnamese labels. Every token is a real HyperFrames blueprint, rule, preset, visual style or seam. `references/creative-directions.md` is generated from it.
+- `references/styleframe-examples/` holds one finished styleframe per direction (A2, A3, A4) from a real pitch; `STYLEFRAME.md` points to the example of its direction when one exists.
+- `references/pattern-library.md`: vertical news and niche explainer cards (9:16), with every on-screen number traced to `SOURCES.md`.
+- `references/brand.example.json`: template for a shared brand kit (`shared-assets/brand.json`).
+- Docs: `brief-template.md`, `plan-demo.md` (7-column scene table), `edit-method.md` (all 22 blueprints, anti-slideshow rules, the 4 cut-catalog seams), README, chapter 12 of `docs/huong-dan-chuyen-sau.md` and the prompt library page `docs/thu-vien-prompt/07-chon-huong-sang-tao.md`.
+
+### New scripts
+- `scripts/directions.mjs`: `check` (token existence against the installed HyperFrames), `pick` (deterministic, one direction per tier: fit / continuous / bold; topic keywords match whole words), `show`, `compat` (clash warnings, exit 3), `doc --write`.
+- `scripts/make-pitch.mjs`: `init` scaffolds 3 HyperFrames styleframe projects with `STYLEFRAME.md` and `RECIPES.md`; `render` makes 3 draft clips, `sheet.jpg` and `PITCH.md` (numbered menu, works on every agent) and measures their motion; `choose` writes `direction`, `direction_swaps`, `energy`, `palette`, `word_budget`, `music_only_s`, `creative_selection`, `styleframe` and `## creative_direction` into `BRIEF.md`. `render` refuses an unwritten scaffold, checks ffmpeg and ffprobe first (exit 1), never reuses a stale poster, and exits 4 when a styleframe fails MOTION. Smoke run: 3 × 3 s styleframes rendered in 26 s.
 - `scripts/recipe-pack.mjs`: inlines the blueprint/rule/seam recipes named in PLAN.md (or a direction) into `build/RECIPES.md`, build rules first.
-- `make-demo.mjs --animatic`: full draft render kept as `demo/animatic.mp4`, frames cut from it, `contact-sheet.jpg`, `animatic:` in DEMO.md.
-- `qc-mp4.mjs` MOTION: share of near-still frames (YDIF < 0.5 at 360 px, 30 fps) and 90th-percentile YDIF. Creative projects FAIL at ≥ 60 % still and peak < 1.5. Calibration: the real slideshow render 70 % / 1.12 (FAIL), the creative 10 s reference 25 % / 7.0 (PASS).
-- Tests: `creative.test.mjs` (14 tests) with fixtures `slideshow/` (the real Gemini 4 Argon TikTok project, must be blocked) and `creative-good/` (must pass).
+- `scripts/brand.mjs check`: validates the brand kit (`#rrggbb` colours, banned directions that exist; missing logo or font files are WARN). `make-pitch` reads it: banned directions leave the pick, `STYLEFRAME.md` gets the colours, logo and fonts, `choose` defaults to palette `thuong-hieu` and fills `voice_id` / `tts_model` when BRIEF has none or only the template default. An explicit brand path that does not exist fails; a brand file in `PICK.json` that is gone is a WARN.
+- `scripts/poi-fetch.mjs`: real nearby amenities (school, market, supermarket, transit, hospital, park, mall) around an address or a point, from OpenStreetMap (Nominatim, Overpass), with straight-line distance and walking time (estimate, or the FOSSGIS OSRM foot router with `--route`). Writes `sources/poi.json` (cache keyed by centre, radius, kinds and `--route`), the POI section of `SOURCES.md` and the ODbL credit in `CREDITS.md`, and prints the geocoded place so a wrong match is caught.
+- `scripts/source-ingest.mjs`: fetches article URLs, PDFs and arXiv papers into `sources/<slug>.txt` and indexes each in `SOURCES.md` with candidate sentences holding numbers or quotes. No AI summary. A missing `pdftotext` exits 2 after indexing the sources already fetched.
+- `make-demo.mjs --animatic`: full draft render scaled to 540 px on the short side, kept as `demo/animatic.mp4`, frames cut from it, `contact-sheet.jpg`, `animatic:` in DEMO.md.
 
-### Changed
-- `check-preflight.mjs`: creative gate when BRIEF has `direction:` (or `creative_override: <reason>` to skip): `## Ý đồ sáng tạo`, Blueprint/Rule column with real tokens (≥ 2 distinct), a seam into every next beat (fade/crossfade/cut banned, soft seams only for `allow_soft` directions), music-only beats ≥ `music_only_s`; final stage adds a moving animatic and `build/RECIPES.md` newer than PLAN.md.
-- `check-viet-pro.mjs`: voice words above BRIEF `word_budget` fail the gate.
+### New gates
+- `check-preflight.mjs` creative gate when BRIEF has `direction:` or `brief_version: 2`: `## Ý đồ sáng tạo`, a Blueprint/Rule column with real tokens (at least 2 distinct), a seam into every next beat (fade/crossfade/cut banned, soft seams only for `allow_soft` directions), music-only beats of at least `music_only_s`. `brief_version: 2` without `direction:` fails. The final stage adds an animatic newer than PLAN.md, `index.html` and `compositions/*.html` (a build edited after the approved animatic blocks), whose motion passes MOTION, and `build/RECIPES.md` newer than PLAN.md.
+- `check-viet-pro.mjs`: voice words above BRIEF `word_budget` fail the gate (`VOICE_OVER_BUDGET`). When the field is missing but `direction:` is set, the budget comes from the direction's energy and the BRIEF duration.
+- `qc-mp4.mjs` MOTION: share of near-still frames (YDIF < 0.5 at 360 px, 30 fps) and 90th-percentile YDIF. Creative projects FAIL at 60 % still or more with a peak under 1.5, with separate thresholds for energy `em`. Calibration: the real slideshow render 70 % / 1.12 (FAIL), the creative 10 s reference 25 % / 7.0 (PASS).
 - `video-lint.mjs`: `SLIDESHOW_MOTION` early WARN. It stays a WARN on purpose: the real slideshow fixture uses `scale()`, `rotate()` and a background canvas, so static code analysis cannot tell it apart; the blocking check is MOTION on the render.
-- SKILL.md: step 1 asks only for the minimal brief; new step 1b; step 2 writes the script after the direction (picture leads); 4b, 6, 6b, 8 and the reference table follow the new gates. `brief-template.md`, `plan-demo.md` (7-column scene table), `edit-method.md` (all 22 blueprints, anti-slideshow rules, the 4 cut-catalog seams), README and `docs/huong-dan-chuyen-sau.md` updated.
-- Existing test fixtures set `creative_override` (they predate the creative gate).
+- `setup-check.mjs` runs `directions.mjs check` when `hyperframes-animation` is installed.
+- `find-cases.mjs` exits 2 on a bare word; search with `--keyword`, `--category` or `--tag`.
+- Tests: `creative.test.mjs` with fixtures `slideshow/` (the real Gemini 4 Argon TikTok project, must be blocked) and `creative-good/` (must pass); `brand.test.mjs`, `poi-fetch.test.mjs` and `source-ingest.test.mjs` run offline on fixtures.
+
+### Compatibility
+- Legacy projects (no `direction:` and no `brief_version: 2`) get one WARN, `creative gate skipped`, and keep the old gates. For them MOTION is a WARN, and a composition edited after the demo stays a WARN.
+- `creative_override: <reason ≥10 chars>` in BRIEF skips the creative gate for footage-only projects and is printed as a WARN. `make-pitch choose` clears it. Existing test fixtures set it, since they predate the creative gate.
+- The seam check no longer flags ordinary prose that contains "hiện".
+- On Windows, `make-pitch` and `render-final` quote the `npx` arguments.
 
 ## 2026-10-13: post-render tools
 
