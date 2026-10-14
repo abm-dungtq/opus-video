@@ -96,3 +96,12 @@ test("main: empty geocode exits 4; HTTP error exits 1; OSRM failure falls back t
     assert.equal(await main(["--project", d, "--lat", "1"], quiet, quiet), 2);
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
+
+test("parseOverpass: convenience stores get their own label, so real supermarkets stay in the table", () => {
+  const node = (id, lat, shop, name) => ({ type: "node", id, lat, lon: CENTER.lon, tags: { shop, name } });
+  const json = { elements: [node(1, 10.773, "convenience", "Circle K"), node(2, 10.7733, "convenience", "FamilyMart"), node(3, 10.7735, "convenience", "GS25"), node(4, 10.7765, "supermarket", "Co.opmart")] };
+  const top = topPerKind(parseOverpass(json, CENTER));
+  assert.equal(top.find((p) => p.name === "Circle K").label, "Cửa hàng tiện lợi");
+  assert.deepEqual(top.filter((p) => p.label === "Siêu thị").map((p) => p.name), ["Co.opmart"]);
+  assert.match(overpassQuery(10, 106, 500, ["supermarket"]), /\["shop"~"\^\(convenience\)\$"\]/);
+});

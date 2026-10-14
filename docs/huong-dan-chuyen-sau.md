@@ -835,6 +835,7 @@ node $OV/scripts/poi-fetch.mjs --project ./ --lat <vĩ độ> --lon <kinh độ>
 
 - Dữ liệu lấy từ OpenStreetMap: Nominatim để đổi địa chỉ ra toạ độ, Overpass để tìm tiện ích. `--route` hỏi thêm bộ định tuyến đi bộ OSRM của FOSSGIS để có phút đi bộ theo đường thật; dịch vụ này lỗi thì script in WARN và dùng ước tính.
 - Mặc định bán kính 1500 m, tối đa 5000 m. `--kinds` chọn loại trong `school,market,supermarket,transit,hospital,park,mall`.
+- Một số tiện ích có nhãn riêng trong bảng: trạm xe buýt (`transit`), phòng khám (`hospital`) và cửa hàng tiện lợi (`supermarket`). Mỗi nhãn giữ tối đa 3 nơi gần nhất, nên Circle K hay GS25 sát nhà không đẩy siêu thị thật ra khỏi bảng.
 - Script ghi `sources/poi.json` (cache), mục `## POI (OpenStreetMap)` trong `SOURCES.md` và dòng ghi công ODbL trong `assets/CREDITS.md`. Chạy lại với cùng tâm, bán kính, `--kinds` và `--route` thì dùng cache, không gọi mạng; `--refresh` để lấy lại.
 - Bảng trong `SOURCES.md` có cả khoảng cách đường thẳng lẫn phút đi bộ kèm quãng đường đi, cùng cột cách tính (ước tính hay OSRM). Số trên hình lấy từ bảng này, PLAN ghi đúng cách tính. Không ghi nguồn lên hình.
 - OSRM nắn điểm ra con đường gần nhất rồi mới tính, nên một nơi rất gần vẫn có thể ra vài phút đi bộ. Nơi cách dưới khoảng 50 m thì viết "ngay cạnh" thay cho số phút.

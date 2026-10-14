@@ -31,12 +31,13 @@ const OSRM = "https://routing.openstreetmap.de/routed-foot/table/v1/foot";
 const SECTION = "## POI (OpenStreetMap)";
 const CREDIT = "- Dữ liệu tiện ích: © OpenStreetMap contributors, ODbL 1.0 (https://www.openstreetmap.org/copyright)";
 
-// A third tuple element is a narrower label ("Trạm xe buýt", "Phòng khám"), so a bus stop named after
-// a market or an optician tagged clinic is never shown as a station or a hospital.
+// A third tuple element is a narrower label ("Trạm xe buýt", "Phòng khám", "Cửa hàng tiện lợi"), so a bus
+// stop named after a market, an optician tagged clinic or a Circle K is never shown as a station, a hospital
+// or a supermarket, and (top-3 is per label) never pushes the real ones out of the table.
 export const KINDS = {
   school: { vi: "Trường học", tags: [["amenity", ["school", "university", "kindergarten"]]] },
   market: { vi: "Chợ", tags: [["amenity", ["marketplace"]]] },
-  supermarket: { vi: "Siêu thị", tags: [["shop", ["supermarket", "convenience"]]] },
+  supermarket: { vi: "Siêu thị", tags: [["shop", ["supermarket"]], ["shop", ["convenience"], "Cửa hàng tiện lợi"]] },
   transit: { vi: "Ga/bến xe", tags: [["railway", ["station", "subway_entrance"]], ["public_transport", ["station"]], ["highway", ["bus_stop"], "Trạm xe buýt"]] },
   hospital: { vi: "Bệnh viện", tags: [["amenity", ["hospital"]], ["amenity", ["clinic"], "Phòng khám"]] },
   park: { vi: "Công viên", tags: [["leisure", ["park"]]] },
