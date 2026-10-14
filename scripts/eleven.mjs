@@ -28,6 +28,8 @@
 // missing sidecar would drop every voice.
 //
 // Credentials: $ELEVENLABS_API_KEY, else ~/.config/opus-video/.env (KEY=VALUE lines).
+// Voice (tts, audio-meta): --voice/--model, then BRIEF.md `voice_id`/`tts_model`, then
+// OPUS_VIDEO_VOICE_ID/OPUS_VIDEO_TTS_MODEL, then the defaults; the chosen source is printed.
 // The key is never printed. Exit codes: 0 ok, 1 error, 2 usage, 3 music unavailable on plan,
 // 4 viet-pro gate blocked.
 
@@ -39,8 +41,8 @@ import { maybeHelp } from "./cli-help.mjs";
 import { parseScript, writeStamp, stampMatches } from "./script-md.mjs";
 import { voiceGate, GATE_EXIT } from "./voice-gate.mjs";
 import { loadKey, ping } from "./jev-client.mjs";
-import { defaultVp } from "./check-viet-pro.mjs";
-import { DEFAULT_VOICE, DEFAULT_TTS_MODEL } from "./voice-defaults.mjs";
+import { defaultVp, frontmatter } from "./check-viet-pro.mjs";
+import { DEFAULT_VOICE, DEFAULT_TTS_MODEL, pickVoice } from "./voice-defaults.mjs";
 maybeHelp(process.argv.slice(2), import.meta.url);
 
 const API = "https://api.elevenlabs.io";
@@ -65,6 +67,14 @@ function loadEnvFile() {
 }
 const fileEnv = loadEnvFile();
 const env = (k) => process.env[k] || fileEnv[k] || "";
+// tts/audio-meta: --voice/--model > BRIEF.md voice_id/tts_model > machine env > defaults; prints the source.
+function projectVoice(project) {
+  const b = join(project, "BRIEF.md");
+  const brief = existsSync(b) ? frontmatter(readFileSync(b, "utf8")) : {};
+  const r = pickVoice({ args, brief, env: { OPUS_VIDEO_VOICE_ID: env("OPUS_VIDEO_VOICE_ID"), OPUS_VIDEO_TTS_MODEL: env("OPUS_VIDEO_TTS_MODEL") } });
+  console.error(`voice: ${r.voice} (${r.from.voice}) · model: ${r.model} (${r.from.model})`);
+  return r;
+}
 
 const [cmd, ...rest] = process.argv.slice(2);
 const args = {};
@@ -222,9 +232,10 @@ const commands = {
   async tts() {
     const textFile = args["text-file"] ? resolve(args["text-file"]) : null;
     const lang = args.lang || "vi";
+    // <project>/script/NN.txt → <project>; any other location → --project or the cwd.
+    const project = resolve(args.project || (textFile && basename(dirname(textFile)) === "script" ? dirname(dirname(textFile)) : "."));
     const g = gate({
-      // <project>/script/NN.txt → <project>; any other location → --project or the cwd.
-      project: resolve(args.project || (textFile && basename(dirname(textFile)) === "script" ? dirname(dirname(textFile)) : ".")),
+      project,
       textFiles: textFile ? [textFile] : [],
       inline: !!args.text,
       skip: !!args["skip-viet-pro-gate"],
@@ -235,8 +246,7 @@ const commands = {
     await tts({
       text,
       out,
-      voice: args.voice || env("OPUS_VIDEO_VOICE_ID") || DEFAULTS.voice,
-      model: args.model || env("OPUS_VIDEO_TTS_MODEL") || DEFAULTS.ttsModel,
+      ...(({ voice, model }) => ({ voice, model }))(projectVoice(project)),
       speed: Number(args.speed || 1.0),
       lang,
     });
@@ -292,8 +302,7 @@ const commands = {
     if (!lines.length) die("no `## … (Frame N)` lines with indented text found in the script");
     const lang = args.lang || "vi";
     const g = gate({ project: resolve(args.project || hf), frames: lines, skip: !!args["skip-viet-pro-gate"], voiceLang: lang });
-    const voice = args.voice || env("OPUS_VIDEO_VOICE_ID") || DEFAULTS.voice;
-    const model = args.model || env("OPUS_VIDEO_TTS_MODEL") || DEFAULTS.ttsModel;
+    const { voice, model } = projectVoice(resolve(args.project || hf));
 
     const voices = [];
     for (const { frame, text } of lines) {
