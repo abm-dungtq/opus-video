@@ -641,7 +641,7 @@ Cảnh con là các file nhúng qua `data-composition-src` (đệ quy). Composit
 | `source-ingest` thoát 2, báo `pdftotext not found` | Máy chưa có poppler | Cài poppler rồi chạy lại |
 | Cổng plan báo `PLAN.md has no "## Sự kiện" table` hoặc `"## Sự kiện" không có hàng sự kiện nào` | Dự án có `direction:` mà `PLAN.md` chưa có bảng sự kiện, hoặc mục để trống, chỉ có `TODO` hay chỉ có tiêu đề bảng | Thêm bảng `Thời điểm \| Sự kiện \| Âm thanh`, hoặc một dòng `không có SFX gắn sự kiện` khi video không có tiếng gắn với hình (mục 13.1) |
 | `sfx-sync` hay cổng final in `SYNC FAIL` | Tiếng SFX vang lệch khỏi sự kiện quá ngưỡng, thường do file có đoạn im lặng ở đầu | Chạy `sfx-sync.mjs --project ./ --fix`, sửa `data-start` theo đề xuất rồi chạy lại (mục 13.1) |
-| `sfx-sync` báo `"<file>" không có trong index.html` | Ô Âm thanh không khớp `src` trong HTML, SFX có `data-volume="0"`, hoặc SFX nằm trong composition con | Ghi đúng `src` như trong `index.html`; SFX trong composition con thì chuyển ra `index.html` hoặc kiểm bằng tai (mục 13.1) |
+| `sfx-sync` báo `"<file>" không có trong index.html` | Ô Âm thanh không khớp `src` trong HTML, SFX có `data-volume="0"`, hoặc SFX nằm trong composition con | Ghi đúng `src` như trong `index.html`; SFX trong composition con thì chuyển thẻ `<audio>` ra `index.html` với `data-start` theo timeline gốc (đo trong composition con là việc để sau) (mục 13.1) |
 | `check-preflight` in WARN `… cần giữ ≥ <n>s` | Chữ trên hình rời đi trước khi đọc kịp | Chữ thật sự ở lại thì ghi `(giữ đến <t>s)` hoặc `(giữ đến hết)` trong ô Hình; chữ thật sự rời sớm thì kéo dài beat hoặc rút chữ (mục 13.2) |
 
 ## 12. Hướng sáng tạo, brand kit và dữ liệu thật
@@ -928,7 +928,7 @@ Cổng final của `check-preflight.mjs` (cũng là cổng của `render-final.m
 Lỗi thường gặp:
 
 - `SYNC FAIL … lệch +270 ms (đầu file im 120 ms)`: file có đoạn im lặng ở đầu. Sửa `data-start` theo dòng `đề xuất` rồi chạy lại.
-- `"assets/sfx/x.mp3" không có trong index.html (hoặc data-volume="0"; SFX trong composition con chưa được kiểm)`: ô Âm thanh không khớp `src`, SFX bị tắt tiếng, hoặc SFX nằm trong composition con. Script chỉ đọc `index.html` (hay file truyền bằng `--html`), vì `data-start` trong composition con tính theo đồng hồ của composition đó.
+- `"assets/sfx/x.mp3" không có trong index.html (hoặc data-volume="0"; SFX trong composition con chưa được kiểm)`: ô Âm thanh không khớp `src`, SFX bị tắt tiếng, hoặc SFX nằm trong composition con. Script chỉ đọc `index.html` (hay file truyền bằng `--html`), vì `data-start` trong composition con tính theo đồng hồ của composition đó. Lối ra hiện nay là đặt thẻ `<audio>` của SFX trong `index.html`; cổng final không có cách bỏ qua dòng FAIL này.
 - `thời điểm "…" không đọc được`: ô Thời điểm phải là số giây, ví dụ `6.5`, `6.5s` hoặc `6,5s`.
 - Đổi cách đo đoạn im lặng thì xoá `assets/sfx-onsets.json` để đo lại.
 
