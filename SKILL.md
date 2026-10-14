@@ -157,6 +157,7 @@ Mỗi dự án có một thư mục riêng:
      - **Dựng tay** (general-video): 2 composition trong cùng project, gồm `index.html` (1920×1080) và `compositions/main-9x16.html` (1080×1920).
      - **Workflow có frame worker** (faceless-explainer, pr-to-video, product-launch-video): làm **một project 9:16 riêng**, theo mục "Bài học từ smoke v2" trong `engine-selection.md`. Sau mỗi lần `captions.mjs build` ở 1080×1920, **bắt buộc** chạy `node $OV/scripts/replace-in-file.mjs compositions/captions.html "--cap-band-top: [0-9]*px;" "--cap-band-top: 1340px;" "--cap-band-height: [0-9]*px;" "--cap-band-height: 200px;"`, vì mặc định 1600px rơi vào vùng UI che.
    - Áp dụng banned list trong brief.
+   - Đặt câu chữ dài nhất sẽ dùng vào cảnh rồi chạy `npx hyperframes check --at-transitions`: chữ tràn hay đè nhau ở chỗ nối cảnh thì sửa chữ hoặc bố cục trước khi chỉnh chuyển động.
 
 6b. **Khung hình demo (BẮT BUỘC trước video cuối).** Làm theo `references/plan-demo.md`:
    - Dự án có `direction:`: `node $OV/scripts/make-demo.mjs --project . --animatic` (bản 9:16: thêm `--aspect 9x16` và `--composition compositions/main-9x16.html`, hoặc `--hyperframes <project-9x16>` nếu là project riêng; cổng final chặn `animatic_9x16` có khung ngang). Script render clip nháp toàn bộ `demo/animatic.mp4`, cắt đúng các mốc trong `PLAN.md`, ghép `demo/contact-sheet.jpg` và ghi `DEMO.md` (`animatic:` + `approval: pending`). Dự án `creative_override` chụp ảnh tĩnh như cũ (bỏ `--animatic`).
