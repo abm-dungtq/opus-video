@@ -14,7 +14,7 @@ const keywords = [];
 const opts = { limit: 5, "max-chars": 1200 };
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
-  if (!a.startsWith("--")) continue;
+  if (!a.startsWith("--")) { console.error(`find-cases: unexpected "${a}"; search with --keyword "<word>" (repeatable), --category or --tag`); process.exit(2); }
   const k = a.slice(2);
   if (k === "full-only" || k === "json") opts[k] = true;
   else if (k === "keyword") keywords.push(String(argv[++i] ?? "").toLowerCase());

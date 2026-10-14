@@ -206,7 +206,7 @@ Cần bản đăng theo từng nơi thì xuất từ bản final bằng `node $O
 | `scripts/poi-fetch.mjs` | Video BĐS/địa điểm (hướng A8, Thẻ 9): tiện ích quanh địa chỉ từ OpenStreetMap, khoảng cách và phút đi bộ (ước tính hoặc `--route` OSRM) vào `sources/poi.json` + `SOURCES.md`, ghi công ODbL ở `CREDITS.md` |
 | `scripts/source-ingest.mjs` | Bước 2 (kiểm chứng): tải bài báo URL, PDF hoặc arXiv vào `sources/<slug>.txt` và ghi mục nguồn kèm câu ứng viên có số vào `SOURCES.md`; không tóm tắt bằng AI |
 | `references/brand.example.json` | Mẫu brand kit; chép thành `shared-assets/brand.json` rồi sửa (đường dẫn tính từ file đó) |
-| `references/pattern-library.md` | Bước 3: công thức theo 6 nhóm video |
+| `references/pattern-library.md` | Bước 3: công thức theo 8 nhóm video |
 | `references/script-workflow.md` | Bước 2 và 9: cổng viet-pro đầy đủ, kỹ thuật theo loại video, kiểm chứng, lint, TikTok viral, `CAPTIONS.md` |
 | `scripts/check-viet-pro.mjs` | Bước 2 (`--stage script`, trước voice/render) và bước 9 (`--stage delivery`): biên bản `## viet_pro`, `script-table.v1.md` + compare, lint viet-pro từng file và `SCRIPT.md`, caption FB + TikTok; `voice_source: clip` lint phụ đề + chữ trên hình thay kịch bản; `--jev-audit` tuỳ chọn (chỉ WARN) |
 | `references/engine-selection.md` | Bước 4 và 6: chọn engine, xử lý 16:9 / 9:16 |

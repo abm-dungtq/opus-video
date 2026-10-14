@@ -25,9 +25,9 @@ import { fold } from "./directions.mjs";
 
 const UA = "opus-video-ingest/1.0";
 const TIMEOUT_MS = 30000;
-const ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", nbsp: " " };
+const ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", nbsp: " ", hellip: "\u2026", lsquo: "\u2018", rsquo: "\u2019", ldquo: "\u201c", rdquo: "\u201d", ndash: "\u2013", mdash: "\u2014" };
 
-export const decodeEntities = (s) => String(s || "").replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|nbsp);/gi, (m, e) => {
+export const decodeEntities = (s) => String(s || "").replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|nbsp|hellip|[lr][sd]quo|[nm]dash);/gi, (m, e) => {
   const k = e.toLowerCase();
   if (k.startsWith("#x")) return String.fromCodePoint(parseInt(k.slice(2), 16));
   if (k.startsWith("#")) return k === "#39" ? "'" : String.fromCodePoint(Number(k.slice(1)));
@@ -160,6 +160,12 @@ export async function main(argv = process.argv.slice(2), log = console.log, err 
   const accessed = today(deps.now());
   const results = [];
   let failed = 0;
+  // Index every source written so far, so no sources/*.txt is left without a SOURCES.md entry.
+  const flush = () => {
+    if (!results.some((r) => r.ok)) return;
+    const head = doc.head.replace(/\s+$/, "");
+    writeFileSync(mdPath, (head ? head + "\n\n" : "") + doc.entries.map((e) => e.text).join("\n"));
+  };
   for (const s of o.sources) {
     const key = s.url || s.file;
     try {
@@ -181,16 +187,13 @@ export async function main(argv = process.argv.slice(2), log = console.log, err 
       results.push({ source: s.arg, ok: true, ...meta, path: join(srcDir, `${slug}.txt`) });
       if (!o.json) log(`source-ingest: ${title} → sources/${slug}.txt (${meta.candidates.length} câu ứng viên)`);
     } catch (e) {
-      if (e instanceof NoPdftotext) { err(`source-ingest: ${s.arg}: ${e.message}`); return 2; }
+      if (e instanceof NoPdftotext) { flush(); err(`source-ingest: ${s.arg}: ${e.message}`); return 2; }
       failed++;
       results.push({ source: s.arg, ok: false, error: e.message });
       err(`source-ingest: ${s.arg}: ${e.message}`);
     }
   }
-  if (results.some((r) => r.ok)) {
-    const head = doc.head.replace(/\s+$/, "");
-    writeFileSync(mdPath, (head ? head + "\n\n" : "") + doc.entries.map((e) => e.text).join("\n"));
-  }
+  flush();
   if (o.json) log(JSON.stringify(results, null, 2));
   else log(`source-ingest: ${results.length - failed}/${results.length} nguồn → ${mdPath}${failed ? "" : "\nNext: đọc sources/<slug>.txt, viết ý chính có trích câu gốc; mọi số liệu trong kịch bản trỏ về một mục SOURCES.md."}`);
   return failed ? 1 : 0;

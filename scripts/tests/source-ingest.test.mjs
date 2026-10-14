@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, readFileSync, readdirSync, rmSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { htmlToText, htmlMeta, slugify, candidates, arxivUrl, sourcesEntry, main } from "../source-ingest.mjs";
+import { htmlToText, htmlMeta, slugify, candidates, arxivUrl, sourcesEntry, decodeEntities, main } from "../source-ingest.mjs";
 
 const HTML = readFileSync(fileURLToPath(new URL("fixtures/ingest/article.html", import.meta.url)), "utf8");
 const tmp = () => mkdtempSync(join(tmpdir(), "ingest-"));
@@ -119,6 +119,11 @@ test("main: PDF via pdftotext stub writes the file; ENOENT exits 2; PDF content-
     const errs = [];
     assert.equal(await main(["--project", d, pdf], quiet, (m) => errs.push(m), { spawnSync: enoent, now: NOW }), 2);
     assert.ok(errs.some((m) => m.includes("brew install poppler")));
+    const d2 = tmp();
+    try {
+      assert.equal(await main(["--project", d2, URL1, pdf], quiet, quiet, { fetch: stubFetch(200, HTML), spawnSync: enoent, now: NOW }), 2);
+      assert.match(readFileSync(join(d2, "SOURCES.md"), "utf8"), new RegExp(`^- URL: ${URL1.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m"), "sources fetched before the missing pdftotext are still indexed");
+    } finally { rmSync(d2, { recursive: true, force: true }); }
 
     assert.equal(await main(["--project", d, "https://x.example/paper"], quiet, quiet, { fetch: stubFetch(200, "%PDF", "application/pdf"), spawnSync, now: NOW }), 0);
     assert.equal(calls.length, 2);
@@ -131,4 +136,8 @@ test("main: bad usage exits 2", async () => {
   assert.equal(await main(["--project", "/tmp", "notes.txt"], quiet, quiet), 2);
   assert.equal(await main(["--project", "/tmp", URL1, "--max-candidates", "x"], quiet, quiet), 2);
   assert.equal(await main(["--project", "/tmp", URL1, "--bogus"], quiet, quiet), 2);
+});
+
+test("decodeEntities: typographic entities common in news HTML", () => {
+  assert.equal(decodeEntities("a&hellip; &ldquo;b&rdquo; &lsquo;c&rsquo; 1&ndash;2 &mdash;"), "a\u2026 \u201cb\u201d \u2018c\u2019 1\u20132 \u2014");
 });
