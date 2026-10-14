@@ -52,7 +52,7 @@ test("walkEstimate, parseOsrmTable, topPerKind, overpassQuery", () => {
   assert.match(md, /\| Chợ \| Chợ \| 10 m \| 1 phút \(13 m\) \| ước tính đường chim bay ×1,3, 80 m\/phút \| node\/1 \|/);
 });
 
-test("main: writes poi.json, SOURCES.md, CREDITS.md; second run uses the cache; one POI section", async () => {
+test("main: writes poi.json, SOURCES.md, assets/CREDITS.md; second run uses the cache; one POI section", async () => {
   const d = mkdtempSync(join(tmpdir(), "poi-"));
   try {
     writeFileSync(join(d, "SOURCES.md"), "# SOURCES\n\n## Bài báo\n\n- URL: x\n");
@@ -62,7 +62,7 @@ test("main: writes poi.json, SOURCES.md, CREDITS.md; second run uses the cache; 
     const data = JSON.parse(readFileSync(join(d, "sources", "poi.json"), "utf8"));
     assert.equal(data.items.length, 6);
     assert.equal(data.items[0].method, "osrm-foot");
-    assert.ok(existsSync(join(d, "CREDITS.md")));
+    assert.ok(existsSync(join(d, "assets", "CREDITS.md")));
     const out = [], json = [];
     assert.equal(await main(["--project", d, "--lat", "10.77251", "--lon", "106.698", "--route", "--json"], (m) => json.push(m), (m) => out.push(m), deps(f)), 0);
     assert.equal(f.calls.length, 2);
@@ -76,7 +76,7 @@ test("main: writes poi.json, SOURCES.md, CREDITS.md; second run uses the cache; 
     const s = readFileSync(join(d, "SOURCES.md"), "utf8");
     assert.equal(s.match(/## POI \(OpenStreetMap\)/g).length, 1);
     assert.match(s, /## Bài báo/);
-    assert.equal(readFileSync(join(d, "CREDITS.md"), "utf8").match(/OpenStreetMap contributors/g).length, 1);
+    assert.equal(readFileSync(join(d, "assets", "CREDITS.md"), "utf8").match(/OpenStreetMap contributors/g).length, 1);
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 

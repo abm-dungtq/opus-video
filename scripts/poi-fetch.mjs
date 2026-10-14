@@ -7,7 +7,7 @@
 //                      [--route] [--refresh] [--json]
 //   node poi-fetch.mjs --help | -h
 // Writes <project>/sources/poi.json (cache), the "## POI (OpenStreetMap)" section of SOURCES.md
-//   (centre, radius, query time, table) and the ODbL credit line in CREDITS.md. Nothing goes on
+//   (centre, radius, query time, table) and the ODbL credit line in assets/CREDITS.md. Nothing goes on
 //   screen as a source label; the builder takes distances and minutes from SOURCES.md.
 // Services: Nominatim (geocode) and Overpass (POI) are free public services, ~1 request/second,
 //   a User-Agent is required; this script waits 1.1 s between requests. --route asks the FOSSGIS
@@ -103,7 +103,7 @@ export function sourcesBlock(meta, list) {
     ...(meta.geocoded ? [`- Geocode: ${meta.geocoded} (kiểm lại đúng địa chỉ dự án; sai thì chạy bằng --lat/--lon)`] : []),
     `- Bán kính: ${meta.radius} m`,
     `- Truy vấn lúc: ${meta.fetched_at}`,
-    `- Dữ liệu: © OpenStreetMap contributors, ODbL (ghi công ở CREDITS.md, không ghi lên hình)`, "",
+    `- Dữ liệu: © OpenStreetMap contributors, ODbL (ghi công ở assets/CREDITS.md, không ghi lên hình)`, "",
     "| Loại | Tên | Khoảng cách | Đi bộ | Cách tính | OSM |", "|---|---|---|---|---|---|",
     ...list.map((p) => `| ${p.label || KINDS[p.kind].vi} | ${p.name} | ${p.distance_m} m | ${p.minutes} phút (${p.route_m} m) | ${METHOD_VI[p.method]} | ${p.osm} |`),
     ""].join("\n");
@@ -203,12 +203,13 @@ export async function main(argv = process.argv.slice(2), log = console.log, err 
 
   const sourcesPath = join(project, "SOURCES.md");
   writeFileSync(sourcesPath, setSourcesSection(existsSync(sourcesPath) ? readFileSync(sourcesPath, "utf8") : "# SOURCES\n", sourcesBlock(data, data.items)));
-  const creditsPath = join(project, "CREDITS.md");
+  mkdirSync(join(project, "assets"), { recursive: true });
+  const creditsPath = join(project, "assets", "CREDITS.md");
   const credits = existsSync(creditsPath) ? readFileSync(creditsPath, "utf8") : "# CREDITS\n";
   if (!credits.includes("OpenStreetMap contributors")) writeFileSync(creditsPath, `${credits.trimEnd()}\n\n${CREDIT}\n`);
 
   if (o.json) log(JSON.stringify(data, null, 2));
-  else log(`${data.items.length ? data.items.map((p) => `${(p.label || KINDS[p.kind].vi).padEnd(20)} ${String(p.distance_m).padStart(5)} m  ${String(p.minutes).padStart(3)} phút  ${p.name}`).join("\n") : "(không có tiện ích có tên trong bán kính này)"}\npoi-fetch: ${data.items.length} tiện ích → sources/poi.json · SOURCES.md · CREDITS.md`);
+  else log(`${data.items.length ? data.items.map((p) => `${(p.label || KINDS[p.kind].vi).padEnd(20)} ${String(p.distance_m).padStart(5)} m  ${String(p.minutes).padStart(3)} phút  ${p.name}`).join("\n") : "(không có tiện ích có tên trong bán kính này)"}\npoi-fetch: ${data.items.length} tiện ích → sources/poi.json · SOURCES.md · assets/CREDITS.md`);
   return 0;
 }
 

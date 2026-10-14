@@ -182,7 +182,7 @@ Gửi tôi pitch 3 hướng, rồi plan, rồi clip nháp animatic để duyệt
 #### opus-video sẽ làm gì
 
 - Pitch với `--category bat-dong-san`. Hướng A8 "Bản đồ dẫn đường bám lời nói" hợp với bản đồ và PiP.
-- `poi-fetch.mjs --project ./ --lat <vĩ độ> --lon <kinh độ> --radius <m> --route` (hoặc `--address "<địa chỉ>"`). Script ghi bảng tiện ích vào `SOURCES.md` với khoảng cách đường thẳng, phút đi bộ, quãng đường đi và cách tính, ghi công OpenStreetMap vào `CREDITS.md`.
+- `poi-fetch.mjs --project ./ --lat <vĩ độ> --lon <kinh độ> --radius <m> --route` (hoặc `--address "<địa chỉ>"`). Script ghi bảng tiện ích vào `SOURCES.md` với khoảng cách đường thẳng, phút đi bộ, quãng đường đi và cách tính, ghi công OpenStreetMap vào `assets/CREDITS.md`.
 - Với `--address`, agent đọc dòng `geocode … →` và so với dự án; sai nơi thì chạy lại bằng toạ độ.
 - Số khoảng cách và phút trên hình lấy từ bảng đó, PLAN ghi rõ cách tính. Nơi cách dưới khoảng 50 m thì ghi "ngay cạnh" thay cho số phút.
 - Phần còn lại như mục 31: kịch bản viet-pro, PLAN, `recipe-pack.mjs`, animatic, `render-final.mjs`, `qc-mp4`.
@@ -194,7 +194,7 @@ Chưa có case sát (`--category explainer --keyword "real estate"` không ra k�
 #### Lưu ý
 
 - Đưa toạ độ thì chắc hơn địa chỉ: địa chỉ có thể bị đổi ra một nơi khác gần đó. `--address` còn cần DNS của máy phân giải được `openstreetmap.org`. Lệnh báo `network error: fetch failed` với `--address` thì gửi agent toạ độ.
-- Không ghi nguồn hay nhãn rào đón lên hình. Nguồn nằm trong `SOURCES.md` và `CREDITS.md`.
+- Không ghi nguồn hay nhãn rào đón lên hình. Nguồn nằm trong `SOURCES.md` và `assets/CREDITS.md`.
 - Dữ liệu OpenStreetMap có thể thiếu hoặc gắn nhãn chưa đúng. Agent gửi bạn bảng tiện ích để bạn bỏ những dòng không đúng thực tế.
 
 ### 35. Tin nóng từ một bài báo

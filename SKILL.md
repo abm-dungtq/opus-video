@@ -203,7 +203,7 @@ Cần bản đăng theo từng nơi thì xuất từ bản final bằng `node $O
 | `scripts/make-pitch.mjs` | Bước 1b: `init` (3 project styleframe + STYLEFRAME.md + RECIPES.md), `render` (3 clip, sheet.jpg, PITCH.md menu số; exit 4 khi styleframe FAIL MOTION), `choose` (ghi BRIEF, exit 3 khi phối sai) |
 | `scripts/recipe-pack.mjs` | Bước 6 (và 1b): gom blueprint/rule/seam theo PLAN.md hoặc theo hướng thành `build/RECIPES.md` |
 | `scripts/brand.mjs` | Bước 1/1b: `check` brand kit (màu #rrggbb, hướng bị cấm có thật, file logo/font tồn tại); `make-pitch` tự đọc |
-| `scripts/poi-fetch.mjs` | Video BĐS/địa điểm (hướng A8, Thẻ 9): tiện ích quanh địa chỉ từ OpenStreetMap, khoảng cách và phút đi bộ (ước tính hoặc `--route` OSRM) vào `sources/poi.json` + `SOURCES.md`, ghi công ODbL ở `CREDITS.md` |
+| `scripts/poi-fetch.mjs` | Video BĐS/địa điểm (hướng A8, Thẻ 9): tiện ích quanh địa chỉ từ OpenStreetMap, khoảng cách và phút đi bộ (ước tính hoặc `--route` OSRM) vào `sources/poi.json` + `SOURCES.md`, ghi công ODbL ở `assets/CREDITS.md` |
 | `scripts/source-ingest.mjs` | Bước 2 (kiểm chứng): tải bài báo URL, PDF hoặc arXiv vào `sources/<slug>.txt` và ghi mục nguồn kèm câu ứng viên có số vào `SOURCES.md`; không tóm tắt bằng AI |
 | `references/brand.example.json` | Mẫu brand kit; chép thành `shared-assets/brand.json` rồi sửa (đường dẫn tính từ file đó) |
 | `references/pattern-library.md` | Bước 3: công thức theo 8 nhóm video |
