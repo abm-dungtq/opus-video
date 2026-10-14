@@ -43,8 +43,11 @@ export function htmlToText(html) {
     const m = h.match(new RegExp(`<${t}\\b[^>]*>([\\s\\S]*)</${t}\\s*>`, "i"));
     if (m) { h = m[1]; break; }
   }
-  h = h.replace(/<\/?(p|br|h[1-6]|li)\b[^>]*>/gi, "\n").replace(/<[^>]*>/g, "");
-  return decodeEntities(h).split("\n").map((l) => l.replace(/[\s ]+/g, " ").trim())
+  // Block tags end a line, cells become " | " and any other tag a space, so "<td>2023</td><td>15%</td>"
+  // or two adjacent <div>s never glue into a number ("202315%") the fact check would then look for.
+  h = h.replace(/<\/?(p|br|h[1-6]|li|div|section|article|main|table|thead|tbody|tfoot|tr|caption|ul|ol|dl|dt|dd|blockquote|figure|figcaption|pre|hr)\b[^>]*>/gi, "\n")
+    .replace(/<\/?(td|th)\b[^>]*>/gi, " | ").replace(/<[^>]*>/g, " ");
+  return decodeEntities(h).split("\n").map((l) => l.replace(/[\s\u00a0]+/g, " ").trim().replace(/\|( \|)+/g, "|").replace(/^\| ?| ?\|$/g, ""))
     .join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 

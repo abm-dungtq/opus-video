@@ -141,3 +141,16 @@ test("main: bad usage exits 2", async () => {
 test("decodeEntities: typographic entities common in news HTML", () => {
   assert.equal(decodeEntities("a&hellip; &ldquo;b&rdquo; &lsquo;c&rsquo; 1&ndash;2 &mdash;"), "a\u2026 \u201cb\u201d \u2018c\u2019 1\u20132 \u2014");
 });
+
+test("htmlToText: table cells, rows and adjacent divs never glue numbers or sentences together", () => {
+  const html = `<body><table><thead><tr><th>Năm</th><th>Tăng</th></tr></thead><tbody><tr><td>2023</td><td>15%</td></tr><tr><td>2024</td><td>20%</td></tr></tbody></table>`
+    + `<div>Giá đất tăng 20% trong năm 2024 theo báo cáo.</div><div>Giao dịch giảm 30% so với cùng kỳ.</div>`
+    + `<section><ul><li>a</li></ul><dl><dt>Quận 1</dt><dd>120 triệu/m²</dd></dl></section><p>x<span>1</span><b>2</b></p></body>`;
+  const t = htmlToText(html);
+  assert.ok(!/202315|15%2024|Tăng2023/.test(t), t);
+  const lines = t.split("\n");
+  assert.ok(lines.includes("Năm | Tăng") && lines.includes("2023 | 15%") && lines.includes("2024 | 20%"), t);
+  assert.ok(lines.includes("Giá đất tăng 20% trong năm 2024 theo báo cáo.") && lines.includes("Giao dịch giảm 30% so với cùng kỳ."), t);
+  assert.ok(lines.includes("Quận 1") && lines.includes("120 triệu/m²"), t);
+  assert.ok(lines.includes("x 1 2"), t);
+});
