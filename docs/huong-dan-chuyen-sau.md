@@ -777,7 +777,8 @@ Agent tự xem từng khung, chạy `qc-mp4` trên animatic (MOTION không đư�
 
 Cổng final (`check-preflight.mjs --project ./ --stage final`, cũng là cổng của `render-final.mjs`) chặn khi:
 
-- `DEMO.md` không có dòng `animatic:`, hoặc file đó không còn. Dự án `aspect: both` cần thêm dòng `animatic_9x16:` (chạy `make-demo.mjs --project ./ --animatic --aspect 9x16`). Cả hai animatic đều qua các luật bên dưới.
+- `DEMO.md` không có dòng `animatic:`, hoặc file đó không còn. Dự án `aspect: both` cần thêm dòng `animatic_9x16:`, tạo bằng `make-demo.mjs --project ./ --animatic --aspect 9x16 --composition compositions/main-9x16.html` (bản 9:16 là project riêng thì thay `--composition` bằng `--hyperframes ../<project-9x16>`). Thiếu cả hai cờ đó thì HyperFrames render `index.html` khổ ngang. Cả hai animatic đều qua các luật bên dưới.
+- `animatic_9x16` có khung ngang (rộng không nhỏ hơn cao): `animatic demo/9x16/animatic.mp4 is 960×540, not portrait; re-run make-demo.mjs --animatic --aspect 9x16 --composition …`. Render lại từ composition 9:16.
 - Animatic cũ hơn `PLAN.md`: `animatic demo/animatic.mp4 is older than PLAN.md; re-run make-demo.mjs --animatic`.
 - `index.html` hoặc một file `compositions/*.html` được sửa sau khi render animatic: `<file> newer than the animatic demo/animatic.mp4; the user approved older motion, re-run make-demo.mjs --animatic`. Với dự án cũ, sửa composition sau demo chỉ là WARN; với dự án có `direction:` thì chặn, vì người dùng đã duyệt một chuyển động khác.
 - Animatic bị MOTION chấm FAIL (mục 12.6): `animatic demo/animatic.mp4: <số đo> … trông như slideshow …`.

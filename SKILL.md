@@ -159,7 +159,7 @@ Mỗi dự án có một thư mục riêng:
    - Áp dụng banned list trong brief.
 
 6b. **Khung hình demo (BẮT BUỘC trước video cuối).** Làm theo `references/plan-demo.md`:
-   - Dự án có `direction:`: `node $OV/scripts/make-demo.mjs --project . --animatic` (bản 9:16: thêm `--aspect 9x16` và `--composition compositions/main-9x16.html`, hoặc `--hyperframes <project-9x16>` nếu là project riêng). Script render clip nháp toàn bộ `demo/animatic.mp4`, cắt đúng các mốc trong `PLAN.md`, ghép `demo/contact-sheet.jpg` và ghi `DEMO.md` (`animatic:` + `approval: pending`). Dự án `creative_override` chụp ảnh tĩnh như cũ (bỏ `--animatic`).
+   - Dự án có `direction:`: `node $OV/scripts/make-demo.mjs --project . --animatic` (bản 9:16: thêm `--aspect 9x16` và `--composition compositions/main-9x16.html`, hoặc `--hyperframes <project-9x16>` nếu là project riêng; cổng final chặn `animatic_9x16` có khung ngang). Script render clip nháp toàn bộ `demo/animatic.mp4`, cắt đúng các mốc trong `PLAN.md`, ghép `demo/contact-sheet.jpg` và ghi `DEMO.md` (`animatic:` + `approval: pending`). Dự án `creative_override` chụp ảnh tĩnh như cũ (bỏ `--animatic`).
    - Tự xem từng khung (đủ dấu, không tràn chữ, vùng an toàn, đúng nội dung cảnh) và chạy `qc-mp4.mjs demo/animatic.mp4 --project . --draft` (MOTION không được FAIL), rồi **gửi clip nháp + contact sheet cho người dùng duyệt** và dừng chờ trả lời. Người dùng duyệt chuyển động, không chỉ ảnh tĩnh.
    - Có góp ý thì sửa và chụp lại. Người dùng đồng ý thì ghi `approval: <ai>, <khi nào>, "<lời đồng ý>"` vào `DEMO.md`. Chỉ khi người dùng đã nói rõ là chạy không dừng mới được ghi `approval: auto — <lý do và lời người dùng>`.
    - Kiểm: `node $OV/scripts/check-preflight.mjs --project . --stage final` phải `PASS`.

@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { loadDirections, checkData, pickDirections, compatWarnings, resolveSelection, classifySeams, wordBudget, renderDoc, DOC } from "../directions.mjs";
-import { check as preflight } from "../check-preflight.mjs";
+import { check as preflight, checkCreative, parsePlan } from "../check-preflight.mjs";
 import { motionVerdict, parseMotion } from "../qc-mp4.mjs";
 import { planTokens, buildRecipes } from "../recipe-pack.mjs";
 import { upstream } from "../directions.mjs";
@@ -141,19 +141,25 @@ test("preflight final: needs a moving animatic and build/RECIPES.md newer than P
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 
-test("preflight final: aspect both also needs a moving animatic_9x16", { skip: !ffmpeg(["-version"]) && "ffmpeg missing" }, () => {
+// creative-good switched to aspect both: 16:9 demo frames + one 9:16 frame, RECIPES, a moving 16:9 animatic.
+function bothAspectFixture() {
   const d = copyFixture("creative-good");
+  writeFileSync(join(d, "BRIEF.md"), readFileSync(join(d, "BRIEF.md"), "utf8").replace(/^aspect: 9:16$/m, "aspect: both"));
+  writeFileSync(join(d, "PLAN.md"), readFileSync(join(d, "PLAN.md"), "utf8").replace("## QA", "## Khung hình demo 9:16\n- 1 — khung lệnh dọc\n\n## QA"));
+  past(join(d, "PLAN.md"), 300);
+  past(join(d, "BRIEF.md"), 300);
+  mkdirSync(join(d, "demo", "9x16"), { recursive: true });
+  mkdirSync(join(d, "build"));
+  writeFileSync(join(d, "build", "RECIPES.md"), "# RECIPES\n");
+  for (let i = 0; i < 5; i++) writeFileSync(join(d, "demo", `frame-0${i}-at-${i}s.png`), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]));
+  writeFileSync(join(d, "demo", "9x16", "frame-00-at-1s.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]));
+  assert.ok(ffmpeg(["-f", "lavfi", "-i", "testsrc2=s=640x360:d=3:r=30", "-pix_fmt", "yuv420p", join(d, "demo", "animatic.mp4")]));
+  return d;
+}
+
+test("preflight final: aspect both also needs a moving animatic_9x16", { skip: !ffmpeg(["-version"]) && "ffmpeg missing" }, () => {
+  const d = bothAspectFixture();
   try {
-    writeFileSync(join(d, "BRIEF.md"), readFileSync(join(d, "BRIEF.md"), "utf8").replace(/^aspect: 9:16$/m, "aspect: both"));
-    writeFileSync(join(d, "PLAN.md"), readFileSync(join(d, "PLAN.md"), "utf8").replace("## QA", "## Khung hình demo 9:16\n- 1 — khung lệnh dọc\n\n## QA"));
-    past(join(d, "PLAN.md"), 300);
-    past(join(d, "BRIEF.md"), 300);
-    mkdirSync(join(d, "demo", "9x16"), { recursive: true });
-    mkdirSync(join(d, "build"));
-    writeFileSync(join(d, "build", "RECIPES.md"), "# RECIPES\n");
-    for (let i = 0; i < 5; i++) writeFileSync(join(d, "demo", `frame-0${i}-at-${i}s.png`), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]));
-    writeFileSync(join(d, "demo", "9x16", "frame-00-at-1s.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]));
-    assert.ok(ffmpeg(["-f", "lavfi", "-i", "testsrc2=s=640x360:d=3:r=30", "-pix_fmt", "yuv420p", join(d, "demo", "animatic.mp4")]));
     const ok = "approval: người dùng, 2026-10-14, \"ok\"\n";
     writeFileSync(join(d, "DEMO.md"), `animatic: demo/animatic.mp4\n${ok}`);
     let r = preflight({ project: d, stage: "final" });
@@ -165,6 +171,43 @@ test("preflight final: aspect both also needs a moving animatic_9x16", { skip: !
     assert.ok(ffmpeg(["-f", "lavfi", "-i", "testsrc2=s=360x640:d=3:r=30", "-pix_fmt", "yuv420p", join(d, "demo", "9x16", "animatic.mp4")]));
     r = preflight({ project: d, stage: "final" });
     assert.equal(r.pass, true, JSON.stringify(r.errors));
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("preflight final: animatic_9x16 rendered from the 16:9 composition is refused, hints name the 9:16 composition", { skip: !ffmpeg(["-version"]) && "ffmpeg missing" }, () => {
+  const d = bothAspectFixture();
+  try {
+    const ok = "approval: người dùng, 2026-10-14, \"ok\"\n";
+    writeFileSync(join(d, "DEMO.md"), `animatic: demo/animatic.mp4\n${ok}`);
+    let r = preflight({ project: d, stage: "final" });
+    assert.ok(r.errors.some((e) => e.includes("no `animatic_9x16:`") && e.includes("--composition compositions/main-9x16.html") && e.includes("--hyperframes")), JSON.stringify(r.errors));
+    assert.ok(ffmpeg(["-f", "lavfi", "-i", "testsrc2=s=640x360:d=3:r=30", "-pix_fmt", "yuv420p", join(d, "demo", "9x16", "animatic.mp4")]));
+    writeFileSync(join(d, "DEMO.md"), `animatic: demo/animatic.mp4\nanimatic_9x16: demo/9x16/animatic.mp4\n${ok}`);
+    r = preflight({ project: d, stage: "final" });
+    assert.equal(r.pass, false);
+    assert.ok(r.errors.some((e) => e.includes("demo/9x16/animatic.mp4") && e.includes("640×360") && e.includes("not portrait") && e.includes("--composition compositions/main-9x16.html")), JSON.stringify(r.errors));
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("checkCreative: orientation comes from the injected probe; the 16:9 animatic is not required to be portrait", () => {
+  const d = copyFixture("creative-good");
+  try {
+    writeFileSync(join(d, "BRIEF.md"), readFileSync(join(d, "BRIEF.md"), "utf8").replace(/^aspect: 9:16$/m, "aspect: both"));
+    past(join(d, "PLAN.md"), 300);
+    mkdirSync(join(d, "demo", "9x16"), { recursive: true });
+    for (const f of ["animatic.mp4", join("9x16", "animatic.mp4")]) writeFileSync(join(d, "demo", f), "x");
+    writeFileSync(join(d, "DEMO.md"), "animatic: demo/animatic.mp4\nanimatic_9x16: demo/9x16/animatic.mp4\n");
+    const brief = readFileSync(join(d, "BRIEF.md"), "utf8"), plan = parsePlan(readFileSync(join(d, "PLAN.md"), "utf8"));
+    const run = (size) => {
+      const errors = [], seen = [];
+      checkCreative({ dir: d, plan, brief, stage: "final", errors, warnings: [], motion: () => ({ frames: 90, still: 0, ratio: 0, peak: 9 }), probe: (f) => { seen.push(f); if (size instanceof Error) throw size; return size; } });
+      return { errors, seen };
+    };
+    const land = run({ width: 960, height: 540 });
+    assert.deepEqual(land.seen.map((f) => f.endsWith(join("9x16", "animatic.mp4"))), [true], "only animatic_9x16 is probed");
+    assert.ok(land.errors.some((e) => e.includes("960×540") && e.includes("not portrait")), JSON.stringify(land.errors));
+    assert.ok(!run({ width: 540, height: 960 }).errors.some((e) => e.includes("portrait")));
+    assert.ok(run(new Error("ffprobe boom")).errors.some((e) => e.includes("demo/9x16/animatic.mp4") && e.includes("ffprobe boom")));
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 

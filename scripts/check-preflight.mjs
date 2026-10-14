@@ -28,8 +28,9 @@
 //     blur-crossfade, …) only when the direction has allow_soft.
 //   - Rows whose Lời đọc cell is empty / "—" / "(nhạc)" / "không lời" add up to at least
 //     BRIEF `music_only_s` seconds (default from the direction's energy, 2s).
-//   - final: DEMO.md `animatic: <mp4>` (plus `animatic_9x16:` for aspect both; make-demo.mjs
-//     --animatic) newer than PLAN.md, index.html
+//   - final: DEMO.md `animatic: <mp4>` (plus `animatic_9x16:` for aspect both, which must be portrait:
+//     make-demo.mjs --animatic --aspect 9x16 --composition compositions/main-9x16.html, or
+//     --hyperframes ../<project-9x16>) newer than PLAN.md, index.html
 //     and compositions/*.html, whose
 //     motion passes qc-mp4 MOTION (FAIL when ≥60% near-still frames and 90th-pct YDIF < 1.5), and
 //     build/RECIPES.md (recipe-pack.mjs) newer than PLAN.md.
@@ -37,11 +38,24 @@
 
 import { existsSync, readFileSync, readdirSync, statSync, openSync, readSync, closeSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
 import { loadDirections, classifySeams, tokenExists, upstream, wordBudget } from "./directions.mjs";
 import { measureMotion, motionVerdict } from "./qc-mp4.mjs";
+
+// make-demo needs the 9:16 composition named, else hyperframes renders the 16:9 index.html.
+const VERTICAL_HINT = "make-demo.mjs --animatic --aspect 9x16 --composition compositions/main-9x16.html (or --hyperframes ../<project-9x16> for a separate 9:16 project)";
+
+// Width and height of the first video stream; throws when ffprobe cannot read the file.
+export function probeSize(file, run = spawnSync) {
+  const r = run("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", file], { encoding: "utf8" });
+  if (r.error) throw new Error(`cannot run ffprobe: ${r.error.message}`);
+  const [width, height] = String(r.stdout || "").trim().split(",").map(Number);
+  if (r.status !== 0 || !(width > 0 && height > 0)) throw new Error(`ffprobe cannot read the frame size: ${String(r.stderr || "").trim() || "no video stream"}`);
+  return { width, height };
+}
 
 export const PLACEHOLDER = /^(?:…|\.{3}|todo|tbd|-|n\/a|chưa|pending|<[^>]*>)$/i;
 export const SECTIONS = { goal: "muc tieu", scenes: "canh", audio: "am thanh", engine: "engine", demo: "khung hinh demo", qa: "qa" };
@@ -80,7 +94,7 @@ export function spanSeconds(cell) {
 const col = (headers, re) => headers.findIndex((h) => re.test(h));
 
 // Creative gate on PLAN.md + BRIEF.md. Pushes into errors/warnings; returns a summary or null.
-export function checkCreative({ dir, plan, brief, stage, errors, warnings, data = loadDirections(), up = upstream(), motion = measureMotion }) {
+export function checkCreative({ dir, plan, brief, stage, errors, warnings, data = loadDirections(), up = upstream(), motion = measureMotion, probe = probeSize }) {
   const fm = frontmatter(brief);
   if (fm.creative_override) {
     if (fm.creative_override.trim().length < 10) errors.push("BRIEF.md creative_override needs a reason of at least 10 characters");
@@ -153,10 +167,13 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
     for (const key of keys) {
       const anim = animaticOf(demoText, key);
       const animPath = anim ? resolve(dir, anim) : "";
-      if (!anim) errors.push(`DEMO.md has no \`${key}:\` — run make-demo.mjs --animatic${key === "animatic_9x16" ? " --aspect 9x16" : ""} so the user approves motion, not stills`);
+      const rerun = key === "animatic_9x16" ? VERTICAL_HINT : "make-demo.mjs --animatic";
+      let bad;
+      if (!anim) errors.push(`DEMO.md has no \`${key}:\` — run ${rerun} so the user approves motion, not stills`);
       else if (!existsSync(animPath)) errors.push(`DEMO.md animatic ${anim} not found`);
-      else if (statSync(animPath).mtimeMs < planTime) errors.push(`animatic ${anim} is older than PLAN.md; re-run make-demo.mjs --animatic`);
-      else if (newerThan(dir, statSync(animPath).mtimeMs).length) errors.push(`${newerThan(dir, statSync(animPath).mtimeMs).join(", ")} newer than the animatic ${anim}; the user approved older motion, re-run make-demo.mjs --animatic`);
+      else if (statSync(animPath).mtimeMs < planTime) errors.push(`animatic ${anim} is older than PLAN.md; re-run ${rerun}`);
+      else if (newerThan(dir, statSync(animPath).mtimeMs).length) errors.push(`${newerThan(dir, statSync(animPath).mtimeMs).join(", ")} newer than the animatic ${anim}; the user approved older motion, re-run ${rerun}`);
+      else if (key === "animatic_9x16" && (bad = notPortrait(probe, animPath, anim))) errors.push(bad);
       else {
         let m;
         try { m = motion(animPath); } catch (e) { errors.push(`cannot measure motion of ${anim}: ${e.message}`); }
@@ -173,6 +190,14 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
     else if (statSync(recipes).mtimeMs < planTime) errors.push("build/RECIPES.md is older than PLAN.md; re-run recipe-pack.mjs");
   }
   return out;
+}
+
+// A 9:16 animatic rendered without the vertical composition is landscape; the user would approve the
+// 16:9 motion as the vertical cut. Returns the error, or "" when height > width.
+function notPortrait(probe, path, anim) {
+  let s;
+  try { s = probe(path); } catch (e) { return `cannot read the frame size of ${anim}: ${e.message}`; }
+  return s.height > s.width ? "" : `animatic ${anim} is ${s.width}×${s.height}, not portrait; re-run ${VERTICAL_HINT}`;
 }
 
 // index.html and compositions/*.html edited after `time` (the build the user has not seen).
