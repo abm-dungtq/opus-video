@@ -92,6 +92,10 @@ test("NO_AUDIO warns without an audio stream and skips the audio checks", () => 
 test("ASPECT fails on mismatch, accepts both, is skipped without a brief", () => {
   assert.deepEqual(level(evaluate({ ...GOOD, width: 1920, height: 1080 }, BRIEF, 60), "ASPECT"), ["FAIL"]);
   assert.deepEqual(level(evaluate({ ...GOOD, width: 1920, height: 1080 }, { aspect: "both" }, 60), "ASPECT"), ["PASS"]);
+  // --draft (animatic, 540 px short edge): only the ratio has to match.
+  assert.deepEqual(level(evaluate({ ...GOOD, width: 540, height: 960 }, BRIEF, 60), "ASPECT"), ["FAIL"]);
+  assert.deepEqual(level(evaluate({ ...GOOD, width: 540, height: 960 }, BRIEF, 60, { draft: true }), "ASPECT"), ["PASS"]);
+  assert.deepEqual(level(evaluate({ ...GOOD, width: 960, height: 540 }, BRIEF, 60, { draft: true }), "ASPECT"), ["FAIL"]);
   assert.deepEqual(level(evaluate({ ...GOOD, width: 1920, height: 1080 }, { aspect: "16:9" }, 60), "ASPECT"), ["PASS"]);
   assert.deepEqual(level(evaluate({ ...GOOD, width: 320, height: 240 }, null, 60), "ASPECT"), ["PASS"]);
 });

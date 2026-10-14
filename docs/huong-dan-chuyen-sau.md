@@ -768,7 +768,7 @@ Lỗi thường gặp:
 
 ```bash
 node $OV/scripts/make-demo.mjs --project ./ --animatic
-node $OV/scripts/qc-mp4.mjs demo/animatic.mp4 --project ./
+node $OV/scripts/qc-mp4.mjs demo/animatic.mp4 --project ./ --draft
 ```
 
 `--animatic` render toàn bộ composition ở `--quality draft`, thu cạnh ngắn về 540 px, giữ lại thành `demo/animatic.mp4`, cắt các khung theo mốc trong `PLAN.md`, ghép `contact-sheet.jpg` và ghi `animatic:` cùng `approval: pending` vào `DEMO.md`. Dùng được cùng `--composition` và `--hyperframes`. Không dùng chung với `--from-video` (thoát 2). Mã thoát giống mục 6b: 0 đã chụp, 1 chụp lỗi, 2 sai cú pháp hoặc `PLAN.md` thiếu mốc.

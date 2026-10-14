@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // qc-mp4.mjs — technical QA of a rendered MP4 before delivery (SKILL.md step 8). One ffprobe,
 // one ffmpeg pass for picture, one for sound; prints one line per check: `LEVEL CODE detail`.
-//   node qc-mp4.mjs <file.mp4> [--project <dir>] [--write-qa] [--json]
+//   node qc-mp4.mjs <file.mp4> [--project <dir>] [--draft] [--write-qa] [--json]
 //   node qc-mp4.mjs --help | -h
 // Checks (WARN never blocks; FAIL does):
 //   NO_VIDEO   FAIL no video stream          NO_AUDIO   WARN no audio stream
@@ -24,6 +24,8 @@
 //              or < 1.2). Otherwise WARN at the FAIL line only. Fix by building beats with
 //              continuous motion (build/RECIPES.md).
 // --project <dir>  read <dir>/BRIEF.md frontmatter (aspect, duration_s, direction, energy).
+// --draft          the file is a draft (make-demo --animatic, 540 px short edge): ASPECT only
+//                  compares the ratio, not the exact size.
 // --write-qa       append a "## qc-mp4 <file> <YYYY-MM-DD HH:mm>" block to <project>/QA.md
 //                  (created if missing); needs --project.
 // --json           print the result array as JSON instead of lines.
@@ -120,7 +122,7 @@ export function parseEbur(stderr) {
 
 // metrics: { hasVideo, hasAudio, width, height, bitRate, black, freeze, silence, ebur }
 // brief: { aspect, duration_s } from BRIEF.md frontmatter, or null without --project.
-export function evaluate(metrics, brief, duration) {
+export function evaluate(metrics, brief, duration, { draft = false } = {}) {
   const L = LIMITS;
   const out = [];
   const add = (code, level, detail) => out.push({ code, level, detail });
@@ -136,7 +138,7 @@ export function evaluate(metrics, brief, duration) {
     const ok = a === "both" ? Object.values(SIZES) : SIZES[a] ? [SIZES[a]] : null;
     if (!ok) add("ASPECT", "PASS", `không kiểm (BRIEF aspect "${brief.aspect ?? ""}" không rõ)`);
     else if (!m.hasVideo) add("ASPECT", "FAIL", "không có hình để so khổ");
-    else if (ok.some(([w, h]) => w === m.width && h === m.height)) add("ASPECT", "PASS", `${m.width}×${m.height} khớp aspect ${a}`);
+    else if (ok.some(([w, h]) => (draft ? w * m.height === h * m.width : w === m.width && h === m.height))) add("ASPECT", "PASS", `${m.width}×${m.height} khớp aspect ${a}${draft ? " (bản nháp, chỉ so tỉ lệ)" : ""}`);
     else add("ASPECT", "FAIL", `${m.width}×${m.height} lệch aspect ${a} (cần ${ok.map(([w, h]) => `${w}×${h}`).join(" hoặc ")})`);
   }
 
@@ -241,17 +243,18 @@ export function readBrief(project) {
 
 export function main(argv = process.argv.slice(2), { run = spawnSync, now = () => new Date(), out = (s) => process.stdout.write(s), err = (s) => process.stderr.write(s) } = {}) {
   if (wantsHelp(argv)) { out(helpText(import.meta.url)); return 0; }
-  let file = null, project = null, writeQa = false, json = false;
+  let file = null, project = null, writeQa = false, json = false, draft = false;
   for (let i = 0; i < argv.length; i++) {
     const x = argv[i];
     if (x === "--project") { project = argv[++i]; if (!project) { err("qc-mp4: --project needs a directory\n"); return 2; } }
     else if (x === "--write-qa") writeQa = true;
     else if (x === "--json") json = true;
+    else if (x === "--draft") draft = true;
     else if (x.startsWith("-")) { err(`qc-mp4: unknown argument ${x}\n`); return 2; }
     else if (file === null) file = x;
     else { err(`qc-mp4: only one file, got extra ${x}\n`); return 2; }
   }
-  if (!file) { err("qc-mp4: usage: node qc-mp4.mjs <file.mp4> [--project <dir>] [--write-qa] [--json]\n"); return 2; }
+  if (!file) { err("qc-mp4: usage: node qc-mp4.mjs <file.mp4> [--project <dir>] [--draft] [--write-qa] [--json]\n"); return 2; }
   if (writeQa && !project) { err("qc-mp4: --write-qa needs --project\n"); return 2; }
   if (!existsSync(file)) { err(`qc-mp4: file not found: ${file}\n`); return 2; }
 
@@ -261,7 +264,7 @@ export function main(argv = process.argv.slice(2), { run = spawnSync, now = () =
     measured = measure(file, run);
   } catch (e) { err(`qc-mp4: ${e.message}\n`); return 2; }
 
-  const results = evaluate(measured.metrics, brief, measured.duration);
+  const results = evaluate(measured.metrics, brief, measured.duration, { draft });
   const sum = summarize(results);
   const lines = [...results.map((r) => `${r.level} ${r.code} ${r.detail}`), sum.line];
   if (json) out(JSON.stringify(results, null, 2) + "\n");
