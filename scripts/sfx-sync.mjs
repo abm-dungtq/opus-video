@@ -14,7 +14,8 @@
 // Windows (ITU-R BT.1359-1, delta = heard − event, positive = sound late):
 //   PASS −45…+125 ms · WARN −90…+185 ms · FAIL otherwise.
 // Only index.html (or --html) is read: a sound inside a sub-composition has data-start on that
-//   composition's clock and is reported as FAIL "không có trong <html>".
+//   composition's clock and is reported as FAIL "không có trong <html>" (as is a sound whose
+//   only tag has data-volume="0", which the mixer drops).
 // --fix       for each line that is not PASS, print the data-start that would put the sound on
 //             the event. Never edits the HTML.
 // --write-qa  append "## SYNC (<ISO time>)" with the lines to <project>/QA.md.
@@ -167,7 +168,7 @@ export function checkSync({ dir = ".", html, run = spawnSync } = {}) {
       if (!Number.isFinite(e.t)) { add({ ...base, level: "FAIL", detail: `thời điểm "${e.raw}" không đọc được (ghi số giây, ví dụ 6.5s)` }); continue; }
       const want = resolve(dir, e.sound);
       const cands = tracks.filter((tr) => tr.src === want);
-      if (!cands.length) { add({ ...base, level: "FAIL", detail: `"${e.sound}" không có trong ${htmlName} (SFX trong composition con chưa được kiểm)` }); continue; }
+      if (!cands.length) { add({ ...base, level: "FAIL", detail: `"${e.sound}" không có trong ${htmlName} (hoặc data-volume="0"; SFX trong composition con chưa được kiểm)` }); continue; }
       const track = cands.reduce((a, b) => (Math.abs(b.start - e.t) < Math.abs(a.start - e.t) ? b : a));
       let lead;
       try {

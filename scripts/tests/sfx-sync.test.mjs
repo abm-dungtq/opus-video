@@ -151,6 +151,6 @@ test("sfx-sync with ffmpeg: 120 ms leading silence is measured, cached, and a 27
     writeFileSync(join(d, "PLAN.md"), `${plan}| 5.0 | lạ | assets/sfx/c.wav |\n`);
     c = capture();
     assert.equal(main(["--project", d], c.io), 1);
-    assert.match(c.buf.out, /^FAIL {2}SYNC {3}5s lạ ← assets\/sfx\/c\.wav.*không có trong/m);
+    assert.match(c.buf.out, /^FAIL {2}SYNC {3}5s lạ ← assets\/sfx\/c\.wav "assets\/sfx\/c\.wav" không có trong index\.html \(hoặc data-volume="0"; SFX trong composition con chưa được kiểm\)$/m);
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
