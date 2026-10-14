@@ -34,6 +34,11 @@
 //     and compositions/*.html, whose
 //     motion passes qc-mp4 MOTION (FAIL when ≥60% near-still frames and 90th-pct YDIF < 1.5), and
 //     build/RECIPES.md (recipe-pack.mjs) newer than PLAN.md.
+//   - PLAN.md "## Sự kiện": a table Thời điểm | Sự kiện | Âm thanh (seconds on the root timeline,
+//     src as in the HTML, "—" for no sound), or a line "không có SFX gắn sự kiện" (WARN only).
+//     plan: a missing section FAILs. final: a missing section only WARNs (the table asks for a
+//     measurement; a delivered project can still re-render), and sfx-sync.mjs measures each event:
+//     its FAIL lines (sound outside ITU-R BT.1359-1 −90…+185 ms) block, its WARN lines warn.
 // Exit: 0 pass · 1 blocked · 2 bad usage.
 
 import { existsSync, readFileSync, readdirSync, statSync, openSync, readSync, closeSync, realpathSync } from "node:fs";
@@ -44,6 +49,7 @@ import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
 import { loadDirections, classifySeams, tokenExists, upstream, wordBudget } from "./directions.mjs";
 import { measureMotion, motionVerdict } from "./qc-mp4.mjs";
+import { checkSync } from "./sfx-sync.mjs";
 
 // make-demo needs the 9:16 composition named, else hyperframes renders the 16:9 index.html.
 const VERTICAL_HINT = "make-demo.mjs --animatic --aspect 9x16 --composition compositions/main-9x16.html (or --hyperframes ../<project-9x16> for a separate 9:16 project)";
@@ -60,6 +66,8 @@ export function probeSize(file, run = spawnSync) {
 export const PLACEHOLDER = /^(?:…|\.{3}|todo|tbd|-|n\/a|chưa|pending|<[^>]*>)$/i;
 export const SECTIONS = { goal: "muc tieu", scenes: "canh", audio: "am thanh", engine: "engine", demo: "khung hinh demo", qa: "qa" };
 export const CREATIVE_SECTION = "y do sang tao";
+export const EVENTS_SECTION = "su kien";
+const EVENTS_MISSING = 'PLAN.md has no "## Sự kiện" table (Thời điểm | Sự kiện | Âm thanh); write "không có SFX gắn sự kiện" when no sound is tied to a picture event';
 const fold = (s) => s.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/gi, "d").toLowerCase().replace(/\s+/g, " ").trim();
 
 // Markdown table → { headers: [folded], rows: [[cell]] } (separator row dropped).
@@ -94,7 +102,7 @@ export function spanSeconds(cell) {
 const col = (headers, re) => headers.findIndex((h) => re.test(h));
 
 // Creative gate on PLAN.md + BRIEF.md. Pushes into errors/warnings; returns a summary or null.
-export function checkCreative({ dir, plan, brief, stage, errors, warnings, data = loadDirections(), up = upstream(), motion = measureMotion, probe = probeSize }) {
+export function checkCreative({ dir, plan, brief, stage, errors, warnings, data = loadDirections(), up = upstream(), motion = measureMotion, probe = probeSize, sync = checkSync }) {
   const fm = frontmatter(brief);
   if (fm.creative_override) {
     if (fm.creative_override.trim().length < 10) errors.push("BRIEF.md creative_override needs a reason of at least 10 characters");
@@ -158,6 +166,12 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
     if (out.musicOnly + 1e-6 < need) errors.push(`PLAN.md "## Cảnh" has ${out.musicOnly.toFixed(1)}s without voice; need ≥ ${need}s of music-and-picture beats (Lời đọc "—" or "(nhạc)")`);
   } else if (t.rows.length) errors.push('PLAN.md "## Cảnh" needs "Thời điểm" and "Lời đọc" columns to measure the music-only beats');
 
+  if (stage !== "final") {
+    const events = plan.sections[EVENTS_SECTION];
+    if (events === undefined) errors.push(EVENTS_MISSING);
+    else if (fold(events).includes("khong co sfx gan su kien")) warnings.push('PLAN.md "## Sự kiện": không có SFX gắn sự kiện (sfx-sync has nothing to measure)');
+  }
+
   if (stage === "final") {
     const planTime = statSync(join(dir, "PLAN.md")).mtimeMs;
     const demoMd = join(dir, "DEMO.md");
@@ -184,6 +198,12 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
           else if (v.level === "WARN") warnings.push(`animatic ${anim}: ${v.detail}`);
         }
       }
+    }
+    let s;
+    try { s = sync({ dir }); } catch (e) { errors.push(`sfx-sync: ${e.message}`); }
+    if (s) {
+      if (s.missing) warnings.push(EVENTS_MISSING);
+      else { errors.push(...s.errors); warnings.push(...s.warnings); }
     }
     const recipes = join(dir, "build", "RECIPES.md");
     if (!existsSync(recipes)) errors.push("build/RECIPES.md not found — run recipe-pack.mjs --project . and build from it (step 6)");
@@ -229,7 +249,7 @@ export function approvalOf(text) {
   return m ? m[1].trim() : "";
 }
 
-export function check({ project = ".", stage = "plan" } = {}) {
+export function check({ project = ".", stage = "plan", sync = checkSync } = {}) {
   const dir = resolve(project);
   const errors = [], warnings = [];
   const out = { project: dir, stage, pass: false, errors, warnings, plan: null, demo: null };
@@ -250,7 +270,7 @@ export function check({ project = ".", stage = "plan" } = {}) {
   const brief = existsSync(join(dir, "BRIEF.md")) ? readFileSync(join(dir, "BRIEF.md"), "utf8") : "";
   const both = /^both$/i.test((frontmatter(brief).aspect || "").trim());
   if (both && !(plan.demo916 && plan.demo916.length)) errors.push('BRIEF.md aspect: both — PLAN.md needs "## Khung hình demo 9:16" with timestamps');
-  out.creative = checkCreative({ dir, plan, brief, stage, errors, warnings });
+  out.creative = checkCreative({ dir, plan, brief, stage, errors, warnings, sync });
 
   if (stage === "final") {
     const planTime = statSync(planPath).mtimeMs;

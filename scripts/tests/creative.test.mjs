@@ -211,6 +211,46 @@ test("checkCreative: orientation comes from the injected probe; the 16:9 animati
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 
+test("preflight plan: a creative PLAN needs ## Sự kiện; the no-SFX line passes with a WARN", () => {
+  const d = copyFixture("creative-good");
+  try {
+    const plan = readFileSync(join(d, "PLAN.md"), "utf8").replace(/## Sự kiện[\s\S]*?(?=\n## )/, "");
+    writeFileSync(join(d, "PLAN.md"), plan);
+    let r = preflight({ project: d });
+    assert.equal(r.pass, false);
+    assert.ok(r.errors.some((e) => e.includes("## Sự kiện")), JSON.stringify(r.errors));
+    writeFileSync(join(d, "PLAN.md"), plan.replace("## QA", "## Sự kiện\nkhông có SFX gắn sự kiện\n\n## QA"));
+    r = preflight({ project: d });
+    assert.equal(r.pass, true, JSON.stringify(r.errors));
+    assert.ok(r.warnings.some((w) => w.includes("không có SFX gắn sự kiện")), JSON.stringify(r.warnings));
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("checkCreative final: sync FAIL lines block; a missing ## Sự kiện only warns", () => {
+  const d = copyFixture("creative-good");
+  try {
+    past(join(d, "PLAN.md"), 300);
+    mkdirSync(join(d, "demo"), { recursive: true });
+    mkdirSync(join(d, "build"), { recursive: true });
+    writeFileSync(join(d, "demo", "animatic.mp4"), "x");
+    writeFileSync(join(d, "build", "RECIPES.md"), "# RECIPES\n");
+    writeFileSync(join(d, "DEMO.md"), "animatic: demo/animatic.mp4\n");
+    const brief = readFileSync(join(d, "BRIEF.md"), "utf8"), plan = parsePlan(readFileSync(join(d, "PLAN.md"), "utf8"));
+    const run = (sync) => {
+      const errors = [], warnings = [];
+      checkCreative({ dir: d, plan, brief, stage: "final", errors, warnings, motion: () => ({ frames: 90, still: 0, ratio: 0, peak: 9 }), probe: () => ({ width: 540, height: 960 }), sync });
+      return { errors, warnings };
+    };
+    const line = { level: "FAIL", t: 2, label: "nhấn", sound: "assets/sfx/a.wav", delta_ms: 270, lead_s: 0.12 };
+    const blocked = run(() => ({ lines: [line], errors: ["SYNC   2s nhấn ← assets/sfx/a.wav lệch +270 ms"], warnings: [], missing: false, none: false }));
+    assert.ok(blocked.errors.some((e) => e.includes("lệch +270 ms")), JSON.stringify(blocked.errors));
+    const missing = run(() => ({ lines: [], errors: [], warnings: ["PLAN.md không có ## Sự kiện"], missing: true, none: false }));
+    assert.ok(!missing.errors.some((e) => e.includes("## Sự kiện")), JSON.stringify(missing.errors));
+    assert.ok(missing.warnings.some((w) => w.includes("## Sự kiện")), JSON.stringify(missing.warnings));
+    assert.deepEqual(missing.errors, []);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
 test("motionVerdict: calibration samples (slideshow FAIL, creative PASS, legacy only WARNs)", () => {
   const brief = { direction: "A2", energy: "don-dap" };
   assert.equal(motionVerdict({ frames: 449, still: 316, ratio: 0.70, peak: 1.12 }, brief).level, "FAIL");

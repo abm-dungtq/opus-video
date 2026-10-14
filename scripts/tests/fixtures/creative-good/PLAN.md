@@ -24,6 +24,9 @@ Người xem TikTok thấy Gemini 4 Argon nhận một yêu cầu và trả kế
 ## Âm thanh
 Voice eleven_v4 tiếng Việt, 16 từ (≤ word_budget 30); nhạc nền synth 124 BPM −20 dB; SFX theo bảng trên.
 
+## Sự kiện
+không có SFX gắn sự kiện
+
 ## Engine
 HyperFrames general-video 9:16, dựng từ build/RECIPES.md; cảnh 1 lấy từ pitch/1-prompt-live-artifact/index.html.
 
