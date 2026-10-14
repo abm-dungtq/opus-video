@@ -28,7 +28,8 @@
 //     blur-crossfade, …) only when the direction has allow_soft.
 //   - Rows whose Lời đọc cell is empty / "—" / "(nhạc)" / "không lời" add up to at least
 //     BRIEF `music_only_s` seconds (default from the direction's energy, 2s).
-//   - final: DEMO.md `animatic: <mp4>` (make-demo.mjs --animatic) newer than PLAN.md, index.html
+//   - final: DEMO.md `animatic: <mp4>` (plus `animatic_9x16:` for aspect both; make-demo.mjs
+//     --animatic) newer than PLAN.md, index.html
 //     and compositions/*.html, whose
 //     motion passes qc-mp4 MOTION (FAIL when ≥60% near-still frames and 90th-pct YDIF < 1.5), and
 //     build/RECIPES.md (recipe-pack.mjs) newer than PLAN.md.
@@ -146,20 +147,25 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
   if (stage === "final") {
     const planTime = statSync(join(dir, "PLAN.md")).mtimeMs;
     const demoMd = join(dir, "DEMO.md");
-    const anim = existsSync(demoMd) ? animaticOf(readFileSync(demoMd, "utf8")) : "";
-    const animPath = anim ? resolve(dir, anim) : "";
-    if (!anim) errors.push("DEMO.md has no `animatic:` — run make-demo.mjs --animatic so the user approves motion, not stills");
-    else if (!existsSync(animPath)) errors.push(`DEMO.md animatic ${anim} not found`);
-    else if (statSync(animPath).mtimeMs < planTime) errors.push(`animatic ${anim} is older than PLAN.md; re-run make-demo.mjs --animatic`);
-    else if (newerThan(dir, statSync(animPath).mtimeMs).length) errors.push(`${newerThan(dir, statSync(animPath).mtimeMs).join(", ")} newer than the animatic ${anim}; the user approved older motion, re-run make-demo.mjs --animatic`);
-    else {
-      let m;
-      try { m = motion(animPath); } catch (e) { errors.push(`cannot measure motion of ${anim}: ${e.message}`); }
-      if (m !== undefined) {
-        const v = motionVerdict(m, fm);
-        out.motion = { ...m, level: v.level };
-        if (v.level === "FAIL") errors.push(`animatic ${anim}: ${v.detail}`);
-        else if (v.level === "WARN") warnings.push(`animatic ${anim}: ${v.detail}`);
+    const demoText = existsSync(demoMd) ? readFileSync(demoMd, "utf8") : "";
+    // aspect both renders a second animatic (make-demo --aspect 9x16 → animatic_9x16:); measure each one.
+    const keys = ["animatic", ...(String(fm.aspect || "").trim() === "both" || animaticOf(demoText, "animatic_9x16") ? ["animatic_9x16"] : [])];
+    for (const key of keys) {
+      const anim = animaticOf(demoText, key);
+      const animPath = anim ? resolve(dir, anim) : "";
+      if (!anim) errors.push(`DEMO.md has no \`${key}:\` — run make-demo.mjs --animatic${key === "animatic_9x16" ? " --aspect 9x16" : ""} so the user approves motion, not stills`);
+      else if (!existsSync(animPath)) errors.push(`DEMO.md animatic ${anim} not found`);
+      else if (statSync(animPath).mtimeMs < planTime) errors.push(`animatic ${anim} is older than PLAN.md; re-run make-demo.mjs --animatic`);
+      else if (newerThan(dir, statSync(animPath).mtimeMs).length) errors.push(`${newerThan(dir, statSync(animPath).mtimeMs).join(", ")} newer than the animatic ${anim}; the user approved older motion, re-run make-demo.mjs --animatic`);
+      else {
+        let m;
+        try { m = motion(animPath); } catch (e) { errors.push(`cannot measure motion of ${anim}: ${e.message}`); }
+        if (m !== undefined) {
+          const v = motionVerdict(m, fm);
+          out[key === "animatic" ? "motion" : "motion_9x16"] = { ...m, level: v.level };
+          if (v.level === "FAIL") errors.push(`animatic ${anim}: ${v.detail}`);
+          else if (v.level === "WARN") warnings.push(`animatic ${anim}: ${v.detail}`);
+        }
       }
     }
     const recipes = join(dir, "build", "RECIPES.md");
@@ -176,8 +182,8 @@ function newerThan(dir, time) {
   return files.filter((f) => existsSync(join(dir, f)) && statSync(join(dir, f)).mtimeMs > time);
 }
 
-export function animaticOf(text) {
-  const m = text.match(/^\s*[-*]?\s*animatic:\s*(\S.*)$/im);
+export function animaticOf(text, key = "animatic") {
+  const m = text.match(new RegExp(`^\\s*[-*]?\\s*${key}:\\s*(\\S.*)$`, "im"));
   return m ? m[1].trim() : "";
 }
 

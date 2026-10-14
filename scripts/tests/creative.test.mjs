@@ -141,6 +141,33 @@ test("preflight final: needs a moving animatic and build/RECIPES.md newer than P
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 
+test("preflight final: aspect both also needs a moving animatic_9x16", { skip: !ffmpeg(["-version"]) && "ffmpeg missing" }, () => {
+  const d = copyFixture("creative-good");
+  try {
+    writeFileSync(join(d, "BRIEF.md"), readFileSync(join(d, "BRIEF.md"), "utf8").replace(/^aspect: 9:16$/m, "aspect: both"));
+    writeFileSync(join(d, "PLAN.md"), readFileSync(join(d, "PLAN.md"), "utf8").replace("## QA", "## Khung hình demo 9:16\n- 1 — khung lệnh dọc\n\n## QA"));
+    past(join(d, "PLAN.md"), 300);
+    past(join(d, "BRIEF.md"), 300);
+    mkdirSync(join(d, "demo", "9x16"), { recursive: true });
+    mkdirSync(join(d, "build"));
+    writeFileSync(join(d, "build", "RECIPES.md"), "# RECIPES\n");
+    for (let i = 0; i < 5; i++) writeFileSync(join(d, "demo", `frame-0${i}-at-${i}s.png`), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]));
+    writeFileSync(join(d, "demo", "9x16", "frame-00-at-1s.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]));
+    assert.ok(ffmpeg(["-f", "lavfi", "-i", "testsrc2=s=640x360:d=3:r=30", "-pix_fmt", "yuv420p", join(d, "demo", "animatic.mp4")]));
+    const ok = "approval: người dùng, 2026-10-14, \"ok\"\n";
+    writeFileSync(join(d, "DEMO.md"), `animatic: demo/animatic.mp4\n${ok}`);
+    let r = preflight({ project: d, stage: "final" });
+    assert.ok(r.errors.some((e) => e.includes("animatic_9x16")), JSON.stringify(r.errors));
+    assert.ok(ffmpeg(["-f", "lavfi", "-i", "color=c=0x101020:s=360x640:d=3:r=30", "-pix_fmt", "yuv420p", join(d, "demo", "9x16", "animatic.mp4")]));
+    writeFileSync(join(d, "DEMO.md"), `animatic: demo/animatic.mp4\nanimatic_9x16: demo/9x16/animatic.mp4\n${ok}`);
+    r = preflight({ project: d, stage: "final" });
+    assert.ok(r.errors.some((e) => e.includes("animatic demo/9x16/animatic.mp4") && e.includes("slideshow")), JSON.stringify(r.errors));
+    assert.ok(ffmpeg(["-f", "lavfi", "-i", "testsrc2=s=360x640:d=3:r=30", "-pix_fmt", "yuv420p", join(d, "demo", "9x16", "animatic.mp4")]));
+    r = preflight({ project: d, stage: "final" });
+    assert.equal(r.pass, true, JSON.stringify(r.errors));
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
 test("motionVerdict: calibration samples (slideshow FAIL, creative PASS, legacy only WARNs)", () => {
   const brief = { direction: "A2", energy: "don-dap" };
   assert.equal(motionVerdict({ frames: 449, still: 316, ratio: 0.70, peak: 1.12 }, brief).level, "FAIL");

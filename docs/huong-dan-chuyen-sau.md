@@ -777,7 +777,7 @@ Agent tự xem từng khung, chạy `qc-mp4` trên animatic (MOTION không đư�
 
 Cổng final (`check-preflight.mjs --project ./ --stage final`, cũng là cổng của `render-final.mjs`) chặn khi:
 
-- `DEMO.md` không có dòng `animatic:`, hoặc file đó không còn.
+- `DEMO.md` không có dòng `animatic:`, hoặc file đó không còn. Dự án `aspect: both` cần thêm dòng `animatic_9x16:` (chạy `make-demo.mjs --project ./ --animatic --aspect 9x16`). Cả hai animatic đều qua các luật bên dưới.
 - Animatic cũ hơn `PLAN.md`: `animatic demo/animatic.mp4 is older than PLAN.md; re-run make-demo.mjs --animatic`.
 - `index.html` hoặc một file `compositions/*.html` được sửa sau khi render animatic: `<file> newer than the animatic demo/animatic.mp4; the user approved older motion, re-run make-demo.mjs --animatic`. Với dự án cũ, sửa composition sau demo chỉ là WARN; với dự án có `direction:` thì chặn, vì người dùng đã duyệt một chuyển động khác.
 - Animatic bị MOTION chấm FAIL (mục 12.6): `animatic demo/animatic.mp4: <số đo> … trông như slideshow …`.
