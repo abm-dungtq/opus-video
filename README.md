@@ -1,6 +1,68 @@
 # opus-video
 
-Agent skill biến một brief hoặc chủ đề tiếng Việt thành video MP4 hoàn chỉnh, xuất 16:9, 9:16 hoặc cả hai. Chạy được trên **Claude Code, OpenAI Codex, Google Antigravity (app và CLI)** và mọi agent đọc được thư mục skill có `SKILL.md`, trên **macOS, Linux, WSL và Windows**.
+**Agent skill dựng video tiếng Việt từ một brief tới file MP4 giao khách.** Bạn nói chủ đề; agent dựng 3 hướng hình ảnh để bạn chọn, viết kịch bản, tạo giọng, dựng, kiểm tra rồi xuất bản giao 16:9, 9:16 hoặc cả hai. Mỗi bước có cổng kiểm tra chặn lại khi chưa đạt.
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Node ≥ 22](https://img.shields.io/badge/node-%E2%89%A5%2022-339933.svg)
+![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Antigravity-6f42c1.svg)
+![OS](https://img.shields.io/badge/OS-macOS%20%C2%B7%20Linux%20%C2%B7%20WSL%20%C2%B7%20Windows-555.svg)
+![Tests](https://img.shields.io/badge/tests-245%20passing-brightgreen.svg)
+
+Chạy trên **Claude Code, OpenAI Codex, Google Antigravity (app và CLI)** và mọi agent đọc được thư mục skill có `SKILL.md`.
+
+[Video demo](#video-demo) · [Có gì mới](#có-gì-mới-2026-10-14) · [Cách hoạt động](#cách-hoạt-động) · [Cài đặt](#1-cài-đặt-nhanh-khuyên-dùng) · [Dùng](#6-dùng) · [Script](#7-script) · [Xử lý sự cố](#10-xử-lý-sự-cố)
+
+## Video demo
+
+Các video dưới đây do opus-video dựng. Bấm vào ảnh để mở file MP4 trong [bản release `demo-videos`](https://github.com/abm-dungtq/opus-video/releases/tag/demo-videos).
+
+<table>
+  <tr>
+    <td align="center" valign="top" width="33%">
+      <a href="https://github.com/abm-dungtq/opus-video/releases/download/demo-videos/gemini-argon-9x16.mp4"><img src="docs/demo/gemini-argon-9x16.jpg" height="300" alt="Gemini 4 Argon, 9:16"></a><br>
+      <b>Gemini 4 Argon</b><br>9:16 · 15 giây<br>
+      <sub>Theo quy trình mới: chọn 1 trong 3 styleframe (hướng A2, câu lệnh thành sản phẩm chạy thật), duyệt animatic hai vòng.</sub>
+    </td>
+    <td align="center" valign="top" width="33%">
+      <a href="https://github.com/abm-dungtq/opus-video/releases/download/demo-videos/abm-intro-9x16.mp4"><img src="docs/demo/abm-intro-9x16.jpg" height="300" alt="ABM, 9:16"></a><br>
+      <b>Giới thiệu ABM</b><br>9:16 · 30 giây<br>
+      <sub>Bản dọc của video giới thiệu doanh nghiệp, dựng song song với bản 16:9.</sub>
+    </td>
+    <td align="center" valign="top" width="33%">
+      <a href="https://github.com/abm-dungtq/opus-video/releases/download/demo-videos/bds-lo-72m2-9x16.mp4"><img src="docs/demo/bds-lo-72m2-9x16.jpg" height="300" alt="Lô đất 72 m², 9:16"></a><br>
+      <b>Tin đăng lô đất 72 m²</b><br>9:16 · 60 giây · bản Zalo 720p<br>
+      <sub>Clip người dùng quay chạy trong khung PiP trên nền bản đồ, phụ đề bám từng chữ.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top" colspan="2">
+      <a href="https://github.com/abm-dungtq/opus-video/releases/download/demo-videos/viet-pro-intro-16x9.mp4"><img src="docs/demo/viet-pro-intro-16x9.jpg" width="420" alt="Viết Pro, 16:9"></a><br>
+      <b>Giới thiệu Viết Pro</b><br>16:9 · 60 giây<br>
+      <sub>Video giới thiệu skill <a href="https://github.com/abm-dungtq/viet-pro-codex">viet-pro</a> cho người mới.</sub>
+    </td>
+    <td align="center" valign="top">
+      <a href="https://github.com/abm-dungtq/opus-video/releases/download/demo-videos/abm-intro-16x9.mp4"><img src="docs/demo/abm-intro-16x9.jpg" width="300" alt="ABM, 16:9"></a><br>
+      <b>Giới thiệu ABM</b><br>16:9 · 30 giây
+    </td>
+  </tr>
+</table>
+
+## Có gì mới (2026-10-14)
+
+Bản trước dựng ra video kiểu trình chiếu: vài thẻ tiêu đề trượt lên rồi mờ đi. Bản này đổi thứ tự làm việc: chọn hình trước, viết lời sau, và mọi bước đều được đo bằng máy.
+
+- **Chọn hướng bằng mắt.** `make-pitch.mjs` dựng 3 styleframe khoảng 3 giây từ chính chủ đề của bạn, theo 3 trong 8 hướng đạo diễn có trong HyperFrames. Bạn chọn một, đổi từ khoá nếu muốn. Styleframe được chọn thành cảnh mở đầu.
+- **Lời đi theo hình.** Kịch bản viết sau khi đã chọn hướng và không được vượt `word_budget` của hướng đó. Vượt thì cổng viet-pro chặn (`VOICE_OVER_BUDGET`).
+- **Dựng theo công thức thật.** `recipe-pack.mjs` gom đúng các blueprint, rule và kiểu nối cảnh mà `PLAN.md` nêu vào `build/RECIPES.md`. Cổng plan chặn cách nối cảnh bằng mờ dần.
+- **Duyệt chuyển động, không duyệt ảnh tĩnh.** `make-demo.mjs --animatic` render clip nháp 540p để bạn xem trước khi render bản cuối. Sửa file dựng sau khi đã duyệt thì cổng final chặn. Dự án `aspect: both` cần thêm animatic dọc.
+- **Đo độ chuyển động.** `qc-mp4.mjs` có mục MOTION: video có từ 60% khung gần như đứng yên và đỉnh chuyển động thấp thì FAIL. Một video trình chiếu thật đo được 70% và bị chặn.
+- **Dữ liệu thật thay số gõ tay.** `poi-fetch.mjs` lấy trường, chợ, bệnh viện, trạm xe… quanh một địa chỉ từ OpenStreetMap, kèm phút đi bộ. `source-ingest.mjs` lưu nguyên văn bài báo, PDF, trang arXiv vào `SOURCES.md` để đối chiếu từng con số trên hình.
+- **Brand kit dùng chung.** `shared-assets/brand.json` (mẫu ở `references/brand.example.json`) giữ màu, font, logo, giọng đọc và các hướng không dùng; `make-pitch` tự đọc.
+- **Giọng theo dự án.** `voice_id` trong `BRIEF.md` đứng trên giọng mặc định của máy; script in ra giọng lấy từ đâu.
+
+Danh sách đầy đủ ở [CHANGELOG.md](CHANGELOG.md).
+
+## Cách hoạt động
 
 Skill này là phần điều phối và không tự render. Nó nối các bước sau:
 
@@ -164,9 +226,9 @@ Agent nào cũng có thể chọn skill tự động khi bạn nói muốn làm 
 | **4b** | **`PLAN.md`** (mẫu ở `references/plan-demo.md`) | `check-preflight.mjs --stage plan` → `PASS` |
 | 5 | Giọng, SFX, nhạc nền | `eleven.mjs` exit 4 nếu cổng viet-pro chặn |
 | 6 | Dựng | |
-| **6b** | **Khung hình demo** (`make-demo.mjs`) → người dùng duyệt → `DEMO.md` `approval:` | `check-preflight.mjs --stage final` → `PASS` |
+| **6b** | **Clip nháp animatic** (`make-demo.mjs --animatic`) → người dùng duyệt → `DEMO.md` `approval:` | `check-preflight.mjs --stage final` → `PASS` |
 | 7 | Render nháp (`hyperframes render --quality looks`); **bản cuối chỉ bằng `render-final.mjs`** | exit 5 nếu thiếu plan/demo/duyệt |
-| 8 | QA (tối đa 3 vòng) | `QA.md` |
+| 8 | QA (tối đa 3 vòng), bắt đầu bằng `qc-mp4.mjs` | `QA.md`, không có dòng `FAIL` |
 | 9 | Caption Facebook + TikTok | `check-viet-pro.mjs --stage delivery` → `PASS` |
 
 Kết quả nằm trong thư mục dự án: `pitch/PITCH.md` + `pitch/sheet.jpg`, `BRIEF.md`, `script-table.md`, `STORYBOARD.md`, `PLAN.md`, `demo/*.png`, `DEMO.md`, `renders/*.mp4`, `QA.md`, `CAPTIONS.md`.
