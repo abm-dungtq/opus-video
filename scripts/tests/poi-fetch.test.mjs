@@ -105,3 +105,16 @@ test("parseOverpass: convenience stores get their own label, so real supermarket
   assert.deepEqual(top.filter((p) => p.label === "Siêu thị").map((p) => p.name), ["Co.opmart"]);
   assert.match(overpassQuery(10, 106, 500, ["supermarket"]), /\["shop"~"\^\(convenience\)\$"\]/);
 });
+
+test("main: Overpass HTTP 200 with an error remark exits 1, prints the remark and writes nothing", async () => {
+  const d = mkdtempSync(join(tmpdir(), "poi-"));
+  try {
+    const remark = "runtime error: Query timed out in \"query\" at line 3 after 26 seconds.";
+    const errs = [];
+    assert.equal(await main(["--project", d, "--lat", "10.7725", "--lon", "106.698"], quiet, (m) => errs.push(m), deps(stubFetch({ overpass: { elements: [], remark } }))), 1);
+    assert.match(errs.join("\n"), /Query timed out/);
+    for (const f of [join("sources", "poi.json"), "SOURCES.md", join("assets", "CREDITS.md")]) assert.ok(!existsSync(join(d, f)), `${f} must not be written`);
+    assert.equal(await main(["--project", d, "--lat", "10.7725", "--lon", "106.698"], quiet, quiet, deps(stubFetch({ overpass: { ...fx("overpass.json"), remark: "runtime remark: Timed out" } }))), 1);
+    assert.equal(await main(["--project", d, "--lat", "10.7725", "--lon", "106.698"], quiet, quiet, deps(stubFetch({ overpass: { ...fx("overpass.json"), remark: "note: data may be stale" } }))), 0);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});

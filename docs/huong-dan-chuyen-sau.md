@@ -844,7 +844,7 @@ node $OV/scripts/poi-fetch.mjs --project ./ --lat <vĩ độ> --lon <kinh độ>
 | Mã thoát | Nghĩa |
 |---|---|
 | 0 | Xong |
-| 1 | Lỗi mạng hoặc dịch vụ (in mã HTTP hoặc mã lỗi mạng) |
+| 1 | Lỗi mạng hoặc dịch vụ (in mã HTTP, mã lỗi mạng, hoặc dòng `remark` khi Overpass hết giờ hay hết bộ nhớ). Không ghi cache, `SOURCES.md` hay `CREDITS.md` |
 | 2 | Sai cú pháp: thiếu `--project`, có cả `--address` lẫn `--lat`/`--lon`, bán kính hay loại không hợp lệ |
 | 4 | Không tìm thấy địa chỉ: `poi-fetch: không tìm thấy địa chỉ "<địa chỉ>"` |
 

@@ -17,7 +17,7 @@
 // With --address the geocoded place name is printed and kept in SOURCES.md: check it is the project.
 // Cache: without --refresh, sources/poi.json with the same centre (< 10 m, or the same --address),
 //   radius, --kinds and --route is reused with no network call (the cache line goes to stderr).
-// Exit: 0 ok · 1 network / service error (HTTP code printed) · 2 bad usage · 4 geocode found nothing.
+// Exit: 0 ok · 1 network / service error (HTTP code, or the Overpass error remark, printed; nothing written) · 2 bad usage · 4 geocode found nothing.
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -186,6 +186,10 @@ export async function main(argv = process.argv.slice(2), log = console.log, err 
         err(`poi-fetch: geocode "${o.address}" → ${geocoded} (${center.lat}, ${center.lon})`);
       }
       const json = await call(OVERPASS, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: `data=${encodeURIComponent(overpassQuery(center.lat, center.lon, o.radius, o.kinds))}` }, true);
+      // Overpass answers a timeout or memory abort with HTTP 200, a "remark" and empty or partial
+      // elements; caching that would serve a wrong table on every later run.
+      if (typeof json?.remark === "string" && /error|timed out|out of memory/i.test(json.remark))
+        throw new HttpError(`Overpass: ${json.remark.slice(0, 200)} (thu nhỏ --radius hoặc --kinds rồi chạy lại)`);
       let items = topPerKind(parseOverpass(json, center)).map((p) => ({ ...p, ...walkEstimate(p.distance_m) }));
       if (o.route && items.length) {
         try {
