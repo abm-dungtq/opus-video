@@ -3,7 +3,8 @@
 // (same assumption as pattern-names.test.mjs).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, cpSync, utimesSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, cpSync, utimesSync, existsSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -13,8 +14,8 @@ import { check as preflight } from "../check-preflight.mjs";
 import { motionVerdict, parseMotion } from "../qc-mp4.mjs";
 import { planTokens, buildRecipes } from "../recipe-pack.mjs";
 import { upstream } from "../directions.mjs";
-import { setFrontmatter, setSection, main as pitchMain } from "../make-pitch.mjs";
-import { writeDemoMd } from "../make-demo.mjs";
+import { setFrontmatter, setSection, main as pitchMain, init as pitchInit } from "../make-pitch.mjs";
+import { writeDemoMd, winArgs } from "../make-demo.mjs";
 import { check as vietPro } from "../check-viet-pro.mjs";
 import { fakeVp, RECORD } from "./fixtures/fake-vp.mjs";
 
@@ -175,6 +176,43 @@ test("make-pitch choose: writes BRIEF frontmatter + creative_direction; clashes 
     assert.equal((readFileSync(join(d, "BRIEF.md"), "utf8").match(/## creative_direction/g) || []).length, 1);
     assert.equal(pitchMain(["choose", "--project", d, "--pick", "1", "--style", "khong-co"], quiet, quiet), 2);
   } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+// Runs fn with PATH pointing at an empty dir, so npx/ffmpeg cannot be spawned by accident.
+function noTools(fn) {
+  const old = process.env.PATH, empty = tmp("cr-nopath-");
+  process.env.PATH = empty;
+  try { return fn(); } finally { process.env.PATH = old; rmSync(empty, { recursive: true, force: true }); }
+}
+
+test("make-pitch render: refuses a styleframe that is still the blank hyperframes scaffold", () => {
+  const d = tmp();
+  try {
+    const blank = "<!doctype html><title>Title</title>\n";
+    mkdirSync(join(d, "pitch", "1-x"), { recursive: true });
+    writeFileSync(join(d, "pitch", "1-x", "index.html"), blank);
+    writeFileSync(join(d, "pitch", "PICK.json"), JSON.stringify({ topic: "t", aspect: "9:16", energy: "vua", duration_s: 15, picks: [{ n: 1, id: "A2", tier: "fit", dir: "pitch/1-x", scaffold: createHash("sha256").update(blank).digest("hex") }] }));
+    const errs = [];
+    const code = noTools(() => pitchMain(["render", "--project", d], () => {}, (m) => errs.push(m)));
+    assert.equal(code, 2, errs.join("\n"));
+    assert.match(errs.join("\n"), /pitch\/1-x\/index\.html.*(scaffold|chưa viết)/);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("make-pitch init: reports missing HyperFrames skills before scaffolding anything", () => {
+  const d = tmp();
+  try {
+    const errs = [];
+    const code = noTools(() => pitchInit({ project: d, topic: "t", aspect: "9:16" }, loadDirections(), { anim: "", creative: "", faceless: "" }));
+    assert.equal(code.code, 1);
+    assert.match(code.msg, /HyperFrames skills/);
+    assert.equal(existsSync(join(d, "pitch")), false);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("winArgs quotes npx arguments with spaces only on Windows", () => {
+  assert.deepEqual(winArgs(["-o", "C:\\a b\\1.mp4", "draft"], true), ["-o", '"C:\\a b\\1.mp4"', "draft"]);
+  assert.deepEqual(winArgs(["-o", "/a b/1.mp4"], false), ["-o", "/a b/1.mp4"]);
 });
 
 test("setFrontmatter / setSection helpers", () => {

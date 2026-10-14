@@ -32,7 +32,9 @@ import { wantsHelp, helpText } from "./cli-help.mjs";
 import { parsePlan } from "./check-preflight.mjs";
 
 const WIN = process.platform === "win32";
-const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { stdio: "inherit", shell: WIN && cmd === "npx", ...opts });
+// With shell:true (npx on Windows) Node joins args unquoted, so a path with spaces splits in two.
+export const winArgs = (args, win = WIN) => (win ? args.map((a) => (/[\s&()^|<>"]/.test(a) ? `"${a.replace(/"/g, '""')}"` : a)) : args);
+const run = (cmd, args, opts = {}) => spawnSync(cmd, cmd === "npx" ? winArgs(args) : args, { stdio: "inherit", shell: WIN && cmd === "npx", ...opts });
 
 // Rewrite DEMO.md: keep any free text above "## Frames", replace the frame list, reset approval.
 export function writeDemoMd(project, frames, label, source = "", animatic = "") {

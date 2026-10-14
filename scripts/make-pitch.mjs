@@ -29,15 +29,17 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, realpa
 import { join, resolve, relative } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
 import { loadDirections, pickDirections, compatWarnings, resolveSelection, wordBudget, upstream, DIMENSIONS, DIM_VI, TIER_VI } from "./directions.mjs";
 import { buildRecipes } from "./recipe-pack.mjs";
-import { contactSheet } from "./make-demo.mjs";
+import { contactSheet, winArgs } from "./make-demo.mjs";
 import { measureMotion, motionVerdict } from "./qc-mp4.mjs";
 
 const WIN = process.platform === "win32";
 const posix = (p) => p.split("\\").join("/");
+const sha = (file) => createHash("sha256").update(readFileSync(file)).digest("hex");
 // Reply keys the user types in PITCH.md → choose flags (--style, --visual, …).
 export const REPLY_KEY = { style: "phong cách", visual: "hình", effect: "hiệu ứng", transition: "chuyển cảnh", sfx: "âm thanh" };
 const SIZE = { "9:16": [1080, 1920], "16:9": [1920, 1080], both: [1080, 1920] };
@@ -90,32 +92,38 @@ ${d.styleframe_vi}
 }
 
 function hfInit(cwd, name, aspect) {
-  return spawnSync("npx", ["hyperframes", "init", name, "--example", "blank", "--resolution", aspect === "16:9" ? "landscape" : "portrait", "--non-interactive"],
+  return spawnSync("npx", winArgs(["hyperframes", "init", name, "--example", "blank", "--resolution", aspect === "16:9" ? "landscape" : "portrait", "--non-interactive"]),
     { cwd, stdio: "inherit", shell: WIN, env: { ...process.env, HYPERFRAMES_SKIP_SKILLS: "1" } });
 }
 
-function init(o, data) {
+export function init(o, data, up = upstream()) {
   if (!o.topic || !o.aspect) return { code: 2, msg: "init needs --topic and --aspect" };
   if (!SIZE[o.aspect]) return { code: 2, msg: "--aspect must be 16:9, 9:16 or both" };
   const project = resolve(o.project);
   const energy = o.energy || "vua";
   if (!data.energy[energy]) return { code: 2, msg: `--energy must be ${Object.keys(data.energy).join(", ")}` };
   const picks = pickDirections({ category: o.category || "", aspect: o.aspect, energy, topic: o.topic }, data);
+  if (!up.anim || !up.faceless || !up.creative) return { code: 1, msg: "make-pitch: HyperFrames skills (hyperframes-animation, hyperframes-creative, faceless-explainer) not found; run setup-check.mjs" };
   const pitch = join(project, "pitch");
   mkdirSync(pitch, { recursive: true });
-  const up = upstream();
+  // Keep the scaffold hash of styleframes that already exist, so render can still spot an unwritten one.
+  let old = [];
+  try { old = JSON.parse(readFileSync(join(pitch, "PICK.json"), "utf8")).picks || []; } catch { /* first init */ }
   const rows = [];
   for (const p of picks) {
     const name = `${p.n}-${p.direction.slug}`;
     const dir = join(pitch, name);
+    const prev = old.find((r) => r.dir === posix(relative(project, dir)));
+    let scaffold = prev?.scaffold || "";
     if (!existsSync(join(dir, "index.html"))) {
       const r = hfInit(pitch, name, o.aspect);
-      if (r.status !== 0 || !existsSync(dir)) return { code: 1, msg: `hyperframes init failed for ${name}` };
+      if (r.status !== 0 || !existsSync(join(dir, "index.html"))) return { code: 1, msg: `hyperframes init failed for ${name}` };
+      scaffold = sha(join(dir, "index.html"));
     }
     writeFileSync(join(dir, "STYLEFRAME.md"), styleframeMd({ n: p.n, pick: p, topic: o.topic, aspect: o.aspect, energy, data }));
     const sel = resolveSelection(p.direction, {}, data);
     writeFileSync(join(dir, "RECIPES.md"), buildRecipes({ blueprints: sel.blueprints, rules: sel.rules, seams: sel.seams, direction: p.direction, style: sel.style }, data, up));
-    rows.push({ n: p.n, id: p.id, tier: p.tier, dir: posix(relative(project, dir)), why: p.why });
+    rows.push({ n: p.n, id: p.id, tier: p.tier, dir: posix(relative(project, dir)), why: p.why, scaffold });
   }
   writeFileSync(join(pitch, "PICK.json"), JSON.stringify({ topic: o.topic, aspect: o.aspect, category: o.category || "", energy, duration_s: Number(o.duration) || 15, picks: rows }, null, 2) + "\n");
   return { code: 0, msg: `make-pitch: 3 hướng → ${rows.map((r) => `${r.n}. ${r.id} (${r.dir})`).join(" · ")}\nNext: viết index.html 3 giây cho từng thư mục theo STYLEFRAME.md + RECIPES.md, rồi chạy make-pitch.mjs render --project .` };
@@ -142,8 +150,9 @@ function render(o, data) {
   for (const r of info.picks) {
     const dir = join(project, r.dir);
     if (!existsSync(join(dir, "index.html"))) return { code: 2, msg: `${r.dir}/index.html not found` };
+    if (r.scaffold && sha(join(dir, "index.html")) === r.scaffold) return { code: 2, msg: `${r.dir}/index.html is still the blank hyperframes scaffold (styleframe chưa viết); write it from STYLEFRAME.md + RECIPES.md first` };
     const mp4 = join(pitch, `${r.n}.mp4`);
-    const x = spawnSync("npx", ["hyperframes", "render", "--quality", "draft", "-o", mp4], { cwd: dir, stdio: "inherit", shell: WIN, env: { ...process.env, HYPERFRAMES_SKIP_SKILLS: "1" } });
+    const x = spawnSync("npx", winArgs(["hyperframes", "render", "--quality", "draft", "-o", mp4]), { cwd: dir, stdio: "inherit", shell: WIN, env: { ...process.env, HYPERFRAMES_SKIP_SKILLS: "1" } });
     if (x.status !== 0 || !existsSync(mp4)) return { code: 1, msg: `render failed for ${r.dir}` };
     const probe = spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", mp4], { encoding: "utf8" });
     const dur = Number(String(probe.stdout).trim()) || 3;
