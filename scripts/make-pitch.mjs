@@ -23,7 +23,8 @@
 //   direction_swaps, energy, palette, word_budget, music_only_s, creative_selection (user|auto),
 //   styleframe; and a "## creative_direction" body section. --auto = option 1, recorded as auto
 //   (only when the user asked to run without stopping).
-// Exit: 0 ok · 1 render/init failed · 2 bad usage · 3 compat warnings to confirm.
+// Exit: 0 ok · 1 render/init failed · 2 bad usage · 3 compat warnings to confirm · 4 a styleframe
+//   fails MOTION (render; PITCH.md is still written), rebuild it.
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, realpathSync } from "node:fs";
 import { join, resolve, relative } from "node:path";
@@ -186,8 +187,16 @@ function render(o, data) {
     "- Hoặc số kèm điều chỉnh: `2, chuyển cảnh: lao-xuyen-tam, nhịp: em`",
     "- Muốn agent tự chọn: `tự chọn` (ghi là auto trong BRIEF.md)", ""].join("\n");
   writeFileSync(join(pitch, "PITCH.md"), md);
-  const bad = lines.filter((l) => l.motion.level === "FAIL");
-  return { code: 0, msg: `make-pitch: ${lines.length} clip → pitch/ · ${sheetOk ? "pitch/sheet.jpg · " : ""}pitch/PITCH.md${bad.length ? `\nWARN  styleframe ${bad.map((b) => b.n).join(", ")} gần như đứng yên; dựng lại trước khi cho người dùng xem` : ""}\nNext: gửi PITCH.md + sheet.jpg (và 3 clip) cho người dùng, dừng chờ câu trả lời, rồi chạy make-pitch.mjs choose.` };
+  return renderResult(lines, sheetOk);
+}
+
+// PITCH.md and sheet.jpg are written either way; a styleframe that fails MOTION exits 4 so the agent
+// rebuilds it instead of showing a slideshow to the user.
+export function renderResult(lines, sheetOk) {
+  const head = `make-pitch: ${lines.length} clip → pitch/ · ${sheetOk ? "pitch/sheet.jpg · " : ""}pitch/PITCH.md`;
+  const bad = lines.filter((l) => l.motion.level === "FAIL").map((b) => b.n);
+  if (bad.length) return { code: 4, msg: `${head}\nFAIL  styleframe ${bad.join(", ")} gần như đứng yên (MOTION)\nNext: dựng lại styleframe ${bad.join(", ")} theo RECIPES.md rồi chạy lại make-pitch.mjs render; chưa gửi cho người dùng.` };
+  return { code: 0, msg: `${head}\nNext: gửi PITCH.md + sheet.jpg (và 3 clip) cho người dùng, dừng chờ câu trả lời, rồi chạy make-pitch.mjs choose.` };
 }
 
 function choose(o, data) {

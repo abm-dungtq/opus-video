@@ -14,7 +14,7 @@ import { check as preflight } from "../check-preflight.mjs";
 import { motionVerdict, parseMotion } from "../qc-mp4.mjs";
 import { planTokens, buildRecipes } from "../recipe-pack.mjs";
 import { upstream } from "../directions.mjs";
-import { setFrontmatter, setSection, main as pitchMain, init as pitchInit } from "../make-pitch.mjs";
+import { setFrontmatter, setSection, main as pitchMain, init as pitchInit, renderResult } from "../make-pitch.mjs";
 import { writeDemoMd, winArgs } from "../make-demo.mjs";
 import { check as vietPro } from "../check-viet-pro.mjs";
 import { fakeVp, RECORD } from "./fixtures/fake-vp.mjs";
@@ -233,6 +233,15 @@ test("make-pitch choose: word budget follows the BRIEF duration; old creative_ov
 test("setFrontmatter: null deletes a key; duplicated keys collapse to one", () => {
   assert.equal(setFrontmatter("---\na: 1\nb: 2\n---\n", { a: null }), "---\nb: 2\n---\n");
   assert.equal(setFrontmatter("---\na: 1\nb: 2\na: 3\n---\n", { a: 9 }), "---\na: 9\nb: 2\n---\n");
+});
+
+test("make-pitch render: exit 4 when a styleframe fails MOTION, 0 otherwise", () => {
+  const pass = { level: "PASS" }, fail = { level: "FAIL" };
+  assert.equal(renderResult([{ n: 1, motion: pass }, { n: 2, motion: pass }], true).code, 0);
+  const r = renderResult([{ n: 1, motion: pass }, { n: 2, motion: fail }], true);
+  assert.equal(r.code, 4);
+  assert.match(r.msg, /FAIL {2}styleframe 2/);
+  assert.doesNotMatch(r.msg, /gửi PITCH\.md/);
 });
 
 test("setFrontmatter / setSection helpers", () => {
