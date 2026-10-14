@@ -15,8 +15,8 @@
 //   it falls back to the estimate. Default walking time is an estimate: straight line × 1.3 at
 //   80 m/minute.
 // With --address the geocoded place name is printed and kept in SOURCES.md: check it is the project.
-// Cache: without --refresh, sources/poi.json with the same centre (< 10 m, or the same --address)
-//   and radius is reused with no network call.
+// Cache: without --refresh, sources/poi.json with the same centre (< 10 m, or the same --address),
+//   radius, --kinds and --route is reused with no network call (the cache line goes to stderr).
 // Exit: 0 ok · 1 network / service error (HTTP code printed) · 2 bad usage · 4 geocode found nothing.
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, realpathSync } from "node:fs";
@@ -167,14 +167,14 @@ export async function main(argv = process.argv.slice(2), log = console.log, err 
 
   let cached = null;
   try { cached = JSON.parse(readFileSync(cachePath, "utf8")); } catch { /* no cache yet */ }
-  const sameCentre = cached && cached.radius === o.radius && String(cached.kinds) === String(o.kinds)
+  const sameCentre = cached && cached.radius === o.radius && String(cached.kinds) === String(o.kinds) && !!cached.route === !!o.route
     && (o.address ? cached.address === o.address : haversine(cached.center, { lat: o.lat, lon: o.lon }) < 10);
 
   let data;
   try {
     if (sameCentre && !o.refresh) {
       data = cached;
-      log(`poi-fetch: dùng cache sources/poi.json (truy vấn lúc ${cached.fetched_at}); --refresh để lấy lại`);
+      err(`poi-fetch: dùng cache sources/poi.json (truy vấn lúc ${cached.fetched_at}); --refresh để lấy lại`);
     } else {
       let center = { lat: o.lat, lon: o.lon }, geocoded = "";
       if (o.address) {
@@ -187,13 +187,12 @@ export async function main(argv = process.argv.slice(2), log = console.log, err 
       const json = await call(OVERPASS, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: `data=${encodeURIComponent(overpassQuery(center.lat, center.lon, o.radius, o.kinds))}` }, true);
       let items = topPerKind(parseOverpass(json, center)).map((p) => ({ ...p, ...walkEstimate(p.distance_m) }));
       if (o.route && items.length) {
-        const pts = items.slice(0, 24);
         try {
-          const t = parseOsrmTable(await call(`${OSRM}/${[center, ...pts].map((p) => `${p.lon},${p.lat}`).join(";")}?sources=0&annotations=duration,distance`));
+          const t = parseOsrmTable(await call(`${OSRM}/${[center, ...items].map((p) => `${p.lon},${p.lat}`).join(";")}?sources=0&annotations=duration,distance`));
           items = items.map((p, i) => (t[i] ? { ...p, ...t[i] } : p));
         } catch (e) { err(`WARN  OSRM đi bộ lỗi (${e.message}); dùng ước tính đường chim bay`); }
       }
-      data = { center, address: o.address || "", ...(geocoded ? { geocoded } : {}), radius: o.radius, kinds: o.kinds, fetched_at: now().toISOString(), items };
+      data = { center, address: o.address || "", ...(geocoded ? { geocoded } : {}), radius: o.radius, kinds: o.kinds, route: !!o.route, fetched_at: now().toISOString(), items };
       mkdirSync(join(project, "sources"), { recursive: true });
       writeFileSync(cachePath, JSON.stringify(data, null, 2) + "\n");
     }
