@@ -4,7 +4,8 @@
 // shared-assets/brand.json (or <project>/brand.json); file paths are relative to that file.
 //   node brand.mjs check [--project .] [--file <brand.json>] [--json]
 //   node brand.mjs --help | -h
-// Lookup order: --file → <project>/brand.json → <project>/../shared-assets/brand.json.
+// Lookup order: --file (must exist; relative to --project) → <project>/brand.json →
+//   <project>/../shared-assets/brand.json.
 // ERROR: palette.bg/fg/accent not #rrggbb (accent2 optional, same form when set); a
 //   banned_directions id that is not in data/directions.json.
 // WARN: logo / watermark / fonts.heading / fonts.body set but the file is missing; a heading font
@@ -22,12 +23,13 @@ const HEX = /^#[0-9a-f]{6}$/i;
 const FILE_KEYS = ["logo", "watermark", "fonts.heading", "fonts.body"];
 const get = (obj, key) => key.split(".").reduce((v, k) => (v && typeof v === "object" ? v[k] : undefined), obj);
 
-// → { path, dir, brand } or null; broken JSON throws Error("brand.json: <path>: <message>").
+// → { path, dir, brand } or null; broken JSON, or an explicit path that does not exist, throws
+// Error("brand.json: <path>: <message>"). A relative explicit path resolves from the project.
 export function findBrand(project, explicit = "") {
   const root = resolve(project || ".");
-  const candidates = explicit ? [resolve(explicit)] : [join(root, "brand.json"), join(dirname(root), "shared-assets", "brand.json")];
+  const candidates = explicit ? [resolve(root, explicit)] : [join(root, "brand.json"), join(dirname(root), "shared-assets", "brand.json")];
   for (const path of candidates) {
-    if (!existsSync(path)) continue;
+    if (!existsSync(path)) { if (explicit) throw new Error(`brand.json: ${path}: not found`); continue; }
     try { return { path, dir: dirname(path), brand: JSON.parse(readFileSync(path, "utf8")) }; }
     catch (e) { throw new Error(`brand.json: ${path}: ${e.message}`); }
   }

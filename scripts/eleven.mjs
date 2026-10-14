@@ -40,13 +40,14 @@ import { parseScript, writeStamp, stampMatches } from "./script-md.mjs";
 import { voiceGate, GATE_EXIT } from "./voice-gate.mjs";
 import { loadKey, ping } from "./jev-client.mjs";
 import { defaultVp } from "./check-viet-pro.mjs";
+import { DEFAULT_VOICE, DEFAULT_TTS_MODEL } from "./voice-defaults.mjs";
 maybeHelp(process.argv.slice(2), import.meta.url);
 
 const API = "https://api.elevenlabs.io";
 const ENV_FILE = join(homedir(), ".config", "opus-video", ".env");
 const DEFAULTS = {
-  voice: "eGSd0uV8dNQnZuEEX9lu",
-  ttsModel: "eleven_v4",
+  voice: DEFAULT_VOICE,
+  ttsModel: DEFAULT_TTS_MODEL,
   musicModel: "music_v2_5",
   sfxModel: "eleven_text_to_sound_v2",
 };

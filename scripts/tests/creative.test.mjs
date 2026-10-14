@@ -270,6 +270,31 @@ test("make-pitch choose with a brand kit: palette, brand path, voice_id only whe
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 
+test("make-pitch choose: a deleted PICK.json brand falls back with a WARN; template defaults count as empty", () => {
+  const root = tmp(), quiet = () => {};
+  const d = join(root, "p1");
+  const brandOk = { name: "Hãng Y", voice_id: "abc123", tts_model: "eleven_v5", palette: { bg: "#000000", fg: "#ffffff", accent: "#ff0000" } };
+  const pick = (brand) => JSON.stringify({ topic: "t", aspect: "9:16", energy: "vua", duration_s: 15, brand, picks: [{ n: 1, id: "A2", tier: "fit", dir: "pitch/1-x" }] });
+  try {
+    mkdirSync(join(d, "pitch"), { recursive: true });
+    writeFileSync(join(d, "pitch", "PICK.json"), pick(join(d, "brand.json")));
+    writeFileSync(join(d, "BRIEF.md"), "---\naspect: 9:16\n---\n\n# Brief\n");
+    assert.equal(pitchMain(["choose", "--project", d, "--pick", "1", "--palette", "thuong-hieu"], quiet, quiet), 2);
+    assert.equal(pitchMain(["choose", "--project", d, "--pick", "1", "--brand", join(d, "nope.json")], quiet, quiet), 2);
+    mkdirSync(join(root, "shared-assets"));
+    writeFileSync(join(root, "shared-assets", "brand.json"), JSON.stringify(brandOk));
+    writeFileSync(join(d, "BRIEF.md"), "---\naspect: 9:16\nduration_s: <số giây>\nvoice_id: eGSd0uV8dNQnZuEEX9lu\npalette: <toi | sang | thuong-hieu>\n---\n\n# Brief\n");
+    const out = [];
+    assert.equal(pitchMain(["choose", "--project", d, "--pick", "1"], (m) => out.push(m), (m) => out.push(m)), 0);
+    assert.match(out.join("\n"), /WARN brand trong PICK\.json không còn/);
+    const b = readFileSync(join(d, "BRIEF.md"), "utf8");
+    assert.match(b, /^palette: thuong-hieu$/m);
+    assert.match(b, /^voice_id: abc123$/m);
+    assert.match(b, /^duration_s: 15$/m);
+    assert.match(b, /^tts_model: eleven_v5$/m);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("styleframeMd adds a brand section only with a brand; pickDirections honours exclude", () => {
   const p = pickDirections({ aspect: "9:16", topic: "t" }, data)[0];
   const args = { n: 1, pick: p, topic: "t", aspect: "9:16", energy: "vua", data };

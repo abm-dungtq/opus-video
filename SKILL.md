@@ -200,7 +200,7 @@ Cần bản đăng theo từng nơi thì xuất từ bản final bằng `node $O
 | `references/brief-template.md` | Bước 1: khung brief và ví dụ 15 giây |
 | `references/creative-directions.md` | Bước 1b: 8 hướng đạo diễn, 2 núm, 5 nhóm từ khoá đổi được, từ vựng chuyển cảnh (sinh từ `data/directions.json`) |
 | `scripts/directions.mjs` | Bước 0/1b: `check` (token có thật trong HyperFrames, cũng chạy trong setup-check), `pick` (3 hướng tương phản), `compat` (cảnh báo phối sai), `doc --write` |
-| `scripts/make-pitch.mjs` | Bước 1b: `init` (3 project styleframe + STYLEFRAME.md + RECIPES.md), `render` (3 clip, sheet.jpg, PITCH.md menu số), `choose` (ghi BRIEF, exit 3 khi phối sai) |
+| `scripts/make-pitch.mjs` | Bước 1b: `init` (3 project styleframe + STYLEFRAME.md + RECIPES.md), `render` (3 clip, sheet.jpg, PITCH.md menu số; exit 4 khi styleframe FAIL MOTION), `choose` (ghi BRIEF, exit 3 khi phối sai) |
 | `scripts/recipe-pack.mjs` | Bước 6 (và 1b): gom blueprint/rule/seam theo PLAN.md hoặc theo hướng thành `build/RECIPES.md` |
 | `scripts/brand.mjs` | Bước 1/1b: `check` brand kit (màu #rrggbb, hướng bị cấm có thật, file logo/font tồn tại); `make-pitch` tự đọc |
 | `references/brand.example.json` | Mẫu brand kit; chép thành `shared-assets/brand.json` rồi sửa (đường dẫn tính từ file đó) |

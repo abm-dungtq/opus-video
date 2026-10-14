@@ -44,6 +44,7 @@ test("validateBrand: the shipped example has no ERROR (missing files only WARN)"
 test("brand check: broken JSON exits 2; ERROR exits 1; brandAbs resolves from the brand dir", () => {
   const d = tmp();
   try {
+    assert.equal(main(["check", "--file", join(d, "nope.json")], quiet, quiet), 2);
     writeFileSync(join(d, "brand.json"), "{ nope");
     assert.equal(main(["check", "--project", d], quiet, quiet), 2);
     writeFileSync(join(d, "brand.json"), JSON.stringify({ ...ok, palette: { bg: "red" } }));
