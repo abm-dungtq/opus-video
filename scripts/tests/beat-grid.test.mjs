@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { FPS, SR, analyze, fitGrid, maxFilter, percentile, main } from "../beat-grid.mjs";
+import { FPS, LIMITS, SR, analyze, fitGrid, maxFilter, percentile, main } from "../beat-grid.mjs";
 
 const hasFfmpeg = spawnSync("ffmpeg", ["-version"]).status === 0;
 const capture = () => {
@@ -62,7 +62,9 @@ test("a tempo drifting from 100 to 140 BPM is UNSTABLE: exit 1, --write writes n
     kickTrain(f, "1.6667*t+0.0167*t*t", 0.1); // 100 BPM at 0 s, 140 BPM at 20 s
     const { buf, io } = capture();
     assert.equal(main([f, "--write"], io), 1);
-    assert.match(buf.out, /^UNSTABLE stability \d+ ms > 25 ms/m);
+    assert.match(buf.out, /^UNSTABLE stability \d+ ms > 45 ms/m);
+    const ms = Number(/^UNSTABLE stability (\d+) ms/m.exec(buf.out)[1]);
+    assert.ok(ms >= 2 * LIMITS.stabilityMs, `drift ${ms} ms should sit far above the ${LIMITS.stabilityMs} ms limit`);
     assert.equal(existsSync(`${f}.beats.json`), false);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

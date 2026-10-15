@@ -17,9 +17,12 @@
 // stability: standard deviation (ms) of the offset between each beat of the grid and the nearest
 //   low-band onset peak above the kick threshold within a quarter beat (beats with none skipped;
 //   a drifting tempo leaves the onsets anywhere in that window). BEAT0 is moved by the mean offset.
-//   Over 25 ms, or fewer than 4 onsets to measure, the tempo drifts or cannot be read: UNSTABLE,
+//   Over 45 ms, or fewer than 4 onsets to measure, the tempo drifts or cannot be read: UNSTABLE,
 //   exit 1, --write writes nothing (B() must not use a grid the music does not follow). The
 //   UNSTABLE line goes to stdout (stderr with --json).
+//   45 ms is calibrated on six real beds of the workspace (all read the right tempo; spread 16–40 ms,
+//   from swing and soft attacks around a steady grid) against 101 ms for a 100→140 BPM drift.
+//   A slow bed that reads at twice its tempo: pass --max-bpm 100.
 // Output: `BPM 120.0  BEAT0 0.043 s  stability 6 ms`, then one row per 4-beat bar: beat index,
 //   start, kicks per beat ("K" or "."), RMS dB and a bar of #.
 // --json   print { bpm, beat0, beatLen, bars: [{ bar, start, kicks, rmsDb }], kick: [[a, b]],
@@ -36,7 +39,7 @@ import { wantsHelp, helpText } from "./cli-help.mjs";
 export const SR = 22050;
 export const HOP = 256;
 export const FPS = SR / HOP;
-export const LIMITS = { stabilityMs: 25, minOnsets: 4, dropDb: 6, octaveRatio: 0.9, bpmStep: 0.02, beat0Step: 0.004 };
+export const LIMITS = { stabilityMs: 45, minOnsets: 4, dropDb: 6, octaveRatio: 0.9, bpmStep: 0.02, beat0Step: 0.004 };
 const LOW_AF = "lowpass=f=150,lowpass=f=150";
 
 // Mono f32 samples of `file` at SR through the ffmpeg filter `af`. run: spawnSync or a stand-in.
