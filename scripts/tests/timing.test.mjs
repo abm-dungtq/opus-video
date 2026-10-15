@@ -152,6 +152,47 @@ test("beats.json in assets/bgm fills the beat grid", () => {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test("CLI: the single assets/bgm beats.json reaches TIMING in the HTML; beatLen 0 stays unmeasured", () => {
+  const dir = project();
+  try {
+    mkdirSync(join(dir, "assets/bgm"), { recursive: true });
+    const beats = join(dir, "assets/bgm/bgm.mp3.beats.json");
+    writeFileSync(beats, JSON.stringify({ bpm: 119.8, beat0: 0.025, beatLen: 0.500835, kick: [[0, 23]], drops: [], stability: 16 }));
+    const { buf, io } = capture();
+    assert.equal(main(["--project", dir], io), 0, buf.err);
+    const t = timingOf(readFileSync(join(dir, "index.html"), "utf8"));
+    assert.ok(t.beatLen > 0);
+    assert.deepEqual([t.beat0, t.beatLen, t.kick], [0.025, 0.500835, [[0, 23]]]);
+    writeFileSync(beats, JSON.stringify({ beat0: 0, beatLen: 0 }));
+    assert.equal(main(["--project", dir], io), 0, buf.err);
+    assert.equal(timingOf(readFileSync(join(dir, "index.html"), "utf8")).beatLen, 0);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("--music picks one of several beats.json; several without --music, or none for --music, exit 2", () => {
+  const dir = project();
+  try {
+    mkdirSync(join(dir, "assets/bgm"), { recursive: true });
+    writeFileSync(join(dir, "assets/bgm/a.mp3.beats.json"), JSON.stringify({ beat0: 0.1, beatLen: 0.5 }));
+    writeFileSync(join(dir, "assets/bgm/b.mp3.beats.json"), JSON.stringify({ beat0: 0.2, beatLen: 0.6 }));
+    const before = readFileSync(join(dir, "index.html"), "utf8");
+    let c = capture();
+    assert.equal(main(["--project", dir], c.io), 2);
+    assert.match(c.buf.err, /2 file \*\.beats\.json; chọn bằng --music/);
+    assert.equal(readFileSync(join(dir, "index.html"), "utf8"), before, "nothing written");
+    assert.equal(existsSync(join(dir, "timing.json")), false);
+    c = capture();
+    assert.equal(main(["--project", dir, "--music", "assets/bgm/c.mp3"], c.io), 2);
+    assert.match(c.buf.err, /c\.mp3\.beats\.json \(chạy beat-grid\.mjs/);
+    c = capture();
+    assert.equal(main(["--project", dir, "--music", "assets/bgm/b.mp3"], c.io), 0, c.buf.err);
+    const t = JSON.parse(readFileSync(join(dir, "timing.json"), "utf8"));
+    assert.deepEqual([t.beat0, t.beatLen], [0.2, 0.6]);
+    c = capture();
+    assert.equal(main(["--project", dir, "--music"], c.io), 2);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test("injectTiming refuses duplicate markers", () => {
   const two = "/* TIMING:BEGIN */x/* TIMING:END */\n/* TIMING:BEGIN */y/* TIMING:END */";
   assert.throws(() => injectTiming(two, {}), /nhiều hơn một khối/);

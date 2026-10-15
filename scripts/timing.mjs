@@ -3,7 +3,7 @@
 // from PLAN.md "## Cảnh", every spoken word on the root timeline from the voice words.json files,
 // and the beat grid when one was measured. Re-run after every voice change; never edit the
 // seconds by hand.
-//   node timing.mjs --project <dir> [--html index.html] [--dry]
+//   node timing.mjs --project <dir> [--html index.html] [--music <file>] [--dry]
 //   node timing.mjs --help | -h
 // Scenes: one per "## Cảnh" row, id s<#> (the # column), start/end from Thời điểm ("2.5–5.8s").
 // Voice: <audio>/<video> whose id starts with "vo-" or with data-audio-group="voiceover"; words
@@ -13,7 +13,9 @@
 // TIMING = { fps, duration, scenes: { s<#>: { start, end, lines: [{ id, words: [[text, start,
 //   end]] }] } }, beat0, beatLen, kick, drops }, seconds rounded to 3 decimals. duration is the
 //   root composition's data-duration; fps comes from hyperframes.json (default 30); beat0, beatLen,
-//   kick, drops come from assets/bgm/*.beats.json when present (defaults 0, 0, [], []: B() refuses an unmeasured grid).
+//   kick, drops come from the music's <file>.beats.json written by beat-grid.mjs --write: the one
+//   in assets/bgm/, or the one of --music when assets/bgm/ holds several (defaults 0, 0, [], []:
+//   B() refuses an unmeasured grid, and so does a beats.json with beatLen 0).
 // WARN when a voice track (data-start + data-duration) ends past the root data-duration; the
 //   duration is never changed.
 // Output: the text between the TIMING:BEGIN and TIMING:END comments of the HTML is replaced, and
@@ -21,9 +23,12 @@
 //   without them (a project not started from the skeleton) is refused and never edited.
 // Prints one line per scene, `TIMING s2 2.500–5.800 words=9`, and `WARN s2 không có từ nào trong
 //   words.json` when the scene's Lời đọc cell has text but no word landed in it.
+// --music <file>  the music bed whose <file>.beats.json gives the beat grid (path from <dir>);
+//         required when assets/bgm/ has more than one *.beats.json.
 // --dry   print only; write nothing.
 // Exit: 0 written (WARN lines allowed) · 1 no TIMING markers, no readable "## Cảnh" table or root
-// data-duration · 2 bad usage, PLAN.md or the HTML missing.
+// data-duration · 2 bad usage, PLAN.md or the HTML missing, several assets/bgm/*.beats.json without
+// --music, or no <file>.beats.json for --music.
 
 import { existsSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -93,26 +98,43 @@ export function planScenes(planText) {
   });
 }
 
-// Beat grid from the single assets/bgm/*.beats.json (first by name when several, with a warning).
-// Returns { grid: { beat0, beatLen, kick, drops } | null, warnings }.
-export function readBeats(dir) {
+// The *.beats.json files in <dir>/assets/bgm/, sorted by name ([] when the folder is missing).
+function beatsFiles(dir) {
   const bgm = join(resolve(dir), "assets", "bgm");
-  if (!existsSync(bgm)) return { grid: null, warnings: [] };
-  const files = readdirSync(bgm).filter((f) => f.endsWith(".beats.json")).sort();
-  if (!files.length) return { grid: null, warnings: [] };
-  const warnings = files.length > 1 ? [`nhiều file beats trong assets/bgm, dùng ${files[0]}`] : [];
+  return existsSync(bgm) ? readdirSync(bgm).filter((f) => f.endsWith(".beats.json")).sort().map((f) => join(bgm, f)) : [];
+}
+
+// Picks the beats.json for the project: <music>.beats.json when `music` is given (path from dir),
+// else the single assets/bgm/*.beats.json. Returns the absolute path or null when there is none.
+// Throws (bad usage, exit 2) when several exist without `music`, or `music` has no beats.json.
+export function beatsFile(dir, music = null) {
+  if (music) {
+    const f = `${resolve(resolve(dir), music)}.beats.json`;
+    if (!existsSync(f)) throw new Error(`không có ${f} (chạy beat-grid.mjs ${music} --write)`);
+    return f;
+  }
+  const files = beatsFiles(dir);
+  if (files.length > 1) throw new Error(`assets/bgm có ${files.length} file *.beats.json; chọn bằng --music <file>`);
+  return files[0] ?? null;
+}
+
+// Beat grid from beatsFile(dir, music). Returns { grid: { beat0, beatLen, kick, drops } | null,
+// warnings }; an unreadable file is a warning and leaves the default (unmeasured) grid.
+export function readBeats(dir, music = null) {
+  const file = beatsFile(dir, music);
+  if (!file) return { grid: null, warnings: [] };
   try {
-    const b = JSON.parse(readFileSync(join(bgm, files[0]), "utf8"));
+    const b = JSON.parse(readFileSync(file, "utf8"));
     if (!Number.isFinite(b?.beat0) || !Number.isFinite(b?.beatLen) || b.beatLen < 0) throw new Error("thiếu beat0/beatLen");
-    return { grid: { beat0: b.beat0, beatLen: b.beatLen, kick: Array.isArray(b.kick) ? b.kick : [], drops: Array.isArray(b.drops) ? b.drops : [] }, warnings };
+    return { grid: { beat0: b.beat0, beatLen: b.beatLen, kick: Array.isArray(b.kick) ? b.kick : [], drops: Array.isArray(b.drops) ? b.drops : [] }, warnings: [] };
   } catch (e) {
-    return { grid: null, warnings: [...warnings, `assets/bgm/${files[0]} không dùng được (${e.message}); giữ nhịp mặc định`] };
+    return { grid: null, warnings: [`${file} không dùng được (${e.message}); giữ nhịp mặc định`] };
   }
 }
 
 // Builds the TIMING object. Throws (exit 1) on plan or root problems.
 // Returns { timing, lines: [text], warnings: [text] }.
-export function buildTiming({ dir, html = "index.html" }) {
+export function buildTiming({ dir, html = "index.html", music = null }) {
   const root = resolve(dir);
   const htmlText = readFileSync(resolve(root, html), "utf8");
   const rootTag = htmlText.replace(/<!--[\s\S]*?-->/g, " ").match(/<[a-z][^>]*\sdata-composition-id\s*=[^>]*>/i);
@@ -125,7 +147,7 @@ export function buildTiming({ dir, html = "index.html" }) {
   }
   const scenes = planScenes(readFileSync(join(root, "PLAN.md"), "utf8"));
   const voice = voiceWords(root, html);
-  const beats = readBeats(root);
+  const beats = readBeats(root, music);
   const warnings = [...voice.warnings, ...beats.warnings];
 
   const out = {};
@@ -170,11 +192,11 @@ export function injectTiming(htmlText, timing) {
 
 export function main(argv = process.argv.slice(2), { out = (s) => process.stdout.write(s), err = (s) => process.stderr.write(s) } = {}) {
   if (wantsHelp(argv)) { out(helpText(import.meta.url)); return 0; }
-  const usage = "usage: node timing.mjs --project <dir> [--html index.html] [--dry]";
-  const o = { project: null, html: "index.html", dry: false };
+  const usage = "usage: node timing.mjs --project <dir> [--html index.html] [--music <file>] [--dry]";
+  const o = { project: null, html: "index.html", music: null, dry: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === "--project" || a === "--html") { const v = argv[++i]; if (!v || v.startsWith("--")) { err(`timing: ${a} needs a value\n${usage}\n`); return 2; } o[a.slice(2)] = v; }
+    if (a === "--project" || a === "--html" || a === "--music") { const v = argv[++i]; if (!v || v.startsWith("--")) { err(`timing: ${a} needs a value\n${usage}\n`); return 2; } o[a.slice(2)] = v; }
     else if (a === "--dry") o.dry = true;
     else { err(`timing: unknown argument ${a}\n${usage}\n`); return 2; }
   }
@@ -183,13 +205,14 @@ export function main(argv = process.argv.slice(2), { out = (s) => process.stdout
   const htmlPath = resolve(dir, o.html);
   if (!existsSync(join(dir, "PLAN.md"))) { err(`timing: PLAN.md not found in ${dir}\n`); return 2; }
   if (!existsSync(htmlPath)) { err(`timing: HTML not found: ${htmlPath}\n`); return 2; }
+  try { beatsFile(dir, o.music); } catch (e) { err(`timing: ${e.message}\n`); return 2; }
 
   const htmlText = readFileSync(htmlPath, "utf8");
   let r, next;
   try {
     // Check the markers first: a legacy composition is refused before anything else is read.
     injectTiming(htmlText, {});
-    r = buildTiming({ dir, html: o.html });
+    r = buildTiming({ dir, html: o.html, music: o.music });
     next = injectTiming(htmlText, r.timing);
   } catch (e) { err(`timing: ${e.message}\n`); return 1; }
 
