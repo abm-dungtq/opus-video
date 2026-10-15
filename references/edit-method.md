@@ -42,6 +42,8 @@ Một câu chỉ có một ý hình. Câu dài hai ý thì tách thành hai fram
 4. **Mỗi beat có một chuyển động bậc cao** (morph kích thước/bo góc, camera, mask/clip-path, 3D, vẽ path, shader), không chỉ `opacity` + `y`. `video-lint` báo sớm `SLIDESHOW_MOTION`; `qc-mp4` MOTION chặn bản render đứng yên (≥60% khung gần như không đổi và không có cú chuyển động mạnh nào).
 5. **Beat không lời là beat hình**: các đoạn `(nhạc)` trong PLAN.md phải tự kể bằng hình (morph, camera bay, chữ đập theo beat), không để khung trống chờ lời.
 
+**Tiêu chuẩn chuyển động.** Cách làm từng chuyển động cho tới mức thành phẩm nằm ở `motion-craft.md`: mức hiệu ứng theo `energy:` (`em`, `vua`, `don-dap`), mười nguyên tắc mọi cảnh phải giữ, bộ kỹ thuật dùng các hàm của skeleton, bảng dấu hiệu nhìn ra là demo và danh sách kiểm từng cảnh. Đi qua danh sách đó trước khi render animatic, rồi đọc sheet từng cảnh trong `demo/scenes/` mà `make-demo.mjs --animatic` sinh ra.
+
 ## Sàn chất lượng
 
 1. Mỗi nhịp có ≥ 2 lớp (nền có chất liệu + chủ thể + chi tiết phụ). Nền phẳng một màu mà chỉ có một dòng chữ là chưa đạt.

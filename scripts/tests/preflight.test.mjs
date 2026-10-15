@@ -322,6 +322,42 @@ test("final stage: REVISIONS.md warnings only when the file exists, never blocki
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test("checkRevisions: with scene sheets, a fix that never names its sheet warns once", () => {
+  const SHEET_WARN = "REVISIONS.md R1: Vị trí chưa trỏ sheet của cảnh (vd. cảnh 3 (demo/scenes/sheet-s3.jpg))";
+  assert.deepEqual(checkRevisions(ROUND + REVISION(1), { sheets: true }), [SHEET_WARN]);
+  const pointed = ROUND + REVISION(1).replace("cảnh 2", "cảnh 2 (demo/scenes/sheet-s2.jpg)");
+  assert.deepEqual(checkRevisions(pointed, { sheets: true }), []);
+  assert.deepEqual(checkRevisions(ROUND + REVISION(1)), []);
+});
+
+test("final stage: the sheet WARN only for a creative project whose DEMO.md lists scene_sheets, never blocking", () => {
+  const stubs = { sync: () => ({ lines: [], errors: [], warnings: [], missing: false, none: true }), words: () => ({ lines: [], errors: [], warnings: [] }), balance: () => ({ level: "PASS", line: "BALANCE ok" }) };
+  const sheetWarns = (r) => r.warnings.filter((w) => w.includes("sheet của cảnh"));
+  const d = mkdtempSync(join(tmpdir(), "pf-sheets-"));
+  cpSync(fileURLToPath(new URL("./fixtures/creative-good", import.meta.url)), d, { recursive: true });
+  try {
+    writeFileSync(join(d, "REVISIONS.md"), ROUND + REVISION(1));
+    writeFileSync(join(d, "DEMO.md"), "animatic: demo/animatic.mp4\napproval: user ok 2026-10-12\n");
+    assert.deepEqual(sheetWarns(check({ project: d, stage: "final", ...stubs })), []);
+    writeFileSync(join(d, "DEMO.md"), "animatic: demo/animatic.mp4\nscene_sheets: demo/scenes/sheet-s1.jpg, demo/scenes/sheet-s2.jpg\napproval: user ok 2026-10-12\n");
+    const r = check({ project: d, stage: "final", ...stubs });
+    assert.deepEqual(sheetWarns(r), ["REVISIONS.md R1: Vị trí chưa trỏ sheet của cảnh (vd. cảnh 3 (demo/scenes/sheet-s3.jpg))"]);
+    assert.ok(!r.errors.some((e) => e.includes("sheet")), JSON.stringify(r.errors));
+    writeFileSync(join(d, "REVISIONS.md"), ROUND + REVISION(1).replace("cảnh 2", "cảnh 2 (demo/scenes/sheet-s2.jpg)"));
+    assert.deepEqual(sheetWarns(check({ project: d, stage: "final", ...stubs })), []);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+  const legacy = proj();
+  try {
+    past(join(legacy, "PLAN.md"));
+    demo(legacy, 2);
+    writeFileSync(join(legacy, "DEMO.md"), "scene_sheets: demo/scenes/sheet-s1.jpg\napproval: user ok 2026-10-12\n");
+    writeFileSync(join(legacy, "REVISIONS.md"), ROUND + REVISION(1));
+    const r = check({ project: legacy, stage: "final", ...stubs });
+    assert.equal(r.pass, true, JSON.stringify(r.errors));
+    assert.deepEqual(sheetWarns(r), []);
+  } finally { rmSync(legacy, { recursive: true, force: true }); }
+});
+
 test("final stage: word-sync FAIL lines block, WARN lines warn, an error blocks; a legacy project never runs it", () => {
   const d = mkdtempSync(join(tmpdir(), "pf-words-"));
   cpSync(fileURLToPath(new URL("./fixtures/creative-good", import.meta.url)), d, { recursive: true });

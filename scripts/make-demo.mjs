@@ -21,6 +21,10 @@
 //     The user approves this MOTION draft, not just stills; check-preflight --stage final requires
 //     it for creative projects (BRIEF `direction:`) and measures its motion (qc-mp4 MOTION).
 //     Works with --composition and --hyperframes.
+//     It also cuts one contact sheet per row of PLAN.md "## Cảnh" (18 frames spread over the scene,
+//     tiled 6x3, 320 px wide) to demo/scenes/sheet-s<#>.jpg (demo/9x16/scenes/ with --aspect 9x16)
+//     and lists them in DEMO.md as `scene_sheets:` (`scene_sheets_9x16:`). A scene shorter than
+//     0.5 s gets a WARN and no sheet; a sheet ffmpeg cannot cut is a WARN, never a failure.
 // Exit: 0 frames captured · 1 capture failed · 2 bad usage / PLAN.md missing timestamps.
 
 import { existsSync, readFileSync, writeFileSync, readdirSync, rmSync, mkdirSync, mkdtempSync, realpathSync, statSync, renameSync } from "node:fs";
@@ -30,24 +34,30 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { parsePlan } from "./check-preflight.mjs";
+import { planScenes } from "./timing.mjs";
 
 const WIN = process.platform === "win32";
 // With shell:true (npx on Windows) Node joins args unquoted, so a path with spaces splits in two.
 export const winArgs = (args, win = WIN) => (win ? args.map((a) => (/[\s&()^|<>"]/.test(a) ? `"${a.replace(/"/g, '""')}"` : a)) : args);
 const run = (cmd, args, opts = {}) => spawnSync(cmd, cmd === "npx" ? winArgs(args) : args, { stdio: "inherit", shell: WIN && cmd === "npx", ...opts });
 
+// DEMO.md keys make-demo owns, in the order they are written above `approval:`.
+const DEMO_KEYS = ["animatic", "animatic_9x16", "scene_sheets", "scene_sheets_9x16"];
+
 // Rewrite DEMO.md: keep any free text above "## Frames", replace the frame list, reset approval.
-export function writeDemoMd(project, frames, label, source = "", animatic = "") {
+// `sheets` (per-scene contact sheets of the animatic) is written as one comma-separated line.
+export function writeDemoMd(project, frames, label, source = "", animatic = "", sheets = []) {
   const p = join(project, "DEMO.md");
   const old = existsSync(p) ? readFileSync(p, "utf8") : "";
-  const key = label === "9:16" ? "animatic_9x16" : "animatic";
-  const kept = Object.fromEntries([...old.matchAll(/^\s*[-*]?\s*(animatic(?:_9x16)?):\s*(\S.*)$/gim)].map((m) => [m[1].toLowerCase(), m[2].trim()]));
-  if (animatic) kept[key] = animatic; else delete kept[key];
-  const head = old.split(/^## Frames/m)[0].replace(/^\s*[-*]?\s*(?:approval|animatic(?:_9x16)?):.*$/gim, "").trimEnd() || "# DEMO";
+  const suffix = label === "9:16" ? "_9x16" : "";
+  const kept = Object.fromEntries([...old.matchAll(/^\s*[-*]?\s*((?:animatic|scene_sheets)(?:_9x16)?):\s*(\S.*)$/gim)].map((m) => [m[1].toLowerCase(), m[2].trim()]));
+  if (animatic) kept[`animatic${suffix}`] = animatic; else delete kept[`animatic${suffix}`];
+  if (animatic && sheets.length) kept[`scene_sheets${suffix}`] = sheets.join(", "); else delete kept[`scene_sheets${suffix}`];
+  const head = old.split(/^## Frames/m)[0].replace(/^\s*[-*]?\s*(?:approval|(?:animatic|scene_sheets)(?:_9x16)?):.*$/gim, "").trimEnd() || "# DEMO";
   const keep = (old.split(/^## Frames/m)[1] || "").split(/\r?\n/).filter((l) => l.trim() && !l.includes(`(${label})`) && /^\s*-\s/.test(l));
   const list = [...keep, ...frames.map((f) => `- ${f} (${label})`)];
   const head2 = head.replace(/^\s*source:.*$/gim, "").trimEnd();
-  const anim = ["animatic", "animatic_9x16"].filter((k) => kept[k]).map((k) => `${k}: ${kept[k]}\n`).join("");
+  const anim = DEMO_KEYS.filter((k) => kept[k]).map((k) => `${k}: ${kept[k]}\n`).join("");
   writeFileSync(p, `${head2}\n\n${source ? `source: ${source}\n` : ""}${anim}approval: pending\n\n## Frames\n\n${list.join("\n")}\n`);
 }
 
@@ -67,6 +77,28 @@ export function cutFrames(mp4, times, outDir) {
     const x = spawnSync("ffmpeg", ["-v", "error", "-y", "-ss", String(t), "-i", mp4, "-frames:v", "1", png], { stdio: "inherit" });
     if (x.status !== 0) throw new Error(`ffmpeg failed at ${t}s`);
   });
+}
+
+// Shortest scene that still gives a readable 18-frame sheet.
+export const MIN_SHEET_S = 0.5;
+
+// One 6x3 contact sheet per scene ({ sid, start, end } on the animatic's timeline) into
+// <outDir>/scenes/sheet-<sid>.jpg; old sheets there are removed first. Returns the written paths.
+export function sceneSheets(mp4, scenes, outDir, { run = spawnSync, warn = (s) => console.error(s) } = {}) {
+  const dir = join(outDir, "scenes");
+  mkdirSync(dir, { recursive: true });
+  for (const f of readdirSync(dir)) if (/^sheet-.*\.jpg$/i.test(f)) rmSync(join(dir, f));
+  const out = [];
+  for (const { sid, start, end } of scenes) {
+    const len = Math.round((end - start) * 1000) / 1000;
+    if (!(len >= MIN_SHEET_S)) { warn(`WARN cảnh ${sid} quá ngắn để làm sheet`); continue; }
+    const jpg = join(dir, `sheet-${sid}.jpg`);
+    const x = run("ffmpeg", ["-nostdin", "-v", "error", "-y", "-ss", String(start), "-t", String(len), "-i", mp4,
+      "-vf", `fps=18/${len},scale=320:-1,tile=6x3`, "-frames:v", "1", jpg], { stdio: "inherit" });
+    if (x.status === 0 && existsSync(jpg)) out.push(jpg);
+    else warn(`WARN cảnh ${sid}: ffmpeg không cắt được sheet`);
+  }
+  return out;
 }
 
 function parseArgs(argv) {
@@ -99,7 +131,7 @@ export function main(argv = process.argv.slice(2)) {
   for (const f of readdirSync(outDir)) if (/^frame-.*\.png$/i.test(f)) rmSync(join(outDir, f));
   const hf = resolve(o.hyperframes || project);
 
-  let animatic = "";
+  let animatic = "", sheets = [];
   if (o.animatic) {
     const mp4 = join(outDir, "animatic.mp4"), full = join(outDir, "animatic.full.mp4");
     const args = ["hyperframes", "render", ...(o.composition ? ["-c", o.composition] : []), "--quality", "draft", "-o", full];
@@ -110,6 +142,9 @@ export function main(argv = process.argv.slice(2)) {
     else { renameSync(full, mp4); console.error("WARN animatic kept at full size (ffmpeg scale failed)"); }
     try { cutFrames(mp4, times, outDir); } catch (e) { console.error(`make-demo: ${e.message}`); return 1; }
     animatic = relative(project, mp4).split("\\").join("/");
+    let scenes = [];
+    try { scenes = planScenes(readFileSync(planPath, "utf8")); } catch (e) { console.error(`WARN không làm sheet từng cảnh: ${e.message}`); }
+    sheets = sceneSheets(mp4, scenes, outDir).map((f) => relative(project, f).split("\\").join("/"));
   } else if (o.fromVideo) {
     const mp4 = resolve(o.fromVideo);
     if (!existsSync(mp4)) { console.error(`make-demo: ${o.fromVideo} not found`); return 2; }
@@ -131,10 +166,10 @@ export function main(argv = process.argv.slice(2)) {
     finally { rmSync(tmp, { recursive: true, force: true }); }
   }
   const frames = readdirSync(outDir).filter((f) => /^frame-.*\.png$/i.test(f)).sort().map((f) => relative(project, join(outDir, f)).split("\\").join("/"));
-  writeDemoMd(project, frames, o.aspect ? "9:16" : "main", o.fromVideo ? relative(project, resolve(o.fromVideo)).split("\\").join("/") : "", animatic);
+  writeDemoMd(project, frames, o.aspect ? "9:16" : "main", o.fromVideo ? relative(project, resolve(o.fromVideo)).split("\\").join("/") : "", animatic, sheets);
   const sheet = join(outDir, "contact-sheet.jpg");
   const sheetOk = contactSheet(frames.map((f) => join(project, f)), sheet);
-  console.log(`make-demo: ${frames.length} frames → ${relative(project, outDir) || "."}/${animatic ? ` · animatic ${animatic}` : ""}${sheetOk ? ` · ${relative(project, sheet).split("\\").join("/")}` : ""} · DEMO.md approval reset to pending`);
+  console.log(`make-demo: ${frames.length} frames → ${relative(project, outDir) || "."}/${animatic ? ` · animatic ${animatic} · ${sheets.length} scene sheet(s)` : ""}${sheetOk ? ` · ${relative(project, sheet).split("\\").join("/")}` : ""} · DEMO.md approval reset to pending`);
   console.log("Next: show these frames (and demo/contact-sheet.jpg if present) to the user, then write their answer as `approval: …` in DEMO.md.");
   return 0;
 }

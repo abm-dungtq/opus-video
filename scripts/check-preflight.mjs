@@ -52,7 +52,9 @@
 //   `(giữ đến hết)`; the hold is then measured to that mark.
 // REVISIONS.md (references/revisions.md), final stage, every project, WARN only, when the file
 //   exists: a round ("## … Vòng …", diacritics optional) with more than 5 "### R<n>" fixes, or a
-//   fix missing one of the lines Vị trí: · Lỗi thấy: · Đổi: · Giữ nguyên:.
+//   fix missing one of the lines Vị trí: · Lỗi thấy: · Đổi: · Giữ nguyên:. In a creative project whose
+//   DEMO.md lists `scene_sheets:` (make-demo.mjs --animatic), also a fix that never names its
+//   scene's sheet (sheet-s<#>), e.g. "Vị trí: 6.5s, cảnh 2 (demo/scenes/sheet-s2.jpg)".
 // Exit: 0 pass · 1 blocked · 2 bad usage.
 
 import { existsSync, readFileSync, readdirSync, statSync, openSync, readSync, closeSync, realpathSync } from "node:fs";
@@ -333,14 +335,16 @@ export function approvalOf(text) {
 const REVISION_FIELDS = ["Vị trí", "Lỗi thấy", "Đổi", "Giữ nguyên"];
 const MAX_FIXES_PER_ROUND = 5;
 
-// WARN sentences for a REVISIONS.md text: rounds ("## …Vòng…") over five fixes, fixes missing a field.
-export function checkRevisions(text) {
+// WARN sentences for a REVISIONS.md text: rounds ("## …Vòng…") over five fixes, fixes missing a field
+// and, with `sheets` (DEMO.md lists per-scene contact sheets), fixes that never name a sheet-s<#>.
+export function checkRevisions(text, { sheets = false } = {}) {
   const warnings = [];
   const rounds = [];
   let round = null, fix = null;
   const closeFix = () => {
     if (!fix) return;
     for (const f of REVISION_FIELDS) if (!fix.fields.has(fold(f))) warnings.push(`REVISIONS.md ${fix.name}: thiếu ${f}`);
+    if (sheets && !fix.sheet) warnings.push(`REVISIONS.md ${fix.name}: Vị trí chưa trỏ sheet của cảnh (vd. cảnh 3 (demo/scenes/sheet-s3.jpg))`);
     fix = null;
   };
   for (const raw of String(text).split(/\r?\n/)) {
@@ -355,12 +359,13 @@ export function checkRevisions(text) {
     const h3 = line.match(/^###\s+(R\d+)\b/i);
     if (h3) {
       closeFix();
-      fix = { name: h3[1], fields: new Set() };
+      fix = { name: h3[1], fields: new Set(), sheet: false };
       if (round) round.fixes++;
       continue;
     }
     if (/^#{1,3}\s/.test(line)) { closeFix(); continue; }
     if (!fix) continue;
+    if (/sheet-s/i.test(line)) fix.sheet = true;
     const label = fold(line.replace(/^[-*]\s*/, "").replace(/\*\*/g, "")).match(/^([^:]+?)\s*:/);
     if (label) fix.fields.add(label[1]);
   }
@@ -422,7 +427,10 @@ export function check({ project = ".", stage = "plan", sync = checkSync, words =
     const changed = comps.filter((f) => statSync(f).mtimeMs > newest);
     if (newest && changed.length) warnings.push(`composition changed after the demo (${changed.map((f) => f.slice(dir.length + 1)).join(", ")}); re-run make-demo.mjs if the look changed`);
     const revisions = join(dir, "REVISIONS.md");
-    if (existsSync(revisions)) warnings.push(...checkRevisions(readFileSync(revisions, "utf8")));
+    if (existsSync(revisions)) {
+      const sheets = Boolean(out.creative) && existsSync(demoMd) && /^\s*[-*]?\s*scene_sheets(?:_9x16)?:\s*\S/im.test(readFileSync(demoMd, "utf8"));
+      warnings.push(...checkRevisions(readFileSync(revisions, "utf8"), { sheets }));
+    }
     if (existsSync(join(dir, "index.html"))) {
       try {
         const b = balance({ dir });
