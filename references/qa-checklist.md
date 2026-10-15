@@ -12,6 +12,7 @@ Chạy cho **mỗi** file render. Ghi kết quả vào `<project>/QA.md` theo t�
 | Có audio | `ffprobe -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 f.mp4` | `audio` |
 | Loudness, true peak, khung đen, đứng hình, khoảng lặng, bitrate | `node $OV/scripts/qc-mp4.mjs f.mp4 --project ./ --write-qa` (mã từng phép kiểm và ngưỡng: `--help`) | không có dòng `FAIL`, exit 0; mỗi `WARN` đã xem và ghi lý do. `BLACK_EDGE` hay báo nhầm với nền tối (vd. #0B1B2B): trích khung đó ra xem; nếu chỉ là nền màu trong lúc nội dung đang hiện dần thì ghi PASS kèm ghi chú, không cần thêm nội dung chỉ để tránh cảnh báo |
 | SFX khớp sự kiện trên hình | `node $OV/scripts/sfx-sync.mjs --project . --write-qa` | không có dòng FAIL, exit 0; dòng WARN đã nghe và ghi lý do |
+| Chữ trên hình khớp lời (hàng `chữ:` trong `## Sự kiện`) | `node $OV/scripts/word-sync.mjs --project . --write-qa` | không có dòng FAIL, exit 0 (lệch ≤ 150 ms là PASS, ≤ 250 ms là WARN); dòng WARN đã xem và ghi lý do |
 | Lint/check (HyperFrames) | `hyperframes check` | exit 0 |
 | Cổng viet-pro (kịch bản + caption) | `node $OV/scripts/check-viet-pro.mjs --project . --stage delivery` | `PASS`, exit 0 (biên bản `## viet_pro` đủ, lint viet-pro 0 ERROR cho `script-table.md`, từng `script/NN.txt`, từng mục của `CAPTIONS.md`) |
 | Plan + demo đã duyệt (bản giao cuối) | `node $OV/scripts/check-preflight.mjs --project . --stage final` | `PASS`, exit 0 (`PLAN.md` đủ mục, `demo/` đủ PNG mới hơn plan, `DEMO.md` có `approval:` thật). Bản giao render bằng `render-final.mjs` |
@@ -36,7 +37,6 @@ mkdir -p qa && for T in 1 4 7 10 13; do ffmpeg -v error -y -ss $T -i renders/f.m
 
 ## Nghe
 
-- [ ] Phụ đề hoặc chữ trên hình lệch giọng không quá 150 ms. So `words.json` với thời điểm chữ xuất hiện trong composition.
 - [ ] Giọng đọc không bị cắt đầu hoặc cuối câu, không có khoảng lặng dài hơn 0,8 giây ngoài chủ đích.
 - [ ] Nhạc nền không lấn giọng. SFX trùng đúng hành động hình ảnh.
 - [ ] Thanh điệu tiếng Việt nghe tự nhiên. Agent không tự chấm mục này: đưa file cho người dùng nghe khi giao bản cuối.

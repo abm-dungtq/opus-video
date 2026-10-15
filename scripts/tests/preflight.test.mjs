@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync, readFileSync } from "node:fs";
+import { cpSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { check, checkRevisions, parsePlan, isPng, readableHold, holdWarnings, parseTable, spanBounds, spanSeconds } from "../check-preflight.mjs";
+import { check, checkCreative, checkRevisions, parsePlan, isPng, readableHold, holdWarnings, parseTable, spanBounds, spanSeconds } from "../check-preflight.mjs";
 import { main as renderFinal, PREFLIGHT_EXIT } from "../render-final.mjs";
 import { writeDemoMd } from "../make-demo.mjs";
 
@@ -320,4 +320,41 @@ test("final stage: REVISIONS.md warnings only when the file exists, never blocki
     r = check({ project: dir, stage: "plan" });
     assert.equal(r.warnings.filter((w) => w.startsWith("REVISIONS.md")).length, 0);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("final stage: word-sync FAIL lines block, WARN lines warn, an error blocks; a legacy project never runs it", () => {
+  const d = mkdtempSync(join(tmpdir(), "pf-words-"));
+  cpSync(fileURLToPath(new URL("./fixtures/creative-good", import.meta.url)), d, { recursive: true });
+  try {
+    past(join(d, "PLAN.md"), 300);
+    mkdirSync(join(d, "demo"), { recursive: true });
+    mkdirSync(join(d, "build"), { recursive: true });
+    writeFileSync(join(d, "demo", "animatic.mp4"), "x");
+    writeFileSync(join(d, "build", "RECIPES.md"), "# RECIPES\n");
+    writeFileSync(join(d, "DEMO.md"), "animatic: demo/animatic.mp4\n");
+    const brief = readFileSync(join(d, "BRIEF.md"), "utf8"), plan = parsePlan(readFileSync(join(d, "PLAN.md"), "utf8"));
+    const sync = () => ({ lines: [], errors: [], warnings: [], missing: false, none: true });
+    const run = (words) => {
+      const errors = [], warnings = [];
+      checkCreative({ dir: d, plan, brief, stage: "final", errors, warnings, motion: () => ({ frames: 90, still: 0, ratio: 0, peak: 9 }), probe: () => ({ width: 540, height: 960 }), sync, words });
+      return { errors, warnings };
+    };
+    const calls = [];
+    const r = run((o) => { calls.push(o.dir); return { lines: [], errors: ['WORD   4.70s "kiểm thử" lời 5.00s lệch −300 ms'], warnings: ['WORD   2.20s "ảnh chụp" lời 2.00s lệch +200 ms'] }; });
+    assert.deepEqual(calls, [d]);
+    assert.ok(r.errors.includes('WORD   4.70s "kiểm thử" lời 5.00s lệch −300 ms'), JSON.stringify(r.errors));
+    assert.ok(r.warnings.includes('WORD   2.20s "ảnh chụp" lời 2.00s lệch +200 ms'), JSON.stringify(r.warnings));
+    assert.ok(run(() => { throw new Error("HTML not found: x"); }).errors.includes("word-sync: HTML not found: x"));
+    const planOnly = [], warnings = [];
+    checkCreative({ dir: d, plan, brief, stage: "plan", errors: planOnly, warnings, words: () => { throw new Error("plan stage must not measure"); } });
+    assert.ok(!planOnly.some((e) => e.startsWith("word-sync")), JSON.stringify(planOnly));
+  } finally { rmSync(d, { recursive: true, force: true }); }
+  const legacy = proj();
+  try {
+    past(join(legacy, "PLAN.md"));
+    demo(legacy, 2);
+    writeFileSync(join(legacy, "DEMO.md"), "approval: user ok 2026-10-12\n");
+    const r = check({ project: legacy, stage: "final", words: () => { throw new Error("legacy project must not run word-sync"); } });
+    assert.equal(r.pass, true, JSON.stringify(r.errors));
+  } finally { rmSync(legacy, { recursive: true, force: true }); }
 });

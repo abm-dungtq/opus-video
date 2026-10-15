@@ -63,6 +63,19 @@ test("parseEvents: an empty section, TODO or a header-only table is an error; a 
   assert.equal(dashes.none, false);
 });
 
+test("an on-screen word row (chữ: …, sound —) is not a sound event: no SYNC line, no FAIL", () => {
+  const d = tmp();
+  try {
+    writeFileSync(join(d, "BRIEF.md"), "---\naspect: 16:9\ndirection: A2\n---\n");
+    writeFileSync(join(d, "PLAN.md"), '# PLAN\n\n## Sự kiện\n| Thời điểm | Sự kiện | Âm thanh |\n|---|---|---|\n| 5.8 | chữ: "kiểm thử" | — |\n');
+    const r = checkSync({ dir: d });
+    assert.deepEqual({ lines: r.lines, errors: r.errors, warnings: r.warnings }, { lines: [], errors: [], warnings: [] });
+    const c = capture();
+    assert.equal(main(["--project", d], c.io), 0, c.buf.out + c.buf.err);
+    assert.doesNotMatch(c.buf.out, /FAIL/);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
 test("leadFromSilence: leading silence only", () => {
   assert.equal(leadFromSilence("[silencedetect @ 0x1] silence_start: 0\n[silencedetect @ 0x1] silence_end: 0.12 | silence_duration: 0.12\n"), 0.12);
   assert.equal(leadFromSilence("[silencedetect @ 0x1] silence_start: 0.3\n[silencedetect @ 0x1] silence_end: 0.5 | silence_duration: 0.2\n"), 0);

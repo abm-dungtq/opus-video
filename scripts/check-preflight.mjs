@@ -40,6 +40,8 @@
 //     the no-SFX line counts only when the table has no rows. final: a missing section only WARNs (the table asks for a
 //     measurement; a delivered project can still re-render), and sfx-sync.mjs measures each event:
 //     its FAIL lines (sound outside ITU-R BT.1359-1 −90…+185 ms) block, its WARN lines warn.
+//     word-sync.mjs measures each "chữ: <cụm>" row against the spoken word the same way: FAIL
+//     (off by more than 250 ms, or never spoken) blocks, WARN warns.
 // Mix balance, final stage, every project with index.html: mix-balance.mjs measures how far the
 //   music sits under the voice in the audio-mix rebuild (PASS 4–7 dB). Its FAIL blocks; older
 //   projects only WARN (mix-balance softens them); a measurement that cannot run is a WARN.
@@ -62,6 +64,7 @@ import { frontmatter } from "./check-viet-pro.mjs";
 import { loadDirections, classifySeams, tokenExists, upstream, wordBudget } from "./directions.mjs";
 import { measureMotion, motionVerdict } from "./qc-mp4.mjs";
 import { checkSync, parseEventsBody } from "./sfx-sync.mjs";
+import { checkWords } from "./word-sync.mjs";
 import { checkBalance } from "./mix-balance.mjs";
 
 // make-demo needs the 9:16 composition named, else hyperframes renders the 16:9 index.html.
@@ -172,7 +175,7 @@ export function holdWarnings(table) {
 }
 
 // Creative gate on PLAN.md + BRIEF.md. Pushes into errors/warnings; returns a summary or null.
-export function checkCreative({ dir, plan, brief, stage, errors, warnings, data = loadDirections(), up = upstream(), motion = measureMotion, probe = probeSize, sync = checkSync }) {
+export function checkCreative({ dir, plan, brief, stage, errors, warnings, data = loadDirections(), up = upstream(), motion = measureMotion, probe = probeSize, sync = checkSync, words = checkWords }) {
   const fm = frontmatter(brief);
   if (fm.creative_override) {
     if (fm.creative_override.trim().length < 10) errors.push("BRIEF.md creative_override needs a reason of at least 10 characters");
@@ -279,6 +282,9 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
       if (s.missing) warnings.push(EVENTS_MISSING);
       else { errors.push(...s.errors); warnings.push(...s.warnings); }
     }
+    let w;
+    try { w = words({ dir }); } catch (e) { errors.push(`word-sync: ${e.message}`); }
+    if (w) { errors.push(...w.errors); warnings.push(...w.warnings); }
     const recipes = join(dir, "build", "RECIPES.md");
     if (!existsSync(recipes)) errors.push("build/RECIPES.md not found — run recipe-pack.mjs --project . and build from it (step 6)");
     else if (statSync(recipes).mtimeMs < planTime) errors.push("build/RECIPES.md is older than PLAN.md; re-run recipe-pack.mjs");
@@ -365,7 +371,7 @@ export function checkRevisions(text) {
   return warnings;
 }
 
-export function check({ project = ".", stage = "plan", sync = checkSync, balance = checkBalance } = {}) {
+export function check({ project = ".", stage = "plan", sync = checkSync, words = checkWords, balance = checkBalance } = {}) {
   const dir = resolve(project);
   const errors = [], warnings = [];
   const out = { project: dir, stage, pass: false, errors, warnings, plan: null, demo: null };
@@ -386,7 +392,7 @@ export function check({ project = ".", stage = "plan", sync = checkSync, balance
   const brief = existsSync(join(dir, "BRIEF.md")) ? readFileSync(join(dir, "BRIEF.md"), "utf8") : "";
   const both = /^both$/i.test((frontmatter(brief).aspect || "").trim());
   if (both && !(plan.demo916 && plan.demo916.length)) errors.push('BRIEF.md aspect: both — PLAN.md needs "## Khung hình demo 9:16" with timestamps');
-  out.creative = checkCreative({ dir, plan, brief, stage, errors, warnings, sync });
+  out.creative = checkCreative({ dir, plan, brief, stage, errors, warnings, sync, words });
   warnings.push(...holdWarnings(parseTable(plan.sections[SECTIONS.scenes])));
 
   if (stage === "final") {

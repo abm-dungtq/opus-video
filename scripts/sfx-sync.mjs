@@ -75,11 +75,16 @@ export function parseEventsBody(body) {
   for (const r of table.rows) {
     const sound = String(r[si] || "").replace(/`/g, "").trim();
     if (NO_SOUND.test(sound)) continue;
-    // plan-demo.md lets a time carry its provenance, "6.5s (đo)" or "6.5s (đề xuất)".
-    const m = fold(String(r[ti] || "")).replace(/\s*\((?:do|de xuat)\)$/, "").match(/^(\d+(?:[.,]\d+)?)\s*s?$/);
-    events.push({ t: m ? Number(m[1].replace(",", ".")) : NaN, label: String(r[li] || "").trim(), sound, ...(m ? {} : { raw: String(r[ti] || "").trim() }) });
+    events.push({ ...eventTime(r[ti]), label: String(r[li] || "").trim(), sound });
   }
   return { events, none: false, missing: false };
+}
+
+// "## Sự kiện" Thời điểm cell → { t } in seconds, or { t: NaN, raw } when unreadable. plan-demo.md
+// lets a time carry its provenance, "6.5s (đo)" or "6.5s (đề xuất)". Shared with word-sync.mjs.
+export function eventTime(cell) {
+  const m = fold(String(cell || "")).replace(/\s*\((?:do|de xuat)\)$/, "").match(/^(\d+(?:[.,]\d+)?)\s*s?$/);
+  return m ? { t: Number(m[1].replace(",", ".")) } : { t: NaN, raw: String(cell || "").trim() };
 }
 
 // silencedetect stderr → seconds of silence at the head of the file (0 when the first silence

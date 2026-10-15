@@ -42,6 +42,7 @@ Giọng (voice id/model), nhạc nền (prompt, âm lượng), SFX theo beat, ng
 | Thời điểm | Sự kiện | Âm thanh |
 |---|---|---|
 | 2.0s | Nút gửi lún xuống | assets/sfx/send.mp3 |
+| 5.8 | chữ: "kiểm thử" | — |
 | 6.5s | Kết quả bung ra | assets/sfx/pop.mp3 |
 | 13.5s | Nhạc lắng, logo đứng yên | — |
 
@@ -68,6 +69,7 @@ Cổng plan kiểm: đủ 6 mục, bảng Cảnh có ít nhất một dòng, s�
 
 - `Thời điểm` là số giây trên timeline gốc (`6.5`, `6.5s` hoặc `6,5s`), không phải giây trong composition con.
 - **Nhãn nguồn của mốc:** mốc lấy từ `audio_meta.json` hoặc đo trên file là mốc **đo được**; mốc chọn theo cảm nhận là mốc **đề xuất**. Khi cần phân biệt thì ghi `(đo)` hoặc `(đề xuất)` sau thời điểm, ví dụ `6.5s (đề xuất)`. Mốc đề xuất phải được kiểm bằng `hyperframes snapshot . --at <t>` trước khi đặt tiếng vào.
+- Hàng `chữ: "<cụm>"` (cột Âm thanh `—`) là lúc chữ chốt hiện trên hình. `scripts/word-sync.mjs --project .` so thời điểm đó với lúc giọng đọc nói cụm từ trong `words.json`: lệch ≤ 150 ms là PASS, ≤ 250 ms là WARN, hơn nữa hoặc cụm không có trong lời là FAIL. Stage final chạy lệnh này cùng `sfx-sync`.
 - `Âm thanh` ghi đúng `src` trong `index.html`; `—` khi sự kiện không có tiếng. Video không có SFX gắn sự kiện thì thay bảng bằng một dòng `không có SFX gắn sự kiện` (chỉ in WARN).
 - `scripts/sfx-sync.mjs --project .` đo đoạn im lặng đầu mỗi file SFX (ngưỡng = đỉnh của file − 20 dB, cache theo sha256 ở `assets/sfx-onsets.json`) rồi cộng vào `data-start` để ra lúc tiếng thật sự vang: `data-start + max(0, im lặng − data-media-start) / data-playback-rate`. Đổi cách đo đoạn im lặng thì xoá `assets/sfx-onsets.json` để đo lại.
 - Lệch = lúc tiếng vang − thời điểm sự kiện; số dương là tiếng trễ hơn hình. Ngưỡng theo ITU-R BT.1359-1:

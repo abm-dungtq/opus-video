@@ -48,6 +48,27 @@ const r3 = (n) => Math.round(n * 1000) / 1000;
 
 const isVoice = (t) => (t.id && t.id.startsWith("vo-")) || t.group === "voiceover";
 
+// Phrase matching, the same rule as W()/WE() in templates/composition/index-skeleton.html (keep
+// both in step): a word's key is fold() with punctuation dropped, so "nguồn," matches "nguồn".
+export const wordKey = (s) => fold(String(s ?? "")).replace(/[^\p{L}\p{N} ]+/gu, "").replace(/\s+/g, " ").trim();
+
+// Every occurrence of a phrase in a word list: consecutive words whose keys, joined by one space,
+// equal the phrase key (words with an empty key, bare punctuation, are skipped).
+// words: [{ text, start, end }] in spoken order. Returns [{ start, end }] in seconds, in order.
+export function phraseHits(words, phrase) {
+  const want = wordKey(phrase);
+  const ws = words.map((w) => ({ w, k: wordKey(w.text) })).filter((x) => x.k);
+  const hits = [];
+  for (let i = 0; want && i < ws.length; i++) {
+    let s = "";
+    for (let j = i; j < ws.length && s.length < want.length; j++) {
+      s = s ? `${s} ${ws[j].k}` : ws[j].k;
+      if (s === want) hits.push({ start: ws[i].w.start, end: ws[j].w.end });
+    }
+  }
+  return hits;
+}
+
 // Spoken words of a composition on the root timeline.
 // dir: project directory; html: HTML path relative to dir (default index.html).
 // Returns { words: [{ id, text, start, end }] sorted by start, tracks: the voice tracks, warnings: [text] }.
