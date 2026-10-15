@@ -50,6 +50,20 @@ Các video dưới đây do opus-video dựng. Bấm vào ảnh để mở file 
 
 ## Có gì mới
 
+### v1.2.0 (2026-10-15): template, style và đồng bộ
+
+Bản này đưa các quy trình của skill motion-video (AgentKit, MIT) vào opus-video, viết lại bằng Node và ffmpeg. Chi tiết ở chương 14 của [hướng dẫn chuyên sâu](docs/huong-dan-chuyen-sau.md).
+
+- **Dựng từ khung sẵn.** `composition.mjs init` tạo `index.html` có bộ hàm hoạt hình và hai hàm mốc: `W(cảnh, "cụm từ")` theo lời đọc, `B(n)` theo phách nhạc. `timing.mjs` sinh toàn bộ mốc thời gian từ `words.json`; sửa giọng xong chỉ cần chạy lại lệnh, không sửa tay số giây.
+- **Nhạc giảm khi có giọng, đo được bằng số.** `audio-mix.mjs` đổi `data-fx-carve` thành sidechain ffmpeg và chuẩn hoá về −14 LUFS. `mix-balance.mjs` in nhạc thấp hơn giọng bao nhiêu dB; đích là 4–7 dB.
+- **Nhịp nhạc đo thật.** `beat-grid.mjs` đo BPM, phách đầu và phách kick của file nhạc. Nhạc trôi tempo thì báo `UNSTABLE` và không cho dùng `B()`.
+- **Chữ chốt khớp lời.** Hàng `chữ: "…"` trong `## Sự kiện` được `word-sync.mjs` so với lúc giọng nói tới, lệch quá 150 ms thì cảnh báo, quá 250 ms thì chặn.
+- **Chuyển động từng cảnh.** `references/motion-craft.md` là tiêu chuẩn chuyển động bằng tiếng Việt; `make-demo --animatic` cắt thêm một sheet cho mỗi cảnh.
+- **9:16 và 1:1 từ một `index.html`.** `reframe.mjs` sinh bản dọc và bản vuông từ khối CSS `html[data-ratio=…]`, không crop.
+- **61 style.** `data/styles/` có 61 style kèm tên và mô tả tiếng Việt, là trục thứ hai bên cạnh 8 hướng đạo diễn. `styles.mjs` tìm, xem, gợi ý theo hướng và phối style theo từng cảnh.
+
+Dự án cũ không bị chặn thêm: các cổng mới chỉ in WARN với chúng.
+
 ### v1.1.0 (2026-10-14): ba cổng cho chuyển động
 
 Ba lỗi trước đây lọt qua mọi cổng kiểm tra: tiếng SFX vang lệch khỏi khoảnh khắc trên hình, chữ biến mất trước khi người xem đọc kịp, và mỗi lần sửa phải render lại cả video mà không ghi lại đã sửa gì. Bản này thêm một cổng cho mỗi lỗi. Ý tưởng lấy từ tài liệu *Motion Engineering with Opus 5.5* của beamnxw (MIT); ngưỡng nào cũng có nguồn.
@@ -292,6 +306,14 @@ Mọi script đều có `--help` / `-h` (in phần mô tả đầu file, thoát 
 | `scripts/cut.mjs` | `probe` tìm khoảng lặng an toàn; `apply-edl` ghép footage theo danh sách cắt JSON |
 | `scripts/brand.mjs` | `check` brand kit dùng chung (`shared-assets/brand.json`, mẫu ở `references/brand.example.json`); `make-pitch` tự đọc |
 | `scripts/poi-fetch.mjs` | Tiện ích thật quanh một địa chỉ hoặc toạ độ từ OpenStreetMap, khoảng cách và phút đi bộ, ghi vào `SOURCES.md` |
+| `scripts/composition.mjs` | `init`: tạo `index.html` từ skeleton (hàm hoạt hình, `W()`, `B()`, khối TIMING trống), khung theo `aspect` |
+| `scripts/timing.mjs` | Ghi khối TIMING (cảnh, từng từ của giọng đọc, lưới phách) từ `PLAN.md`, `words.json` và `*.beats.json` |
+| `scripts/beat-grid.mjs` | Đo BPM, phách đầu, phách kick, drop của file nhạc; `--write` ghi `<nhạc>.beats.json`; `UNSTABLE` khi tempo trôi |
+| `scripts/word-sync.mjs` | So hàng `chữ:` trong `## Sự kiện` với lúc giọng nói tới (PASS ≤ 150 ms, WARN ≤ 250 ms) |
+| `scripts/audio-mix.mjs` | Dựng lại tiếng của composition bằng ffmpeg; giảm nhạc theo giọng từ `data-fx-carve`; `--loudnorm`, `--stems` |
+| `scripts/mix-balance.mjs` | Đo nhạc thấp hơn giọng bao nhiêu dB lúc có lời (PASS 4–7 dB) |
+| `scripts/reframe.mjs` | Sinh bản 9:16 hoặc 1:1 từ một `index.html` có khối `html[data-ratio=…]`; asset hard-link |
+| `scripts/styles.mjs` | 61 style: `find`, `show`, `css`, `suggest --direction`, `resolve --project` (style theo cảnh), `validate` |
 | `scripts/source-ingest.mjs` | Lưu văn bản gốc của URL, PDF, trang abstract arXiv (toàn văn thì truyền `https://arxiv.org/pdf/<id>`) vào `sources/` và ghi mục nguồn vào `SOURCES.md`; PDF cần `pdftotext` (poppler) |
 
 ## 8. Cập nhật và gỡ
@@ -322,4 +344,4 @@ Test cần project thật sẽ tự bỏ qua khi không tìm thấy project đó
 
 ## Giấy phép
 
-Mã nguồn và tài liệu dùng giấy phép MIT (xem `LICENSE`). Corpus trong `data/` lấy từ hai repo có giấy phép MIT. Prompt trong corpus thuộc về tác giả gốc, và mỗi dòng đều ghi tác giả cùng link. Repo không phân phối lại video gốc. `scripts/cut.mjs` phỏng theo ý tưởng của [open-edit](https://github.com/veedstudio/open-edit) (Apache-2.0, © VEED LIMITED); xem `NOTICE`.
+Mã nguồn và tài liệu dùng giấy phép MIT (xem `LICENSE`). Corpus trong `data/` lấy từ hai repo có giấy phép MIT. Prompt trong corpus thuộc về tác giả gốc, và mỗi dòng đều ghi tác giả cùng link. Repo không phân phối lại video gốc. `scripts/cut.mjs` phỏng theo ý tưởng của [open-edit](https://github.com/veedstudio/open-edit) (Apache-2.0, © VEED LIMITED); xem `NOTICE`. 61 style trong `data/styles/`, ba tài liệu chi tiết style, skeleton composition, nguyên tắc chuyển động và các thuật toán beat-grid, reframe, resolve style phỏng theo skill motion-video của AgentKit (MIT, © 2026 BestAgentKits); xem `NOTICE` và `third_party/agentkit-motion-video/LICENSE`.
