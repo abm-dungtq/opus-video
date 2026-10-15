@@ -55,6 +55,13 @@ Dự án mới có `aspect: both` chỉ có một thư mục và một `index.ht
 3. **Kiểm tra trong thư mục mới.** `cd ../<tên>-9x16 && npx --yes hyperframes@0.8.144 lint && npx --yes hyperframes@0.8.144 check`.
 4. **Render** trong thư mục mới như bản 16:9 (`render-final.mjs` hoặc `npm run render`), rồi nén theo bước 9 của quy trình.
 
+Giới hạn cần biết:
+
+- `--force` chỉ thay thư mục rỗng hoặc thư mục do chính `reframe.mjs` tạo cho bản gốc này (có tệp `.reframe.json`). Thư mục khác bị từ chối, kể cả khi có `--force`.
+- Dòng `WARN layout` chỉ quét `left/top/width/height` trong CSS và `style=""`. Lệnh không bắt `x:` hay `translate(...px)` của GSAP, không bắt `right/bottom/inset`, cũng không bắt `data-width="1920"` ở root của composition con trong `compositions/`. Hết WARN chưa có nghĩa bố cục đã vừa khung: vẫn phải xem bản dọc.
+- `assets/` của bản dọc là hard-link tới file của bản gốc. Công cụ nào ghi đè một file trong `assets/` của bản dọc cũng đổi luôn file của bản gốc. Sửa và sinh asset trong bản gốc.
+- Bản 1:1 ghi `data-resolution="square"`. Đây là tên preset 1080×1080 có trong `hyperframes render --resolution` của 0.8.144. Đã kiểm: `npx --yes hyperframes@0.8.144 lint` trên một bản 1:1 trong `/tmp` cho 0 lỗi (2026-10-15).
+
 Dự án cũ, dự án tạo bằng `new-project.sh --legacy-pair` và workflow frame-worker vẫn làm bản 9:16 bằng cách copy thành dự án riêng như các mục dưới đây. `reframe.mjs` từ chối dự án có `compositions/frames/`.
 
 ### Cách cũ: composition hoặc dự án riêng cho từng khổ

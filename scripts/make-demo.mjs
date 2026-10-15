@@ -25,6 +25,8 @@
 //     tiled 6x3, 320 px wide) to demo/scenes/sheet-s<#>.jpg (demo/9x16/scenes/ with --aspect 9x16)
 //     and lists them in DEMO.md as `scene_sheets:` (`scene_sheets_9x16:`). A scene shorter than
 //     0.5 s gets a WARN and no sheet; a sheet ffmpeg cannot cut is a WARN, never a failure.
+//     With --composition, a composition shorter than the PLAN.md timeline leaves the scenes that
+//     start past the animatic's end without a sheet ("ffmpeg không cắt được sheet" WARN).
 // Exit: 0 frames captured · 1 capture failed · 2 bad usage / PLAN.md missing timestamps.
 
 import { existsSync, readFileSync, writeFileSync, readdirSync, rmSync, mkdirSync, mkdtempSync, realpathSync, statSync, renameSync } from "node:fs";
