@@ -48,8 +48,9 @@ const NO_VOICE = /^(?:|-|—|–)$/;
 const r3 = (n) => Math.round(n * 1000) / 1000;
 
 // Phrase matching, the same rule as W()/WE() in templates/composition/index-skeleton.html (keep
-// both in step): a word's key is fold() with punctuation dropped, so "nguồn," matches "nguồn".
-export const wordKey = (s) => fold(String(s ?? "")).replace(/[^\p{L}\p{N} ]+/gu, "").replace(/\s+/g, " ").trim();
+// both in step): a word's key is fold() with dashes turned into spaces and other punctuation
+// dropped, so "nguồn," matches "nguồn" and "AI-agent" matches "AI agent".
+export const wordKey = (s) => fold(String(s ?? "")).replace(/\p{Pd}+/gu, " ").replace(/[^\p{L}\p{N} ]+/gu, "").replace(/\s+/g, " ").trim();
 
 // Every occurrence of a phrase in a word list: consecutive words whose keys, joined by one space,
 // equal the phrase key (words with an empty key, bare punctuation, are skipped).

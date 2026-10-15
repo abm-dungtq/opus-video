@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
-import { buildTiming, injectTiming, phraseHits, planScenes, voiceWords, main, NO_MARKERS } from "../timing.mjs";
+import { buildTiming, injectTiming, phraseHits, planScenes, voiceWords, wordKey, main, NO_MARKERS } from "../timing.mjs";
 import { SKELETON } from "../composition.mjs";
 
 const FIXTURE = fileURLToPath(new URL("./fixtures/timing", import.meta.url));
@@ -270,6 +270,18 @@ test("several voice tracks: phraseHits and the skeleton W/WE order the words by 
   const node = phraseHits(lines.flatMap((l) => l.words).map(([text, start, end]) => ({ text, start, end })), "mã nguồn");
   assert.deepEqual(node, [{ start: 0.2, end: 0.6 }, { start: 1.0, end: 1.5 }, { start: 3.0, end: 3.6 }]);
   node.forEach((h, n) => { assert.equal(W("s1", "mã nguồn", n + 1), h.start); assert.equal(WE("s1", "mã nguồn", n + 1), h.end); });
+});
+
+test("a hyphen separates words: \"AI-agent\" matches \"AI agent\" both ways, in Node and in the skeleton", () => {
+  assert.equal(wordKey("AI-agent"), "ai agent");
+  assert.deepEqual(phraseHits([{ text: "AI-agent", start: 1, end: 1.6 }], "AI agent"), [{ start: 1, end: 1.6 }]);
+  assert.deepEqual(phraseHits([{ text: "AI", start: 1, end: 1.2 }, { text: "agent,", start: 1.2, end: 1.6 }], "AI-agent"), [{ start: 1, end: 1.6 }]);
+  assert.deepEqual(phraseHits([{ text: "–", start: 0.5, end: 0.6 }, { text: "AI", start: 1, end: 1.2 }], "AI"), [{ start: 1, end: 1.2 }], "a bare dash is skipped");
+  const lines = [{ id: "vo-01", words: [["AI-agent", 1, 1.6]] }];
+  const { window, warns } = runSkeleton({ fps: 30, duration: 10, scenes: { s1: { start: 0, end: 5, lines } }, beat0: 0, beatLen: 0, kick: [], drops: [] });
+  assert.equal(window.__probe.W("s1", "AI agent"), 1);
+  assert.equal(window.__probe.WE("s1", "ai agent"), 1.6);
+  assert.deepEqual(warns, []);
 });
 
 test("skeleton B throws without a beat grid", () => {
