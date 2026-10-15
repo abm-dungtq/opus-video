@@ -23,7 +23,8 @@
 //   <dir>/timing.json holds the same object. The markers come from composition.mjs init; a file
 //   without them (a project not started from the skeleton) is refused and never edited.
 // Prints one line per scene, `TIMING s2 2.500–5.800 words=9`, and `WARN s2 không có từ nào trong
-//   words.json` when the scene's Lời đọc cell has text but no word landed in it.
+//   words.json` when the scene's Lời đọc cell has text but no word landed in it ("—", "(nhạc)",
+//   "không lời", "im lặng"… mean no speech: MUSIC_ONLY in check-preflight.mjs).
 // --music <file>  the music bed whose <file>.beats.json gives the beat grid (path from <dir>);
 //         required when assets/bgm/ has more than one *.beats.json.
 // --dry   print only; write nothing.
@@ -35,7 +36,7 @@ import { existsSync, readFileSync, readdirSync, realpathSync, writeFileSync } fr
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
-import { SECTIONS, fold, parsePlan, parseTable, spanBounds } from "./check-preflight.mjs";
+import { MUSIC_ONLY, SECTIONS, fold, parsePlan, parseTable, spanBounds } from "./check-preflight.mjs";
 import { isVoice, parseTracks } from "./audio-mix.mjs";
 import { trackWords } from "./balance-measure.mjs";
 
@@ -44,7 +45,6 @@ export const NO_MARKERS = "index.html không có TIMING:BEGIN/END (tạo bằng 
 const MARK_BEGIN = /\/\*\s*TIMING:BEGIN\s*\*\//g;
 const MARK_END = /\/\*\s*TIMING:END\s*\*\//g;
 const BLOCK = /([ \t]*)(\/\*\s*TIMING:BEGIN\s*\*\/)[\s\S]*?(\/\*\s*TIMING:END\s*\*\/)/;
-const NO_VOICE = /^(?:|-|—|–)$/;
 const r3 = (n) => Math.round(n * 1000) / 1000;
 
 // Phrase matching, the same rule as W()/WE() in templates/composition/index-skeleton.html (keep
@@ -101,7 +101,7 @@ export function planScenes(planText) {
     const sid = `s${ni >= 0 && String(r[ni] || "").trim() ? String(r[ni]).trim() : i + 1}`;
     const b = spanBounds(r[ti]);
     if (!b) throw new Error(`${sid}: Thời điểm "${String(r[ti] || "").trim()}" không đọc được (ghi dạng 2.5–5.8s)`);
-    return { sid, start: b.start, end: b.end, spoken: vi >= 0 && !NO_VOICE.test(fold(String(r[vi] || ""))) };
+    return { sid, start: b.start, end: b.end, spoken: vi >= 0 && !MUSIC_ONLY.test(fold(String(r[vi] || ""))) };
   });
 }
 

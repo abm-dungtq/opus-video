@@ -123,7 +123,8 @@ export function parsePlan(text) {
   return { sections, scenes, demo: times(sections[SECTIONS.demo]), demo916: k916 ? times(sections[k916]) : null };
 }
 
-const MUSIC_ONLY = /^(?:|-|—|–|\(?nhac\)?|\(?chi nhac\)?|khong loi|\(khong loi\)|\(im lang\)|im lang|music only)$/;
+// A folded Lời đọc cell that means no speech in the scene (also read by timing.mjs).
+export const MUSIC_ONLY = /^(?:|-|—|–|\(?nhac\)?|\(?chi nhac\)?|khong loi|\(khong loi\)|\(im lang\)|im lang|music only)$/;
 // "0–1.5s", "1.5 - 3s", "0.0s - 4.9s" → seconds (0 when unreadable)
 export function spanSeconds(cell) {
   const b = spanBounds(cell);

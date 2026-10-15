@@ -147,6 +147,12 @@ test("voiceWords: a voice track without words.json is a warning, not a crash", (
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test("planScenes: a music-only Lời đọc cell is no speech, by the preflight rule", () => {
+  const cells = ["(nhạc)", "Nhạc", "chỉ nhạc", "(không lời)", "im lặng", "music only", "–"];
+  const plan = `## Cảnh\n| # | Thời điểm | Lời đọc |\n|---|---|---|\n${cells.map((c, i) => `| ${i + 1} | ${i}–${i + 1}s | ${c} |`).join("\n")}\n| 9 | 8–9s | "Nhạc hay" |\n`;
+  assert.deepEqual(planScenes(plan).map((s) => s.spoken), [...cells.map(() => false), true]);
+});
+
 test("planScenes: ids from #, unreadable time throws, missing table throws", () => {
   const s = planScenes("## Cảnh\n| # | Thời điểm | Lời đọc |\n|---|---|---|\n| 1 | 0–2,5s | — |\n| 2 | 2,5 - 4s | \"Chào\" |\n");
   assert.deepEqual(s, [{ sid: "s1", start: 0, end: 2.5, spoken: false }, { sid: "s2", start: 2.5, end: 4, spoken: true }]);
