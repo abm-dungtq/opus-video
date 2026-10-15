@@ -187,6 +187,33 @@ test("final stage: composition edited after the demo is a WARN, not a FAIL", () 
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test("final stage: mix balance FAIL blocks, WARN warns, a measurement error warns, no index.html is not measured", () => {
+  const dir = proj();
+  try {
+    past(join(dir, "PLAN.md"), 200);
+    demo(dir, 2);
+    writeFileSync(join(dir, "DEMO.md"), "approval: user ok 2026-10-12\n");
+    const calls = [];
+    const stub = (level) => (o) => { calls.push(o.dir); return { level, line: `${level} BALANCE nhạc dưới giọng 11.1 dB (lúc có lời), nhạc lúc không lời −22.4 dBFS` }; };
+    assert.equal(check({ project: dir, stage: "final", balance: stub("FAIL") }).pass, true);
+    assert.deepEqual(calls, [], "no index.html, nothing to measure");
+    writeFileSync(join(dir, "index.html"), "<html></html>");
+    let r = check({ project: dir, stage: "final", balance: stub("FAIL") });
+    assert.equal(r.pass, false);
+    assert.ok(r.errors.includes("BALANCE nhạc dưới giọng 11.1 dB (lúc có lời), nhạc lúc không lời −22.4 dBFS"), r.errors.join("\n"));
+    assert.equal(r.balance.level, "FAIL");
+    r = check({ project: dir, stage: "final", balance: stub("WARN") });
+    assert.equal(r.pass, true);
+    assert.ok(r.warnings.some((w) => w.startsWith("BALANCE nhạc dưới giọng")));
+    r = check({ project: dir, stage: "final", balance: stub("PASS") });
+    assert.ok(!r.warnings.some((w) => w.includes("BALANCE")) && r.pass);
+    r = check({ project: dir, stage: "final", balance: () => { throw new Error("ffmpeg exited 1"); } });
+    assert.equal(r.pass, true);
+    assert.ok(r.warnings.includes("mix-balance: không đo được (ffmpeg exited 1)"));
+    assert.equal(check({ project: dir, stage: "plan", balance: stub("FAIL") }).pass, true, "plan stage does not measure");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test("isPng reads the signature; writeDemoMd lists frames and resets approval", () => {
   const dir = proj();
   try {

@@ -1,0 +1,809 @@
+<!doctype html>
+<html lang="vi" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Be Vietnam Pro";
+        src: url("assets/fonts/BeVietnamPro-Regular.ttf") format("truetype");
+        font-weight: 400;
+        font-display: block;
+      }
+      @font-face {
+        font-family: "Be Vietnam Pro";
+        src: url("assets/fonts/BeVietnamPro-Medium.ttf") format("truetype");
+        font-weight: 500;
+        font-display: block;
+      }
+      @font-face {
+        font-family: "Be Vietnam Pro";
+        src: url("assets/fonts/BeVietnamPro-SemiBold.ttf") format("truetype");
+        font-weight: 600;
+        font-display: block;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: #0a0a0a;
+      }
+      #root {
+        position: relative;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: #0a0a0a;
+        font-family: "Be Vietnam Pro", -apple-system, BlinkMacSystemFont, sans-serif;
+        color: #e0e0e0;
+      }
+      .clip {
+        position: absolute;
+        inset: 0;
+      }
+
+      /* ---------- atmosphere (not scaled by the camera) ---------- */
+      #bg {
+        overflow: hidden;
+      }
+      .glow {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(90px);
+        will-change: transform;
+      }
+      #glow-a {
+        left: 140px;
+        top: 520px;
+        width: 620px;
+        height: 620px;
+        background: rgba(124, 58, 237, 0.34);
+      }
+      #glow-b {
+        left: 380px;
+        top: 900px;
+        width: 560px;
+        height: 560px;
+        background: rgba(6, 182, 212, 0.22);
+      }
+      #dots {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1080px;
+        height: 1920px;
+        will-change: transform;
+      }
+      .dot {
+        position: absolute;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: #8be9f7;
+      }
+
+      /* ---------- camera: outer scales, inner translates ---------- */
+      #zoom-outer,
+      #zoom-inner {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1080px;
+        height: 1920px;
+      }
+      #zoom-outer {
+        transform-origin: 50% 50%;
+      }
+
+      /* ---------- the one prompt box (grows into the board, then the result card) ---------- */
+      #box {
+        position: absolute;
+        left: 110px;
+        top: 560px;
+        width: 860px;
+        height: 1000px;
+        background: #15151d;
+        border: 2px solid rgba(224, 224, 224, 0.14);
+        border-bottom: none;
+        border-radius: 36px;
+        clip-path: inset(0px 0px 700px 0px round 36px);
+      }
+      #box-edge {
+        position: absolute;
+        left: 146px;
+        top: 858px;
+        width: 788px;
+        height: 2px;
+        background: rgba(224, 224, 224, 0.14);
+      }
+      #chip {
+        position: absolute;
+        left: 162px;
+        top: 586px;
+        height: 52px;
+        padding: 0 22px 0 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-radius: 26px;
+        background: rgba(124, 58, 237, 0.2);
+        color: #c4b5fd;
+        font-size: 27px;
+        font-weight: 500;
+        white-space: nowrap;
+        transform-origin: 0% 50%;
+      }
+      #send {
+        position: absolute;
+        left: 838px;
+        top: 576px;
+        width: 76px;
+        height: 76px;
+        border-radius: 50%;
+        background: #2a2a35;
+        display: grid;
+        place-items: center;
+      }
+      #prompt-row {
+        position: absolute;
+        left: 162px;
+        top: 668px;
+        width: 756px;
+        height: 76px;
+        display: flex;
+        align-items: center;
+        white-space: nowrap;
+        font-size: 48px;
+        font-weight: 500;
+        letter-spacing: -0.01em;
+      }
+      #ptext {
+        display: inline-block;
+        white-space: pre;
+        color: #f4f4f5;
+      }
+      #caret {
+        display: inline-block;
+        width: 6px;
+        height: 56px;
+        margin-left: 4px;
+        background: #22d3ee;
+        border-radius: 2px;
+      }
+      #placeholder {
+        display: inline-block;
+        margin-left: 10px;
+        color: rgba(224, 224, 224, 0.32);
+        font-weight: 400;
+      }
+      #probe {
+        position: absolute;
+        left: 0;
+        top: 0;
+        visibility: hidden;
+        white-space: pre;
+        font-size: 48px;
+        font-weight: 500;
+        letter-spacing: -0.01em;
+      }
+
+      /* attachments tray */
+      .att {
+        position: absolute;
+        top: 770px;
+        width: 236px;
+        height: 64px;
+        border-radius: 18px;
+        background: #1f1f2b;
+        border: 2px solid rgba(224, 224, 224, 0.16);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        font-size: 28px;
+        font-weight: 500;
+        color: #d4d4d8;
+        white-space: nowrap;
+        opacity: 0;
+        transform-origin: 50% 50%;
+      }
+      #att-0 {
+        left: 162px;
+      }
+      #att-1 {
+        left: 422px;
+      }
+      #att-2 {
+        left: 682px;
+      }
+
+      /* the single stream the three inputs merge into */
+      #stream {
+        position: absolute;
+        left: 162px;
+        top: 930px;
+        width: 756px;
+        height: 10px;
+        border-radius: 5px;
+        background: linear-gradient(90deg, #7c3aed 0%, #22d3ee 30%, #ffffff 45%, #22d3ee 60%, #7c3aed 100%);
+        background-size: 300% 100%;
+        background-position: 100% 0%;
+        transform-origin: 50% 50%;
+        box-shadow: 0 0 24px rgba(34, 211, 238, 0.55);
+      }
+
+      /* ---------- agent progress theater ---------- */
+      #status {
+        position: absolute;
+        left: 162px;
+        top: 880px;
+        width: 756px;
+        height: 420px;
+        transform-origin: 50% 87%;
+      }
+      .srow {
+        position: absolute;
+        left: 0;
+        width: 756px;
+        height: 90px;
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        font-size: 42px;
+        font-weight: 500;
+        color: #71717a;
+        clip-path: inset(0% 100% 0% 0%);
+        visibility: hidden;
+      }
+      .srow svg {
+        flex: 0 0 auto;
+      }
+
+      .shl {
+        position: absolute;
+        left: -18px;
+        top: 4px;
+        width: 792px;
+        height: 82px;
+        border-radius: 18px;
+        background: linear-gradient(90deg, rgba(34, 211, 238, 0.14), rgba(124, 58, 237, 0.1));
+        opacity: 0;
+      }
+      .sfill {
+        position: absolute;
+        left: 66px;
+        bottom: 4px;
+        width: 690px;
+        height: 4px;
+        border-radius: 2px;
+        background: linear-gradient(90deg, #22d3ee, #a78bfa);
+        transform-origin: 0% 50%;
+      }
+      #sweep-wrap {
+        position: absolute;
+        left: 110px;
+        top: 560px;
+        width: 860px;
+        height: 1000px;
+        border-radius: 36px;
+        overflow: hidden;
+      }
+      #sweep {
+        position: absolute;
+        left: 0;
+        top: -200px;
+        width: 240px;
+        height: 1400px;
+        background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(196, 181, 253, 0.1) 50%, rgba(255, 255, 255, 0) 100%);
+        transform: translateX(-420px) rotate(18deg);
+      }
+
+      /* ---------- result card content ---------- */
+      #res-head {
+        position: absolute;
+        left: 162px;
+        top: 800px;
+        width: 756px;
+        height: 130px;
+        display: flex;
+        align-items: center;
+        opacity: 0;
+        transform-origin: 50% 50%;
+      }
+      #res-title {
+        font-size: 88px;
+        font-weight: 400;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+        background: linear-gradient(90deg, #a78bfa 0%, #e0e0e0 35%, #ffffff 45%, #67e8f9 50%, #e0e0e0 60%, #a78bfa 100%);
+        background-size: 300% 100%;
+        background-position: 100% 0%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      #res-sub {
+        position: absolute;
+        left: 162px;
+        top: 950px;
+        width: 756px;
+        font-size: 44px;
+        font-weight: 500;
+        color: #e4e4e7;
+        white-space: nowrap;
+        clip-path: inset(0% 100% 0% 0%);
+        visibility: hidden;
+      }
+      .pill {
+        position: absolute;
+        width: 366px;
+        height: 96px;
+        border-radius: 24px;
+        background: rgba(124, 58, 237, 0.16);
+        border: 2px solid rgba(167, 139, 250, 0.45);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding-left: 26px;
+        font-size: 36px;
+        font-weight: 500;
+        color: #ede9fe;
+        white-space: nowrap;
+        opacity: 0;
+        transform-origin: 50% 50%;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="15"
+      data-width="1080"
+      data-height="1920"
+    >
+      <div id="bg" class="clip" data-start="0" data-duration="15" data-track-index="0">
+        <div id="glow-a" class="glow"></div>
+        <div id="glow-b" class="glow"></div>
+        <div id="dots" data-layout-allow-overflow></div>
+      </div>
+
+      <div id="cam" class="clip" data-start="0" data-duration="15" data-track-index="1">
+        <div id="zoom-outer">
+          <div id="zoom-inner">
+            <div id="box" data-layout-allow-overflow></div>
+            <div id="box-edge" data-layout-allow-overflow></div>
+            <div id="sweep-wrap"><div id="sweep" data-layout-allow-overflow></div></div>
+
+            <div id="chip">
+              <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 2 C12.8 8 16 11.2 22 12 C16 12.8 12.8 16 12 22 C11.2 16 8 12.8 2 12 C8 11.2 11.2 8 12 2 Z"
+                  fill="#a78bfa"
+                />
+              </svg>
+              <span>Gemini 4 Argon</span>
+            </div>
+
+            <div id="send">
+              <svg width="38" height="38" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 19 V5 M5 12 L12 5 L19 12"
+                  stroke="#e0e0e0"
+                  stroke-width="2.6"
+                  fill="none"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </div>
+
+            <div id="prompt-row">
+              <span id="ptext"></span><span id="caret"></span
+              ><span id="placeholder">Hỏi Gemini 4 Argon…</span>
+            </div>
+            <span id="probe"></span>
+
+            <div class="att" id="att-0">
+              <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M8 7 L3 12 L8 17 M16 7 L21 12 L16 17" stroke="#67e8f9" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span>mã nguồn</span>
+            </div>
+            <div class="att" id="att-1">
+              <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="14" rx="3" stroke="#67e8f9" stroke-width="2.2" fill="none" />
+                <circle cx="9" cy="10" r="2" fill="#67e8f9" />
+                <path d="M4 18 L10 13 L14 16 L17 13 L21 17" stroke="#67e8f9" stroke-width="2" fill="none" stroke-linejoin="round" />
+              </svg>
+              <span>ảnh chụp lỗi</span>
+            </div>
+            <div class="att" id="att-2">
+              <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 12 V12 M8 8 V16 M12 5 V19 M16 8 V16 M20 11 V13" stroke="#67e8f9" stroke-width="2.6" fill="none" stroke-linecap="round" />
+              </svg>
+              <span>ghi âm</span>
+            </div>
+
+            <div id="stream"></div>
+
+            <div id="status">
+              <div class="srow" id="srow-0" style="top: 0px">
+                <svg width="44" height="44" viewBox="0 0 36 36">
+                  <circle class="ring" cx="18" cy="18" r="13" fill="none" stroke="#3f3f46" stroke-width="3" />
+                  <circle class="spin" cx="18" cy="18" r="13" fill="none" stroke="#22d3ee" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="52 82" opacity="0" />
+                  <path class="tick" d="M9 18.5 L15.5 25 L27 11.5" fill="none" stroke="#a78bfa" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="30" stroke-dashoffset="30" />
+                </svg>
+                <span>Phân tích dự án</span>
+              </div>
+              <div class="srow" id="srow-1" style="top: 110px">
+                <svg width="44" height="44" viewBox="0 0 36 36">
+                  <circle class="ring" cx="18" cy="18" r="13" fill="none" stroke="#3f3f46" stroke-width="3" />
+                  <circle class="spin" cx="18" cy="18" r="13" fill="none" stroke="#22d3ee" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="52 82" opacity="0" />
+                  <path class="tick" d="M9 18.5 L15.5 25 L27 11.5" fill="none" stroke="#a78bfa" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="30" stroke-dashoffset="30" />
+                </svg>
+                <span>Lên kế hoạch</span>
+              </div>
+              <div class="srow" id="srow-2" style="top: 220px">
+                <svg width="44" height="44" viewBox="0 0 36 36">
+                  <circle class="ring" cx="18" cy="18" r="13" fill="none" stroke="#3f3f46" stroke-width="3" />
+                  <circle class="spin" cx="18" cy="18" r="13" fill="none" stroke="#22d3ee" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="52 82" opacity="0" />
+                  <path class="tick" d="M9 18.5 L15.5 25 L27 11.5" fill="none" stroke="#a78bfa" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="30" stroke-dashoffset="30" />
+                </svg>
+                <span>Sửa lỗi</span>
+              </div>
+              <div class="srow" id="srow-3" style="top: 330px">
+                <svg width="44" height="44" viewBox="0 0 36 36">
+                  <circle class="ring" cx="18" cy="18" r="13" fill="none" stroke="#3f3f46" stroke-width="3" />
+                  <circle class="spin" cx="18" cy="18" r="13" fill="none" stroke="#22d3ee" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="52 82" opacity="0" />
+                  <path class="tick" d="M9 18.5 L15.5 25 L27 11.5" fill="none" stroke="#a78bfa" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="30" stroke-dashoffset="30" />
+                </svg>
+                <span>Kiểm thử</span>
+              </div>
+            </div>
+
+            <div id="res-head"><span id="res-title">Gemini 4 Argon</span></div>
+            <div id="res-sub">Từ kế hoạch đến kiểm thử</div>
+            <div class="pill" id="pill-0" style="left: 162px; top: 1060px">
+              <svg width="34" height="34" viewBox="0 0 36 36"><path class="ptick" d="M9 18.5 L15.5 25 L27 11.5" fill="none" stroke="#a78bfa" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              <span>Phân tích</span>
+            </div>
+            <div class="pill" id="pill-1" style="left: 552px; top: 1060px">
+              <svg width="34" height="34" viewBox="0 0 36 36"><path class="ptick" d="M9 18.5 L15.5 25 L27 11.5" fill="none" stroke="#a78bfa" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              <span>Kế hoạch</span>
+            </div>
+            <div class="pill" id="pill-2" style="left: 162px; top: 1180px">
+              <svg width="34" height="34" viewBox="0 0 36 36"><path class="ptick" d="M9 18.5 L15.5 25 L27 11.5" fill="none" stroke="#a78bfa" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              <span>Sửa lỗi</span>
+            </div>
+            <div class="pill" id="pill-3" style="left: 552px; top: 1180px">
+              <svg width="34" height="34" viewBox="0 0 36 36"><path class="ptick" d="M9 18.5 L15.5 25 L27 11.5" fill="none" stroke="#a78bfa" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              <span>Kiểm thử</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- sound: voice (group voiceover), music bed (group music), sparse SFX (group sfx) -->
+      <audio id="vo-01" src="assets/voice/01.mp3" data-start="2.5" data-duration="2.96" data-track-index="10" data-volume="1" data-audio-group="voiceover"></audio>
+      <audio id="vo-02" src="assets/voice/02.mp3" data-start="5.8" data-duration="5.6" data-track-index="11" data-volume="1" data-audio-group="voiceover"></audio>
+      <audio id="music" src="assets/bgm/bgm.mp3" data-start="0" data-duration="15" data-track-index="12" data-volume="0.45" data-audio-group="music" data-fx-carve='{"enabled":true,"sources":["voiceover"],"strength":0.8}'></audio>
+      <audio id="sfx-keys" src="assets/sfx/keys.mp3" data-start="0.3" data-duration="1.36" data-track-index="13" data-volume="0.35" data-audio-group="sfx"></audio>
+      <audio id="sfx-send" src="assets/sfx/send.mp3" data-start="2.12" data-duration="0.48" data-track-index="14" data-volume="0.4" data-audio-group="sfx"></audio>
+      <audio id="sfx-merge" src="assets/sfx/chirp.mp3" data-start="5.3" data-duration="0.48" data-track-index="13" data-volume="0.3" data-audio-group="sfx"></audio>
+      <audio id="sfx-tick" src="assets/sfx/chirp.mp3" data-start="8.8" data-duration="0.48" data-track-index="14" data-volume="0.25" data-audio-group="sfx"></audio>
+      <audio id="sfx-impact" src="assets/sfx/impact.mp3" data-start="11.75" data-duration="1.48" data-track-index="13" data-volume="0.45" data-audio-group="sfx"></audio>
+    </div>
+
+    <script>
+      const tl = gsap.timeline({ paused: true });
+      const DUR = 15;
+      const W = 1080;
+      const H = 1920;
+
+      /* ---------- deterministic particle field (middle band only) ---------- */
+      const dotsEl = document.getElementById("dots");
+      for (let i = 0; i < 46; i++) {
+        const fx = (i * 0.618034) % 1;
+        const fy = (i * 0.414214 + 0.13) % 1;
+        const d = document.createElement("div");
+        d.className = "dot";
+        d.style.left = 150 + fx * 780 + "px";
+        d.style.top = 380 + fy * 1180 + "px";
+        d.style.opacity = (0.16 + ((i * 7) % 5) * 0.07).toFixed(2);
+        dotsEl.appendChild(d);
+      }
+      tl.fromTo("#dots", { y: 60 }, { y: -260, duration: DUR, ease: "none" }, 0);
+      tl.fromTo("#glow-a", { x: -40, y: 30 }, { x: 70, y: 260, duration: DUR, ease: "sine.inOut" }, 0);
+      tl.fromTo("#glow-b", { x: 50, y: -20 }, { x: -60, y: 220, duration: DUR, ease: "sine.inOut" }, 0);
+
+      /* ---------- discrete-text-sequence: the typed request ---------- */
+      const CHUNKS = ["S", "ửa", " l", "ỗi", " đ", "ăng", " nh", "ập", " g", "iúp", " m", "ình"];
+      const SEQUENCE = [{ t: 0, text: "" }];
+      {
+        let acc = "";
+        let t = 0.3;
+        CHUNKS.forEach((c, i) => {
+          acc += c;
+          SEQUENCE.push({ t: t, text: acc });
+          t += i === 7 ? 0.16 : 0.072;
+        });
+      }
+      const T_TYPED = SEQUENCE[SEQUENCE.length - 1].t; // ~1.2s
+      const T_ENTER = 2.2;
+      function textAt(time) {
+        for (let i = SEQUENCE.length - 1; i >= 0; i--) {
+          if (time >= SEQUENCE[i].t) return SEQUENCE[i].text;
+        }
+        return "";
+      }
+
+      const ptext = document.getElementById("ptext");
+      const caret = document.getElementById("caret");
+      const placeholder = document.getElementById("placeholder");
+      const probe = document.getElementById("probe");
+      const outer = document.getElementById("zoom-outer");
+      const inner = document.getElementById("zoom-inner");
+
+      /* ---------- camera: camera-cursor-tracking, then coordinate-target-zoom pushes ---------- */
+      const TEXT_X = 162;
+      const CARET_TARGET = 0.88 * W; // keep the whole typed line on screen
+      const BOX_LEFT = 110;
+      // measured once at build time (fixed composition geometry), never inside a callback
+      const WIDTHS = SEQUENCE.map((s) => {
+        probe.textContent = s.text;
+        return probe.offsetWidth;
+      });
+      probe.textContent = "";
+      function widthAt(time) {
+        for (let i = SEQUENCE.length - 1; i >= 0; i--) {
+          if (time >= SEQUENCE[i].t) return WIDTHS[i];
+        }
+        return 0;
+      }
+      function caretXAt(time) {
+        let sum = 0;
+        for (let k = 0; k < 6; k++) sum += widthAt(Math.max(0, time - k * 0.035));
+        return TEXT_X + sum / 6 + 10;
+      }
+      function camA(time) {
+        const S = 1.28 + 0.03 * Math.min(1, time / T_ENTER);
+        const initial = (60 - W / 2) / S - (BOX_LEFT - W / 2); // box left edge at screen x=60
+        const tracking = (CARET_TARGET - W / 2) / S - (caretXAt(time) - W / 2);
+        return { S: S, x: Math.min(initial, tracking), y: H / 2 - 730 };
+      }
+      // later stations: S + stage point to centre (nested wrappers: T = -offset)
+      const at = (t, S, cx, cy, ease) => ({ t, S, x: W / 2 - cx, y: H / 2 - cy, ease: gsap.parseEase(ease) });
+      const B0 = 2.05;
+      const STATIONS = [
+        at(2.9, 1.12, 540, 760, "power2.inOut"), // whole prompt box + tray
+        at(5.4, 1.18, 540, 790, "sine.inOut"), // slow push on the three inputs
+        at(6.5, 1.0, 540, 1010, "power2.inOut"), // the box opens into the board
+        at(7.8, 1.08, 530, 965, "sine.inOut"), // lean towards "Phân tích dự án" as it starts
+        at(8.9, 1.14, 550, 1020, "sine.inOut"), // follow the active row: "Lên kế hoạch"
+        at(9.85, 1.18, 530, 1085, "sine.inOut"), // "Sửa lỗi"
+        at(10.8, 1.22, 548, 1150, "sine.inOut"), // "Kiểm thử"
+        at(11.65, 1.34, 540, 1255, "power3.in"), // push into "Kiểm thử"
+        at(12.6, 1.05, 540, 1035, "expo.out"), // settle on the result card
+        at(15.0, 1.17, 540, 1050, "none"), // continuous push-in to the end
+      ];
+      const lerp = (a, b, p) => a + (b - a) * p;
+      let camStart = null;
+      function cameraAt(time) {
+        if (time <= B0) return camA(time);
+        if (!camStart) camStart = camA(B0);
+        let prev = { t: B0, S: camStart.S, x: camStart.x, y: camStart.y };
+        for (const s of STATIONS) {
+          if (time <= s.t) {
+            const p = s.ease((time - prev.t) / (s.t - prev.t));
+            return { S: lerp(prev.S, s.S, p), x: lerp(prev.x, s.x, p), y: lerp(prev.y, s.y, p) };
+          }
+          prev = s;
+        }
+        return prev;
+      }
+
+      /* ---------- one driver: text states, caret, camera ---------- */
+      const driver = { t: 0 };
+      tl.to(
+        driver,
+        {
+          t: DUR,
+          duration: DUR,
+          ease: "none",
+          onUpdate: () => {
+            const t = driver.t;
+            const txt = textAt(t);
+            ptext.textContent = txt;
+            placeholder.style.display = txt.length ? "none" : "inline-block";
+            let on = 1;
+            if (t < SEQUENCE[1].t || t > T_TYPED + 0.04) on = Math.sin(t * Math.PI * 2 * 1.6) > -0.2 ? 1 : 0;
+            if (t >= T_ENTER) on = 0;
+            caret.style.opacity = on;
+            const c = cameraAt(t);
+            outer.style.transform = `scale(${c.S})`;
+            inner.style.transform = `translate(${c.x}px, ${c.y}px)`;
+          },
+        },
+        0,
+      );
+
+      /* ---------- composer ritual: attachments spring into the tray ---------- */
+      [1.42, 1.58, 1.74].forEach((t0, i) => {
+        tl.fromTo(
+          "#att-" + i,
+          { opacity: 0, scale: 0.6, y: 18 },
+          { opacity: 1, scale: 1, y: 0, duration: 0.36, ease: "back.out(2)" },
+          t0,
+        );
+      });
+
+      /* ---------- submit: press dip on the send control ---------- */
+      tl.to("#send", { scale: 0.84, backgroundColor: "#7c3aed", duration: 0.08, ease: "power2.in" }, T_ENTER - 0.06);
+      tl.to("#send", { scale: 1, duration: 0.28, ease: "back.out(3)" }, T_ENTER + 0.02);
+
+      /* ---------- card-morph-anchor: the same box opens, then becomes the board and the card ---------- */
+      const boxEl = document.getElementById("box");
+      const edgeEl = document.getElementById("box-edge");
+      const morph = { inset: 700, r: 36 };
+      const paintBox = () => {
+        boxEl.style.clipPath = `inset(0px 0px ${morph.inset}px 0px round ${morph.r}px)`;
+        edgeEl.style.transform = `translateY(${700 - morph.inset}px)`;
+      };
+      tl.to(morph, { inset: 560, duration: 0.45, ease: "power3.out", onUpdate: paintBox }, T_ENTER + 0.05);
+      tl.to(morph, { inset: 0, r: 30, duration: 0.85, ease: "power2.inOut", onUpdate: paintBox, immediateRender: false }, 5.6);
+      tl.to("#box", { backgroundColor: "#141026", borderColor: "rgba(167,139,250,0.55)", duration: 0.7, ease: "power2.inOut" }, 11.75);
+      tl.to("#box-edge", { backgroundColor: "rgba(167,139,250,0.55)", duration: 0.7, ease: "power2.inOut" }, 11.75);
+
+      /* ---------- the three inputs light up as the voice names them (words.json, vo-01 at 2.5s) ---------- */
+      [3.22, 4.18, 4.9].forEach((t0, i) => {
+        const id = "#att-" + i;
+        tl.to(id, { borderColor: "rgba(34,211,238,0.9)", backgroundColor: "#16323a", color: "#ffffff", duration: 0.18, ease: "power2.out" }, t0);
+        tl.to(id, { scale: 1.1, duration: 0.16, ease: "power2.out" }, t0);
+        tl.to(id, { scale: 1, duration: 0.3, ease: "power2.inOut" }, t0 + 0.16);
+      });
+
+      /* ---------- the three inputs merge into one stream ---------- */
+      const MERGE = 5.15;
+      const ATT_DX = [260, 0, -260];
+      ATT_DX.forEach((dx, i) => {
+        tl.to("#att-" + i, { x: dx, y: 160, scaleY: 0.14, scaleX: 0.8, duration: 0.42, ease: "power3.in" }, MERGE + i * 0.03);
+        tl.to("#att-" + i, { opacity: 0, duration: 0.14, ease: "none" }, MERGE + 0.32 + i * 0.03);
+      });
+      tl.fromTo("#stream", { scaleX: 0 }, { scaleX: 1, duration: 0.45, ease: "power3.out" }, MERGE + 0.36);
+      tl.fromTo(
+        "#stream",
+        { backgroundPosition: "100% 0%" },
+        { backgroundPosition: "0% 0%", duration: 0.9, ease: "sine.inOut", immediateRender: false },
+        MERGE + 0.4,
+      );
+      tl.to("#chip", { scale: 1.08, backgroundColor: "rgba(124,58,237,0.42)", color: "#ffffff", duration: 0.3, ease: "power2.out" }, 5.8);
+      tl.to("#chip", { scale: 1, backgroundColor: "rgba(124,58,237,0.2)", color: "#c4b5fd", duration: 0.5, ease: "power2.inOut" }, 7.5);
+
+      /* ---------- agent-progress-theater: rows grow out of the stream, run with the voice ---------- */
+      const ROW_Y = [0, 110, 220, 330];
+      const STREAM_IN_STATUS = 930 - 880 - 45; // stream centre relative to a row centre at top 0
+      ROW_Y.forEach((ry, i) => {
+        tl.set("#srow-" + i, { visibility: "visible" }, 5.9 + i * 0.12);
+        tl.fromTo(
+          "#srow-" + i,
+          { clipPath: "inset(0% 100% 0% 0%)", y: STREAM_IN_STATUS - ry },
+          { clipPath: "inset(0% 0% 0% 0%)", y: 0, duration: 0.55, ease: "power3.out", immediateRender: false },
+          5.9 + i * 0.12,
+        );
+      });
+      tl.to("#stream", { scaleY: 0.2, opacity: 0, duration: 0.4, ease: "power2.in" }, 5.95);
+
+      // spoken windows from vo-02 words.json (+5.8s): phân tích dự án · lên kế hoạch · sửa lỗi · kiểm thử
+      const ROW_ON = [7.8, 8.92, 9.84, 10.76];
+      const ROW_DONE = [8.8, 9.85, 10.45, 11.42];
+      // per-row highlight + progress fill, built once at build time
+      ROW_ON.forEach((ton, i) => {
+        const r = document.getElementById("srow-" + i);
+        const hl = document.createElement("div");
+        hl.className = "shl";
+        r.insertBefore(hl, r.firstChild);
+        const fill = document.createElement("div");
+        fill.className = "sfill";
+        r.appendChild(fill);
+      });
+      ROW_ON.forEach((ton, i) => {
+        const row = "#srow-" + i;
+        tl.fromTo(row + " .shl", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.25, ease: "power2.out", immediateRender: false }, ton);
+        tl.to(row + " .shl", { opacity: 0, duration: 0.35, ease: "power2.in" }, ROW_DONE[i] + 0.1);
+        tl.fromTo(row + " .sfill", { scaleX: 0 }, { scaleX: 1, duration: ROW_DONE[i] - ton, ease: "power1.inOut" }, ton);
+        tl.to(row + " .sfill", { opacity: 0.3, duration: 0.3, ease: "none" }, ROW_DONE[i]);
+        tl.fromTo(row + " svg", { scale: 1 }, { scale: 1.35, duration: 0.1, ease: "power2.out", immediateRender: false }, ROW_DONE[i]);
+        tl.to(row + " svg", { scale: 1, duration: 0.25, ease: "back.out(3)" }, ROW_DONE[i] + 0.1);
+        const spin = document.querySelector(row + " .spin");
+        tl.set(row + " .spin", { attr: { opacity: 1 } }, ton);
+        tl.set(row + " .ring", { attr: { opacity: 0 } }, ton);
+        tl.to(row + " span", { color: "#f4f4f5", duration: 0.15, ease: "none" }, ton);
+        const rot = { a: 0 };
+        tl.fromTo(
+          rot,
+          { a: 0 },
+          {
+            a: 900,
+            duration: ROW_DONE[i] - ton,
+            ease: "none",
+            immediateRender: false,
+            onUpdate: () => spin.setAttribute("transform", `rotate(${rot.a} 18 18)`),
+          },
+          ton,
+        );
+        tl.set(row + " .spin", { attr: { opacity: 0 } }, ROW_DONE[i]);
+        tl.fromTo(
+          row + " .tick",
+          { attr: { "stroke-dashoffset": 30 } },
+          { attr: { "stroke-dashoffset": 0 }, duration: 0.16, ease: "power2.out", immediateRender: false },
+          ROW_DONE[i],
+        );
+        tl.to(row + " span", { color: "#a1a1aa", duration: 0.2, ease: "none" }, ROW_DONE[i]);
+      });
+
+      /* ---------- zoom-through seam: the run board -> the result card ---------- */
+      const ZT = 11.55;
+      tl.to("#status", { scale: 1.2, filter: "blur(10px)", duration: 0.2, ease: "power3.in" }, ZT);
+      tl.to("#status", { opacity: 0.15, duration: 0.2, ease: "none" }, ZT);
+      tl.set("#status", { opacity: 0 }, ZT + 0.2);
+      tl.set("#res-head", { opacity: 0.15, scale: 0.75, filter: "blur(10px)" }, ZT + 0.2);
+      tl.to("#res-head", { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.5, ease: "expo.out" }, ZT + 0.2);
+      tl.fromTo(
+        "#res-title",
+        { backgroundPosition: "100% 0%" },
+        { backgroundPosition: "0% 0%", duration: 0.9, ease: "sine.inOut", immediateRender: false },
+        12.0,
+      );
+      tl.fromTo(
+        "#res-title",
+        { backgroundPosition: "100% 0%" },
+        { backgroundPosition: "0% 0%", duration: 0.9, ease: "sine.inOut", immediateRender: false },
+        13.7,
+      );
+      tl.set("#res-sub", { visibility: "visible" }, 12.15);
+      tl.to("#res-sub", { clipPath: "inset(0% 0% 0% 0%)", duration: 0.5, ease: "power3.out" }, 12.15);
+      [12.45, 12.57, 12.69, 12.81].forEach((t0, i) => {
+        tl.fromTo(
+          "#pill-" + i,
+          { opacity: 0, scale: 0.7 },
+          { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(1.8)" },
+          t0,
+        );
+      });
+
+      /* ---------- end hold keeps living: ticks pulse on the 120 BPM beat, light sweeps the card ---------- */
+      [13.0, 13.5, 14.0, 14.5].forEach((tb, k) => {
+        const id = "#pill-" + k;
+        tl.to(id, { scale: 1.06, borderColor: "rgba(103,232,249,0.9)", backgroundColor: "rgba(34,211,238,0.18)", duration: 0.1, ease: "power2.out" }, tb);
+        tl.to(id, { scale: 1, borderColor: "rgba(167,139,250,0.45)", backgroundColor: "rgba(124,58,237,0.16)", duration: 0.38, ease: "power2.inOut" }, tb + 0.1);
+      });
+      // the board boots while the voice says "Gemini 4 Argon": one light pass, pending rings breathe
+      tl.fromTo("#sweep", { x: -420 }, { x: 1100, duration: 1.2, ease: "power1.inOut", immediateRender: false }, 6.55);
+      [0, 1, 2, 3].forEach((i) => {
+        tl.fromTo("#srow-" + i + " .ring", { attr: { stroke: "#3f3f46" } }, { attr: { stroke: "#67e8f9" }, duration: 0.25, ease: "sine.inOut", yoyo: true, repeat: 1, immediateRender: false }, 6.9 + i * 0.18);
+      });
+      [12.9, 14.1].forEach((t0) => {
+        tl.fromTo("#sweep", { x: -420 }, { x: 1100, duration: 1.0, ease: "power1.inOut", immediateRender: false }, t0);
+      });
+      tl.fromTo(
+        "#res-title",
+        { backgroundPosition: "100% 0%" },
+        { backgroundPosition: "0% 0%", duration: 0.9, ease: "sine.inOut", immediateRender: false },
+        14.62,
+      );
+
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

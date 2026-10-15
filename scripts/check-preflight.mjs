@@ -40,6 +40,9 @@
 //     the no-SFX line counts only when the table has no rows. final: a missing section only WARNs (the table asks for a
 //     measurement; a delivered project can still re-render), and sfx-sync.mjs measures each event:
 //     its FAIL lines (sound outside ITU-R BT.1359-1 −90…+185 ms) block, its WARN lines warn.
+// Mix balance, final stage, every project with index.html: mix-balance.mjs measures how far the
+//   music sits under the voice in the audio-mix rebuild (PASS 4–7 dB). Its FAIL blocks; older
+//   projects only WARN (mix-balance softens them); a measurement that cannot run is a WARN.
 // Readable hold, both stages, every project, WARN only (thresholds not yet calibrated): a "## Cảnh"
 //   row whose quoted text ("…", “…”, «…») in the Hình column stays up shorter than
 //   max(1s, words / 2.5 + 0.5s) — 2.5 words/s from viet-pro's speech rate, 0.5s eye-landing is
@@ -59,6 +62,7 @@ import { frontmatter } from "./check-viet-pro.mjs";
 import { loadDirections, classifySeams, tokenExists, upstream, wordBudget } from "./directions.mjs";
 import { measureMotion, motionVerdict } from "./qc-mp4.mjs";
 import { checkSync, parseEventsBody } from "./sfx-sync.mjs";
+import { checkBalance } from "./mix-balance.mjs";
 
 // make-demo needs the 9:16 composition named, else hyperframes renders the 16:9 index.html.
 const VERTICAL_HINT = "make-demo.mjs --animatic --aspect 9x16 --composition compositions/main-9x16.html (or --hyperframes ../<project-9x16> for a separate 9:16 project)";
@@ -361,7 +365,7 @@ export function checkRevisions(text) {
   return warnings;
 }
 
-export function check({ project = ".", stage = "plan", sync = checkSync } = {}) {
+export function check({ project = ".", stage = "plan", sync = checkSync, balance = checkBalance } = {}) {
   const dir = resolve(project);
   const errors = [], warnings = [];
   const out = { project: dir, stage, pass: false, errors, warnings, plan: null, demo: null };
@@ -413,6 +417,15 @@ export function check({ project = ".", stage = "plan", sync = checkSync } = {}) 
     if (newest && changed.length) warnings.push(`composition changed after the demo (${changed.map((f) => f.slice(dir.length + 1)).join(", ")}); re-run make-demo.mjs if the look changed`);
     const revisions = join(dir, "REVISIONS.md");
     if (existsSync(revisions)) warnings.push(...checkRevisions(readFileSync(revisions, "utf8")));
+    if (existsSync(join(dir, "index.html"))) {
+      try {
+        const b = balance({ dir });
+        out.balance = b;
+        const text = b.line.replace(/^\S+\s+/, "");
+        if (b.level === "FAIL") errors.push(text);
+        else if (b.level === "WARN") warnings.push(text);
+      } catch (e) { warnings.push(`mix-balance: không đo được (${e.message})`); }
+    }
   }
   out.pass = errors.length === 0;
   return out;

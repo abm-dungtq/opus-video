@@ -2,7 +2,8 @@
 // render-final.mjs — the only way to make the final (delivery) MP4. Runs the preflight gate
 // (check-preflight --stage final: PLAN.md + demo frames + approval in DEMO.md), checks that ffmpeg
 // and ffprobe run, then `npx hyperframes render --quality delivery <your args>` in the project
-// directory, then swaps the sound for the audio-mix (ffmpeg) mix of the composition and writes the
+// directory, then swaps the sound for the audio-mix (ffmpeg) mix of the composition (data-fx-carve
+// beds ducked under their voice, loudness-normalized to -14 LUFS / -1.5 dBTP) and writes the
 // sidecar <output>.render.json {composition, visual_hash, audio_hash, mode, mixer, source,
 // source_sha256 (of that MP4), created}.
 //   node render-final.mjs [--project .] -- [hyperframes render args, e.g. -c compositions/main-9x16.html --output renders/x-9x16.mp4]
@@ -16,8 +17,8 @@
 // Sub-scenes are the files embedded through data-composition-src (followed recursively); sibling
 // compositions such as main-9x16.html next to index.html are not.
 // Dynamic sound keeps the HyperFrames mix (sidecar mixer "hyperframes") and blocks --audio-only:
-// data-audio-group, data-automation, data-fx-chain, data-fx-carve, a GSAP tween on volume or a
-// script setting .volume, or <audio>/unmuted <video> inside a sub-scene.
+// data-automation, data-fx-chain, a GSAP tween on volume or a script setting .volume, or
+// <audio>/unmuted <video> inside a sub-scene. data-audio-group and data-fx-carve go through audio-mix.
 // --audio-only <old>: new music, SFX or volumes without re-rendering the picture. Same preflight,
 // then needs <old>.render.json whose source_sha256 matches <old>, and the same picture: visual_hash
 // covers the composition and its sub-scenes without <audio> and data-volume, non-HTML files under
@@ -241,7 +242,7 @@ function remix({ videoSrc, comp, root, out, spawn, err }) {
     const silent = !compTracks(root, comp).length;
     const wav = join(work, "mix.wav");
     if (!silent) {
-      const code = audioMix(["--html", comp, "--duration", String(duration), "--out", wav, "--base", root], { spawn, log: () => {}, err });
+      const code = audioMix(["--html", comp, "--duration", String(duration), "--out", wav, "--base", root, "--loudnorm"], { spawn, log: () => {}, err });
       if (code !== 0) throw new Error(`audio-mix exited ${code}`);
     }
     const args = ["-hide_banner", "-v", "error", "-y", "-i", videoSrc];

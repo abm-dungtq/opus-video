@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseTracks, buildArgs, dynamicAudio } from "../audio-mix.mjs";
+import { parseTracks, buildArgs, dynamicAudio, carveThreshold, carveKeys, keyLevelArgs, parseMeanVolume, parseLoudnorm, loudnormPass1Args, loudnormPass2Args, CARVE_FLOOR_DB } from "../audio-mix.mjs";
 
 const CLI = fileURLToPath(new URL("../audio-mix.mjs", import.meta.url));
 const BASE = "/proj";
@@ -22,9 +22,9 @@ const HTML = `
 test("parseTracks: audio + unmuted video, defaults, skips muted, volume 0 and comments", () => {
   const t = parseTracks(HTML, BASE);
   assert.equal(t.length, 3);
-  assert.deepEqual(t[0], { id: "vo", src: "/proj/assets/vo.mp3", start: 1.5, duration: 4, volume: 1, mediaStart: 0, rate: 1, group: "voiceover" });
-  assert.deepEqual(t[1], { id: "bgm", src: "/proj/assets/bgm.mp3", start: 0, duration: 10, volume: 0.3, mediaStart: 2, rate: 1, group: null });
-  assert.deepEqual(t[2], { id: "talk", src: "/proj/assets/talk.mp4", start: 3, duration: 6, volume: 1, mediaStart: 0, rate: 1.25, group: null });
+  assert.deepEqual(t[0], { id: "vo", src: "/proj/assets/vo.mp3", start: 1.5, duration: 4, volume: 1, mediaStart: 0, rate: 1, group: "voiceover", carve: null });
+  assert.deepEqual(t[1], { id: "bgm", src: "/proj/assets/bgm.mp3", start: 0, duration: 10, volume: 0.3, mediaStart: 2, rate: 1, group: null, carve: null });
+  assert.deepEqual(t[2], { id: "talk", src: "/proj/assets/talk.mp4", start: 3, duration: 6, volume: 1, mediaStart: 0, rate: 1.25, group: null, carve: null });
 });
 
 test("parseTracks: a tag without an id gives id null", () => {
@@ -38,7 +38,7 @@ test("parseTracks: a <video> written over several lines", () => {
     data-start="0.5" data-duration="60.18" data-has-audio="true" data-volume="0.8"></video>`;
   const t = parseTracks(html, BASE);
   assert.equal(t.length, 1);
-  assert.deepEqual(t[0], { id: "pip-video", src: "/proj/assets/video/clip.mp4", start: 0.5, duration: 60.18, volume: 0.8, mediaStart: 0, rate: 1, group: null });
+  assert.deepEqual(t[0], { id: "pip-video", src: "/proj/assets/video/clip.mp4", start: 0.5, duration: 60.18, volume: 0.8, mediaStart: 0, rate: 1, group: null, carve: null });
 });
 
 test("buildArgs: per-track filters, adelay in ms, amix without normalize, length bounded by samples and -t", () => {
@@ -98,8 +98,8 @@ test("dynamicAudio: flags Web Audio attributes and GSAP volume tweens, not the w
 <script>tl.to("#t", { opacity: 0 }); // fade out the title</script>`;
   assert.deepEqual(dynamicAudio(plain), []);
   assert.deepEqual(dynamicAudio(`<!-- <audio data-automation="x"> --><p>no</p>`), [], "comments are ignored");
-  assert.deepEqual(dynamicAudio(`<audio src="v.mp3" data-audio-group="voiceover"></audio>`), ["data-audio-group"]);
-  assert.deepEqual(dynamicAudio(`<audio\n  src="b.mp3"\n  data-automation='[]' data-fx-chain="eq"></audio><audio data-fx-carve="vo"></audio>`), ["data-automation", "data-fx-chain", "data-fx-carve"]);
+  assert.deepEqual(dynamicAudio(`<audio src="v.mp3" data-audio-group="voiceover"></audio>`), [], "groups are rebuilt");
+  assert.deepEqual(dynamicAudio(`<audio\n  src="b.mp3"\n  data-automation='[]' data-fx-chain="eq"></audio><audio data-fx-carve="vo"></audio>`), ["data-automation", "data-fx-chain"], "carve is rebuilt, chain and automation are not");
   assert.deepEqual(dynamicAudio(`<script>tl.to(bgm, { volume: 0, duration: 1 }, 4);</script>`), ["GSAP tween on volume"]);
   assert.deepEqual(dynamicAudio(`<script>gsap.fromTo(a, {"volume": 1}, {"volume": 0});</script>`), ["GSAP tween on volume"]);
   assert.deepEqual(dynamicAudio(`<p>volume: loud</p>`), [], "only inside <script>");
@@ -121,5 +121,118 @@ test("parseTracks/--base: a src missing next to the HTML falls back to the proje
     assert.equal(spawnSync("node", [CLI, "--html", html, "--duration", "1", "--out", join(dir, "m.wav")], { encoding: "utf8" }).status, 2, "without --base the src is missing");
     const r = spawnSync("node", [CLI, "--html", html, "--duration", "1", "--out", join(dir, "m.wav"), "--base", dir], { encoding: "utf8" });
     assert.equal(r.status, 0, r.stderr);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+const FIXTURE = fileURLToPath(new URL("./fixtures/audio-mix/carve-index.html", import.meta.url));
+
+test("dynamicAudio: a real composition with data-audio-group and data-fx-carve needs no HyperFrames mixer", () => {
+  assert.deepEqual(dynamicAudio(readFileSync(FIXTURE, "utf8")), []);
+});
+
+test("parseTracks: data-fx-carve read as {enabled, sources, strength}; sources match an id or a group", () => {
+  const t = parseTracks(readFileSync(FIXTURE, "utf8"), BASE);
+  const music = t.findIndex((x) => x.id === "music");
+  assert.deepEqual(t[music].carve, { enabled: true, sources: ["voiceover"], strength: 0.8 });
+  assert.equal(t[music].group, "music");
+  assert.deepEqual(carveKeys(t, music).map((i) => t[i].id), ["vo-01", "vo-02"]);
+  assert.ok(t.filter((x) => x.id !== "music").every((x) => x.carve === null));
+  const byId = parseTracks(`<audio id="vo" src="v.mp3"></audio><audio id="m" src="m.mp3" data-fx-carve='{"sources":["vo","m"]}'></audio>`, BASE);
+  assert.deepEqual(byId[1].carve, { enabled: true, sources: ["vo", "m"], strength: 0.5 }, "enabled and strength default");
+  assert.deepEqual(carveKeys(byId, 1), [0], "a bed never keys itself");
+  const off = parseTracks(`<audio id="vo" src="v.mp3"></audio><audio src="m.mp3" data-fx-carve='{"enabled":false,"sources":["vo"]}'></audio>`, BASE);
+  assert.deepEqual(carveKeys(off, 1), []);
+  assert.throws(() => parseTracks(`<audio id="music" src="m.mp3" data-fx-carve="voiceover"></audio>`, BASE), /data-fx-carve on <audio #music> is not valid JSON/);
+  assert.throws(() => parseTracks(`<audio src="m.mp3" data-fx-carve='[1]'></audio>`, BASE), /src="m\.mp3".*JSON object/);
+});
+
+test("carveThreshold: depth 2 + 6*strength dB under the voice level, floored at -50 dBFS, at most 0 dBFS", () => {
+  assert.equal(carveThreshold(-20, 0.8), +(10 ** (-26.8 / 20)).toFixed(6));
+  assert.equal(carveThreshold(-20, 0), +(10 ** (-22 / 20)).toFixed(6));
+  assert.equal(CARVE_FLOOR_DB, -50);
+  assert.equal(carveThreshold(-48, 1), +(10 ** (-50 / 20)).toFixed(6), "a quiet voice cannot push the threshold under the floor");
+  assert.equal(carveThreshold(-Infinity, 0.5), +(10 ** (-50 / 20)).toFixed(6), "silence → floor");
+  assert.equal(carveThreshold(undefined, 0.5), +(10 ** (-50 / 20)).toFixed(6), "unmeasured → floor");
+  assert.equal(carveThreshold(9, 0), 1);
+});
+
+test("buildArgs: a carve bed is sidechain-ducked by the sum of its sources; stems map voice and ducked music", () => {
+  const t = parseTracks(readFileSync(FIXTURE, "utf8"), BASE);
+  const music = t.findIndex((x) => x.id === "music");
+  const keyDb = []; keyDb[music] = -20;
+  const args = buildArgs(t, 15, "/tmp/mix.wav", { keyDb, stems: "/tmp/stems" });
+  const fc = args[args.indexOf("-filter_complex") + 1];
+  assert.match(fc, /\[a0\]asplit=3\[a0_0\]\[a0_1\]\[a0_2\]/, "voice feeds the key, the mix and the voice stem");
+  assert.match(fc, /\[a0_0\]\[a1_0\]amix=inputs=2:normalize=0,apad=whole_dur=15\[k2\]/);
+  assert.match(fc, new RegExp(`\\[a2\\]\\[k2\\]sidechaincompress=threshold=${carveThreshold(-20, 0.8)}:ratio=20:attack=15:release=350:makeup=1\\[d2\\]`));
+  assert.match(fc, /\[a0_1\]\[a1_1\]\[d2_0\]\[a3\]\[a4\]\[a5\]\[a6\]\[a7\]amix=inputs=8:normalize=0,apad=whole_dur=15,atrim=end_sample=720000\[out\]/);
+  assert.match(fc, /\[a0_2\]\[a1_2\]amix=inputs=2:normalize=0,apad=whole_dur=15,atrim=end_sample=720000\[voice\]/);
+  assert.match(fc, /\[d2_1\]amix=inputs=1:normalize=0,apad=whole_dur=15,atrim=end_sample=720000\[music\]/);
+  const fs = String(720000 * 4 + (1 << 20));
+  for (const [map, file] of [["[out]", "/tmp/mix.wav"], ["[voice]", "/tmp/stems/voice.wav"], ["[music]", "/tmp/stems/music.wav"]]) {
+    const i = args.indexOf(map);
+    assert.deepEqual(args.slice(i + 1, i + 10), ["-ar", "48000", "-ac", "2", "-t", "15", "-fs", fs, file], `${map} bounded`);
+  }
+  const plain = buildArgs(parseTracks(HTML, BASE), 12, "/tmp/out.wav");
+  assert.ok(!plain.join(" ").includes("sidechaincompress") && !plain.includes("[voice]"), "no carve, no stems: graph unchanged");
+});
+
+test("loudnorm: pass 1 prints JSON at -14 LUFS / -1.5 dBTP / LRA 11; pass 2 is linear with the measured values", () => {
+  assert.ok(loudnormPass1Args("/tmp/m.wav").includes("loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json"));
+  const stderr = `[Parsed_loudnorm_0 @ 0x1]\n{\n\t"input_i" : "-21.30",\n\t"input_tp" : "-3.10",\n\t"input_lra" : "6.20",\n\t"input_thresh" : "-31.70",\n\t"output_i" : "-14.02",\n\t"target_offset" : "0.02"\n}\n`;
+  const m = parseLoudnorm(stderr);
+  assert.equal(m.input_i, "-21.30");
+  assert.throws(() => parseLoudnorm("nothing"), /no measurement/);
+  const a = loudnormPass2Args("/tmp/m.wav", m, 15, "/tmp/o.wav");
+  assert.match(a[a.indexOf("-af") + 1], /^loudnorm=I=-14:TP=-1\.5:LRA=11:measured_I=-21\.30:measured_TP=-3\.10:measured_LRA=6\.20:measured_thresh=-31\.70:offset=0\.02:linear=true,aresample=48000,apad=whole_dur=15,atrim=end_sample=720000$/);
+  assert.deepEqual(a.slice(-9), ["-ar", "48000", "-ac", "2", "-t", "15", "-fs", String(720000 * 4 + (1 << 20)), "/tmp/o.wav"]);
+  assert.equal(parseMeanVolume("[Parsed_volumedetect_0] mean_volume: -19.6 dB"), -19.6);
+  assert.equal(parseMeanVolume("mean_volume: -inf dB"), -Infinity);
+  assert.throws(() => parseMeanVolume(""), /no mean_volume/);
+  const k = keyLevelArgs(parseTracks(readFileSync(FIXTURE, "utf8"), BASE), [0, 1]);
+  assert.match(k[k.indexOf("-filter_complex") + 1], /\[c0\]\[c1\]concat=n=2:v=0:a=1,volumedetect\[v\]$/);
+  assert.ok(!k[k.indexOf("-filter_complex") + 1].includes("adelay"), "the level is measured without the silence between clips");
+});
+
+test("CLI: malformed data-fx-carve exits 2 naming the tag", () => {
+  const dir = mkdtempSync(join(tmpdir(), "amix-"));
+  try {
+    const html = join(dir, "index.html");
+    writeFileSync(html, `<audio id="music" src="m.wav" data-fx-carve='{"sources":'></audio>`);
+    const r = spawnSync("node", [CLI, "--html", html, "--duration", "1", "--out", join(dir, "o.wav")], { encoding: "utf8" });
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /#music/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+const hasFfmpeg = spawnSync("ffmpeg", ["-version"]).status === 0;
+test("CLI: a carve bed ducks under the voice, the mix lands at -14 LUFS, stems match the mix length", { skip: !hasFfmpeg && "ffmpeg missing" }, () => {
+  const dir = mkdtempSync(join(tmpdir(), "amix-duck-"));
+  try {
+    spawnSync("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "sine=f=220:d=6", "-ac", "2", join(dir, "bed.wav")]);
+    spawnSync("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "sine=f=880:d=2", join(dir, "vo.wav")]);
+    const html = join(dir, "index.html");
+    writeFileSync(html, `<audio id="vo-01" src="vo.wav" data-start="2" data-duration="2" data-audio-group="voiceover"></audio>
+<audio id="bgm" src="bed.wav" data-start="0" data-duration="6" data-volume="0.5" data-audio-group="music" data-fx-carve='{"enabled":true,"sources":["voiceover"],"strength":0.8}'></audio>`);
+    const out = join(dir, "mix.wav"), stems = join(dir, "stems");
+    const dry = spawnSync("node", [CLI, "--html", html, "--duration", "6", "--out", out, "--stems", stems, "--loudnorm", "--dry-run"], { encoding: "utf8" });
+    assert.equal(dry.status, 0, dry.stderr);
+    assert.match(dry.stdout, /sidechaincompress=threshold=/);
+    assert.match(dry.stdout, /loudnorm=I=-14:TP=-1\.5:LRA=11/);
+    assert.deepEqual(readdirSync(dir).sort(), ["bed.wav", "index.html", "vo.wav"], "dry run writes nothing");
+    const r = spawnSync("node", [CLI, "--html", html, "--duration", "6", "--out", out, "--stems", stems, "--loudnorm"], { encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(readdirSync(dir).sort(), ["bed.wav", "index.html", "mix.wav", "stems", "vo.wav"], "work files removed");
+    const level = (file, ss, t) => parseMeanVolume(spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-ss", String(ss), "-t", String(t), "-i", file, "-af", "volumedetect", "-f", "null", "-"], { encoding: "utf8" }).stderr);
+    const music = join(stems, "music.wav");
+    const duck = level(music, 0, 1.8) - level(music, 2.5, 1.2);
+    assert.ok(duck > 5 && duck < 9, `bed ducked ${duck.toFixed(1)} dB under the voice`);
+    const ebu = spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-i", out, "-af", "ebur128=peak=true", "-f", "null", "-"], { encoding: "utf8" }).stderr;
+    const I = Number(ebu.match(/Integrated loudness:\s*\n\s*I:\s+(-?[\d.]+) LUFS/)?.[1]);
+    assert.ok(Math.abs(I + 14) <= 1, `integrated ${I} LUFS`);
+    for (const f of [out, join(stems, "voice.wav"), music]) {
+      const d = Number(spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f], { encoding: "utf8" }).stdout);
+      assert.ok(Math.abs(d - 6) <= 0.02, `${f}: ${d}s`);
+    }
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
