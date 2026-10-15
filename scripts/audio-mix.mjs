@@ -11,16 +11,23 @@
 // directory (HyperFrames resolves compositions/*.html paths from the project root).
 // data-fx-carve='{"enabled":true,"sources":["voiceover"],"strength":0.8}' on a bed (music): the bed
 //   is ducked by ffmpeg sidechaincompress keyed by the sum of its sources (each source matches a
-//   track id or a data-audio-group name). Depth D = 2 + 6*strength dB: the threshold sits D dB
-//   under the RMS level of the key tracks, measured once with volumedetect (never below -50 dBFS);
-//   ratio 20, attack 15 ms, release 350 ms. Malformed data-fx-carve JSON: exit 2.
+//   track id or a data-audio-group name), aimed at a distance under the voice:
+//   target = 4 + 2.5*strength dB; natural = music under voice in a first mix without ducking,
+//   measured on its stems in the speech windows of words.json exactly as mix-balance.mjs does;
+//   wanted reduction = clamp(target - natural, 0, 12) dB. The threshold (dB under the RMS of the
+//   key tracks, volumedetect on the clips back to back, clamped to -50..0 dBFS) is searched by
+//   bisection: up to 6 extra trial mixes, each measured the same way, until the reduction got is
+//   within 0.3 dB of the wanted one (else the closest trial, with a WARN). Ratio 20, attack 15 ms,
+//   release 350 ms. No reduction wanted or music silent during speech: not ducked. A silent voice
+//   key: WARN, not ducked. Each bed prints natural, target, wanted, got and threshold on stderr.
+//   Malformed data-fx-carve JSON: exit 2.
 // --loudnorm: two-pass loudnorm of the mix to -14 LUFS, -1.5 dBTP, LRA 11 (linear), through a
 //   work WAV in a temp folder next to --out (removed afterwards).
 // --stems <dir>: also writes <dir>/voice.wav (tracks with id vo-*, group voiceover, or a carve
 //   source) and <dir>/music.wav (beds: carve on, group music, or a src under bgm/; after ducking),
 //   each only when such tracks exist, same length as the mix, before --loudnorm.
-// --dry-run prints the ffmpeg commands without writing anything (the voice level of a ducked bed
-// is still measured). Every output: 48 kHz stereo WAV, capped at the expected size (sample-count
+// --dry-run prints the ffmpeg commands and writes nothing next to --out (a ducked bed still gets its
+// voice level and undocked mix measured, in a temp folder that is removed). Every output: 48 kHz stereo WAV, capped at the expected size (sample-count
 // trim, -t and -fs) so a misbehaving filter graph cannot fill the disk.
 // Exit: 0 ok · 1 ffmpeg failed · 2 bad usage, a src file is missing or data-fx-carve is not JSON.
 
@@ -29,6 +36,7 @@ import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
+import { decodeMono, measureBalance, speechSpans } from "./balance-measure.mjs";
 
 const attr = (tag, name) => {
   const m = tag.match(new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i"));
@@ -113,17 +121,46 @@ export function carveKeys(tracks, bed) {
   return tracks.map((t, i) => i).filter((i) => i !== bed && (c.sources.includes(tracks[i].id) || (tracks[i].group != null && c.sources.includes(tracks[i].group))));
 }
 
-// Assumption: approximates the level part of HyperFrames' carve (carveProfile duckDb) with a fixed
-// depth D = 2 + 6*strength dB under the key's mean RMS; the multi-band EQ of carve is not reproduced.
-// The voice level is one mean over the whole key, so a quiet tail would sit near or under the
-// threshold; the threshold never goes below CARVE_FLOOR_DB, so a near-silent key cannot make every
-// breath duck the bed. Returns the linear threshold for sidechaincompress (0..1).
-export const CARVE_FLOOR_DB = -50;
-export const carveDepth = (strength) => 2 + 6 * strength;
-export function carveThreshold(voiceDb, strength) {
-  const db = Number.isFinite(voiceDb) ? voiceDb - carveDepth(strength) : CARVE_FLOOR_DB;
-  return +(10 ** (Math.min(0, Math.max(CARVE_FLOOR_DB, db)) / 20)).toFixed(6);
+// Indices of the tracks on the voice stem: id vo-*, group voiceover, or a key of any carve bed.
+export function voiceIndices(tracks) {
+  const keyed = new Set(tracks.flatMap((_, b) => carveKeys(tracks, b)));
+  return tracks.map((_, i) => i).filter((i) => isVoice(tracks[i]) || keyed.has(i));
 }
+
+// Assumption: HyperFrames' carve (multi-band EQ plus a duck from carveProfile) is approximated by
+// a level-only duck aimed at a distance under the voice; the EQ is not reproduced.
+export const CARVE_FLOOR_DB = -50;
+export const MAX_REDUCTION_DB = 12;
+export const duckTarget = (strength) => 4 + 2.5 * strength;
+// natural: music under voice in dB without ducking (+Infinity when the music is silent during
+// speech, -Infinity when the voice is). Returns the dB to take off the bed while the voice speaks.
+export function duckReduction(natural, strength) {
+  if (!Number.isFinite(natural)) return 0;
+  return Math.min(MAX_REDUCTION_DB, Math.max(0, duckTarget(strength) - natural));
+}
+// Threshold in dBFS `drop` dB under the voice RMS; the floor keeps a near-silent key from making
+// every breath duck the bed.
+export const thresholdAt = (voiceDb, drop) => Math.min(0, Math.max(CARVE_FLOOR_DB, voiceDb - drop));
+
+// The threshold is found by measurement, not computed: the compressor follows the key's
+// short-term level, so the reduction it gives depends on how the voice's level is spread around
+// its mean (one TTS voice measured 3.9 dB at drop 0 and +0.52 dB per dB of drop), not on the mean
+// alone. measure(drop) → reduction got in dB (larger drop, more reduction; NaN when it could not
+// be measured). Bisects drop in [lo, hi]; returns { drop, got, passes, ok } for the closest trial.
+export const DUCK_SEARCH = { lo: -12, hi: 24, tol: 0.3, passes: 6 };
+export function searchDrop(wanted, measure, { lo, hi, tol, passes } = DUCK_SEARCH) {
+  let best = null;
+  for (let n = 1; n <= passes; n++) {
+    const drop = (lo + hi) / 2;
+    const got = measure(drop);
+    if (!Number.isFinite(got)) break;
+    if (!best || Math.abs(got - wanted) < Math.abs(best.got - wanted)) best = { drop, got, passes: n };
+    if (Math.abs(got - wanted) <= tol) break;
+    if (got < wanted) lo = drop; else hi = drop;
+  }
+  return best ? { ...best, ok: Math.abs(best.got - wanted) <= tol } : { drop: null, got: NaN, passes: 0, ok: false };
+}
+const linear = (db) => +(10 ** (db / 20)).toFixed(6);
 
 export const LOUDNORM = { I: -14, TP: -1.5, LRA: 11 };
 const LOUDNORM_BASE = `loudnorm=I=${LOUDNORM.I}:TP=${LOUDNORM.TP}:LRA=${LOUDNORM.LRA}`;
@@ -153,14 +190,14 @@ const outputArgs = (samples, totalSeconds, out) => {
   return ["-ar", "48000", "-ac", "2", "-t", String(totalSeconds), "-fs", String(maxBytes), out];
 };
 
-// keyDb[i]: measured RMS (dBFS) of the key of bed i (see keyLevelArgs); a bed with keys but no
-// level ducks at the floor threshold. stems: directory for voice.wav / music.wav, or null.
-export function buildArgs(tracks, totalSeconds, outWav, { keyDb = [], stems = null } = {}) {
+// thresholds[i]: linear sidechaincompress threshold of bed i; a bed without one is not ducked.
+// stems: directory for voice.wav / music.wav, or null.
+export function buildArgs(tracks, totalSeconds, outWav, { thresholds = [], stems = null } = {}) {
   if (!tracks.length) throw new Error("no audible tracks");
   const idx = tracks.map((_, i) => i);
   const keys = idx.map((i) => carveKeys(tracks, i));
-  const ducked = idx.filter((i) => keys[i].length);
-  const voice = stems ? idx.filter((i) => isVoice(tracks[i]) || ducked.some((b) => keys[b].includes(i))) : [];
+  const ducked = idx.filter((i) => keys[i].length && thresholds[i] != null);
+  const voice = stems ? voiceIndices(tracks) : [];
   const music = stems ? idx.filter((i) => isBed(tracks[i])) : [];
   // How many filters read each label; labels read more than once go through asplit.
   const uses = new Map();
@@ -188,7 +225,7 @@ export function buildArgs(tracks, totalSeconds, outWav, { keyDb = [], stems = nu
   const samples = Math.round(totalSeconds * 48000);
   for (const b of ducked) {
     const ks = keys[b].map((k) => use(`a${k}`));
-    const threshold = carveThreshold(keyDb[b], tracks[b].carve.strength);
+    const threshold = thresholds[b];
     // The key is padded to the full length so the bed is never cut where the voice ends.
     chains.push(`${ks.join("")}amix=inputs=${ks.length}:normalize=0,apad=whole_dur=${totalSeconds}[k${b}]`);
     chains.push(`${use(`a${b}`)}[k${b}]sidechaincompress=threshold=${threshold}:ratio=20:attack=15:release=350:makeup=1[d${b}]`);
@@ -241,7 +278,8 @@ export function loudnormPass2Args(inWav, m, totalSeconds, outWav) {
 const shellQuote = (a) => (/^[\w@%+=:,./-]+$/.test(a) ? a : `'${a.replace(/'/g, "'\\''")}'`);
 const MEASURE = { encoding: "utf8", maxBuffer: 64 << 20 };
 
-export function main(argv = process.argv.slice(2), { spawn = spawnSync, log = console.log, err = console.error } = {}) {
+// onDuck receives { id, natural, target, reduction (wanted), got, passes, voiceDb, thresholdDb } per ducked carve bed.
+export function main(argv = process.argv.slice(2), { spawn = spawnSync, log = console.log, err = console.error, onDuck = () => {} } = {}) {
   if (wantsHelp(argv)) { process.stdout.write(helpText(import.meta.url)); return 0; }
   const o = { dryRun: false, loudnorm: false };
   for (let i = 0; i < argv.length; i++) {
@@ -267,21 +305,6 @@ export function main(argv = process.argv.slice(2), { spawn = spawnSync, log = co
   if (missing.length) { err(`audio-mix: src not found:\n  ${missing.join("\n  ")}`); return 2; }
   const out = resolve(o.out);
   const stems = o.stems ? resolve(o.stems) : null;
-
-  // Voice level of each ducked bed's key, measured once before the mix.
-  const keyDb = [];
-  for (let b = 0; b < tracks.length; b++) {
-    if (!tracks[b].carve?.enabled) continue;
-    const keys = carveKeys(tracks, b);
-    if (!keys.length) { err(`audio-mix: ${tracks[b].id ?? tracks[b].src}: data-fx-carve sources ${JSON.stringify(tracks[b].carve.sources)} match no track id or group; not ducked`); continue; }
-    const r = spawn("ffmpeg", keyLevelArgs(tracks, keys), MEASURE);
-    if (r.error) { err(`audio-mix: cannot run ffmpeg: ${r.error.message}`); return 1; }
-    try {
-      if (r.status !== 0) throw new Error(`ffmpeg exited ${r.status}`);
-      keyDb[b] = parseMeanVolume(r.stderr);
-    } catch (e) { err(`audio-mix: cannot measure the voice level for ${tracks[b].id ?? tracks[b].src}: ${e.message}`); return 1; }
-  }
-
   const run = (args, opts = { stdio: "inherit" }) => {
     const r = spawn("ffmpeg", args, opts);
     if (r.error) throw new Error(`cannot run ffmpeg: ${r.error.message}`);
@@ -289,27 +312,70 @@ export function main(argv = process.argv.slice(2), { spawn = spawnSync, log = co
     return r;
   };
   const show = (args) => log(["ffmpeg", ...args].map(shellQuote).join(" "));
-  if (!o.loudnorm) {
-    const args = buildArgs(tracks, total, out, { keyDb, stems });
-    if (o.dryRun) { show(args); return 0; }
-    if (stems) mkdirSync(stems, { recursive: true });
-    try { run(args); } catch (e) { err(`audio-mix: ${e.message}`); return 1; }
-    return 0;
-  }
-  if (o.dryRun) {
-    const mix = join(dirname(out), ".audio-mix-XXXXXX", "mix.wav");
-    show(buildArgs(tracks, total, mix, { keyDb, stems }));
-    show(loudnormPass1Args(mix));
-    show(loudnormPass2Args(mix, { input_i: "<I>", input_tp: "<TP>", input_lra: "<LRA>", input_thresh: "<thresh>", target_offset: "<offset>" }, total, out));
-    return 0;
-  }
-  // The work WAV stays on the output's disk: the system disk may be nearly full.
-  mkdirSync(dirname(out), { recursive: true });
-  if (stems) mkdirSync(stems, { recursive: true });
-  const work = mkdtempSync(join(dirname(out), ".audio-mix-"));
+  const name = (t) => (t.id ? `#${t.id}` : t.src);
+  // Work files (undocked mix, loudnorm input) stay on the output's disk: the system disk may be nearly full.
+  let work = null;
+  const workDir = () => {
+    if (!work) { mkdirSync(dirname(out), { recursive: true }); work = mkdtempSync(join(dirname(out), ".audio-mix-")); }
+    return work;
+  };
   try {
-    const mix = join(work, "mix.wav");
-    run(buildArgs(tracks, total, mix, { keyDb, stems }));
+    const thresholds = [];
+    const beds = tracks.map((_, b) => b).filter((b) => tracks[b].carve?.enabled);
+    const keyed = [];
+    for (const b of beds) {
+      const keys = carveKeys(tracks, b);
+      if (!keys.length) { err(`audio-mix: ${name(tracks[b])}: data-fx-carve sources ${JSON.stringify(tracks[b].carve.sources)} match no track id or group; not ducked`); continue; }
+      let voiceDb;
+      try { voiceDb = parseMeanVolume(run(keyLevelArgs(tracks, keys), MEASURE).stderr); } catch (e) { throw new Error(`cannot measure the voice level for ${name(tracks[b])}: ${e.message}`); }
+      if (!Number.isFinite(voiceDb)) { err(`audio-mix: WARN ${name(tracks[b])}: the voice keying it is silent; not ducked`); continue; }
+      keyed.push({ b, voiceDb });
+    }
+    if (keyed.length) {
+      // Natural distance: the same mix without ducking, measured like mix-balance.mjs; every trial
+      // of the threshold search is measured the same way, on the post-duck stems.
+      const dir = workDir();
+      const { windows } = speechSpans(voiceIndices(tracks).map((i) => tracks[i]), total);
+      const under = (th) => {
+        run(buildArgs(tracks, total, join(dir, "trial.wav"), { thresholds: th, stems: dir }));
+        return measureBalance({ voice: decodeMono(join(dir, "voice.wav"), spawn), music: decodeMono(join(dir, "music.wav"), spawn), windows }).under;
+      };
+      const natural = under([]);
+      const at = (drop) => { const th = []; for (const { b, voiceDb } of keyed) th[b] = linear(thresholdAt(voiceDb, drop)); return th; };
+      // All beds share one drop (one summed music stem can meet one target): aim at the largest wanted.
+      const strengths = [...new Set(keyed.map(({ b }) => tracks[b].carve.strength))];
+      if (strengths.length > 1) err(`audio-mix: WARN carve beds have different strengths (${strengths.join(", ")}); ducked together toward the largest target`);
+      const aim = keyed.reduce((a, k) => (duckTarget(tracks[k.b].carve.strength) > duckTarget(tracks[a.b].carve.strength) ? k : a));
+      const target = duckTarget(tracks[aim.b].carve.strength);
+      const wanted = duckReduction(natural, tracks[aim.b].carve.strength);
+      const fmt = (x) => (Number.isFinite(x) ? x.toFixed(1) : String(x));
+      const found = wanted > 0 ? searchDrop(wanted, (drop) => under(at(drop)) - natural) : null;
+      if (found?.drop != null) Object.assign(thresholds, at(found.drop));
+      for (const { b, voiceDb } of keyed) {
+        const thresholdDb = found?.drop != null ? thresholdAt(voiceDb, found.drop) : null;
+        const how = !found ? " (not ducked)" : found.drop == null ? " (could not measure; not ducked)" : `, got ${fmt(found.got)} dB after ${found.passes} pass${found.passes > 1 ? "es" : ""}, threshold ${fmt(thresholdDb)} dBFS`;
+        err(`audio-mix: ${found && !found.ok ? "WARN " : ""}duck ${name(tracks[b])}: natural ${fmt(natural)} dB, target ${fmt(target)} dB, wanted ${fmt(wanted)} dB${how}`);
+        onDuck({ id: tracks[b].id, natural, target, reduction: wanted, got: found?.got ?? 0, passes: found?.passes ?? 0, voiceDb, thresholdDb });
+      }
+    }
+
+    if (!o.loudnorm) {
+      const args = buildArgs(tracks, total, out, { thresholds, stems });
+      if (o.dryRun) { show(args); return 0; }
+      if (stems) mkdirSync(stems, { recursive: true });
+      run(args);
+      return 0;
+    }
+    if (o.dryRun) {
+      const mix = join(dirname(out), ".audio-mix-XXXXXX", "mix.wav");
+      show(buildArgs(tracks, total, mix, { thresholds, stems }));
+      show(loudnormPass1Args(mix));
+      show(loudnormPass2Args(mix, { input_i: "<I>", input_tp: "<TP>", input_lra: "<LRA>", input_thresh: "<thresh>", target_offset: "<offset>" }, total, out));
+      return 0;
+    }
+    if (stems) mkdirSync(stems, { recursive: true });
+    const mix = join(workDir(), "mix.wav");
+    run(buildArgs(tracks, total, mix, { thresholds, stems }));
     const m = parseLoudnorm(run(loudnormPass1Args(mix), MEASURE).stderr);
     if (!Number.isFinite(Number(m.input_i))) { err("audio-mix: the mix is silent; loudnorm skipped"); renameSync(mix, out); return 0; }
     run(loudnormPass2Args(mix, m, total, out));
@@ -318,7 +384,7 @@ export function main(argv = process.argv.slice(2), { spawn = spawnSync, log = co
     err(`audio-mix: ${e.message}`);
     return 1;
   } finally {
-    rmSync(work, { recursive: true, force: true });
+    if (work) rmSync(work, { recursive: true, force: true });
   }
 }
 

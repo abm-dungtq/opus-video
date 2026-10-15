@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseTracks, buildArgs, dynamicAudio, carveThreshold, carveKeys, keyLevelArgs, parseMeanVolume, parseLoudnorm, loudnormPass1Args, loudnormPass2Args, CARVE_FLOOR_DB } from "../audio-mix.mjs";
+import { parseTracks, buildArgs, dynamicAudio, carveKeys, voiceIndices, keyLevelArgs, parseMeanVolume, parseLoudnorm, loudnormPass1Args, loudnormPass2Args, duckTarget, duckReduction, thresholdAt, searchDrop, CARVE_FLOOR_DB, MAX_REDUCTION_DB } from "../audio-mix.mjs";
 
 const CLI = fileURLToPath(new URL("../audio-mix.mjs", import.meta.url));
 const BASE = "/proj";
@@ -146,25 +146,49 @@ test("parseTracks: data-fx-carve read as {enabled, sources, strength}; sources m
   assert.throws(() => parseTracks(`<audio src="m.mp3" data-fx-carve='[1]'></audio>`, BASE), /src="m\.mp3".*JSON object/);
 });
 
-test("carveThreshold: depth 2 + 6*strength dB under the voice level, floored at -50 dBFS, at most 0 dBFS", () => {
-  assert.equal(carveThreshold(-20, 0.8), +(10 ** (-26.8 / 20)).toFixed(6));
-  assert.equal(carveThreshold(-20, 0), +(10 ** (-22 / 20)).toFixed(6));
-  assert.equal(CARVE_FLOOR_DB, -50);
-  assert.equal(carveThreshold(-48, 1), +(10 ** (-50 / 20)).toFixed(6), "a quiet voice cannot push the threshold under the floor");
-  assert.equal(carveThreshold(-Infinity, 0.5), +(10 ** (-50 / 20)).toFixed(6), "silence → floor");
-  assert.equal(carveThreshold(undefined, 0.5), +(10 ** (-50 / 20)).toFixed(6), "unmeasured → floor");
-  assert.equal(carveThreshold(9, 0), 1);
+test("duck aim: target 4 + 2.5*strength, wanted = target − natural clamped to 0..12, threshold clamped to −50..0 dBFS", () => {
+  assert.equal(duckTarget(0.8), 6);
+  assert.equal(duckTarget(0), 4);
+  assert.ok(Math.abs(duckReduction(3.7, 0.8) - 2.3) < 1e-9);
+  assert.equal(duckReduction(8, 0.8), 0, "already far enough under");
+  assert.equal(duckReduction(-20, 1), MAX_REDUCTION_DB);
+  assert.equal(duckReduction(Infinity, 0.8), 0, "music silent during speech");
+  assert.equal(duckReduction(-Infinity, 0.8), 0, "voice silent");
+  assert.equal(thresholdAt(-20, 3), -23);
+  assert.equal(thresholdAt(-45, 12), CARVE_FLOOR_DB);
+  assert.equal(thresholdAt(-5, -12), 0);
+});
+
+test("searchDrop: bisects the drop until the reduction got is within 0.3 dB, at most 6 measures", () => {
+  const calls = [];
+  const f = (drop) => { calls.push(drop); return 3.9 + 0.52 * drop; };
+  for (const wanted of [2.3, 0.8, 6, 9.5]) {
+    calls.length = 0;
+    const r = searchDrop(wanted, f);
+    assert.ok(r.ok && Math.abs(r.got - wanted) <= 0.3, `wanted ${wanted}: got ${r.got}`);
+    assert.ok(calls.length <= 6 && r.passes === calls.length);
+  }
+  const low = searchDrop(0.1, () => 5);
+  assert.equal(low.ok, false, "more reduction than wanted everywhere");
+  const lowDrops = []; searchDrop(0.1, (d) => { lowDrops.push(d); return 5; });
+  assert.equal(lowDrops.length, 6, "stops after 6 measures");
+  assert.ok(lowDrops[5] < -11, "walks to the lowest drop");
+  const highDrops = []; const high = searchDrop(20, (d) => { highDrops.push(d); return 1; });
+  assert.ok(!high.ok && highDrops[5] > 23, "walks to the highest drop");
+  const nan = searchDrop(2, (d) => (d === 6 ? 2.6 : NaN));
+  assert.deepEqual(nan, { drop: 6, got: 2.6, passes: 1, ok: false }, "a failed measure keeps the best trial");
+  assert.deepEqual(searchDrop(2, () => NaN), { drop: null, got: NaN, passes: 0, ok: false });
 });
 
 test("buildArgs: a carve bed is sidechain-ducked by the sum of its sources; stems map voice and ducked music", () => {
   const t = parseTracks(readFileSync(FIXTURE, "utf8"), BASE);
   const music = t.findIndex((x) => x.id === "music");
-  const keyDb = []; keyDb[music] = -20;
-  const args = buildArgs(t, 15, "/tmp/mix.wav", { keyDb, stems: "/tmp/stems" });
+  const thresholds = []; thresholds[music] = 0.0447;
+  const args = buildArgs(t, 15, "/tmp/mix.wav", { thresholds, stems: "/tmp/stems" });
   const fc = args[args.indexOf("-filter_complex") + 1];
   assert.match(fc, /\[a0\]asplit=3\[a0_0\]\[a0_1\]\[a0_2\]/, "voice feeds the key, the mix and the voice stem");
   assert.match(fc, /\[a0_0\]\[a1_0\]amix=inputs=2:normalize=0,apad=whole_dur=15\[k2\]/);
-  assert.match(fc, new RegExp(`\\[a2\\]\\[k2\\]sidechaincompress=threshold=${carveThreshold(-20, 0.8)}:ratio=20:attack=15:release=350:makeup=1\\[d2\\]`));
+  assert.match(fc, /\[a2\]\[k2\]sidechaincompress=threshold=0\.0447:ratio=20:attack=15:release=350:makeup=1\[d2\]/);
   assert.match(fc, /\[a0_1\]\[a1_1\]\[d2_0\]\[a3\]\[a4\]\[a5\]\[a6\]\[a7\]amix=inputs=8:normalize=0,apad=whole_dur=15,atrim=end_sample=720000\[out\]/);
   assert.match(fc, /\[a0_2\]\[a1_2\]amix=inputs=2:normalize=0,apad=whole_dur=15,atrim=end_sample=720000\[voice\]/);
   assert.match(fc, /\[d2_1\]amix=inputs=1:normalize=0,apad=whole_dur=15,atrim=end_sample=720000\[music\]/);
@@ -173,6 +197,11 @@ test("buildArgs: a carve bed is sidechain-ducked by the sum of its sources; stem
     const i = args.indexOf(map);
     assert.deepEqual(args.slice(i + 1, i + 10), ["-ar", "48000", "-ac", "2", "-t", "15", "-fs", fs, file], `${map} bounded`);
   }
+  const undocked = buildArgs(t, 15, "/tmp/mix.wav", { stems: "/tmp/stems" });
+  const ufc = undocked[undocked.indexOf("-filter_complex") + 1];
+  assert.ok(!ufc.includes("sidechaincompress"), "no threshold, no duck");
+  assert.match(ufc, /\[a0_1\]\[a1_1\]amix=inputs=2:normalize=0,apad=whole_dur=15,atrim=end_sample=720000\[voice\]/, "the voice stem keeps the carve sources");
+  assert.deepEqual(voiceIndices(t).map((i) => t[i].id), ["vo-01", "vo-02"]);
   const plain = buildArgs(parseTracks(HTML, BASE), 12, "/tmp/out.wav");
   assert.ok(!plain.join(" ").includes("sidechaincompress") && !plain.includes("[voice]"), "no carve, no stems: graph unchanged");
 });
@@ -206,14 +235,14 @@ test("CLI: malformed data-fx-carve exits 2 naming the tag", () => {
 });
 
 const hasFfmpeg = spawnSync("ffmpeg", ["-version"]).status === 0;
-test("CLI: a carve bed ducks under the voice, the mix lands at -14 LUFS, stems match the mix length", { skip: !hasFfmpeg && "ffmpeg missing" }, () => {
+test("CLI: a carve bed ducks to 6 dB under the voice (strength 0.8), the mix lands at -14 LUFS, stems match the mix length", { skip: !hasFfmpeg && "ffmpeg missing" }, () => {
   const dir = mkdtempSync(join(tmpdir(), "amix-duck-"));
   try {
     spawnSync("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "sine=f=220:d=6", "-ac", "2", join(dir, "bed.wav")]);
     spawnSync("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "sine=f=880:d=2", join(dir, "vo.wav")]);
     const html = join(dir, "index.html");
     writeFileSync(html, `<audio id="vo-01" src="vo.wav" data-start="2" data-duration="2" data-audio-group="voiceover"></audio>
-<audio id="bgm" src="bed.wav" data-start="0" data-duration="6" data-volume="0.5" data-audio-group="music" data-fx-carve='{"enabled":true,"sources":["voiceover"],"strength":0.8}'></audio>`);
+<audio id="bgm" src="bed.wav" data-start="0" data-duration="6" data-audio-group="music" data-fx-carve='{"enabled":true,"sources":["voiceover"],"strength":0.8}'></audio>`);
     const out = join(dir, "mix.wav"), stems = join(dir, "stems");
     const dry = spawnSync("node", [CLI, "--html", html, "--duration", "6", "--out", out, "--stems", stems, "--loudnorm", "--dry-run"], { encoding: "utf8" });
     assert.equal(dry.status, 0, dry.stderr);
@@ -222,11 +251,13 @@ test("CLI: a carve bed ducks under the voice, the mix lands at -14 LUFS, stems m
     assert.deepEqual(readdirSync(dir).sort(), ["bed.wav", "index.html", "vo.wav"], "dry run writes nothing");
     const r = spawnSync("node", [CLI, "--html", html, "--duration", "6", "--out", out, "--stems", stems, "--loudnorm"], { encoding: "utf8" });
     assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stderr, /duck #bgm: natural 0\.0 dB, target 6\.0 dB, wanted 6\.0 dB, got \d+\.\d dB after \d pass/);
     assert.deepEqual(readdirSync(dir).sort(), ["bed.wav", "index.html", "mix.wav", "stems", "vo.wav"], "work files removed");
     const level = (file, ss, t) => parseMeanVolume(spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-ss", String(ss), "-t", String(t), "-i", file, "-af", "volumedetect", "-f", "null", "-"], { encoding: "utf8" }).stderr);
     const music = join(stems, "music.wav");
-    const duck = level(music, 0, 1.8) - level(music, 2.5, 1.2);
-    assert.ok(duck > 5 && duck < 9, `bed ducked ${duck.toFixed(1)} dB under the voice`);
+    const under = level(join(stems, "voice.wav"), 2.5, 1.2) - level(music, 2.5, 1.2);
+    assert.ok(Math.abs(under - 6) <= 0.5, `music ${under.toFixed(1)} dB under the voice while it speaks`);
+    assert.ok(Math.abs(level(music, 0, 1.8) - level(join(dir, "bed.wav"), 0, 1.8)) < 0.5, "not ducked before the voice");
     const ebu = spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-i", out, "-af", "ebur128=peak=true", "-f", "null", "-"], { encoding: "utf8" }).stderr;
     const I = Number(ebu.match(/Integrated loudness:\s*\n\s*I:\s+(-?[\d.]+) LUFS/)?.[1]);
     assert.ok(Math.abs(I + 14) <= 1, `integrated ${I} LUFS`);

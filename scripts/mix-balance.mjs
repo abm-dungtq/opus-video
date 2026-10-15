@@ -5,15 +5,16 @@
 //   node mix-balance.mjs --help | -h
 // Runs audio-mix.mjs --stems into a temp folder (the length is the root data-duration, else the
 // end of the last track), decodes voice.wav and music.wav to 16 kHz mono and takes RMS (dBFS):
-//   speech = the spoken words of words.json next to each voice mp3 (timing.mjs voiceWords), words
-//   closer than 0.3 s merged; a project without words.json falls back to the voice clips' spans.
+//   speech = the spoken words of words.json next to each voice track (id vo-*, group voiceover or a
+//   carve source), words closer than 0.3 s merged; a voice track without words.json counts as
+//   speaking for its whole clip (balance-measure.mjs, shared with audio-mix's duck).
 //   under = voice RMS − music RMS during speech; music RMS outside speech is reported as is.
 // Verdict: PASS 4 ≤ under ≤ 7 dB · WARN 2–4 or 7–10 dB · FAIL under 2 or over 10 dB.
 //   Older projects (BRIEF without direction: and brief_version: 2) and compositions whose sound
 //   audio-mix cannot fully rebuild (data-fx-chain, data-automation, volume tweens) get WARN, not FAIL.
 //   No music bed → PASS (không có nhạc nền); no voice → PASS (không có giọng đọc).
 // Prints one line: "<LEVEL> BALANCE nhạc dưới giọng 5.1 dB (lúc có lời), nhạc lúc không lời −18.2 dBFS".
-// --json prints the numbers instead; --write-qa appends the line to QA.md under "## BALANCE (<time>)".
+// --json prints the numbers instead, with each ducked bed's natural, target, wanted reduction and reduction got (dB); --write-qa appends the line to QA.md under "## BALANCE (<time>)".
 // Levels are measured before loudnorm: under does not depend on it, the dBFS values are pre-normalization.
 // Exit: 0 PASS/WARN · 1 FAIL or ffmpeg failed · 2 bad usage, missing html/src or bad data-fx-carve.
 
@@ -25,42 +26,12 @@ import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
 import { isLegacy } from "./sfx-sync.mjs";
-import { parseTracks, dynamicAudio, isVoice, isBed, main as audioMix } from "./audio-mix.mjs";
-import { voiceWords } from "./timing.mjs";
+import { parseTracks, dynamicAudio, isBed, voiceIndices, main as audioMix } from "./audio-mix.mjs";
+import { decodeMono, measureBalance, speechSpans } from "./balance-measure.mjs";
 
-export const RATE = 16000;
-export const MERGE_GAP_S = 0.3;
 export const BANDS = { pass: [4, 7], warn: [2, 10] };
 
 class UsageError extends Error {}
-
-// Sorted spans [start, end] merged when the gap between them is under `gap` seconds.
-export function speechWindows(spans, gap = MERGE_GAP_S) {
-  const out = [];
-  for (const [s, e] of [...spans].sort((a, b) => a[0] - b[0])) {
-    const last = out[out.length - 1];
-    if (last && s - last[1] < gap) last[1] = Math.max(last[1], e);
-    else out.push([s, e]);
-  }
-  return out;
-}
-
-// RMS in dBFS of the samples selected by `pick(i)`; -Infinity for silence or no samples.
-export function rmsDb(samples, pick = () => true) {
-  let sum = 0, n = 0;
-  for (let i = 0; i < samples.length; i++) if (pick(i)) { sum += samples[i] * samples[i]; n++; }
-  return n && sum > 0 ? 10 * Math.log10(sum / n) : -Infinity;
-}
-
-// voice, music: Float32Array mono at `rate`; windows: [[start, end]] in seconds.
-export function measureBalance({ voice, music, windows, rate = RATE }) {
-  const inSpeech = new Uint8Array(Math.max(voice.length, music.length));
-  for (const [s, e] of windows) inSpeech.fill(1, Math.max(0, Math.round(s * rate)), Math.min(inSpeech.length, Math.round(e * rate)));
-  const voiceSpeech = rmsDb(voice, (i) => inSpeech[i] === 1);
-  const musicSpeech = rmsDb(music, (i) => inSpeech[i] === 1);
-  const quiet = inSpeech.some((v) => v === 0);
-  return { voiceSpeech, musicSpeech, musicQuiet: quiet ? rmsDb(music, (i) => inSpeech[i] === 0) : null, under: voiceSpeech - musicSpeech };
-}
 
 export function balanceVerdict(under, soft = false) {
   const [p0, p1] = BANDS.pass, [w0, w1] = BANDS.warn;
@@ -79,14 +50,6 @@ function rootDuration(html, tracks) {
   return Math.max(0, ...tracks.map((t) => t.start + (t.duration ?? 0)));
 }
 
-function decode(file, run) {
-  const r = run("ffmpeg", ["-hide_banner", "-nostdin", "-v", "error", "-i", file, "-f", "f32le", "-ac", "1", "-ar", String(RATE), "-"], { maxBuffer: 1 << 30 });
-  if (r.error) throw new Error(`cannot run ffmpeg: ${r.error.message}`);
-  if (r.status !== 0) throw new Error(`ffmpeg could not decode ${file}: ${String(r.stderr ?? "").trim()}`);
-  const buf = Buffer.from(r.stdout);
-  return new Float32Array(buf.buffer, buf.byteOffset, Math.floor(buf.length / 4)).slice();
-}
-
 // Measures one composition. Returns { level, line, legacy, notes, ...numbers }. Throws UsageError
 // (exit 2) for a missing project/html/src or bad data-fx-carve, Error (exit 1) when ffmpeg fails.
 export function checkBalance({ dir = ".", html = "index.html", run = spawnSync, mix = audioMix } = {}) {
@@ -101,7 +64,7 @@ export function checkBalance({ dir = ".", html = "index.html", run = spawnSync, 
   const notes = [];
   const done = (level, label, extra = {}) => ({ level, line: `${level} BALANCE ${label}`, legacy, notes, ...extra });
   if (!tracks.some(isBed)) return done("PASS", "không có nhạc nền");
-  if (!tracks.some(isVoice)) return done("PASS", "không có giọng đọc");
+  if (!voiceIndices(tracks).length) return done("PASS", "không có giọng đọc");
 
   const dynamic = dynamicAudio(text);
   if (dynamic.length) notes.push(`âm thanh động (${dynamic.join(", ")}) không đo được, số đo theo audio-mix`);
@@ -109,22 +72,20 @@ export function checkBalance({ dir = ".", html = "index.html", run = spawnSync, 
   const total = rootDuration(text, tracks);
   if (!(total > 0)) throw new UsageError(`cannot tell the length of ${htmlPath} (no root data-duration, no track lengths)`);
 
-  const { words } = voiceWords(root, html);
-  let spans = words.map((w) => [w.start, w.end]);
-  if (!spans.length) {
-    spans = tracks.filter(isVoice).map((t) => [t.start, t.start + (t.duration ?? total - t.start)]);
-    notes.push("không có words.json, khoảng có lời theo clip giọng");
-  }
-  const windows = speechWindows(spans);
+  const { windows, noWords } = speechSpans(voiceIndices(tracks).map((i) => tracks[i]), total);
+  if (noWords.length) notes.push(`không có words.json cho ${noWords.join(", ")}, khoảng có lời theo clip giọng`);
 
   const work = mkdtempSync(join(tmpdir(), "mix-balance-"));
   try {
-    const errs = [];
-    const code = mix(["--html", htmlPath, "--duration", String(total), "--out", join(work, "mix.wav"), "--base", root, "--stems", work], { spawn: run, log: () => {}, err: (s) => errs.push(s) });
+    const errs = [], duck = [];
+    const code = mix(["--html", htmlPath, "--duration", String(total), "--out", join(work, "mix.wav"), "--base", root, "--stems", work], {
+      spawn: run, log: () => {}, err: (s) => errs.push(s),
+      onDuck: (d) => duck.push({ id: d.id, natural_db: finite(d.natural), target_db: finite(d.target), reduction_db: finite(d.reduction), got_db: finite(d.got), passes: d.passes }),
+    });
     if (code === 2) throw new UsageError(`audio-mix: ${errs.join("; ")}`);
     if (code !== 0) throw new Error(`audio-mix exited ${code}: ${errs.join("; ")}`);
-    const m = measureBalance({ voice: decode(join(work, "voice.wav"), run), music: decode(join(work, "music.wav"), run), windows });
-    const numbers = { under_db: finite(m.under), voice_speech_dbfs: finite(m.voiceSpeech), music_speech_dbfs: finite(m.musicSpeech), music_quiet_dbfs: m.musicQuiet === null ? null : finite(m.musicQuiet), windows: windows.map(([a, b]) => [+a.toFixed(3), +b.toFixed(3)]) };
+    const m = measureBalance({ voice: decodeMono(join(work, "voice.wav"), run), music: decodeMono(join(work, "music.wav"), run), windows });
+    const numbers = { under_db: finite(m.under), voice_speech_dbfs: finite(m.voiceSpeech), music_speech_dbfs: finite(m.musicSpeech), music_quiet_dbfs: m.musicQuiet === null ? null : finite(m.musicQuiet), windows: windows.map(([a, b]) => [+a.toFixed(3), +b.toFixed(3)]), duck };
     const tail = notes.length ? ` (${notes.join("; ")})` : "";
     if (m.musicSpeech === -Infinity) return done("PASS", `nhạc không phát lúc có lời${tail}`, numbers);
     if (m.voiceSpeech === -Infinity) return done(legacy || dynamic.length ? "WARN" : "FAIL", `giọng đọc im lặng trong khoảng có lời${tail}`, numbers);

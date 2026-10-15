@@ -5,32 +5,15 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { speechWindows, rmsDb, measureBalance, balanceVerdict, checkBalance, main } from "../mix-balance.mjs";
+import { balanceVerdict, checkBalance, main } from "../mix-balance.mjs";
 
 const CLI = fileURLToPath(new URL("../mix-balance.mjs", import.meta.url));
 const hasFfmpeg = spawnSync("ffmpeg", ["-version"]).status === 0;
-
-test("speechWindows: words closer than 0.3 s merge, sorted", () => {
-  assert.deepEqual(speechWindows([[3, 3.5], [1, 1.4], [1.6, 2], [2.35, 2.6]]), [[1, 2], [2.35, 2.6], [3, 3.5]]);
-  assert.deepEqual(speechWindows([]), []);
-});
 
 test("balanceVerdict: PASS 4–7 dB, WARN 2–4 and 7–10 dB, FAIL outside; soft turns FAIL into WARN", () => {
   for (const [u, l] of [[4, "PASS"], [5.1, "PASS"], [7, "PASS"], [3.9, "WARN"], [2, "WARN"], [7.1, "WARN"], [10, "WARN"], [1.9, "FAIL"], [10.1, "FAIL"], [-3, "FAIL"]]) assert.equal(balanceVerdict(u), l, `${u} dB`);
   assert.equal(balanceVerdict(12, true), "WARN");
   assert.equal(balanceVerdict(5, true), "PASS");
-});
-
-test("measureBalance: RMS of voice and music inside the speech windows, music outside them", () => {
-  const rate = 100;
-  const voice = new Float32Array(400), music = new Float32Array(400);
-  for (let i = 100; i < 200; i++) voice[i] = i % 2 ? 0.5 : -0.5;
-  for (let i = 0; i < 400; i++) music[i] = (i % 2 ? 1 : -1) * (i >= 100 && i < 200 ? 0.25 : 0.1);
-  const m = measureBalance({ voice, music, windows: [[1, 2]], rate });
-  assert.ok(Math.abs(m.under - 20 * Math.log10(2)) < 1e-6);
-  assert.ok(Math.abs(m.musicQuiet - 20 * Math.log10(0.1)) < 1e-6);
-  assert.equal(rmsDb(new Float32Array(10)), -Infinity);
-  assert.equal(measureBalance({ voice, music, windows: [[0, 4]], rate }).musicQuiet, null, "no quiet part");
 });
 
 // A project with a 2 s voice (880 Hz) at 1 s and a 4 s bed (220 Hz) `gapDb` under it.
@@ -68,9 +51,26 @@ test("checkBalance: no words.json falls back to the voice clip; no music bed →
     const r = checkBalance({ dir });
     assert.equal(r.level, "PASS", r.line);
     assert.deepEqual(r.windows, [[1, 3]]);
-    assert.match(r.line, /không có words\.json/);
+    assert.match(r.line, /không có words\.json cho vo-01/);
     writeFileSync(join(dir, "index.html"), `<audio id="vo-01" src="vo.wav" data-start="0" data-duration="2"></audio>`);
     assert.equal(checkBalance({ dir }).line, "PASS BALANCE không có nhạc nền");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("checkBalance: a carve bed is aimed at its target; --json reports natural, target and reduction", { skip: !hasFfmpeg && "ffmpeg missing" }, () => {
+  const dir = project(0);
+  try {
+    const html = join(dir, "index.html");
+    writeFileSync(html, readFileSync(html, "utf8").replace('data-audio-group="music"', `data-audio-group="music" data-fx-carve='{"enabled":true,"sources":["voiceover"],"strength":0.8}'`));
+    const r = checkBalance({ dir });
+    assert.equal(r.level, "PASS", r.line);
+    assert.ok(Math.abs(r.under_db - 6) <= 0.5, `under ${r.under_db}`);
+    assert.equal(r.duck.length, 1);
+    const d = r.duck[0];
+    assert.equal(d.id, "bgm");
+    assert.ok(Math.abs(d.natural_db) < 0.3 && d.target_db === 6 && Math.abs(d.reduction_db - 6) < 0.3, JSON.stringify(d));
+    const j = JSON.parse(spawnSync("node", [CLI, "--project", dir, "--json"], { encoding: "utf8" }).stdout);
+    assert.deepEqual(Object.keys(j.duck[0]), ["id", "natural_db", "target_db", "reduction_db", "got_db", "passes"]);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
