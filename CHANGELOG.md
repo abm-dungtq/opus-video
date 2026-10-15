@@ -39,8 +39,9 @@ Why: every project started from an empty `index.html` with seconds typed by hand
 - `timing.mjs` refuses several `assets/bgm/*.beats.json` without `--music` (exit 2).
 
 ### Known limitations
-- `render-final` runs the duck search twice: once inside the final preflight (`mix-balance`) and again for the delivered mix. Each pass is a short ffmpeg mix (about 0.3 s per 15 s of video), so it costs time, not correctness.
+- The duck search is not cached: each `audio-mix` run with a carve bed builds up to 8 full-length mixes (natural, up to 6 trials, final) and decodes two stems per trial, and `render-final` runs it twice (final preflight via `mix-balance`, then the delivered mix), so about 16 mixes per final render: about 2 s for a 12 s video, an estimated 1 min per side for 3 minutes. It costs time, not correctness.
 - `styles.mjs find` does not score like the Python original (`difflib`): an exact id or alias scores 1, otherwise the best of 0.7 × name similarity (bigram Dice, counted from 0.5) and 0.6 × the share of query words found in the descriptions. Rankings can differ from motion-video for the same query.
+- `styles.mjs find` matches a Vietnamese query syllable by syllable, not by adjacent syllables: "phong cách tối giản" ranks `creative-suite` and `glass-keynote` (0.600, "toi" and "gian" from "không gian") above `minimal-future-product` (0.300). It only orders suggestions; the user still picks the style.
 - `reframe.mjs` layout WARN only reads `left/top/width/height` in CSS and `style=""`. It misses GSAP `x:` and `translate(...px)`, `right/bottom/inset`, and a `data-width="1920"` root of a sub-composition in `compositions/`.
 - `data-resolution="square"` on the 1:1 edition: `square` is the 1080×1080 preset of `hyperframes render --resolution` in 0.8.144, and `npx --yes hyperframes@0.8.144 lint` on a 1:1 edition in `/tmp` reports 0 errors. A full 1:1 render was not run.
 - The carve duck matches HyperFrames' duck level only, not its multi-band EQ.
