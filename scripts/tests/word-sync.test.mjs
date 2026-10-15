@@ -84,15 +84,39 @@ test("a phrase never spoken FAILs; a legacy project turns every FAIL into WARN",
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 
-test("TIMING scene check: a word shown in the scene before the one it is spoken in WARNs", () => {
+test("rowPhrase: a quoted phrase ends at its closing quote, the rest of the cell is ignored", () => {
+  assert.equal(rowPhrase('chữ: "kiểm thử" bay vào'), "kiểm thử");
+  assert.equal(rowPhrase("chữ: “Ảnh chụp” trượt lên, nảy nhẹ"), "Ảnh chụp");
+  assert.equal(rowPhrase("chữ: «mã nguồn» hiện"), "mã nguồn");
+  assert.equal(rowPhrase('chữ: "kiểm thử bay vào'), "kiểm thử bay vào", "no closing quote: the whole rest");
+  assert.equal(rowPhrase("chữ: kiểm thử bay vào"), "kiểm thử bay vào", "no quote: the whole rest");
+  const d = copy();
+  try {
+    addRow(d, '| 5.05 | chữ: "kiểm thử" bay vào | — |');
+    const r = checkWords({ dir: d });
+    assert.deepEqual(r.lines.filter((l) => l.t === 5.05).map((l) => l.text), ['PASS  WORD   5.05s "kiểm thử" lời 5.00s lệch +50 ms']);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("TIMING scene check: a row just before a scene boundary whose word opens the next scene has no scene WARN", () => {
   const d = copy();
   try {
     addRow(d, "| 2.95 | chữ: xong | — |");
     const r = checkWords({ dir: d });
-    const lines = r.lines.filter((l) => l.phrase === "xong").map((l) => l.text);
-    assert.deepEqual(lines, [
-      'PASS  WORD   2.95s "xong" lời 3.05s lệch −100 ms',
-      'WARN  WORD   2.95s "xong" không có trong lời của cảnh s1 (TIMING); chữ hiện ở cảnh khác với lời',
+    assert.deepEqual(r.lines.filter((l) => l.phrase === "xong").map((l) => l.text), ['PASS  WORD   2.95s "xong" lời 3.05s lệch −100 ms']);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("TIMING scene check: a phrase missing from the TIMING scene of its spoken time WARNs", () => {
+  const d = copy();
+  try {
+    addRow(d, "| 3.05 | chữ: xong | — |");
+    const p = join(d, "index.html");
+    writeFileSync(p, readFileSync(p, "utf8").replace('["Xong,",3.05,3.4]', '["Rồi,",3.05,3.4]'));
+    const r = checkWords({ dir: d });
+    assert.deepEqual(r.lines.filter((l) => l.phrase === "xong").map((l) => l.text), [
+      'PASS  WORD   3.05s "xong" lời 3.05s lệch +0 ms',
+      'WARN  WORD   3.05s "xong" không có trong lời của cảnh s2 (TIMING); TIMING cũ hơn words.json hoặc cụm vắt qua hai cảnh, chạy lại timing.mjs',
     ]);
   } finally { rmSync(d, { recursive: true, force: true }); }
 });

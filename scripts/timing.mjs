@@ -55,6 +55,7 @@ export const wordKey = (s) => fold(String(s ?? "")).replace(/[^\p{L}\p{N} ]+/gu,
 // Every occurrence of a phrase in a word list: consecutive words whose keys, joined by one space,
 // equal the phrase key (words with an empty key, bare punctuation, are skipped).
 // words: [{ text, start, end }] in spoken order. Returns [{ start, end }] in seconds, in order.
+// hit() in templates/composition/index-skeleton.html is a second copy of this match: change both together.
 export function phraseHits(words, phrase) {
   const want = wordKey(phrase);
   const ws = words.map((w) => ({ w, k: wordKey(w.text) })).filter((x) => x.k);

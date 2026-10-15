@@ -7,15 +7,15 @@
 //   node word-sync.mjs --help | -h
 // PLAN.md "## Sự kiện" (Thời điểm | Sự kiện | Âm thanh): a row whose Sự kiện starts with "chữ:"
 //   (diacritics optional, "chu:" too) is a keyword row; the rest of the cell is the phrase, quotes
-//   and trailing punctuation dropped. Âm thanh is usually "—", so sfx-sync skips the row.
+//   and trailing punctuation dropped. A phrase that opens with a quote ends at its closing quote. Âm thanh is usually "—", so sfx-sync skips the row.
 //   Example: | 5.8 | chữ: "kiểm thử" | — |
 // Spoken words: voice tracks of the HTML (id "vo-*" or data-audio-group="voiceover") and their
 //   <src>.words.json, on the root timeline, the same reader as timing.mjs. A phrase matches
 //   consecutive words after fold() with punctuation dropped, the rule of W() in the skeleton; the
 //   occurrence nearest the row's time is measured.
 // Windows: PASS |lệch| ≤ 150 ms · WARN ≤ 250 ms · FAIL otherwise, or when the phrase is not spoken.
-// When the HTML holds a TIMING block written by timing.mjs, a phrase not spoken inside the scene
-//   that holds the row's time is one more WARN line.
+// When the HTML holds a TIMING block written by timing.mjs, a phrase missing from the TIMING scene
+//   that holds its spoken time (stale TIMING, or a phrase across two scenes) is one more WARN line.
 // No keyword row: one line `PASS  WORD   không có hàng chữ`, exit 0.
 // --write-qa  append "## WORD (<ISO time>)" with the lines to <project>/QA.md.
 // --json      print [{ level, t, phrase, spoken, delta_ms }] instead of lines.
@@ -44,9 +44,17 @@ export function wordVerdict(deltaMs) {
   return a <= WINDOWS_MS.pass ? "PASS" : a <= WINDOWS_MS.warn ? "WARN" : "FAIL";
 }
 
-// "chữ: “kiểm thử”." → "kiểm thử": text after the first colon, quotes and trailing punctuation dropped.
+// Closing quote for each opening quote a phrase may start with.
+const CLOSE = { '"': '"', "“": "”", "«": "»", "'": "'", "‘": "’" };
+
+// "chữ: “kiểm thử”." → "kiểm thử": text after the first colon. A phrase that opens with a quote
+// ends at its closing quote ('chữ: "kiểm thử" bay vào' → "kiểm thử"); otherwise quotes and
+// trailing punctuation are dropped from the whole rest.
 export function rowPhrase(label) {
   const rest = String(label || "").slice(String(label || "").indexOf(":") + 1).trim();
+  const close = CLOSE[rest[0]];
+  const end = close ? rest.indexOf(close, 1) : -1;
+  if (end > 0) return rest.slice(1, end).trim();
   return rest.replace(/^["“«'‘]+/, "").replace(/[\s"”»'’.,;:!?…]+$/, "").replace(/["“”«»]/g, "").trim();
 }
 
@@ -117,10 +125,12 @@ export function checkWords({ dir = ".", html = "index.html" } = {}) {
     const delta = Math.round((r.t - hit.start) * 1000);
     add({ ...base, level: wordVerdict(delta), spoken: hit.start, delta_ms: delta, detail: `${head} lời ${fmtT(hit.start)} lệch ${signed(delta)} ms` });
     if (timing) {
-      const sc = sceneAt(timing, r.t);
+      // The scene is the one holding the spoken word, not the row's time: a row a little before a
+      // scene boundary whose word opens the next scene is measured by the delta above, not here.
+      const sc = sceneAt(timing, hit.start);
       const sceneWords = sc ? sc[1].lines.flatMap((l) => l.words).map(([text, start, end]) => ({ text, start, end })) : [];
-      if (!sc) add({ ...base, level: "WARN", detail: `${head} thời điểm nằm ngoài mọi cảnh của TIMING` });
-      else if (!phraseHits(sceneWords, r.phrase).length) add({ ...base, level: "WARN", detail: `${head} không có trong lời của cảnh ${sc[0]} (TIMING); chữ hiện ở cảnh khác với lời` });
+      if (!sc) add({ ...base, level: "WARN", detail: `${head} lời ${fmtT(hit.start)} nằm ngoài mọi cảnh của TIMING` });
+      else if (!phraseHits(sceneWords, r.phrase).length) add({ ...base, level: "WARN", detail: `${head} không có trong lời của cảnh ${sc[0]} (TIMING); TIMING cũ hơn words.json hoặc cụm vắt qua hai cảnh, chạy lại timing.mjs` });
     }
   }
   return out;
