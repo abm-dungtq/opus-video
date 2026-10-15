@@ -1,0 +1,14 @@
+[
+  { "text": "Bạn", "start": 0.2, "end": 0.4 },
+  { "text": "đưa", "start": 0.5, "end": 0.7 },
+  { "text": "mã", "start": 1.0, "end": 1.15 },
+  { "text": "nguồn,", "start": 1.2, "end": 1.6 },
+  { "text": "ảnh", "start": 2.0, "end": 2.15 },
+  { "text": "chụp.", "start": 2.2, "end": 2.6 },
+  { "text": "Xong,", "start": 3.05, "end": 3.4 },
+  { "text": "kiểm", "start": 5.0, "end": 5.15 },
+  { "text": "thử", "start": 5.2, "end": 5.4 },
+  { "text": "rồi", "start": 5.5, "end": 5.7 },
+  { "text": "kiểm", "start": 7.0, "end": 7.15 },
+  { "text": "thử.", "start": 7.2, "end": 7.5 }
+]

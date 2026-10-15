@@ -70,19 +70,59 @@ node $OV/scripts/eleven.mjs music --prompt "calm curious ambient, 100 BPM, light
 - Đã kiểm chứng chạy được trên gói Creator. Gói này cho tối đa 2 luồng song song, nên không gọi music song song.
 - Nếu script exit 3 và in `MUSIC_UNAVAILABLE`, chuyển sang:
   `hyperframes media-use resolve --type bgm --intent "<mood>" --project .`
-- Ghi BPM vào prompt để storyboard bám beat được.
+- Ghi BPM vào prompt để storyboard bám beat được, rồi đo nhịp thật của file (mục 3b).
+
+## 3b. Đo nhịp nhạc (`beat-grid.mjs`)
+
+BPM ghi trong prompt chỉ là ý muốn, file nhạc sinh ra có thể lệch. Với hướng `don-dap` hoặc nhóm `story-music`, đo nhịp thật trước khi cắt hình theo phách:
+
+```bash
+node $OV/scripts/beat-grid.mjs assets/bgm/bgm.mp3 --write
+node $OV/scripts/timing.mjs --project .
+```
+
+- Lệnh in `BPM`, `BEAT0` (giây của phách đầu), `stability` (ms) và bảng ô nhịp có phách kick (`K`). `--write` ghi `bgm.mp3.beats.json`, `timing.mjs` đọc file này để `B(n)` trong composition rơi đúng phách thứ n. Lệnh chỉ đo, không cắt ghép nhạc.
+- `stability` là độ lệch chuẩn giữa lưới phách và onset dải trầm. Trên 45 ms thì lệnh in `UNSTABLE`, exit 1 và không ghi file: nhạc trôi tempo hoặc không đọc được nhịp, không dùng `B()` cho bài này. Ngưỡng 45 ms đo trên 6 bản nhạc thật trong workspace (16–40 ms, cả 6 đọc đúng tempo); một chuỗi kick trôi từ 100 lên 140 BPM cho khoảng 100 ms.
+- Nhạc chậm mà lệnh đọc ra gấp đôi tempo nghe được: chạy lại với `--max-bpm 100`.
+- Dự án có nhiều file `*.beats.json` trong `assets/bgm/` thì `timing.mjs` cần `--music <file>`.
 
 ## 4. Mix
 
 | Lớp | Mức mục tiêu |
 |---|---|
 | Voice | khoảng −16 LUFS |
-| Nhạc nền khi có giọng | −28 đến −31 LUFS (ducking) |
+| Nhạc nền khi có giọng | thấp hơn giọng 4–7 dB, đo bằng `mix-balance.mjs` |
 | Nhạc nền khi không có giọng | khoảng −20 LUFS |
 | SFX | khoảng −20 LUFS, đỉnh không quá −3 dBTP |
-| Bản master giao cho mạng xã hội | khoảng −14 LUFS integrated, −1 dBTP |
+| Bản master giao cho mạng xã hội | khoảng −14 LUFS integrated, −1,5 dBTP (`audio-mix --loudnorm`; thấp hơn −14 khi đỉnh không cho tăng đủ) |
 
-- Trong HyperFrames, đặt volume và ducking theo `hyperframes-audio`. Có thể dùng `media-use/scripts/audio-duck.mjs`.
+### Nhạc dưới giọng 4–7 dB
+
+```bash
+node $OV/scripts/mix-balance.mjs --project . [--write-qa]
+```
+
+- Lệnh dựng lại tiếng bằng `audio-mix.mjs`, tách hai stem giọng và nhạc, rồi so RMS của hai stem trong những đoạn đang có lời (lấy từ `words.json`). Kết quả là một dòng, ví dụ `PASS BALANCE nhạc dưới giọng 6.1 dB (lúc có lời), nhạc lúc không lời −22.3 dBFS`.
+- Ngưỡng: 4–7 dB là PASS, 2–4 hoặc 7–10 dB là WARN, ngoài khoảng đó là FAIL. Dự án cũ chỉ nhận WARN. Cổng `check-preflight --stage final` chạy phép đo này với dự án có `index.html`.
+- Lý do chọn khoảng này: theo `audio-and-beat-sync.md` của motion-video (AgentKit), khi nhạc thấp hơn giọng khoảng 10 dB, người xem báo là "không có nhạc". Dưới 4 dB thì nhạc dễ lấn lời.
+- Vai trò track: giọng là id `vo-*` hoặc `*-voice` (ví dụ `el-01-…-voice` do `assemble-index` của faceless-explainer sinh), `data-audio-group="voiceover"`, file nằm trong `assets/voice/` hoặc nguồn của một carve; nhạc nền là track có carve, group `music` hoặc file nằm trong `bgm/`. Dự án có lời mà vẫn in `PASS BALANCE không có giọng đọc` thì track giọng không theo quy tắc nào ở trên: đặt lại id hoặc group.
+
+### Giảm nhạc theo giọng (`data-fx-carve`)
+
+`audio-mix.mjs` đọc `data-audio-group` và `data-fx-carve` rồi đổi thành sidechain ffmpeg: nhạc nền có carve được giảm khi track nguồn của carve có tiếng. Không cần sửa HTML của dự án cũ.
+
+- Độ giảm có đích: `4 + 2,5 × strength` dB nhạc dưới giọng (strength 0,8 cho 6 dB). Lệnh trộn thử một bản không giảm để đo mức tự nhiên, rồi tìm ngưỡng compressor bằng cách đo lại sau mỗi lần thử (tối đa 6 lần), không dùng hằng số cố định. stderr in một dòng `duck #music: natural … target … wanted … got …`.
+- Đây là xấp xỉ phần mức của carve trong HyperFrames, không tái tạo EQ nhiều dải. Trên bản render HyperFrames thật của dự án Gemini, carve không có `data-fx-chain` không làm nhạc nhỏ đi khi có lời.
+- `--loudnorm` đo bản mix bằng loudnorm, rồi nhân cả bản mix với một mức tăng cố định: `min(−14 − I đo được, −1,5 − TP đo được)` dB, áp bằng `volume`. Không có xử lý động nên khoảng cách nhạc dưới giọng mà duck đã ngắm được giữ nguyên. Khi đỉnh chặn mức tăng và bản mix thấp hơn −14 LUFS quá 0,5 LU, lệnh in `WARN LOUDNESS <I> LUFS (đỉnh giới hạn mức tăng)` kèm số đo. Bản giao khi đó nhỏ hơn −14 LUFS, và đó là lựa chọn có chủ ý. `--stems <dir>` ghi `voice.wav` và `music.wav` (mức trước loudnorm). `render-final.mjs` luôn gọi `--loudnorm`.
+
+### Kết quả hiệu chỉnh (2026-10-15, bản sao trong `/tmp`)
+
+| Dự án | BALANCE | Ghi chú |
+|---|---|---|
+| `gemini-argon-dot2-9x16` (có carve, strength 0,8) | PASS 6,1 dB | nhạc tự nhiên 3,7 dB dưới giọng, duck thêm 2,4 dB; bản mix −15,6 LUFS, đỉnh −1,5 dBTP (đỉnh giới hạn mức tăng ở +1,4 dB) |
+| `claude-code-ceo-sme` (dự án cũ, nhạc `data-volume` 0,2, không carve) | WARN 8,4 dB (id giọng `el-NN-…-voice`) | ngoài khoảng 4–7 dB; ngưỡng giữ nguyên, chờ người dùng nghe |
+
+- Trong HyperFrames, đặt volume theo `hyperframes-audio`. Ducking dùng `data-fx-carve` trên track nhạc (mục trên); bản giao do `audio-mix.mjs` thực hiện.
 - Chỉnh mức bằng lệnh thay vì thử tay: `hyperframes normalize-audio --lufs=-16 --target <id> --write` cho từng track voice; đặt limiter ở bus master theo `hyperframes-audio` để đạt −1 dBTP. Sau đó đo lại trên file render.
 - Đo loudness và true peak: `node $OV/scripts/qc-mp4.mjs renders/x.mp4 --project ./` (dòng `LOUDNESS` và `TRUE_PEAK`).
 - Bản giao do `render-final.mjs` dựng lại tiếng bằng `audio-mix.mjs` (ffmpeg) từ các thuộc tính audio tĩnh trong composition. Đo trên một video 9:16 dài 60 giây, loudness của hai cách mix chỉ lệch 0,1 LU.
@@ -98,7 +138,7 @@ node $OV/scripts/render-final.mjs --project . --audio-only renders/<cũ>.mp4 -- 
 - Bản 9:16 thêm `-c compositions/main-9x16.html` sau `--`. Sau `--` chỉ nhận `-c` và `--output`; `--output` bắt buộc và phải khác file cũ.
 - Đo trên video 9:16 dài 60 giây: render đầy đủ mất khoảng 108–111 giây, `--audio-only` khoảng 1 giây.
 - File âm thanh mới đặt trong `assets/voice/`, `assets/sfx/` hoặc `assets/bgm/`. File mới ở chỗ khác trong `assets/` bị tính là đổi hình.
-- **Tiếng động** (giữ bản mix của HyperFrames, không đổi tiếng riêng được): `data-audio-group`, `data-automation`, `data-fx-chain`, `data-fx-carve`, tween GSAP trên volume hoặc script gán `.volume`, `<audio>` hay `<video>` không `muted` trong cảnh con (`data-composition-src`).
+- **Tiếng động** (giữ bản mix của HyperFrames, không đổi tiếng riêng được): `data-automation`, `data-fx-chain`, tween GSAP trên volume hoặc script gán `.volume`, `<audio>` hay `<video>` không `muted` trong cảnh con (`data-composition-src`).
 - **Sidecar** `<file>.mp4.render.json` do `render-final` ghi sau mỗi lần chạy: `composition`, `visual_hash`, `audio_hash`, `mode` (`full` hoặc `audio-only`), `mixer` (`audio-mix` hoặc `hyperframes`), `source`, `source_sha256`, `created`. `source_sha256` là sha256 của chính file MP4, nên file đã nén hay sửa sau khi render không còn khớp.
 - Tiếng không đổi so với sidecar thì lệnh báo và thoát 0, không ghi file mới.
 - **Exit 6** khi không đổi tiếng được: file cũ không có sidecar, sidecar không khớp file (sha256 khác), file cũ render từ composition khác, hình đã đổi, có tiếng động, hoặc thiếu file được tham chiếu. Khi đó render đầy đủ bằng `render-final.mjs`.

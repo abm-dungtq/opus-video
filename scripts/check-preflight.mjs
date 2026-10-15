@@ -29,8 +29,8 @@
 //   - Rows whose Lời đọc cell is empty / "—" / "(nhạc)" / "không lời" add up to at least
 //     BRIEF `music_only_s` seconds (default from the direction's energy, 2s).
 //   - final: DEMO.md `animatic: <mp4>` (plus `animatic_9x16:` for aspect both, which must be portrait:
-//     make-demo.mjs --animatic --aspect 9x16 --composition compositions/main-9x16.html, or
-//     --hyperframes ../<project-9x16>) newer than PLAN.md, index.html
+//     reframe.mjs . --ratio 9x16, then make-demo.mjs --animatic --aspect 9x16 --hyperframes
+//     ../<project>-9x16; older projects with compositions/main-9x16.html pass --composition) newer than PLAN.md, index.html
 //     and compositions/*.html, whose
 //     motion passes qc-mp4 MOTION (FAIL when ≥60% near-still frames and 90th-pct YDIF < 1.5), and
 //     build/RECIPES.md (recipe-pack.mjs) newer than PLAN.md.
@@ -40,6 +40,16 @@
 //     the no-SFX line counts only when the table has no rows. final: a missing section only WARNs (the table asks for a
 //     measurement; a delivered project can still re-render), and sfx-sync.mjs measures each event:
 //     its FAIL lines (sound outside ITU-R BT.1359-1 −90…+185 ms) block, its WARN lines warn.
+//     word-sync.mjs measures each "chữ: <cụm>" row against the spoken word the same way: FAIL
+//     (off by more than 250 ms, or never spoken) blocks, WARN warns.
+// Style axis (data/styles, styles.mjs), both stages: BRIEF.md `style_profile:` must name a style
+//   (id or alias) and resolve with its "## style_layers" against the "## Cảnh" rows (optional Loại
+//   column). FAIL in a project that is not legacy (BRIEF has direction: or brief_version: 2), WARN
+//   in an older one; the resolver's warnings are WARN lines. No style_profile: is a WARN only when
+//   the creative gate is on (no creative_override).
+// Mix balance, final stage, every project with index.html: mix-balance.mjs measures how far the
+//   music sits under the voice in the audio-mix rebuild (PASS 4–7 dB). Its FAIL blocks; older
+//   projects only WARN (mix-balance softens them); a measurement that cannot run is a WARN.
 // Readable hold, both stages, every project, WARN only (thresholds not yet calibrated): a "## Cảnh"
 //   row whose quoted text ("…", “…”, «…») in the Hình column stays up shorter than
 //   max(1s, words / 2.5 + 0.5s) — 2.5 words/s from viet-pro's speech rate, 0.5s eye-landing is
@@ -47,21 +57,31 @@
 //   `(giữ đến hết)`; the hold is then measured to that mark.
 // REVISIONS.md (references/revisions.md), final stage, every project, WARN only, when the file
 //   exists: a round ("## … Vòng …", diacritics optional) with more than 5 "### R<n>" fixes, or a
-//   fix missing one of the lines Vị trí: · Lỗi thấy: · Đổi: · Giữ nguyên:.
+//   fix missing one of the lines Vị trí: · Lỗi thấy: · Đổi: · Giữ nguyên:. In a creative project whose
+//   DEMO.md lists `scene_sheets:` (make-demo.mjs --animatic), also a fix that never names its
+//   scene's sheet (sheet-s<#>), e.g. "Vị trí: 6.5s, cảnh 2 (demo/scenes/sheet-s2.jpg)".
 // Exit: 0 pass · 1 blocked · 2 bad usage.
 
 import { existsSync, readFileSync, readdirSync, statSync, openSync, readSync, closeSync, realpathSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
 import { loadDirections, classifySeams, tokenExists, upstream, wordBudget } from "./directions.mjs";
 import { measureMotion, motionVerdict } from "./qc-mp4.mjs";
-import { checkSync, parseEventsBody } from "./sfx-sync.mjs";
+import { checkSync, parseEventsBody, isLegacy } from "./sfx-sync.mjs";
+import { resolveProject } from "./styles.mjs";
+import { checkWords } from "./word-sync.mjs";
+import { checkBalance } from "./mix-balance.mjs";
 
-// make-demo needs the 9:16 composition named, else hyperframes renders the 16:9 index.html.
-const VERTICAL_HINT = "make-demo.mjs --animatic --aspect 9x16 --composition compositions/main-9x16.html (or --hyperframes ../<project-9x16> for a separate 9:16 project)";
+// make-demo needs the 9:16 source named, else hyperframes renders the 16:9 index.html. The default
+// source is the edition reframe.mjs derives next to the project; a project that still keeps its own
+// compositions/main-9x16.html names that file instead.
+export const verticalHint = (dir) => {
+  const edition = `../${basename(resolve(dir))}-9x16`;
+  return `reframe.mjs . --ratio 9x16, then make-demo.mjs --animatic --aspect 9x16 --hyperframes ${edition} (a project with its own compositions/main-9x16.html: --composition compositions/main-9x16.html instead)`;
+};
 
 // Width and height of the first video stream; throws when ffprobe cannot read the file.
 export function probeSize(file, run = spawnSync) {
@@ -103,7 +123,14 @@ export function parsePlan(text) {
   return { sections, scenes, demo: times(sections[SECTIONS.demo]), demo916: k916 ? times(sections[k916]) : null };
 }
 
-const MUSIC_ONLY = /^(?:|-|—|–|\(?nhac\)?|\(?chi nhac\)?|khong loi|\(khong loi\)|\(im lang\)|im lang|music only)$/;
+// Scene id from the "#" cell of "## Cảnh" (row index i when empty): "2" → "s2"; a cell already
+// written "s2" (or "S2") stays "s2", never "ss2". One rule for timing.mjs and styles.mjs.
+export const sceneId = (cell, i) => {
+  const c = String(cell ?? "").trim();
+  return c ? `s${c.replace(/^s(?=.)/i, "")}` : `s${i + 1}`;
+};
+// A folded Lời đọc cell that means no speech in the scene (also read by timing.mjs).
+export const MUSIC_ONLY = /^(?:|-|—|–|\(?nhac\)?|\(?chi nhac\)?|khong loi|\(khong loi\)|\(im lang\)|im lang|music only)$/;
 // "0–1.5s", "1.5 - 3s", "0.0s - 4.9s" → seconds (0 when unreadable)
 export function spanSeconds(cell) {
   const b = spanBounds(cell);
@@ -168,7 +195,7 @@ export function holdWarnings(table) {
 }
 
 // Creative gate on PLAN.md + BRIEF.md. Pushes into errors/warnings; returns a summary or null.
-export function checkCreative({ dir, plan, brief, stage, errors, warnings, data = loadDirections(), up = upstream(), motion = measureMotion, probe = probeSize, sync = checkSync }) {
+export function checkCreative({ dir, plan, brief, stage, errors, warnings, data = loadDirections(), up = upstream(), motion = measureMotion, probe = probeSize, sync = checkSync, words = checkWords }) {
   const fm = frontmatter(brief);
   if (fm.creative_override) {
     if (fm.creative_override.trim().length < 10) errors.push("BRIEF.md creative_override needs a reason of at least 10 characters");
@@ -251,13 +278,13 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
     for (const key of keys) {
       const anim = animaticOf(demoText, key);
       const animPath = anim ? resolve(dir, anim) : "";
-      const rerun = key === "animatic_9x16" ? VERTICAL_HINT : "make-demo.mjs --animatic";
+      const rerun = key === "animatic_9x16" ? verticalHint(dir) : "make-demo.mjs --animatic";
       let bad;
       if (!anim) errors.push(`DEMO.md has no \`${key}:\` — run ${rerun} so the user approves motion, not stills`);
       else if (!existsSync(animPath)) errors.push(`DEMO.md animatic ${anim} not found`);
       else if (statSync(animPath).mtimeMs < planTime) errors.push(`animatic ${anim} is older than PLAN.md; re-run ${rerun}`);
       else if (newerThan(dir, statSync(animPath).mtimeMs).length) errors.push(`${newerThan(dir, statSync(animPath).mtimeMs).join(", ")} newer than the animatic ${anim}; the user approved older motion, re-run ${rerun}`);
-      else if (key === "animatic_9x16" && (bad = notPortrait(probe, animPath, anim))) errors.push(bad);
+      else if (key === "animatic_9x16" && (bad = notPortrait(probe, animPath, anim, rerun))) errors.push(bad);
       else {
         let m;
         try { m = motion(animPath); } catch (e) { errors.push(`cannot measure motion of ${anim}: ${e.message}`); }
@@ -275,6 +302,9 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
       if (s.missing) warnings.push(EVENTS_MISSING);
       else { errors.push(...s.errors); warnings.push(...s.warnings); }
     }
+    let w;
+    try { w = words({ dir }); } catch (e) { errors.push(`word-sync: ${e.message}`); }
+    if (w) { errors.push(...w.errors); warnings.push(...w.warnings); }
     const recipes = join(dir, "build", "RECIPES.md");
     if (!existsSync(recipes)) errors.push("build/RECIPES.md not found — run recipe-pack.mjs --project . and build from it (step 6)");
     else if (statSync(recipes).mtimeMs < planTime) errors.push("build/RECIPES.md is older than PLAN.md; re-run recipe-pack.mjs");
@@ -282,12 +312,31 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
   return out;
 }
 
+// Style gate on BRIEF.md style_profile + "## style_layers". Pushes into errors/warnings; returns
+// { base, layers } or null.
+export function checkStyle({ dir, brief, errors, warnings, resolveFn = resolveProject }) {
+  const fm = frontmatter(brief);
+  const id = String(fm.style_profile || "").trim();
+  if (!id || PLACEHOLDER.test(id)) {
+    if (!isLegacy(fm) && !fm.creative_override) warnings.push("BRIEF.md has no style_profile: (make-pitch.mjs choose writes it; ids in data/styles/index.json) — the look falls back to the direction's style keyword");
+    return null;
+  }
+  try {
+    const r = resolveFn(dir);
+    for (const w of r.warnings) warnings.push(`style_profile ${r.base}: ${w}`);
+    return { base: r.base, layers: r.layers.length };
+  } catch (e) {
+    (isLegacy(fm) ? warnings : errors).push(`style_profile "${id}": ${e.message}`);
+    return null;
+  }
+}
+
 // A 9:16 animatic rendered without the vertical composition is landscape; the user would approve the
 // 16:9 motion as the vertical cut. Returns the error, or "" when height > width.
-function notPortrait(probe, path, anim) {
+function notPortrait(probe, path, anim, hint) {
   let s;
   try { s = probe(path); } catch (e) { return `cannot read the frame size of ${anim}: ${e.message}`; }
-  return s.height > s.width ? "" : `animatic ${anim} is ${s.width}×${s.height}, not portrait; re-run ${VERTICAL_HINT}`;
+  return s.height > s.width ? "" : `animatic ${anim} is ${s.width}×${s.height}, not portrait; re-run ${hint}`;
 }
 
 // index.html and compositions/*.html edited after `time` (the build the user has not seen).
@@ -323,14 +372,16 @@ export function approvalOf(text) {
 const REVISION_FIELDS = ["Vị trí", "Lỗi thấy", "Đổi", "Giữ nguyên"];
 const MAX_FIXES_PER_ROUND = 5;
 
-// WARN sentences for a REVISIONS.md text: rounds ("## …Vòng…") over five fixes, fixes missing a field.
-export function checkRevisions(text) {
+// WARN sentences for a REVISIONS.md text: rounds ("## …Vòng…") over five fixes, fixes missing a field
+// and, with `sheets` (DEMO.md lists per-scene contact sheets), fixes that never name a sheet-s<#>.
+export function checkRevisions(text, { sheets = false } = {}) {
   const warnings = [];
   const rounds = [];
   let round = null, fix = null;
   const closeFix = () => {
     if (!fix) return;
     for (const f of REVISION_FIELDS) if (!fix.fields.has(fold(f))) warnings.push(`REVISIONS.md ${fix.name}: thiếu ${f}`);
+    if (sheets && !fix.sheet) warnings.push(`REVISIONS.md ${fix.name}: Vị trí chưa trỏ sheet của cảnh (vd. cảnh 3 (demo/scenes/sheet-s3.jpg))`);
     fix = null;
   };
   for (const raw of String(text).split(/\r?\n/)) {
@@ -345,12 +396,13 @@ export function checkRevisions(text) {
     const h3 = line.match(/^###\s+(R\d+)\b/i);
     if (h3) {
       closeFix();
-      fix = { name: h3[1], fields: new Set() };
+      fix = { name: h3[1], fields: new Set(), sheet: false };
       if (round) round.fixes++;
       continue;
     }
     if (/^#{1,3}\s/.test(line)) { closeFix(); continue; }
     if (!fix) continue;
+    if (/sheet-s/i.test(line)) fix.sheet = true;
     const label = fold(line.replace(/^[-*]\s*/, "").replace(/\*\*/g, "")).match(/^([^:]+?)\s*:/);
     if (label) fix.fields.add(label[1]);
   }
@@ -361,7 +413,7 @@ export function checkRevisions(text) {
   return warnings;
 }
 
-export function check({ project = ".", stage = "plan", sync = checkSync } = {}) {
+export function check({ project = ".", stage = "plan", sync = checkSync, words = checkWords, balance = checkBalance } = {}) {
   const dir = resolve(project);
   const errors = [], warnings = [];
   const out = { project: dir, stage, pass: false, errors, warnings, plan: null, demo: null };
@@ -382,7 +434,8 @@ export function check({ project = ".", stage = "plan", sync = checkSync } = {}) 
   const brief = existsSync(join(dir, "BRIEF.md")) ? readFileSync(join(dir, "BRIEF.md"), "utf8") : "";
   const both = /^both$/i.test((frontmatter(brief).aspect || "").trim());
   if (both && !(plan.demo916 && plan.demo916.length)) errors.push('BRIEF.md aspect: both — PLAN.md needs "## Khung hình demo 9:16" with timestamps');
-  out.creative = checkCreative({ dir, plan, brief, stage, errors, warnings, sync });
+  out.creative = checkCreative({ dir, plan, brief, stage, errors, warnings, sync, words });
+  out.style = checkStyle({ dir, brief, errors, warnings });
   warnings.push(...holdWarnings(parseTable(plan.sections[SECTIONS.scenes])));
 
   if (stage === "final") {
@@ -412,7 +465,19 @@ export function check({ project = ".", stage = "plan", sync = checkSync } = {}) 
     const changed = comps.filter((f) => statSync(f).mtimeMs > newest);
     if (newest && changed.length) warnings.push(`composition changed after the demo (${changed.map((f) => f.slice(dir.length + 1)).join(", ")}); re-run make-demo.mjs if the look changed`);
     const revisions = join(dir, "REVISIONS.md");
-    if (existsSync(revisions)) warnings.push(...checkRevisions(readFileSync(revisions, "utf8")));
+    if (existsSync(revisions)) {
+      const sheets = Boolean(out.creative) && existsSync(demoMd) && /^\s*[-*]?\s*scene_sheets(?:_9x16)?:\s*\S/im.test(readFileSync(demoMd, "utf8"));
+      warnings.push(...checkRevisions(readFileSync(revisions, "utf8"), { sheets }));
+    }
+    if (existsSync(join(dir, "index.html"))) {
+      try {
+        const b = balance({ dir });
+        out.balance = b;
+        const text = b.line.replace(/^\S+\s+/, "");
+        if (b.level === "FAIL") errors.push(text);
+        else if (b.level === "WARN") warnings.push(text);
+      } catch (e) { warnings.push(`mix-balance: không đo được (${e.message})`); }
+    }
   }
   out.pass = errors.length === 0;
   return out;

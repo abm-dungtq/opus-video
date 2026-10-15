@@ -4,6 +4,8 @@
 
 Dùng ở **bước 1b** (`SKILL.md`): agent chọn 3 hướng bằng `directions.mjs pick`, dựng styleframe bằng `make-pitch.mjs`, người dùng chọn bằng mắt rồi đổi tối đa vài từ khoá. Người dùng chỉ thấy cột tiếng Việt; token kỹ thuật ghi vào `BRIEF.md` và `PLAN.md`.
 
+Hướng quyết định cách kể bằng hình. Giao diện (màu, chữ, chất liệu, chuyển cảnh) là trục riêng: style profile trong `data/styles/`, ghi vào BRIEF bằng `style_profile:`. Mỗi hướng gợi ý vài style hợp (`styles_goi_y`, số trong ngoặc là năng lượng 1–5); xem `references/style-system.md`.
+
 ## Hai núm chỉnh
 
 | Núm | Lựa chọn |
@@ -29,6 +31,7 @@ Dùng ở **bước 1b** (`SKILL.md`): agent chọn 3 hướng bằng `direction
 - Hook: Giây đầu: khối nhỏ nảy vào giữa khung, giãn ra thành ý đầu tiên đúng lúc giọng đọc bắt đầu.
 - Styleframe 3 giây: 3 giây: khối bo góc ở tâm morph qua 3 trạng thái (nút → thanh tải → thẻ tiêu đề chủ đề), chữ bên trong vào sau khi khung bắt đầu morph và ra trước lần morph kế.
 - Style: preset `blue-professional` · Blueprint: `fixed-anchor-cycle`, `cta-morph-press` · Rule: `card-morph-anchor`, `scale-swap-transition`, `press-release-spring`
+- Style profile gợi ý: `expressive-material` Chất liệu biểu cảm (3/5), `precision-dark-product` Sản phẩm tối chính xác (3/5), `glass-keynote` Keynote kính mờ (3/5), `neo-brutalist-web` Web tân thô mộc (4/5)
 - Chuyển cảnh: `card-morph-anchor`, `scale-swap-transition`
 - SFX: "soft tactile UI pop", "tight airy whoosh" · Nhịp: vua/don-dap · Nhóm: product, interactive, motion
 - Case tham khảo: `y:thegrootdev-966114`, `y:verbove-268381`
@@ -38,6 +41,7 @@ Dùng ở **bước 1b** (`SKILL.md`): agent chọn 3 hướng bằng `direction
 - Hook: Giây đầu: con trỏ nhấp nháy trong khung lệnh, câu hỏi gõ ra từng ký tự kèm tiếng phím.
 - Styleframe 3 giây: 3 giây: khung lệnh gõ câu hỏi về chủ đề, nhấn Enter, ba dòng trạng thái chạy, khối kết quả đầu tiên trồi lên từ chính khung lệnh.
 - Style: style `Data Drift` · Blueprint: `prompt-type-submit-generate`, `agent-progress-theater` · Rule: `discrete-text-sequence`, `camera-cursor-tracking`, `coordinate-target-zoom`
+- Style profile gợi ý: `precision-dark-product` Sản phẩm tối chính xác (3/5), `terminal-ops` Phiên terminal (3/5), `glass-keynote` Keynote kính mờ (3/5), `accelerated-compute` Sức mạnh điện toán (4/5)
 - Chuyển cảnh: `zoom-through`, `card-morph-anchor`
 - SFX: "crisp mechanical keycap click", "subtle digital telemetry chirp", "deep clean sub bass impact" · Nhịp: vua/don-dap · Nhóm: product, interactive, explainer
 - Case tham khảo: `y:twoclipping-496100`, `y:demonugc-525162`
@@ -47,6 +51,7 @@ Dùng ở **bước 1b** (`SKILL.md`): agent chọn 3 hướng bằng `direction
 - Hook: Giây đầu: một từ khoá đập vào giữa khung trên nhịp trống đầu tiên, nền đảo màu.
 - Styleframe 3 giây: 3 giây: ba từ khoá của chủ đề lần lượt đập vào theo 3 beat, từ sau húc văng từ trước, nền đổi cực màu ở beat thứ ba.
 - Style: style `Maximalist Type` · Blueprint: `kinetic-type-beats`, `ticker-takeover` · Rule: `kinetic-beat-slam`, `reactive-displacement`, `waterfall-entry`
+- Style profile gợi ý: `kinetic-typography` Chữ chuyển động (4/5), `athletic-impact` Thể thao bùng nổ (5/5), `extreme-energy` Cảm giác mạnh (5/5), `swiss-kinetic-editorial` Chữ Thuỵ Sĩ chuyển động (3/5)
 - Chuyển cảnh: `beat-cut`, `waterfall-cut`
 - SFX: "punchy modern electronic stomp clap", "tight transient percussion hit" · Nhịp: don-dap · Nhóm: motion, story-music, product
 - Case tham khảo: `y:raphaelaubryy-687877`, `y:techhalla-498547`
@@ -56,6 +61,7 @@ Dùng ở **bước 1b** (`SKILL.md`): agent chọn 3 hướng bằng `direction
 - Hook: Giây đầu: con trỏ to lướt vào khung và bấm lún một nút, máy quay đẩy theo.
 - Styleframe 3 giây: 3 giây: con trỏ phóng to kéo một thẻ liên quan chủ đề qua màn hình, nhả tay thẻ nảy về chỗ, camera trượt sang vùng kế tiếp.
 - Style: preset `capsule` · Blueprint: `cursor-ui-demo`, `camera-journey`, `zoom-out-workspace-reveal` · Rule: `context-sensitive-cursor`, `cursor-drag`, `physics-press-reaction`, `coordinate-target-zoom`
+- Style profile gợi ý: `creative-canvas` Bảng vẽ cộng tác (3/5), `saas-bento` Lưới bento SaaS (3/5), `premium-ui-demo` Giao diện cao cấp (2/5), `playful-productivity` Làm việc vui vẻ (4/5)
 - Chuyển cảnh: `multi-phase-camera`, `viewport-change`
 - SFX: "crisp mechanical keycap click", "soft tactile UI pop" · Nhịp: vua/don-dap · Nhóm: product, interactive
 - Case tham khảo: `y:annacher-433425`, `y:demonugc-525162`
@@ -65,6 +71,7 @@ Dùng ở **bước 1b** (`SKILL.md`): agent chọn 3 hướng bằng `direction
 - Hook: Giây đầu: máy quay lao từ xa vào giữa một không gian có chiều sâu, các mảnh bay về khoá đúng chỗ.
 - Styleframe 3 giây: 3 giây: ba tầng thẻ nghiêng 3D về chủ đề, máy quay bay xuyên tầng đầu, tầng sau rõ nét dần (rack focus).
 - Style: style `Data Drift` · Blueprint: `camera-journey`, `zoom-out-workspace-reveal` · Rule: `3d-camera-flight`, `depth-of-field-blur`, `depth-scatter-assemble`, `orbit-3d-entry`
+- Style profile gợi ý: `immersive-console` Ra mắt máy chơi game (4/5), `holographic-hud` Màn hình HUD (3/5), `accelerated-compute` Sức mạnh điện toán (4/5), `neon-cyberpunk` Đêm neon cyberpunk (5/5)
 - Chuyển cảnh: `zoom-through`, `cinematic-zoom`
 - SFX: "tight airy cinematic whoosh", "deep clean sub bass impact" · Nhịp: vua/don-dap · Nhóm: 3d, motion, explainer
 - Case tham khảo: `y:koldo2k-778767`
@@ -74,6 +81,7 @@ Dùng ở **bước 1b** (`SKILL.md`): agent chọn 3 hướng bằng `direction
 - Hook: Giây đầu: một con số lớn đếm vụt lên đúng lúc giọng đọc nói ra nó.
 - Styleframe 3 giây: 3 giây: đường biểu đồ tự vẽ, vạch đọc quét theo, con số chính của chủ đề đếm lên và khoá lại.
 - Style: style `Swiss Pulse` · Blueprint: `dataviz-countup`, `comparison-split` · Rule: `chart-scrub-readout`, `counting-dynamic-scale`, `stat-bars-and-fills`, `svg-path-draw`
+- Style profile gợi ý: `data-editorial` Báo chí dữ liệu (2/5), `systematic-enterprise` Doanh nghiệp hệ thống (2/5), `friendly-system-motion` Hệ thống thân thiện (3/5), `swiss-kinetic-editorial` Chữ Thuỵ Sĩ chuyển động (3/5)
 - Chuyển cảnh: `zoom-through`, `push-slide`
 - SFX: "subtle digital telemetry chirp", "soft tactile UI pop" · Nhịp: em/vua · Nhóm: explainer, product, bat-dong-san
 
@@ -82,6 +90,7 @@ Dùng ở **bước 1b** (`SKILL.md`): agent chọn 3 hướng bằng `direction
 - Hook: Giây đầu: một câu in trên giấy, nét bút dạ quẹt tô sáng đúng từ đang được đọc.
 - Styleframe 3 giây: 3 giây: tiêu đề chủ đề in kiểu tạp chí, bút dạ khoanh tròn từ khoá, máy quay lia nhẹ sang đoạn kế trên cùng trang giấy.
 - Style: preset `code-editorial` · Blueprint: `spatial-pan-stations`, `transcript-scroll-artifact-reveal` · Rule: `css-marker-patterns`, `svg-path-draw`, `asr-keyword-glow`
+- Style profile gợi ý: `editorial-intelligence` Bài luận về AI (2/5), `calm-workspace` Trang làm việc yên tĩnh (1/5), `quirky-editorial` Tạp chí lập dị (3/5), `paper-cut-collage` Cắt dán giấy (3/5)
 - Chuyển cảnh: `multi-phase-camera`, `push-slide` (cho phép chuyển cảnh mềm: `focus-pull`, `blur-crossfade`, `cross-warp-morph`, `thermal-distortion`, `light-leak`)
 - SFX: "felt tip marker stroke on textured paper", "crisp magazine page snap" · Nhịp: em/vua · Nhóm: explainer, story-music
 
@@ -90,6 +99,7 @@ Dùng ở **bước 1b** (`SKILL.md`): agent chọn 3 hướng bằng `direction
 - Hook: Giây đầu: máy quay sà xuống bản đồ, một chiếc ghim rơi nảy đúng điểm chính.
 - Styleframe 3 giây: 3 giây: sơ đồ/bản đồ của chủ đề, ghim rơi, một đường nối tự vẽ tới điểm thứ hai, nhãn số liệu bật lên.
 - Style: preset `cartesian` · Blueprint: `camera-journey`, `constellation-hub` · Rule: `svg-path-draw`, `viewport-change`, `ai-tracking-box`
+- Style profile gợi ý: `blueprint-engineering` Bản vẽ kỹ thuật (2/5), `precision-hardware` Thiết bị chính xác (3/5), `isometric-systems` Hệ thống isometric (2/5), `mission-control` Trung tâm điều khiển phóng (4/5)
 - Chuyển cảnh: `viewport-change`, `multi-phase-camera` (cho phép chuyển cảnh mềm: `focus-pull`, `blur-crossfade`, `cross-warp-morph`, `thermal-distortion`, `light-leak`)
 - SFX: "soft tactile UI pop", "tight airy whoosh" · Nhịp: em/vua · Nhóm: explainer, story-music, bat-dong-san
 

@@ -9,7 +9,8 @@
 //   node make-pitch.mjs render --project .
 //   node make-pitch.mjs choose --project . (--pick <1|2|3> | --auto) [--style id] [--visual id]
 //                              [--effect id] [--transition id] [--sfx id] [--energy e]
-//                              [--palette toi|sang|thuong-hieu] [--brand <brand.json>] [--accept-warnings]
+//                              [--palette toi|sang|thuong-hieu] [--brand <brand.json>]
+//                              [--style-profile <id|alias>] [--accept-warnings]
 //   node make-pitch.mjs --help | -h
 // init/choose read brand.json (project, then ../shared-assets) when present (brand.mjs): banned
 //   directions are dropped from the pick, STYLEFRAME.md gets the brand colours, logo and fonts,
@@ -18,7 +19,11 @@
 // init: directions.mjs pick → pitch/PICK.json; for each pick a HyperFrames project
 //   pitch/<n>-<slug>/ (`hyperframes init --example blank`, portrait for 9:16/both, landscape for
 //   16:9) holding STYLEFRAME.md (what to build in ~3 s) and RECIPES.md (recipe-pack for that
-//   direction). The agent then writes each index.html from STYLEFRAME.md + RECIPES.md.
+//   direction). The agent then writes each index.html from STYLEFRAME.md + RECIPES.md. Each pick
+//   gets a style profile (styles.mjs): the first of the direction's styles_goi_y that fits the
+//   energy and is not used by an earlier pick; STYLEFRAME.md lists its palette (CSS), type,
+//   material, transitions, three signature moves, constraints and detail document. Brand colours
+//   win over the style palette. The id is kept in pitch/PICK.json.
 // render: renders every pitch/<n>-*/index.html at --quality draft to pitch/<n>.mp4, cuts a poster
 //   pitch/<n>.png at 60% of the clip, tiles pitch/sheet.jpg, measures motion (qc-mp4 MOTION) and
 //   writes PITCH.md: the 3 options with paths, the two knobs, 3–4 swappable keywords per group
@@ -26,8 +31,9 @@
 // choose: compat check (directions.mjs); warnings → exit 3 so the agent asks the user once, then
 //   re-run with --accept-warnings if they keep it. Writes BRIEF.md frontmatter: direction,
 //   direction_swaps, energy, palette, word_budget, music_only_s, creative_selection (user|auto),
-//   styleframe; and a "## creative_direction" body section. --auto = option 1, recorded as auto
-//   (only when the user asked to run without stopping).
+//   styleframe, style_profile (the pick's style, or --style-profile; with it, compat also warns on
+//   an energy mismatch and on a swapped style keyword); and a "## creative_direction" body
+//   section. --auto = option 1, recorded as auto (only when the user asked to run without stopping).
 // Exit: 0 ok · 1 render/init failed or ffmpeg/ffprobe missing · 2 bad usage · 3 compat warnings to confirm · 4 a styleframe
 //   fails MOTION (render; PITCH.md is still written), rebuild it.
 
@@ -39,6 +45,8 @@ import { createHash } from "node:crypto";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
 import { loadDirections, pickDirections, compatWarnings, resolveSelection, wordBudget, upstream, DIMENSIONS, DIM_VI, TIER_VI } from "./directions.mjs";
+import { StyleError, defaultStyle, loadProfiles, lookup, paletteCss } from "./styles.mjs";
+import { OV_DIR } from "./skill-paths.mjs";
 import { buildRecipes } from "./recipe-pack.mjs";
 import { findBrand, validateBrand, brandAbs } from "./brand.mjs";
 import { PLACEHOLDER } from "./check-preflight.mjs";
@@ -91,10 +99,34 @@ ${files.map(([label, v]) => `- ${label}: \`${v}\``).join("\n")}${files.length ? 
 `;
 }
 
+// The look of the styleframe from a style profile. Brand colours, when given, win over its palette.
+export function styleMd(style, direction, brand = null) {
+  if (!style) return "";
+  const dims = style.dimensions || {};
+  const list = (xs) => (xs || []).join("; ");
+  return `## Style: ${style.ten_vi} (${style.id})
+${style.mo_ta_vi}
+
+Style quyết định giao diện (màu, chữ, chất liệu) và thắng token style/preset của hướng ở trên khi hai bên khác nhau; hướng ${direction.id} vẫn quyết định cách kể bằng hình. Seam giữa các beat vẫn lấy từ hướng (cổng sáng tạo chặn fade, cut); chuyển cảnh của style chỉ là chất liệu cho seam đó.
+${brand ? "- **Màu thương hiệu thắng:** dùng màu ở mục Thương hiệu thay cho bảng màu dưới đây; từ style chỉ lấy chữ, chất liệu, chuyển động.\n" : ""}- Bảng màu (${dims.palette?.mode || "?"}): ${dims.palette?.rule || "—"}
+
+\`\`\`css
+${paletteCss(style)}
+\`\`\`
+
+- Chữ: ${list(dims.typography)} (font thiếu dấu tiếng Việt thì thay bằng Be Vietnam Pro)
+- Chất liệu: ${list(dims.material)}
+- Chuyển cảnh: ${list(dims.transitions)}
+- Nước đi đặc trưng: ${list((style.signature_moves || []).slice(0, 3))}
+- Ràng buộc: ${list(style.constraints)}
+${style.detail ? `- Chi tiết: \`${join(OV_DIR, style.detail)}\`\n` : ""}
+`;
+}
+
 // One finished styleframe per direction (from a real pitch), shown to the agent as a reference.
 const EXAMPLES = fileURLToPath(new URL("../references/styleframe-examples/", import.meta.url));
 
-export function styleframeMd({ n, pick, topic, aspect, energy, data, brand = null }) {
+export function styleframeMd({ n, pick, topic, aspect, energy, data, brand = null, style = null }) {
   const d = pick.direction;
   const example = join(EXAMPLES, `${d.id}.html`);
   const [w, h] = SIZE[aspect] || SIZE["9:16"];
@@ -111,7 +143,7 @@ ${d.styleframe_vi}
 - Luật chống slideshow: ${d.anti_slideshow_vi}
 - Style: ${sel.style.kind} \`${sel.style.name}\` · Blueprint: ${sel.blueprints.map((b) => `\`${b}\``).join(", ")} · Rule: ${sel.rules.map((r) => `\`${r}\``).join(", ")} · Seam: ${sel.seams.map((s) => `\`${s}\``).join(", ")}
 ${existsSync(example) ? `- Ví dụ cùng hướng: \`${example}\` (styleframe mẫu từ một pitch thật, chủ đề khác; học cách dựng, không chép chữ hay màu)\n` : ""}
-${brandMd(brand)}## Bắt buộc
+${styleMd(style, d, brand)}${brandMd(brand)}## Bắt buộc
 1. Đọc hết \`RECIPES.md\` cùng thư mục trước khi viết \`index.html\`; dựng bằng đúng các cơ chế trong đó.
 2. Dùng chữ thật của chủ đề (tên sản phẩm, con số, câu hook ngắn), không lorem ipsum, không bịa số liệu.
 3. ${brand ? "Font heading của brand nếu có đủ dấu tiếng Việt; không thì Be Vietnam Pro." : "Font có đủ dấu tiếng Việt (Be Vietnam Pro hoặc font preset đã kiểm dấu)."}
@@ -148,8 +180,12 @@ export function init(o, data, up = upstream()) {
   // Keep the scaffold hash of styleframes that already exist, so render can still spot an unwritten one.
   let old = [];
   try { old = JSON.parse(readFileSync(join(pitch, "PICK.json"), "utf8")).picks || []; } catch { /* first init */ }
+  const profiles = loadProfiles();
+  const used = new Set();
   const rows = [];
   for (const p of picks) {
+    const styleId = defaultStyle(p.direction, energy, profiles, used);
+    if (styleId) used.add(styleId);
     const name = `${p.n}-${p.direction.slug}`;
     const dir = join(pitch, name);
     const prev = old.find((r) => r.dir === posix(relative(project, dir)));
@@ -159,13 +195,13 @@ export function init(o, data, up = upstream()) {
       if (r.status !== 0 || !existsSync(join(dir, "index.html"))) return { code: 1, msg: `hyperframes init failed for ${name}` };
       scaffold = sha(join(dir, "index.html"));
     }
-    writeFileSync(join(dir, "STYLEFRAME.md"), styleframeMd({ n: p.n, pick: p, topic: o.topic, aspect: o.aspect, energy, data, brand }));
+    writeFileSync(join(dir, "STYLEFRAME.md"), styleframeMd({ n: p.n, pick: p, topic: o.topic, aspect: o.aspect, energy, data, brand, style: styleId ? profiles[styleId] : null }));
     const sel = resolveSelection(p.direction, {}, data);
     writeFileSync(join(dir, "RECIPES.md"), buildRecipes({ blueprints: sel.blueprints, rules: sel.rules, seams: sel.seams, direction: p.direction, style: sel.style }, data, up));
-    rows.push({ n: p.n, id: p.id, tier: p.tier, dir: posix(relative(project, dir)), why: p.why, scaffold });
+    rows.push({ n: p.n, id: p.id, tier: p.tier, dir: posix(relative(project, dir)), why: p.why, scaffold, ...(styleId ? { style_profile: styleId } : {}) });
   }
   writeFileSync(join(pitch, "PICK.json"), JSON.stringify({ topic: o.topic, aspect: o.aspect, category: o.category || "", energy, duration_s: Number(o.duration) || Number(briefFm.duration_s) || 15, ...(brand ? { brand: brand.path } : {}), picks: rows }, null, 2) + "\n");
-  return { code: 0, msg: `make-pitch: 3 hướng → ${rows.map((r) => `${r.n}. ${r.id} (${r.dir})`).join(" · ")}${brandWarn}\nNext: viết index.html 3 giây cho từng thư mục theo STYLEFRAME.md + RECIPES.md, rồi chạy make-pitch.mjs render --project .` };
+  return { code: 0, msg: `make-pitch: 3 hướng → ${rows.map((r) => `${r.n}. ${r.id}${r.style_profile ? ` + ${r.style_profile}` : ""} (${r.dir})`).join(" · ")}${brandWarn}\nNext: viết index.html 3 giây cho từng thư mục theo STYLEFRAME.md + RECIPES.md, rồi chạy make-pitch.mjs render --project .` };
 }
 
 function keywordMenu(data, picks) {
@@ -258,7 +294,13 @@ function choose(o, data) {
   }
   if (o.palette === "thuong-hieu" && !brand) return { code: 2, msg: "--palette thuong-hieu cần brand.json (chép references/brand.example.json thành shared-assets/brand.json)" };
   const swaps = Object.fromEntries(DIMENSIONS.filter((d) => o[d]).map((d) => [d, o[d]]));
-  const warnings = compatWarnings(direction, swaps, energy, data);
+  const profiles = loadProfiles();
+  let styleId = row.style_profile && profiles[row.style_profile] ? row.style_profile : defaultStyle(direction, energy, profiles);
+  if (o["style-profile"]) {
+    try { styleId = lookup(o["style-profile"], profiles); } catch (e) { if (e instanceof StyleError) return { code: 2, msg: `--style-profile: ${e.message}` }; throw e; }
+  }
+  const style = styleId ? profiles[styleId] : null;
+  const warnings = compatWarnings(direction, swaps, energy, data, o["style-profile"] ? style : null);
   if (warnings.some((w) => w.startsWith("không có từ khoá"))) return { code: 2, msg: warnings.join("\n") };
   if (warnings.length && !o["accept-warnings"]) return { code: 3, msg: `${warnings.map((w) => `WARN  ${w}`).join("\n")}\nchoose: hỏi người dùng một lần; nếu họ vẫn giữ lựa chọn thì chạy lại với --accept-warnings` };
   const sel = resolveSelection(direction, swaps, data);
@@ -281,12 +323,14 @@ function choose(o, data) {
     music_only_s: budget.music_only_s,
     creative_selection: o.auto ? "auto" : "user",
     styleframe: `${row.dir}/index.html`,
+    style_profile: styleId || "",
     creative_override: null,
   });
   brief = setSection(brief, "creative_direction", [
     `- Hướng: ${direction.id} — ${direction.ten_vi} (${o.auto ? "agent tự chọn theo yêu cầu chạy không dừng" : `người dùng chọn phương án ${n}`})`,
     `- Mô tả: ${direction.mo_ta_vi}`,
     `- Style: ${sel.style.kind} \`${sel.style.name}\``,
+    ...(style ? [`- Style profile: ${style.ten_vi} (\`${style.id}\`), giao diện lấy từ \`data/styles/${style.id}.json\`${brand ? "; màu thương hiệu thắng bảng màu của style" : ""}`] : []),
     `- Blueprint: ${sel.blueprints.map((b) => `\`${b}\``).join(", ")} · Rule: ${sel.rules.map((r) => `\`${r}\``).join(", ")}`,
     `- Chuyển cảnh: ${sel.seams.map((s) => `\`${s}\``).join(", ")}${sel.allow_soft ? " (cho phép chuyển cảnh mềm)" : ""}`,
     `- SFX: ${sel.sfx.map((s) => `"${s}"`).join(", ")}`,
@@ -297,7 +341,7 @@ function choose(o, data) {
     ...(warnings.length ? [`- Cảnh báo phối đã được người dùng chấp nhận: ${warnings.join("; ")}`] : []),
   ].join("\n"));
   writeFileSync(briefPath, brief);
-  return { code: 0, msg: `make-pitch: BRIEF.md ← direction ${direction.id}, energy ${energy}, word_budget ${budget.words}, music_only_s ${budget.music_only_s}${Object.keys(swaps).length ? `, swaps ${Object.entries(swaps).map(([k, v]) => `${k}=${v}`).join(", ")}` : ""}${aspectWarn}${brandWarn}\nNext: bước 2 viết kịch bản viet-pro theo ngân sách lời này (hình dẫn, lời theo).` };
+  return { code: 0, msg: `make-pitch: BRIEF.md ← direction ${direction.id}${styleId ? `, style_profile ${styleId}` : ""}, energy ${energy}, word_budget ${budget.words}, music_only_s ${budget.music_only_s}${Object.keys(swaps).length ? `, swaps ${Object.entries(swaps).map(([k, v]) => `${k}=${v}`).join(", ")}` : ""}${aspectWarn}${brandWarn}\nNext: bước 2 viết kịch bản viet-pro theo ngân sách lời này (hình dẫn, lời theo).` };
 }
 
 function parseArgs(argv) {

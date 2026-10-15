@@ -132,8 +132,10 @@ test("dynamicAudioReasons: attributes on the composition and sound in a data-com
     rmSync(join(p, "compositions"), { recursive: true });
     assert.throws(() => visualHash(p), /referenced file not found/, "an embedded sub-scene that is gone");
     edit(/<div data-composition-src[^\n]*\n/, "");
-    edit('id="bgm"', 'id="bgm" data-fx-carve="voiceover"');
-    assert.deepEqual(dynamicAudioReasons(p), ["index.html: data-fx-carve"]);
+    edit('id="bgm"', `id="bgm" data-audio-group="music" data-fx-carve='{"enabled":true,"sources":["voiceover"],"strength":0.8}'`);
+    assert.deepEqual(dynamicAudioReasons(p), [], "carve and groups are rebuilt by audio-mix");
+    edit('id="bgm"', 'id="bgm" data-fx-chain="eq"');
+    assert.deepEqual(dynamicAudioReasons(p), ["index.html: data-fx-chain"]);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -193,10 +195,10 @@ test("--audio-only: usage, preflight, sidecar, picture, dynamic sound, unchanged
     assert.notEqual(side.audio_hash, readSidecar(base).audio_hash);
     assert.ok(!readdirSync(join(p, "renders")).some((n) => n.includes("remix-tmp")));
 
-    // dynamic sound (data-audio-group) → 6
-    edit('id="bgm"', 'id="bgm" data-audio-group="music"');
+    // dynamic sound (data-fx-chain) → 6
+    edit('id="bgm"', 'id="bgm" data-fx-chain="eq"');
     assert.equal(run(["--audio-only", "renders/base.mp4", "--", "--output", "renders/grp.mp4"]), AUDIO_ONLY_EXIT);
-    edit(' data-audio-group="music"', "");
+    edit(' data-fx-chain="eq"', "");
 
     // picture changed → 6
     edit("Lô 72 m2", "Lô 90 m2");

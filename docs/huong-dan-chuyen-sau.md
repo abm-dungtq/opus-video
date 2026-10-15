@@ -272,7 +272,8 @@ Remotion chỉ chọn khi người dùng yêu cầu React hoặc đã có codeba
 
 Mỗi khổ cần một composition riêng, vì `--resolution` không đổi khổ. Với `aspect: both`, bản dọc được dàn lại bố cục, không crop:
 
-- Dựng tay (`general-video`): hai composition trong cùng project, `index.html` 1920×1080 và `compositions/main-9x16.html` 1080×1920.
+- Dự án mới dựng từ skeleton: một `index.html`, bản 9:16 và 1:1 sinh bằng `reframe.mjs` (mục 14.5).
+- Dự án cũ dựng tay (`general-video`): hai composition trong cùng project, `index.html` 1920×1080 và `compositions/main-9x16.html` 1080×1920.
 - Workflow có frame worker (`faceless-explainer`, `pr-to-video`, `product-launch-video`): một project 9:16 riêng, giữ nguyên `audio_meta.json` và sidecar. Sau mỗi lần `captions.mjs build` ở 1080×1920, chạy lệnh sửa dải phụ đề vì mặc định 1600px rơi vào vùng UI che:
 
 ```bash
@@ -351,7 +352,7 @@ Lệnh so từng frame của `SCRIPT.md` với `script/NN.txt` (bỏ qua khác b
 
 ### 6.5 Mix
 
-Mức mục tiêu: giọng khoảng -16 LUFS, nhạc nền khi có giọng -28 đến -31 LUFS, nhạc khi không có giọng khoảng -20 LUFS, SFX khoảng -20 LUFS với đỉnh không quá -3 dBTP, bản master khoảng -14 LUFS integrated và -1 dBTP. Chỉnh bằng `hyperframes normalize-audio` và limiter ở bus master theo skill `hyperframes-audio`, rồi đo lại bằng `qc-mp4.mjs` (mục 10.1). Bảng đầy đủ ở [audio-pipeline.md](../references/audio-pipeline.md). Bản giao không giữ bản mix của HyperFrames mà dựng lại bằng `audio-mix.mjs` (mục 10.3).
+Mức mục tiêu: giọng khoảng -16 LUFS, nhạc nền khi có giọng thấp hơn giọng 4–7 dB (đo bằng `mix-balance.mjs`, mục 14.4), nhạc khi không có giọng khoảng -20 LUFS, SFX khoảng -20 LUFS với đỉnh không quá -3 dBTP, bản master khoảng -14 LUFS integrated và -1 dBTP. Chỉnh bằng `hyperframes normalize-audio` và limiter ở bus master theo skill `hyperframes-audio`, rồi đo lại bằng `qc-mp4.mjs` (mục 10.1). Bảng đầy đủ ở [audio-pipeline.md](../references/audio-pipeline.md). Bản giao không giữ bản mix của HyperFrames mà dựng lại bằng `audio-mix.mjs` (mục 10.3).
 
 ### 6.6 Nhánh footage thật (beta)
 
@@ -570,7 +571,7 @@ node $OV/scripts/render-final.mjs --project . --audio-only renders/<cũ>-9x16.mp
 | `source_sha256` | sha256 của chính file MP4 này. Nén hay sửa file sau khi render thì không còn khớp |
 | `created` | Thời điểm ghi |
 
-**Điều kiện chặn.** `--audio-only` chỉ chạy khi file cũ có sidecar, `source_sha256` khớp file, sidecar cùng composition, `visual_hash` không đổi và không có tiếng động. Tiếng động là những thứ chỉ HyperFrames mix được: `data-audio-group`, `data-automation`, `data-fx-chain`, `data-fx-carve`, tween GSAP trên volume hoặc script gán `.volume`, và `<audio>` hay `<video>` có tiếng trong một cảnh con. Gặp tiếng động, render đầy đủ vẫn giữ bản mix của HyperFrames (`mixer` là `hyperframes`).
+**Điều kiện chặn.** `--audio-only` chỉ chạy khi file cũ có sidecar, `source_sha256` khớp file, sidecar cùng composition, `visual_hash` không đổi và không có tiếng động. Tiếng động là những thứ chỉ HyperFrames mix được: `data-automation`, `data-fx-chain`, tween GSAP trên volume hoặc script gán `.volume`, và `<audio>` hay `<video>` có tiếng trong một cảnh con. Gặp tiếng động, render đầy đủ vẫn giữ bản mix của HyperFrames (`mixer` là `hyperframes`). Từ v1.2.0, `data-audio-group` và `data-fx-carve` đi đường `audio-mix.mjs` (mục 14.4).
 
 Cảnh con là các file nhúng qua `data-composition-src` (đệ quy). Composition anh em như `compositions/main-9x16.html` cạnh `index.html` không phải cảnh con. Đường dẫn trong composition tìm theo thư mục của composition trước, không thấy thì tìm từ gốc dự án, giống HyperFrames. Đường dẫn trong tham số lệnh và sau `--audio-only` tính từ thư mục dự án.
 
@@ -781,8 +782,8 @@ Agent tự xem từng khung, chạy `qc-mp4` trên animatic (MOTION không đư�
 
 Cổng final (`check-preflight.mjs --project ./ --stage final`, cũng là cổng của `render-final.mjs`) chặn khi:
 
-- `DEMO.md` không có dòng `animatic:`, hoặc file đó không còn. Dự án `aspect: both` cần thêm dòng `animatic_9x16:`, tạo bằng `make-demo.mjs --project ./ --animatic --aspect 9x16 --composition compositions/main-9x16.html` (bản 9:16 là project riêng thì thay `--composition` bằng `--hyperframes ../<project-9x16>`). Thiếu cả hai cờ đó thì HyperFrames render `index.html` khổ ngang. Cả hai animatic đều qua các luật bên dưới.
-- `animatic_9x16` có khung ngang (rộng không nhỏ hơn cao): `animatic demo/9x16/animatic.mp4 is 960×540, not portrait; re-run make-demo.mjs --animatic --aspect 9x16 --composition …`. Render lại từ composition 9:16.
+- `DEMO.md` không có dòng `animatic:`, hoặc file đó không còn. Dự án `aspect: both` cần thêm dòng `animatic_9x16:`, tạo bằng `reframe.mjs ./ --ratio 9x16` rồi `make-demo.mjs --project ./ --animatic --aspect 9x16 --hyperframes ../<project>-9x16` (dự án cũ có `compositions/main-9x16.html` thì thay `--hyperframes …` bằng `--composition compositions/main-9x16.html`). Thiếu cả hai cờ đó thì HyperFrames render `index.html` khổ ngang. Cả hai animatic đều qua các luật bên dưới.
+- `animatic_9x16` có khung ngang (rộng không nhỏ hơn cao): `animatic demo/9x16/animatic.mp4 is 960×540, not portrait; re-run reframe.mjs …`. Render lại từ bản 9:16.
 - Animatic cũ hơn `PLAN.md`: `animatic demo/animatic.mp4 is older than PLAN.md; re-run make-demo.mjs --animatic`.
 - `index.html` hoặc một file `compositions/*.html` được sửa sau khi render animatic: `<file> newer than the animatic demo/animatic.mp4; the user approved older motion, re-run make-demo.mjs --animatic`. Với dự án cũ, sửa composition sau demo chỉ là WARN; với dự án có `direction:` thì chặn, vì người dùng đã duyệt một chuyển động khác.
 - Animatic bị MOTION chấm FAIL (mục 12.6): `animatic demo/animatic.mp4: <số đo> … trông như slideshow …`.
@@ -975,3 +976,111 @@ Thêm vào `--at` các mốc ghi ở `Giữ nguyên`. Bản 0.8.144 không có c
 - `REVISIONS.md R<n>: thiếu <trường>`: bổ sung dòng còn thiếu trước khi giao.
 
 Mã thoát của `check-preflight` không đổi: 0 đạt, 1 bị chặn, 2 sai cú pháp.
+
+## 14. Template, style và đồng bộ
+
+Chương này nói về bản v1.2.0 (2026-10-15). Các phần mới học từ skill motion-video của AgentKit (MIT) và được viết lại bằng Node cùng ffmpeg, không gọi script Python lúc chạy. Có năm việc: dựng từ một khung sẵn, giảm nhạc khi có giọng và đo được bằng số, đo nhịp nhạc thật, kiểm chữ chốt khớp lời, sinh bản 9:16 và 1:1 từ một `index.html`. Thêm vào đó là 61 style, một trục thứ hai bên cạnh 8 hướng đạo diễn.
+
+Dự án cũ (BRIEF không có `direction:` và không có `brief_version: 2`) không bị chặn thêm: các cổng mới chỉ in WARN với chúng.
+
+### 14.1 Khung composition và mốc thời gian theo lời
+
+**Dùng khi nào.** Bước 4 và 6, khi dựng tay (`general-video`). `new-project.sh` đã gọi sẵn lệnh tạo khung.
+
+```bash
+node $OV/scripts/composition.mjs init --project . [--aspect 16:9|9:16]
+node $OV/scripts/timing.mjs --project . [--music assets/bgm/bgm.mp3] [--dry]
+```
+
+- `composition.mjs init` chép `templates/composition/index-skeleton.html` thành `index.html`, đặt kích thước khung theo `aspect` của BRIEF (`both` bắt đầu từ 16:9). Lệnh không ghi đè file đã có.
+- Skeleton có sẵn bộ hàm hoạt hình (`pop`, `rise`, `draw`, `slideX`, `flipIn`, `typeIn`, `odo`, `slam`, `settleCam`, `shake`…), cộng ba hàm mốc: `W("s2", "mã nguồn")` trả giây lúc giọng đọc nói cụm đó trong cảnh s2, `WE` trả lúc cụm nói xong, `B(n)` trả giây của phách thứ n.
+- `timing.mjs` đọc bảng `## Cảnh` của `PLAN.md` và mọi `words.json` của track giọng (id `vo-*` hoặc `*-voice`, `data-audio-group="voiceover"`, hoặc file nằm trong `assets/voice/`), rồi ghi đè khối nằm giữa `TIMING:BEGIN` và `TIMING:END`. Sửa giọng xong chỉ cần chạy lại lệnh này, không sửa tay số giây.
+- Cụm từ khớp theo chữ đã bỏ dấu câu và gộp hoa thường, nên "mã nguồn" khớp với hai token "mã" và "nguồn,". Không khớp thì `W` in `W miss: <cảnh> <cụm>` và trả lúc bắt đầu cảnh.
+- Giọng kéo quá `data-duration` của root thì lệnh in WARN và không tự kéo dài video.
+
+### 14.2 Đo nhịp nhạc
+
+**Dùng khi nào.** Bước 5, với hướng `don-dap` hoặc nhóm `story-music`, khi hình cần cắt theo phách.
+
+```bash
+node $OV/scripts/beat-grid.mjs assets/bgm/bgm.mp3 --write
+node $OV/scripts/timing.mjs --project .
+```
+
+Dòng đầu cho biết tempo, phách đầu và độ ổn định, ví dụ `BPM 119.8  BEAT0 0.025 s  stability 16 ms`. Sau đó là bảng ô nhịp với `K` ở phách có kick. `--write` ghi `bgm.mp3.beats.json` cạnh file nhạc. Lệnh chỉ đo, không cắt ghép nhạc.
+
+- `stability` trên 45 ms thì lệnh in `UNSTABLE`, exit 1 và không ghi file. Khi đó `B()` không dùng được cho bài nhạc này: dựng theo `W()` hoặc theo giây.
+- Ngưỡng 45 ms đo trên 6 bản nhạc thật trong workspace (từ 16 đến 40 ms, cả 6 đọc đúng tempo). Một chuỗi kick trôi từ 100 lên 140 BPM cho khoảng 100 ms nên vẫn bị chặn.
+- Nhạc chậm bị đọc ra gấp đôi tempo nghe được thì chạy lại với `--max-bpm 100`.
+- Chưa đo nhịp mà gọi `B()` thì composition ném lỗi `B() cần beat-grid.mjs`.
+
+### 14.3 Chữ chốt khớp lời
+
+**Dùng khi nào.** Bước 4b khi viết `PLAN.md`, rồi bước 8. Thêm vào bảng `## Sự kiện` một hàng cho mỗi chữ chốt cần hiện đúng lúc giọng nói tới:
+
+```markdown
+| 7.8 | chữ: "phân tích dự án" | — |
+```
+
+```bash
+node $OV/scripts/word-sync.mjs --project . --write-qa
+```
+
+- Lệnh tìm cụm trong lời đọc theo cùng luật với `W()`. Cụm xuất hiện nhiều lần thì lấy lần gần `Thời điểm` nhất. Lệch tới 150 ms là PASS, tới 250 ms là WARN, xa hơn hoặc không có trong lời đọc là FAIL.
+- Cụm trong ngoặc kép dừng ở dấu đóng ngoặc: `chữ: "kiểm thử" bay vào` cho cụm `kiểm thử`.
+- Dòng WARN "không có trong lời của cảnh … (TIMING)" chỉ có hai nghĩa: khối TIMING cũ hơn `words.json` (chạy lại `timing.mjs`), hoặc cụm vắt qua hai cảnh.
+- Cổng final của `check-preflight` chạy phép kiểm này với dự án sáng tạo: FAIL chặn, WARN cảnh báo.
+
+### 14.4 Nhạc dưới giọng: giảm và đo
+
+`audio-mix.mjs` (bản giao của `render-final.mjs` đi qua lệnh này) đọc `data-audio-group` và `data-fx-carve` rồi đổi thành sidechain ffmpeg. Không phải sửa HTML của dự án cũ.
+
+- Đích là nhạc thấp hơn giọng `4 + 2,5 × strength` dB lúc có lời (strength 0,8 cho 6 dB). Lệnh đo mức tự nhiên, rồi tìm ngưỡng compressor bằng cách đo lại sau mỗi lần thử.
+- `--loudnorm` tăng hoặc giảm cả bản mix một mức cố định để về −14 LUFS, nhưng không vượt đỉnh −1,5 dBTP. Khi đỉnh chặn, bản mix nhỏ hơn −14 LUFS và lệnh in `WARN LOUDNESS`. `render-final.mjs` luôn bật cờ này.
+
+Đo kết quả:
+
+```bash
+node $OV/scripts/mix-balance.mjs --project . [--write-qa] [--json]
+```
+
+Kết quả là một dòng như `PASS BALANCE nhạc dưới giọng 6.1 dB (lúc có lời), nhạc lúc không lời −22.3 dBFS`. Từ 4 đến 7 dB là PASS, 2–4 hoặc 7–10 dB là WARN, ngoài khoảng đó là FAIL. Khoảng này có lý do: motion-video ghi lại rằng khi nhạc thấp hơn giọng khoảng 10 dB, người xem báo là "không có nhạc". Cổng final chạy phép đo này với dự án có `index.html`.
+
+Track giọng được nhận khi có id `vo-*` hoặc `*-voice` (dự án faceless-explainer đặt `el-01-…-voice`), group `voiceover`, file nằm trong `assets/voice/`, hoặc là nguồn của một carve. Dự án có lời mà lệnh vẫn in `PASS BALANCE không có giọng đọc` thì đặt lại id hoặc group của track giọng.
+
+### 14.5 Một index.html cho 16:9, 9:16 và 1:1
+
+Dự án mới `aspect: both` chỉ có một thư mục. Phần khác của khổ dọc viết trong khối CSS `html[data-ratio="9x16"] …` của `index.html` (khổ vuông là `1x1`), bố cục đặt trong class thay vì inline style.
+
+```bash
+node $OV/scripts/reframe.mjs . --ratio 9x16      # hoặc --ratio 1x1
+cd ../<project>-9x16 && npx --yes hyperframes@0.8.144 lint
+```
+
+- Lệnh tạo `../<project>-9x16/` với khung 1080×1920 (1:1 là 1080×1080, `data-resolution="square"`), giữ nguyên giọng, nhạc, TIMING và bản mix. `assets/` là bản clone APFS của bản gốc (chép thường khi khác ổ): ghi ở bản dọc không đổi file của bản gốc. Asset sinh lại ở bản gốc chỉ sang bản dọc sau khi chạy lại `--force`.
+- Mỗi dòng `WARN layout` chỉ một giá trị `left/top/width/height` từ 1080 px trở lên nằm ngoài khối override. Lệnh không bắt `x:` hay `translate(...px)` của GSAP, `right/bottom/inset`, cũng không bắt `data-width="1920"` của composition con. Vẫn phải xem bản dọc bằng mắt.
+- Bản gốc đổi thì chạy lại với `--force`. `--force` chỉ thay thư mục rỗng hoặc thư mục do chính `reframe.mjs` tạo cho bản gốc này, và chỉ thay các tệp do lệnh sinh ra. `renders/`, `demo/`, `DEMO.md`, `QA.md`, `REVISIONS.md` của bản dọc được giữ.
+- Animatic dọc: `make-demo.mjs --project ./ --animatic --aspect 9x16 --hyperframes ../<project>-9x16`.
+- Dự án cũ, dự án tạo bằng `new-project.sh --legacy-pair` và workflow frame-worker vẫn làm bản 9:16 bằng project riêng như mục 5.2.
+
+### 14.6 Chuyển động từng cảnh
+
+[motion-craft.md](../references/motion-craft.md) là tiêu chuẩn chuyển động bằng tiếng Việt: mức hiệu ứng theo `energy`, 10 nguyên tắc, bộ kỹ thuật dùng hàm của skeleton, các dấu hiệu nhìn ra là demo và danh sách kiểm 6 mục cho từng cảnh.
+
+`make-demo.mjs --animatic` cắt thêm một sheet cho mỗi cảnh: 18 khung xếp 6×3 ở `demo/scenes/sheet-s<#>.jpg`, ghi vào `DEMO.md` dưới khoá `scene_sheets:`. Bản 9:16 nằm ở `demo/9x16/scenes/`, khoá `scene_sheets_9x16:`. Cảnh ngắn hơn 0,5 giây không có sheet. Với `--composition`, cảnh bắt đầu sau khi animatic đã hết cũng không có sheet và lệnh in WARN. Trong `REVISIONS.md`, ô `Vị trí` ghi kèm sheet của cảnh, ví dụ `cảnh 3 (demo/scenes/sheet-s3.jpg)`.
+
+### 14.7 Style: trục thứ hai
+
+Hướng đạo diễn (A1–A8) quyết định cách kể bằng hình. Style quyết định giao diện: màu, chữ, chất liệu, chuyển cảnh, nhịp. Có 61 style trong `data/styles/`, mỗi style một file JSON với tên và mô tả tiếng Việt (`ten_vi`, `mo_ta_vi`). Agent chỉ đọc `data/styles/index.json` (một dòng mỗi style) và đúng một profile đã chọn.
+
+```bash
+node $OV/scripts/styles.mjs find "keynote kính"
+node $OV/scripts/styles.mjs suggest --direction A3 --energy don-dap
+node $OV/scripts/styles.mjs show glass-keynote
+node $OV/scripts/styles.mjs resolve --project . --markdown
+```
+
+- `make-pitch init` gán cho mỗi styleframe một style trong danh sách gợi ý của hướng, hợp với nhịp. `choose` ghi `style_profile:` vào BRIEF; đổi bằng `--style-profile <id|alias>`.
+- Phối theo cảnh: mục `## style_layers` trong BRIEF là một mảng JSON, mỗi lớp mượn vài chiều của một style khác cho vài cảnh (theo id `s2` hoặc theo cột `Loại` của `## Cảnh`). `resolve --markdown` in khối để dán vào `## Ý đồ sáng tạo`. Luật đầy đủ ở [style-system.md](../references/style-system.md).
+- `find` chấm điểm khác bản Python gốc: khớp đúng id hoặc alias được 1; còn lại lấy điểm cao hơn giữa độ giống tên (theo bigram, chỉ tính từ 0,5) và tỉ lệ từ khoá có trong mô tả. Kết quả xếp hạng có thể khác motion-video với cùng câu tìm.
+- Cổng `check-preflight` (cả hai stage): BRIEF có `style_profile:` mà resolve lỗi thì FAIL với dự án mới, WARN với dự án cũ. Dự án sáng tạo thiếu `style_profile:` chỉ bị WARN.

@@ -46,6 +46,26 @@ Blender (12 case trong corpus chuspeeism) và After Effects (5 case) có xuất 
 
 ## Hai khổ hình: 16:9 và 9:16
 
+### Một index.html cho cả hai khổ (mặc định cho dự án mới)
+
+Dự án mới có `aspect: both` chỉ có một thư mục và một `index.html` 16:9 (tạo bằng `composition.mjs init`). Bản 9:16 và 1:1 được sinh từ file đó, không crop thô.
+
+1. **Dựng 16:9 kèm override.** Bố cục đặt trong class, không viết inline style, vì CSS không ghi đè được inline style. Khung lấy kích thước từ `--W`/`--H`. Phần khác cho khổ dọc viết trong khối `html[data-ratio="9x16"] …` (khổ vuông là `html[data-ratio="1x1"] …`) của `index.html`: vùng an toàn, cỡ chữ, bố cục trái–phải chuyển thành trên–dưới. Skeleton có sẵn một ví dụ cho `.headline`.
+2. **Sinh bản dọc.** Chạy `node $OV/scripts/reframe.mjs . --ratio 9x16` (hoặc `--ratio 1x1`). Lệnh tạo `../<tên>-9x16/` với root 1080×1920, `data-ratio="9x16"` và `aspect: 9:16` trong BRIEF. `assets/` được clone APFS từng tệp: cùng giọng đọc, nhạc và SFX, không tốn thêm dung lượng cho tới khi một bên đổi tệp. Mỗi dòng `WARN layout` chỉ ra một giá trị `left/top/width/height` ≥ 1080 px nằm ngoài khối override: sửa giá trị đó trong bản gốc. Không sửa thư mục bản dọc. Mỗi lần bản gốc đổi thì chạy lại với `--force`.
+3. **Kiểm tra trong thư mục mới.** `cd ../<tên>-9x16 && npx --yes hyperframes@0.8.144 lint && npx --yes hyperframes@0.8.144 check`.
+4. **Render** trong thư mục mới như bản 16:9 (`render-final.mjs` hoặc `npm run render`), rồi nén theo bước 9 của quy trình.
+
+Giới hạn cần biết:
+
+- `--force` chỉ thay thư mục rỗng hoặc thư mục do chính `reframe.mjs` tạo cho bản gốc này (có tệp `.reframe.json`). Thư mục khác bị từ chối, kể cả khi có `--force`. Khi chạy lại, lệnh chỉ thay những gì nó sinh ra (`index.html`, `BRIEF.md`, `compositions/`, `assets/`, `PLAN.md`, `package.json`, `hyperframes.json`, `.reframe.json`). `renders/`, `demo/`, `DEMO.md`, `QA.md`, `REVISIONS.md` và mọi tệp khác của bản dọc được giữ.
+- Dòng `WARN layout` chỉ quét `left/top/width/height` trong CSS và `style=""`. Lệnh không bắt `x:` hay `translate(...px)` của GSAP, không bắt `right/bottom/inset`, cũng không bắt `data-width="1920"` ở root của composition con trong `compositions/`. Hết WARN chưa có nghĩa bố cục đã vừa khung: vẫn phải xem bản dọc.
+- `assets/` của bản dọc là bản clone (copy-on-write trên APFS, chép thường khi khác ổ). Ghi vào `assets/` của bản dọc không đổi file của bản gốc, và ngược lại. Asset sinh lại ở bản gốc chỉ tới bản dọc sau khi chạy lại `reframe.mjs --force`.
+- Bản 1:1 ghi `data-resolution="square"`. Đây là tên preset 1080×1080 có trong `hyperframes render --resolution` của 0.8.144. Đã kiểm: `npx --yes hyperframes@0.8.144 lint` trên một bản 1:1 trong `/tmp` cho 0 lỗi (2026-10-15).
+
+Dự án cũ, dự án tạo bằng `new-project.sh --legacy-pair` và workflow frame-worker vẫn làm bản 9:16 bằng cách copy thành dự án riêng như các mục dưới đây. `reframe.mjs` từ chối dự án có `compositions/frames/`.
+
+### Cách cũ: composition hoặc dự án riêng cho từng khổ
+
 - Trong HyperFrames, `--resolution` chỉ đổi kích thước render, còn khổ hình phải khớp composition. Vì vậy mỗi khổ cần **một composition riêng**:
   - `index.html`: 1920×1080 → `hyperframes render --output renders/<name>-16x9.mp4`
   - `compositions/main-9x16.html`: 1080×1920 → `hyperframes render -c compositions/main-9x16.html --output renders/<name>-9x16.mp4`

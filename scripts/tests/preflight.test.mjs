@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync, readFileSync } from "node:fs";
+import { cpSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { check, checkRevisions, parsePlan, isPng, readableHold, holdWarnings, parseTable, spanBounds, spanSeconds } from "../check-preflight.mjs";
+import { check, checkCreative, checkRevisions, verticalHint, parsePlan, isPng, readableHold, holdWarnings, parseTable, spanBounds, spanSeconds } from "../check-preflight.mjs";
 import { main as renderFinal, PREFLIGHT_EXIT } from "../render-final.mjs";
 import { writeDemoMd } from "../make-demo.mjs";
 
@@ -187,6 +187,33 @@ test("final stage: composition edited after the demo is a WARN, not a FAIL", () 
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test("final stage: mix balance FAIL blocks, WARN warns, a measurement error warns, no index.html is not measured", () => {
+  const dir = proj();
+  try {
+    past(join(dir, "PLAN.md"), 200);
+    demo(dir, 2);
+    writeFileSync(join(dir, "DEMO.md"), "approval: user ok 2026-10-12\n");
+    const calls = [];
+    const stub = (level) => (o) => { calls.push(o.dir); return { level, line: `${level} BALANCE nhạc dưới giọng 11.1 dB (lúc có lời), nhạc lúc không lời −22.4 dBFS` }; };
+    assert.equal(check({ project: dir, stage: "final", balance: stub("FAIL") }).pass, true);
+    assert.deepEqual(calls, [], "no index.html, nothing to measure");
+    writeFileSync(join(dir, "index.html"), "<html></html>");
+    let r = check({ project: dir, stage: "final", balance: stub("FAIL") });
+    assert.equal(r.pass, false);
+    assert.ok(r.errors.includes("BALANCE nhạc dưới giọng 11.1 dB (lúc có lời), nhạc lúc không lời −22.4 dBFS"), r.errors.join("\n"));
+    assert.equal(r.balance.level, "FAIL");
+    r = check({ project: dir, stage: "final", balance: stub("WARN") });
+    assert.equal(r.pass, true);
+    assert.ok(r.warnings.some((w) => w.startsWith("BALANCE nhạc dưới giọng")));
+    r = check({ project: dir, stage: "final", balance: stub("PASS") });
+    assert.ok(!r.warnings.some((w) => w.includes("BALANCE")) && r.pass);
+    r = check({ project: dir, stage: "final", balance: () => { throw new Error("ffmpeg exited 1"); } });
+    assert.equal(r.pass, true);
+    assert.ok(r.warnings.includes("mix-balance: không đo được (ffmpeg exited 1)"));
+    assert.equal(check({ project: dir, stage: "plan", balance: stub("FAIL") }).pass, true, "plan stage does not measure");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test("isPng reads the signature; writeDemoMd lists frames and resets approval", () => {
   const dir = proj();
   try {
@@ -293,4 +320,103 @@ test("final stage: REVISIONS.md warnings only when the file exists, never blocki
     r = check({ project: dir, stage: "plan" });
     assert.equal(r.warnings.filter((w) => w.startsWith("REVISIONS.md")).length, 0);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("checkRevisions: with scene sheets, a fix that never names its sheet warns once", () => {
+  const SHEET_WARN = "REVISIONS.md R1: Vị trí chưa trỏ sheet của cảnh (vd. cảnh 3 (demo/scenes/sheet-s3.jpg))";
+  assert.deepEqual(checkRevisions(ROUND + REVISION(1), { sheets: true }), [SHEET_WARN]);
+  const pointed = ROUND + REVISION(1).replace("cảnh 2", "cảnh 2 (demo/scenes/sheet-s2.jpg)");
+  assert.deepEqual(checkRevisions(pointed, { sheets: true }), []);
+  assert.deepEqual(checkRevisions(ROUND + REVISION(1)), []);
+});
+
+test("final stage: the sheet WARN only for a creative project whose DEMO.md lists scene_sheets, never blocking", () => {
+  const stubs = { sync: () => ({ lines: [], errors: [], warnings: [], missing: false, none: true }), words: () => ({ lines: [], errors: [], warnings: [] }), balance: () => ({ level: "PASS", line: "BALANCE ok" }) };
+  const sheetWarns = (r) => r.warnings.filter((w) => w.includes("sheet của cảnh"));
+  const d = mkdtempSync(join(tmpdir(), "pf-sheets-"));
+  cpSync(fileURLToPath(new URL("./fixtures/creative-good", import.meta.url)), d, { recursive: true });
+  try {
+    writeFileSync(join(d, "REVISIONS.md"), ROUND + REVISION(1));
+    writeFileSync(join(d, "DEMO.md"), "animatic: demo/animatic.mp4\napproval: user ok 2026-10-12\n");
+    assert.deepEqual(sheetWarns(check({ project: d, stage: "final", ...stubs })), []);
+    writeFileSync(join(d, "DEMO.md"), "animatic: demo/animatic.mp4\nscene_sheets: demo/scenes/sheet-s1.jpg, demo/scenes/sheet-s2.jpg\napproval: user ok 2026-10-12\n");
+    const r = check({ project: d, stage: "final", ...stubs });
+    assert.deepEqual(sheetWarns(r), ["REVISIONS.md R1: Vị trí chưa trỏ sheet của cảnh (vd. cảnh 3 (demo/scenes/sheet-s3.jpg))"]);
+    assert.ok(!r.errors.some((e) => e.includes("sheet")), JSON.stringify(r.errors));
+    writeFileSync(join(d, "REVISIONS.md"), ROUND + REVISION(1).replace("cảnh 2", "cảnh 2 (demo/scenes/sheet-s2.jpg)"));
+    assert.deepEqual(sheetWarns(check({ project: d, stage: "final", ...stubs })), []);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+  const legacy = proj();
+  try {
+    past(join(legacy, "PLAN.md"));
+    demo(legacy, 2);
+    writeFileSync(join(legacy, "DEMO.md"), "scene_sheets: demo/scenes/sheet-s1.jpg\napproval: user ok 2026-10-12\n");
+    writeFileSync(join(legacy, "REVISIONS.md"), ROUND + REVISION(1));
+    const r = check({ project: legacy, stage: "final", ...stubs });
+    assert.equal(r.pass, true, JSON.stringify(r.errors));
+    assert.deepEqual(sheetWarns(r), []);
+  } finally { rmSync(legacy, { recursive: true, force: true }); }
+});
+
+test("final stage: word-sync FAIL lines block, WARN lines warn, an error blocks; a legacy project never runs it", () => {
+  const d = mkdtempSync(join(tmpdir(), "pf-words-"));
+  cpSync(fileURLToPath(new URL("./fixtures/creative-good", import.meta.url)), d, { recursive: true });
+  try {
+    past(join(d, "PLAN.md"), 300);
+    mkdirSync(join(d, "demo"), { recursive: true });
+    mkdirSync(join(d, "build"), { recursive: true });
+    writeFileSync(join(d, "demo", "animatic.mp4"), "x");
+    writeFileSync(join(d, "build", "RECIPES.md"), "# RECIPES\n");
+    writeFileSync(join(d, "DEMO.md"), "animatic: demo/animatic.mp4\n");
+    const brief = readFileSync(join(d, "BRIEF.md"), "utf8"), plan = parsePlan(readFileSync(join(d, "PLAN.md"), "utf8"));
+    const sync = () => ({ lines: [], errors: [], warnings: [], missing: false, none: true });
+    const run = (words) => {
+      const errors = [], warnings = [];
+      checkCreative({ dir: d, plan, brief, stage: "final", errors, warnings, motion: () => ({ frames: 90, still: 0, ratio: 0, peak: 9 }), probe: () => ({ width: 540, height: 960 }), sync, words });
+      return { errors, warnings };
+    };
+    const calls = [];
+    const r = run((o) => { calls.push(o.dir); return { lines: [], errors: ['WORD   4.70s "kiểm thử" lời 5.00s lệch −300 ms'], warnings: ['WORD   2.20s "ảnh chụp" lời 2.00s lệch +200 ms'] }; });
+    assert.deepEqual(calls, [d]);
+    assert.ok(r.errors.includes('WORD   4.70s "kiểm thử" lời 5.00s lệch −300 ms'), JSON.stringify(r.errors));
+    assert.ok(r.warnings.includes('WORD   2.20s "ảnh chụp" lời 2.00s lệch +200 ms'), JSON.stringify(r.warnings));
+    assert.ok(run(() => { throw new Error("HTML not found: x"); }).errors.includes("word-sync: HTML not found: x"));
+    const planOnly = [], warnings = [];
+    checkCreative({ dir: d, plan, brief, stage: "plan", errors: planOnly, warnings, words: () => { throw new Error("plan stage must not measure"); } });
+    assert.ok(!planOnly.some((e) => e.startsWith("word-sync")), JSON.stringify(planOnly));
+  } finally { rmSync(d, { recursive: true, force: true }); }
+  const legacy = proj();
+  try {
+    past(join(legacy, "PLAN.md"));
+    demo(legacy, 2);
+    writeFileSync(join(legacy, "DEMO.md"), "approval: user ok 2026-10-12\n");
+    const r = check({ project: legacy, stage: "final", words: () => { throw new Error("legacy project must not run word-sync"); } });
+    assert.equal(r.pass, true, JSON.stringify(r.errors));
+  } finally { rmSync(legacy, { recursive: true, force: true }); }
+});
+
+test("aspect both: a missing or landscape animatic_9x16 points at the reframe edition next to the project first", () => {
+  assert.match(verticalHint("/w/promo"), /^reframe\.mjs \. --ratio 9x16, then make-demo\.mjs --animatic --aspect 9x16 --hyperframes \.\.\/promo-9x16 /);
+  assert.match(verticalHint("/w/promo/"), /--hyperframes \.\.\/promo-9x16 /, "trailing slash");
+  const d = mkdtempSync(join(tmpdir(), "pf-vertical-"));
+  cpSync(fileURLToPath(new URL("./fixtures/creative-good", import.meta.url)), d, { recursive: true });
+  try {
+    writeFileSync(join(d, "BRIEF.md"), readFileSync(join(d, "BRIEF.md"), "utf8").replace(/^aspect: .*$/m, "aspect: both"));
+    past(join(d, "PLAN.md"), 300);
+    mkdirSync(join(d, "demo", "9x16"), { recursive: true });
+    for (const f of ["animatic.mp4", join("9x16", "animatic.mp4")]) writeFileSync(join(d, "demo", f), "x");
+    const brief = readFileSync(join(d, "BRIEF.md"), "utf8"), plan = parsePlan(readFileSync(join(d, "PLAN.md"), "utf8"));
+    const run = (demoMd) => {
+      writeFileSync(join(d, "DEMO.md"), demoMd);
+      const errors = [];
+      checkCreative({ dir: d, plan, brief, stage: "final", errors, warnings: [], motion: () => ({ frames: 90, still: 0, ratio: 0, peak: 9 }), probe: () => ({ width: 960, height: 540 }), sync: () => ({ errors: [], warnings: [], none: true }), words: () => ({ errors: [], warnings: [] }) });
+      return errors;
+    };
+    const edition = `--hyperframes ../${d.split(/[\\/]/).pop()}-9x16`;
+    const missing = run("animatic: demo/animatic.mp4\n").find((e) => e.includes("no `animatic_9x16:`"));
+    assert.ok(missing && missing.includes("reframe.mjs . --ratio 9x16") && missing.includes(edition), missing);
+    assert.ok(missing.indexOf("reframe.mjs") < missing.indexOf("compositions/main-9x16.html"), "the reframe edition comes before the legacy composition");
+    const landscape = run("animatic: demo/animatic.mp4\nanimatic_9x16: demo/9x16/animatic.mp4\n").find((e) => e.includes("not portrait"));
+    assert.ok(landscape && landscape.includes(edition), landscape);
+  } finally { rmSync(d, { recursive: true, force: true }); }
 });

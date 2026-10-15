@@ -16,7 +16,7 @@ Chép đúng khung này. Mỗi mục `### R<số>` cần đủ các dòng `Vị 
 ## Vòng 1 (2026-10-14 15:00) — lời người dùng: "<chép nguyên văn>"
 
 ### R1
-- Vị trí: 6.5s (khung 195 ở 30 fps), cảnh 2
+- Vị trí: 6.5s (khung 195 ở 30 fps), cảnh 2 (demo/scenes/sheet-s2.jpg)
 - Lỗi thấy: con trỏ đè lên nhãn kết quả
 - Đổi: con trỏ rời nút trong 6.8–7.0s, dừng cách nhãn 24 px
 - Giữ nguyên: lúc nhấn 6.5s, lúc hiện kết quả 7.0s, chữ, tiếng
@@ -30,8 +30,9 @@ Dòng tiêu đề vòng chép **nguyên văn** lời người dùng, không tóm
 - Mỗi vòng có tối đa 5 mục `### R`. Nếu người dùng xin nhiều hơn, hỏi người dùng mục nào để sang vòng sau rồi mới sửa.
 - Sửa theo thứ tự: chữ đọc được và thông tin thiếu trước, rồi đến nhịp và thời điểm, cuối cùng là chi tiết hình.
 - `Vị trí` ghi giây trên **timeline gốc**. Thời điểm bên trong một composition con phải đổi ra giây gốc bằng cách lấy thời điểm bắt đầu composition cộng thời điểm bên trong.
+- `Vị trí` ghi kèm contact sheet của cảnh, ví dụ `cảnh 3 (demo/scenes/sheet-s3.jpg)`. `make-demo.mjs --animatic` sinh một sheet cho mỗi cảnh và liệt kê chúng ở dòng `scene_sheets:` trong `DEMO.md` (bản 9:16 nằm ở `demo/9x16/scenes/`). Người dùng và agent cùng nhìn một ảnh nên dễ thống nhất lỗi nằm ở đâu trong cảnh.
 - `Giữ nguyên` liệt kê các mốc và thành phần không được đổi khi sửa mục đó. Sau khi sửa, kiểm lại cả những mốc này chứ không chỉ chỗ vừa đổi.
-- `check-preflight.mjs --stage final` in WARN khi một vòng có hơn 5 mục hoặc một mục thiếu trường. Cảnh báo này không chặn render, nhưng phải sửa ghi chép trước khi giao.
+- `check-preflight.mjs --stage final` in WARN khi một vòng có hơn 5 mục hoặc một mục thiếu trường. Với dự án có `direction:` mà `DEMO.md` đã có `scene_sheets:`, lệnh cũng in WARN cho mục không nhắc tới `sheet-s<#>`. Các cảnh báo này không chặn render, nhưng phải sửa ghi chép trước khi giao.
 
 ## 4. Kiểm từng mục
 
