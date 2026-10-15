@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseTracks, buildArgs, dynamicAudio, carveKeys, isVoice, voiceIndices, keyLevelArgs, parseMeanVolume, parseLoudnorm, loudnormPass1Args, staticGain, gainArgs, duckTarget, duckReduction, thresholdAt, searchDrop, CARVE_FLOOR_DB, MAX_REDUCTION_DB } from "../audio-mix.mjs";
+import { parseTracks, buildArgs, dynamicAudio, carveKeys, isVoice, voiceIndices, keyLevelArgs, parseMeanVolume, parseLoudnorm, loudnormPass1Args, staticGain, gainArgs, decodeEntities, duckTarget, duckReduction, thresholdAt, searchDrop, CARVE_FLOOR_DB, MAX_REDUCTION_DB } from "../audio-mix.mjs";
 
 const CLI = fileURLToPath(new URL("../audio-mix.mjs", import.meta.url));
 const BASE = "/proj";
@@ -244,6 +244,15 @@ test("loudnorm: pass 1 prints JSON at -14 LUFS / -1.5 dBTP / LRA 11; pass 2 is o
   const k = keyLevelArgs(parseTracks(readFileSync(FIXTURE, "utf8"), BASE), [0, 1]);
   assert.match(k[k.indexOf("-filter_complex") + 1], /\[c0\]\[c1\]concat=n=2:v=0:a=1,volumedetect\[v\]$/);
   assert.ok(!k[k.indexOf("-filter_complex") + 1].includes("adelay"), "the level is measured without the silence between clips");
+});
+
+test("attributes: HTML character references are decoded (entity-encoded data-fx-carve, & in src)", () => {
+  const html = `<audio id="vo-01" src="vo.wav" data-audio-group="voiceover"></audio>
+<audio id="bgm" src="nh&#7841;c &amp; beat.mp3" data-audio-group="music" data-fx-carve="{&quot;enabled&quot;:true,&quot;sources&quot;:[&#34;voiceover&#x22;],&quot;strength&quot;:0.8}"></audio>`;
+  const [, bed] = parseTracks(html, "/p");
+  assert.deepEqual(bed.carve, { enabled: true, sources: ["voiceover"], strength: 0.8 });
+  assert.equal(bed.src, "/p/nhạc & beat.mp3");
+  assert.equal(decodeEntities("&amp;quot; &lt;b&gt; &#39;x&apos; &#0; &bogus;"), "&quot; <b> 'x' &#0; &bogus;");
 });
 
 test("CLI: malformed data-fx-carve exits 2 naming the tag", () => {

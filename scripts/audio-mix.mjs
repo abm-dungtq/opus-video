@@ -42,9 +42,17 @@ import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { decodeMono, measureBalance, speechSpans } from "./balance-measure.mjs";
 
+// Character references in an attribute value, decoded in one pass as a browser does
+// (data-fx-carve="{&quot;enabled&quot;:true}", src="a&amp;b.mp3"); "&amp;quot;" stays "&quot;".
+const NAMED = { quot: '"', amp: "&", apos: "'", lt: "<", gt: ">" };
+export const decodeEntities = (v) => v.replace(/&(?:#(\d+)|#x([\da-f]+)|(quot|amp|apos|lt|gt));/gi, (m, dec, hex, name) => {
+  if (name) return NAMED[name.toLowerCase()];
+  const cp = dec ? Number(dec) : parseInt(hex, 16);
+  return cp > 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : m;
+});
 const attr = (tag, name) => {
   const m = tag.match(new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, "i"));
-  return m ? (m[1] ?? m[2] ?? m[3]) : undefined;
+  return m ? decodeEntities(m[1] ?? m[2] ?? m[3]) : undefined;
 };
 const hasFlag = (tag, name) => new RegExp(`\\s${name}(?=[\\s>/=])`, "i").test(tag);
 const num = (v, dflt) => {
