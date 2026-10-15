@@ -6,7 +6,7 @@
 //                            [--topic "<chủ đề>"] [--json]
 //   node directions.mjs show <A1..A8> [--json]
 //   node directions.mjs compat --direction <id> [--energy e] [--style id] [--visual id]
-//                            [--effect id] [--transition id] [--sfx id] [--json]
+//                            [--effect id] [--transition id] [--sfx id] [--style-profile <id|alias>] [--json]
 //   node directions.mjs doc [--write]            render references/creative-directions.md
 //   node directions.mjs --help | -h
 // check: blueprint → hyperframes-animation/blueprints/<n>.md · rule → rules/<n>.md ·
@@ -14,11 +14,15 @@
 //   hyperframes-creative/references/visual-styles.md · seam → listed in data "seams" and, by kind,
 //   a "## N. <heading>" in faceless-explainer/references/cut-catalog.md, a rule file, or the name in
 //   hyperframes-animation/transitions/*.md (css, shader); kind native is opus-video's own.
+//   styles_goi_y: 3–5 style profile ids per direction, each a file in data/styles/ (styles.mjs).
 // pick: 3 contrasting directions — one per tier (fit, continuous, bold) — scored by category (+3),
 //   topic keywords (+2 each, max 4), energy (+1), aspect (required). Ties break on a hash of the
 //   topic, so different topics do not always get the same order. Deterministic, no network.
 // compat: WARN lines when a swapped keyword clashes with the direction, the energy or another
-//   swapped keyword (tags vs clash in directions.json). The user still decides.
+//   swapped keyword (tags vs clash in directions.json). The user still decides. With
+//   --style-profile: WARN when the profile energy (1–5) sits more than one step outside the chosen
+//   energy (em 1–2, vua 3, don-dap 4–5; without --energy, the direction's energies), and when the
+//   old style keyword is swapped too (two palette sources).
 // Exit: 0 ok · 1 check failed · 2 bad usage · 3 compat warnings (ask the user once).
 
 import { existsSync, readFileSync, readdirSync, writeFileSync, realpathSync } from "node:fs";
@@ -27,6 +31,7 @@ import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { findSkill, OV_DIR } from "./skill-paths.mjs";
+import { ENERGY_RANGE, STYLES_DIR, StyleError, loadProfiles, lookup } from "./styles.mjs";
 
 export const DATA = join(OV_DIR, "data", "directions.json");
 export const DOC = join(OV_DIR, "references", "creative-directions.md");
@@ -95,9 +100,12 @@ export function checkData(data, up = upstream()) {
   for (const d of data.directions) {
     if (ids.has(d.id)) errors.push(`duplicate direction id ${d.id}`);
     ids.add(d.id);
-    for (const f of ["slug", "ten_vi", "mo_ta_vi", "hook_vi", "styleframe_vi", "anti_slideshow_vi", "tier", "categories", "aspects", "energy", "tags", "style", "blueprints", "rules", "seams", "sfx"]) {
+    for (const f of ["slug", "ten_vi", "mo_ta_vi", "hook_vi", "styleframe_vi", "anti_slideshow_vi", "tier", "categories", "aspects", "energy", "tags", "style", "styles_goi_y", "blueprints", "rules", "seams", "sfx"]) {
       if (d[f] === undefined || (Array.isArray(d[f]) && !d[f].length) || d[f] === "") errors.push(`${d.id}: field ${f} is missing or empty`);
     }
+    const styles = d.styles_goi_y || [];
+    if (styles.length && (styles.length < 3 || styles.length > 5 || new Set(styles).size !== styles.length)) errors.push(`${d.id}: styles_goi_y needs 3-5 distinct style ids`);
+    for (const s of styles) if (!existsSync(join(STYLES_DIR, `${s}.json`))) errors.push(`${d.id}.styles_goi_y: style "${s}" not found in data/styles/`);
     if (!TIERS.includes(d.tier)) errors.push(`${d.id}: tier "${d.tier}" not in ${TIERS.join("/")}`);
     for (const e of d.energy || []) if (!data.energy[e]) errors.push(`${d.id}: energy "${e}" not defined`);
     if (new Set([...(d.blueprints || []), ...(d.rules || [])]).size < 2) errors.push(`${d.id}: needs at least 2 distinct blueprint/rule tokens`);
@@ -144,9 +152,26 @@ export function pickDirections(opts = {}, data = loadDirections()) {
 export const keyword = (data, dim, id) => (data.keywords[dim] || []).find((k) => k.id === id) || null;
 const energyTags = (e) => (e === "em" ? ["calm"] : e === "don-dap" ? ["loud"] : []);
 
-// swaps: { style?: id, visual?: id, effect?: id, transition?: id, sfx?: id }
-export function compatWarnings(direction, swaps = {}, energy = "", data = loadDirections()) {
-  const warnings = [];
+// A style profile chosen next to the direction: energy more than one step outside the chosen energy
+// (or the direction's energies), or a swapped style keyword as a second palette source.
+export function styleProfileWarnings(direction, profile, energy = "", swaps = {}, data = loadDirections()) {
+  const out = [];
+  const ranges = (energy ? [energy] : direction.energy || []).map((e) => ENERGY_RANGE[e]).filter(Boolean);
+  if (ranges.length) {
+    const lo = Math.min(...ranges.map((r) => r[0])), hi = Math.max(...ranges.map((r) => r[1]));
+    const off = profile.energy < lo ? lo - profile.energy : profile.energy > hi ? profile.energy - hi : 0;
+    const label = energy ? `nhịp ${data.energy[energy]?.ten_vi || energy}` : `hướng ${direction.id} (nhịp ${direction.energy.join("/")})`;
+    if (off > 1) out.push(`style ${profile.ten_vi} (${profile.id}) có năng lượng ${profile.energy}/5, lệch ${off} bậc so với ${label}; chọn style khác hoặc đổi nhịp`);
+  }
+  const k = swaps.style ? keyword(data, "style", swaps.style) : null;
+  if (swaps.style) out.push(`đổi cả từ khoá Phong cách "${k?.ten_vi || swaps.style}" lẫn style ${profile.ten_vi} (${profile.id}): hai nguồn bảng màu; giữ một`);
+  return out;
+}
+
+// swaps: { style?: id, visual?: id, effect?: id, transition?: id, sfx?: id }; profile: a style
+// profile object (data/styles) the user picked, or null.
+export function compatWarnings(direction, swaps = {}, energy = "", data = loadDirections(), profile = null) {
+  const warnings = profile ? styleProfileWarnings(direction, profile, energy, swaps, data) : [];
   const chosen = Object.entries(swaps).filter(([, id]) => id).map(([dim, id]) => ({ dim, k: keyword(data, dim, id) }));
   for (const c of chosen) if (!c.k) warnings.push(`không có từ khoá "${swaps[c.dim]}" trong nhóm ${DIM_VI[c.dim]}`);
   const valid = chosen.filter((c) => c.k);
@@ -209,11 +234,14 @@ export function classifySeams(cell, data = loadDirections()) {
 
 const tokenLabel = (t) => (t.kind === "sfx" ? t.prompts.map((p) => `"${p}"`).join(", ") : `${t.kind} \`${t.name}\``);
 
-export function renderDoc(data = loadDirections()) {
+const styleList = (d, profiles) => (d.styles_goi_y || []).map((id) => (profiles[id] ? `\`${id}\` ${profiles[id].ten_vi} (${profiles[id].energy}/5)` : `\`${id}\``)).join(", ");
+
+export function renderDoc(data = loadDirections(), profiles = loadProfiles()) {
   const L = [];
   L.push("# Hướng đạo diễn và từ khoá sáng tạo", "");
   L.push("> File sinh tự động từ `data/directions.json` bằng `node scripts/directions.mjs doc --write`. Không sửa tay; sửa JSON rồi sinh lại. `node scripts/directions.mjs check` kiểm mọi token có thật trong HyperFrames đã cài.", "");
   L.push("Dùng ở **bước 1b** (`SKILL.md`): agent chọn 3 hướng bằng `directions.mjs pick`, dựng styleframe bằng `make-pitch.mjs`, người dùng chọn bằng mắt rồi đổi tối đa vài từ khoá. Người dùng chỉ thấy cột tiếng Việt; token kỹ thuật ghi vào `BRIEF.md` và `PLAN.md`.", "");
+  L.push("Hướng quyết định cách kể bằng hình. Giao diện (màu, chữ, chất liệu, chuyển cảnh) là trục riêng: style profile trong `data/styles/`, ghi vào BRIEF bằng `style_profile:`. Mỗi hướng gợi ý vài style hợp (`styles_goi_y`, số trong ngoặc là năng lượng 1–5); xem `references/style-system.md`.", "");
   L.push("## Hai núm chỉnh", "");
   L.push("| Núm | Lựa chọn |", "|---|---|");
   L.push(`| Nhịp (\`energy\`) | ${Object.entries(data.energy).map(([k, v]) => `\`${k}\` ${v.ten_vi}: ${v.mo_ta_vi} (≈${v.words_per_15s} từ/15s, ≥${v.music_only_s}s không lời)`).join("<br>")} |`);
@@ -227,6 +255,7 @@ export function renderDoc(data = loadDirections()) {
     L.push(`- Hook: ${d.hook_vi}`);
     L.push(`- Styleframe 3 giây: ${d.styleframe_vi}`);
     L.push(`- Style: ${tokenLabel(d.style)} · Blueprint: ${d.blueprints.map((b) => `\`${b}\``).join(", ")} · Rule: ${d.rules.map((r) => `\`${r}\``).join(", ")}`);
+    L.push(`- Style profile gợi ý: ${styleList(d, profiles)}`);
     L.push(`- Chuyển cảnh: ${d.seams.map((s) => `\`${s}\``).join(", ")}${d.allow_soft ? " (cho phép chuyển cảnh mềm: " + data.seam_classes.soft.map((s) => `\`${s}\``).join(", ") + ")" : ""}`);
     L.push(`- SFX: ${d.sfx.map((s) => `"${s}"`).join(", ")} · Nhịp: ${d.energy.join("/")} · Nhóm: ${d.categories.join(", ")}`);
     if (d.cases.length) L.push(`- Case tham khảo: ${d.cases.map((c) => `\`${c}\``).join(", ")}`);
@@ -253,7 +282,7 @@ function parseArgs(argv) {
   for (let i = 1; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--json" || a === "--write") o[a.slice(2)] = true;
-    else if (/^--[a-z]+$/.test(a)) { if (argv[i + 1] === undefined) return { bad: `${a} needs a value` }; o[a.slice(2)] = argv[++i]; }
+    else if (/^--[a-z-]+$/.test(a)) { if (argv[i + 1] === undefined) return { bad: `${a} needs a value` }; o[a.slice(2)] = argv[++i]; }
     else o.rest.push(a);
   }
   return o;
@@ -280,15 +309,20 @@ export function main(argv = process.argv.slice(2), log = console.log, err = cons
   if (o.cmd === "show") {
     const d = data.directions.find((x) => x.id === (o.rest[0] || "").toUpperCase());
     if (!d) { err(`directions show: unknown id ${o.rest[0] || ""}`); return 2; }
-    log(o.json ? JSON.stringify(d, null, 2) : `${d.id} ${d.ten_vi}\n${d.mo_ta_vi}\nHook: ${d.hook_vi}\nStyleframe: ${d.styleframe_vi}\nChống slideshow: ${d.anti_slideshow_vi}\nTokens: ${tokenLabel(d.style)} · ${d.blueprints.join(", ")} · ${d.rules.join(", ")} · seams ${d.seams.join(", ")}`);
+    log(o.json ? JSON.stringify(d, null, 2) : `${d.id} ${d.ten_vi}\n${d.mo_ta_vi}\nHook: ${d.hook_vi}\nStyleframe: ${d.styleframe_vi}\nChống slideshow: ${d.anti_slideshow_vi}\nTokens: ${tokenLabel(d.style)} · ${d.blueprints.join(", ")} · ${d.rules.join(", ")} · seams ${d.seams.join(", ")}\nStyle gợi ý: ${styleList(d, loadProfiles()).replace(/`/g, "")}`);
     return 0;
   }
   if (o.cmd === "compat") {
     const d = data.directions.find((x) => x.id === String(o.direction || "").toUpperCase());
     if (!d) { err("directions compat: --direction <A1..A8> is required"); return 2; }
     const swaps = Object.fromEntries(DIMENSIONS.filter((k) => o[k]).map((k) => [k, o[k]]));
-    const w = compatWarnings(d, swaps, o.energy || "", data);
-    if (o.json) log(JSON.stringify({ direction: d.id, swaps, warnings: w, selection: resolveSelection(d, swaps, data) }, null, 2));
+    let profile = null;
+    if (o["style-profile"]) {
+      try { const profiles = loadProfiles(); profile = profiles[lookup(o["style-profile"], profiles)]; }
+      catch (e) { if (e instanceof StyleError) { err(`directions compat: ${e.message}`); return 2; } throw e; }
+    }
+    const w = compatWarnings(d, swaps, o.energy || "", data, profile);
+    if (o.json) log(JSON.stringify({ direction: d.id, swaps, ...(profile ? { style_profile: profile.id } : {}), warnings: w, selection: resolveSelection(d, swaps, data) }, null, 2));
     else { for (const x of w) log(`WARN  ${x}`); log(w.length ? `compat: ${w.length} cảnh báo — hỏi người dùng một lần, họ vẫn quyết` : "compat: ok"); }
     return w.length ? 3 : 0;
   }

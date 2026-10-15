@@ -27,13 +27,17 @@ Người xem là ai, xem xong làm gì. Thời lượng, khổ hình (16:9 / 9:1
 - Chuyển cảnh: zoom-through, card-morph-anchor
 - SFX: crisp mechanical keycap click, clean glass UI confirmation pop
 - Luật chống slideshow: mọi beat mọc ra từ khung lệnh; camera đẩy vào kết quả thay vì đổi thẻ
+- Style nền: Sản phẩm tối chính xác (`precision-dark-product`)
+- Mọi chiều lấy từ style nền ở mọi cảnh.
+- Ràng buộc còn hiệu lực (cùng lớp bất biến trong references/style-system.md):
+  - [precision-dark-product · mọi cảnh] …
 
 ## Cảnh
-| # | Thời điểm | Lời đọc | Hình / hiệu ứng | Blueprint/Rule | Nối sang beat sau | Âm thanh |
-|---|---|---|---|---|---|---|
-| 1 | 0–2s | — | Khung lệnh gõ yêu cầu (styleframe đã duyệt) | prompt-type-submit-generate | card-morph-anchor | keycap click |
-| 2 | 2–6s | "…" | Khung giãn thành bảng tiến trình | agent-progress-theater | zoom-through vào bước cuối | soft pop |
-| 3 | 6–15s | "…" | Logo khoá giữa khung | cta-morph-press | — | glass pop |
+| # | Thời điểm | Loại | Lời đọc | Hình / hiệu ứng | Blueprint/Rule | Nối sang beat sau | Âm thanh |
+|---|---|---|---|---|---|---|---|
+| 1 | 0–2s | hook | — | Khung lệnh gõ yêu cầu (styleframe đã duyệt) | prompt-type-submit-generate | card-morph-anchor | keycap click |
+| 2 | 2–6s | ui-demo | "…" | Khung giãn thành bảng tiến trình | agent-progress-theater | zoom-through vào bước cuối | soft pop |
+| 3 | 6–15s | outro | "…" | Logo khoá giữa khung | cta-morph-press | — | glass pop |
 
 ## Âm thanh
 Giọng (voice id/model), nhạc nền (prompt, âm lượng), SFX theo beat, ngôn ngữ.
@@ -63,6 +67,8 @@ HyperFrames <workflow> (hoặc Remotion/Canvas) và lý do; composition nào cho
 Lệnh sẽ chạy ở bước 8 (lint, check, video-lint, qc-mp4 MOTION, judge) và tiêu chí đạt.
 ```
 
+Cột `Loại` là tuỳ chọn: một loại cảnh trong `references/style-system.md` (`cover`, `hook`, `ui-demo`, `diagram`, `outro`…) hoặc `—`. Lớp trong `## style_layers` của BRIEF chọn cảnh theo cột này hoặc theo id `s<#>`. Các dòng từ `- Style nền:` trở xuống trong `## Ý đồ sáng tạo` là khối in bởi `node $OV/scripts/styles.mjs resolve --markdown` (chạy trong thư mục dự án); dán nguyên khối, có lớp mượn thì khối có thêm bảng cảnh × chiều.
+
 Cổng plan kiểm: đủ 6 mục, bảng Cảnh có ít nhất một dòng, số mốc demo ≥ số cảnh, và có mục 9:16 khi `aspect: both`. Chữ trên hình là chuỗi trong ngoặc kép ở cột Hình; cổng WARN khi beat ngắn hơn `số từ / 2,5 + 0,5 s` (tối thiểu 1 s). Chữ còn ở lại qua beat sau thì ghi `(giữ đến 15s)` hoặc `(giữ đến hết)` trong ô Hình, tính bằng giây trên timeline gốc. Sửa plan sau khi đã chụp demo thì phải chụp lại (frame cũ hơn `PLAN.md` bị chặn).
 
 **Bảng `## Sự kiện`** ghi mỗi khoảnh khắc trên hình có gắn tiếng:
@@ -90,6 +96,7 @@ Cổng plan kiểm: đủ 6 mục, bảng Cảnh có ít nhất một dòng, s�
 - Mọi hàng trừ hàng cuối nêu seam trong từ vựng ở `references/creative-directions.md`. `fade`, `crossfade`, `cut`, "hiện", "mờ dần"… bị chặn; seam mềm (`focus-pull`, `blur-crossfade`, `cross-warp-morph`…) chỉ dùng được với hướng có `allow_soft` (A7, A8).
 - Các hàng có Lời đọc `—`, `(nhạc)` hoặc `không lời` cộng lại ≥ `music_only_s` của BRIEF (hình dẫn, lời theo).
 - Có `## Sự kiện` (bảng `Thời điểm | Sự kiện | Âm thanh`, hoặc dòng `không có SFX gắn sự kiện`); thiếu thì stage plan chặn. Mục để trống, chỉ có tiêu đề bảng hay chỉ có `TODO` cũng chặn; dòng `không có SFX gắn sự kiện` chỉ có nghĩa khi bảng không có hàng. Stage final chạy `sfx-sync`: dòng FAIL chặn, dòng WARN chỉ cảnh báo, thiếu mục này chỉ WARN.
+- BRIEF có `style_profile:` thì style phải resolve được cùng `## style_layers` và cột `Loại` (`styles.mjs resolve`); sai thì chặn. Thiếu `style_profile:` chỉ WARN. Dự án cũ chỉ nhận WARN.
 - Stage final thêm: `DEMO.md` có `animatic:` (make-demo `--animatic`) mới hơn PLAN và không bị qc-mp4 MOTION chấm FAIL; `build/RECIPES.md` (recipe-pack) mới hơn PLAN.
 
 ## 2. Chụp khung hình demo

@@ -4,7 +4,7 @@
 
 **Hỏi người dùng (bước 1):** chủ đề, aspect, thời lượng, tài sản thương hiệu (logo, màu, footage). Kỹ thuật dựng (engine, workflow, fps, BPM) agent tự đề xuất và ghi rõ là "đề xuất".
 
-**Không tự đề xuất phong cách.** Phong cách, hình chủ đạo, hiệu ứng, chuyển cảnh và SFX do người dùng chọn **bằng mắt** ở bước 1b (`make-pitch.mjs`: 3 styleframe theo chủ đề). `make-pitch.mjs choose` ghi các trường `direction` … `styleframe` và mục `## creative_direction`; agent không gõ tay các trường này. Chỉ khi người dùng nói rõ là chạy không dừng thì mới dùng `choose --auto` (ghi `creative_selection: auto`). Dự án chỉ cắt footage, không dựng hình mới, có thể đặt `creative_override: <lý do ≥10 ký tự>` thay cho bước 1b.
+**Không tự đề xuất phong cách.** Phong cách, hình chủ đạo, hiệu ứng, chuyển cảnh và SFX do người dùng chọn **bằng mắt** ở bước 1b (`make-pitch.mjs`: 3 styleframe theo chủ đề). `make-pitch.mjs choose` ghi các trường `direction` … `style_profile` và mục `## creative_direction`; agent không gõ tay các trường này. `style_profile` là giao diện (màu, chữ, chất liệu, chuyển cảnh), trục riêng bên cạnh hướng; xem `style-system.md`. Chỉ khi người dùng nói rõ là chạy không dừng thì mới dùng `choose --auto` (ghi `creative_selection: auto`). Dự án chỉ cắt footage, không dựng hình mới, có thể đặt `creative_override: <lý do ≥10 ký tự>` thay cho bước 1b.
 
 ```markdown
 ---
@@ -29,6 +29,7 @@ word_budget: <số từ tối đa của toàn bộ lời đọc>
 music_only_s: <số giây tối thiểu chỉ có nhạc và hình>
 creative_selection: <user | auto>
 styleframe: pitch/<n>-<slug>/index.html
+style_profile: <id trong data/styles/index.json>   # choose ghi style của styleframe; --style-profile để đổi
 ---
 
 <inputs>
@@ -44,7 +45,10 @@ styleframe: pitch/<n>-<slug>/index.html
 </deliverables>
 
 ## creative_direction
-(make-pitch.mjs choose ghi mục này: hướng, style, blueprint/rule, chuyển cảnh, SFX, ngân sách lời, luật chống slideshow, styleframe mở đầu)
+(make-pitch.mjs choose ghi mục này: hướng, style, style profile, blueprint/rule, chuyển cảnh, SFX, ngân sách lời, luật chống slideshow, styleframe mở đầu)
+
+## style_layers
+(tuỳ chọn; mảng JSON trong code fence, ví dụ ở cuối file này)
 
 <art_direction>
 - Bảng màu (3–5 mã hex) lấy theo style/preset của hướng đã chọn và `palette`: nền #…, chữ #…, nhấn #…
@@ -91,6 +95,7 @@ word_budget: 26
 music_only_s: 2
 creative_selection: user
 styleframe: pitch/1-live-data-simulation/index.html
+style_profile: data-editorial
 ---
 
 <inputs>
@@ -114,3 +119,18 @@ styleframe: pitch/1-live-data-simulation/index.html
 - Nhạc nền: calm curious ambient, 110 BPM, instrumental
 </audio>
 ```
+
+## Ví dụ: mượn style theo cảnh (`## style_layers`)
+
+Chỉ thêm mục này khi người dùng nói rõ một nét mà style nền không có. Mỗi lớp mượn vài chiều của một style khác cho vài cảnh; id cảnh là `s<#>` theo cột `#` của `## Cảnh` trong PLAN.md, loại cảnh theo cột tuỳ chọn `Loại`. Tối đa 4 lớp. Luật resolve và 14 chiều ở `style-system.md`; kiểm bằng `node $OV/scripts/styles.mjs resolve --project .`.
+
+````markdown
+## style_layers
+
+```json
+[
+  { "style": "blueprint-engineering", "dimensions": ["diagrams", "texture"], "scenes": { "types": ["diagram"] } },
+  { "style": "kinetic-typography", "dimensions": ["typography", "transitions"], "scenes": { "ids": ["s5"] } }
+]
+```
+````

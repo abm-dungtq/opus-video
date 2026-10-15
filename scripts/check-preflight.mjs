@@ -42,6 +42,11 @@
 //     its FAIL lines (sound outside ITU-R BT.1359-1 −90…+185 ms) block, its WARN lines warn.
 //     word-sync.mjs measures each "chữ: <cụm>" row against the spoken word the same way: FAIL
 //     (off by more than 250 ms, or never spoken) blocks, WARN warns.
+// Style axis (data/styles, styles.mjs), both stages: BRIEF.md `style_profile:` must name a style
+//   (id or alias) and resolve with its "## style_layers" against the "## Cảnh" rows (optional Loại
+//   column). FAIL in a project that is not legacy (BRIEF has direction: or brief_version: 2), WARN
+//   in an older one; the resolver's warnings are WARN lines. No style_profile: is a WARN only when
+//   the creative gate is on (no creative_override).
 // Mix balance, final stage, every project with index.html: mix-balance.mjs measures how far the
 //   music sits under the voice in the audio-mix rebuild (PASS 4–7 dB). Its FAIL blocks; older
 //   projects only WARN (mix-balance softens them); a measurement that cannot run is a WARN.
@@ -65,7 +70,8 @@ import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
 import { loadDirections, classifySeams, tokenExists, upstream, wordBudget } from "./directions.mjs";
 import { measureMotion, motionVerdict } from "./qc-mp4.mjs";
-import { checkSync, parseEventsBody } from "./sfx-sync.mjs";
+import { checkSync, parseEventsBody, isLegacy } from "./sfx-sync.mjs";
+import { resolveProject } from "./styles.mjs";
 import { checkWords } from "./word-sync.mjs";
 import { checkBalance } from "./mix-balance.mjs";
 
@@ -294,6 +300,25 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
   return out;
 }
 
+// Style gate on BRIEF.md style_profile + "## style_layers". Pushes into errors/warnings; returns
+// { base, layers } or null.
+export function checkStyle({ dir, brief, errors, warnings, resolveFn = resolveProject }) {
+  const fm = frontmatter(brief);
+  const id = String(fm.style_profile || "").trim();
+  if (!id || PLACEHOLDER.test(id)) {
+    if (!isLegacy(fm) && !fm.creative_override) warnings.push("BRIEF.md has no style_profile: (make-pitch.mjs choose writes it; ids in data/styles/index.json) — the look falls back to the direction's style keyword");
+    return null;
+  }
+  try {
+    const r = resolveFn(dir);
+    for (const w of r.warnings) warnings.push(`style_profile ${r.base}: ${w}`);
+    return { base: r.base, layers: r.layers.length };
+  } catch (e) {
+    (isLegacy(fm) ? warnings : errors).push(`style_profile "${id}": ${e.message}`);
+    return null;
+  }
+}
+
 // A 9:16 animatic rendered without the vertical composition is landscape; the user would approve the
 // 16:9 motion as the vertical cut. Returns the error, or "" when height > width.
 function notPortrait(probe, path, anim) {
@@ -398,6 +423,7 @@ export function check({ project = ".", stage = "plan", sync = checkSync, words =
   const both = /^both$/i.test((frontmatter(brief).aspect || "").trim());
   if (both && !(plan.demo916 && plan.demo916.length)) errors.push('BRIEF.md aspect: both — PLAN.md needs "## Khung hình demo 9:16" with timestamps');
   out.creative = checkCreative({ dir, plan, brief, stage, errors, warnings, sync, words });
+  out.style = checkStyle({ dir, brief, errors, warnings });
   warnings.push(...holdWarnings(parseTable(plan.sections[SECTIONS.scenes])));
 
   if (stage === "final") {
