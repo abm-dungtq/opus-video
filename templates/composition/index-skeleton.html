@@ -36,7 +36,17 @@
       .odo-d { display: inline-block; height: 1em; line-height: 1; overflow: hidden; }
       .odo-s { display: block; }
       .odo-s i { display: block; height: 1em; font-style: normal; }
-      /* ratio overrides: html[data-ratio="9x16"] { ... } and html[data-ratio="1x1"] { ... } */
+      .headline { left: 120px; top: 380px; width: calc(var(--W) - 240px); font-size: 120px; }
+      .headline.small { font-size: 96px; }
+      /* Ratio overrides for the 9:16 and 1:1 editions written by scripts/reframe.mjs. Keep layout in
+         classes: an inline style cannot be overridden here. 9:16 safe area: TikTok/Reels/Shorts UI
+         covers the top 12% and the bottom 20%, so main content stays between --safe-top and
+         --safe-bottom; type is about 1.3x the 16:9 size and side-by-side layouts stack. */
+      html[data-ratio="9x16"] { --safe-top: 230px; --safe-bottom: 384px; }
+      html[data-ratio="9x16"] .headline { left: 80px; top: var(--safe-top); width: calc(var(--W) - 160px); font-size: 156px; }
+      html[data-ratio="9x16"] .headline.small { font-size: 124px; }
+      html[data-ratio="1x1"] .headline { left: 80px; top: 300px; width: calc(var(--W) - 160px); font-size: 112px; }
+      html[data-ratio="1x1"] .headline.small { font-size: 92px; }
     </style>
   </head>
   <body>
@@ -46,10 +56,10 @@
         <div id="stage" class="layer">
           <!-- one .scene per row of PLAN.md "## Cảnh"; the WINDOWS table in the script maps selector -> scene id -> transition -->
           <section id="sc1" class="scene layer">
-            <div class="abs hl" style="left: 120px; top: 380px; font-size: 120px">Tiêu đề</div>
+            <div class="abs hl headline">Tiêu đề</div>
           </section>
           <section id="sc2" class="scene layer">
-            <div class="abs hl" style="left: 120px; top: 380px; font-size: 96px">Ý thứ nhất</div>
+            <div class="abs hl headline small">Ý thứ nhất</div>
           </section>
         </div>
       </div>

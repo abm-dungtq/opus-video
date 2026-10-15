@@ -46,6 +46,19 @@ Blender (12 case trong corpus chuspeeism) và After Effects (5 case) có xuất 
 
 ## Hai khổ hình: 16:9 và 9:16
 
+### Một index.html cho cả hai khổ (mặc định cho dự án mới)
+
+Dự án mới có `aspect: both` chỉ có một thư mục và một `index.html` 16:9 (tạo bằng `composition.mjs init`). Bản 9:16 và 1:1 được sinh từ file đó, không crop thô.
+
+1. **Dựng 16:9 kèm override.** Bố cục đặt trong class, không viết inline style, vì CSS không ghi đè được inline style. Khung lấy kích thước từ `--W`/`--H`. Phần khác cho khổ dọc viết trong khối `html[data-ratio="9x16"] …` (khổ vuông là `html[data-ratio="1x1"] …`) của `index.html`: vùng an toàn, cỡ chữ, bố cục trái–phải chuyển thành trên–dưới. Skeleton có sẵn một ví dụ cho `.headline`.
+2. **Sinh bản dọc.** Chạy `node $OV/scripts/reframe.mjs . --ratio 9x16` (hoặc `--ratio 1x1`). Lệnh tạo `../<tên>-9x16/` với root 1080×1920, `data-ratio="9x16"` và `aspect: 9:16` trong BRIEF. `assets/` được hard-link nên dùng chung giọng đọc, nhạc và SFX. Mỗi dòng `WARN layout` chỉ ra một giá trị `left/top/width/height` ≥ 1080 px nằm ngoài khối override: sửa giá trị đó trong bản gốc. Không sửa thư mục bản dọc. Mỗi lần bản gốc đổi thì chạy lại với `--force`.
+3. **Kiểm tra trong thư mục mới.** `cd ../<tên>-9x16 && npx --yes hyperframes@0.8.144 lint && npx --yes hyperframes@0.8.144 check`.
+4. **Render** trong thư mục mới như bản 16:9 (`render-final.mjs` hoặc `npm run render`), rồi nén theo bước 9 của quy trình.
+
+Dự án cũ, dự án tạo bằng `new-project.sh --legacy-pair` và workflow frame-worker vẫn làm bản 9:16 bằng cách copy thành dự án riêng như các mục dưới đây. `reframe.mjs` từ chối dự án có `compositions/frames/`.
+
+### Cách cũ: composition hoặc dự án riêng cho từng khổ
+
 - Trong HyperFrames, `--resolution` chỉ đổi kích thước render, còn khổ hình phải khớp composition. Vì vậy mỗi khổ cần **một composition riêng**:
   - `index.html`: 1920×1080 → `hyperframes render --output renders/<name>-16x9.mp4`
   - `compositions/main-9x16.html`: 1080×1920 → `hyperframes render -c compositions/main-9x16.html --output renders/<name>-9x16.mp4`
