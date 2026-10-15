@@ -118,7 +118,7 @@ test("existing edition: exit 1 without --force; --force replaces its own edition
     assert.equal(main([project, "--ratio", "9x16"], c.io), 1);
     assert.match(c.buf.err, /đã có; thêm --force/);
     assert.equal(main([project, "--ratio", "9x16", "--force"], capture().io), 0);
-    assert.equal(existsSync(join(out, "stale.txt")), false, "--force rewrites the edition from scratch");
+    assert.equal(readFileSync(join(out, "stale.txt"), "utf8"), "x", "--force keeps files reframe did not write");
 
     const foreign = join(parent, "real-project");
     mkdirSync(foreign);
@@ -143,6 +143,27 @@ test("writing into an edition asset leaves the master's file byte-identical", ()
     writeFileSync(join(parent, "demo-9x16", a), "edition-regen"); // O_TRUNC in place, as eleven.mjs writes
     assert.deepEqual(readFileSync(join(project, a)), before);
     assert.equal(readFileSync(join(parent, "demo-9x16", a), "utf8"), "edition-regen");
+  } finally { rmSync(parent, { recursive: true, force: true }); }
+});
+
+test("--force keeps the edition's renders, demo and approval files, and rewrites only what reframe owns", () => {
+  const { parent, project } = master();
+  try {
+    const out = join(parent, "demo-9x16");
+    assert.equal(main([project, "--ratio", "9x16"], capture().io), 0);
+    const own = { [join("renders", "demo-9x16-final.mp4")]: "mp4", [join("demo", "f01.png")]: "png", "DEMO.md": "approved: yes\n", "QA.md": "# QA\n", "REVISIONS.md": "# Rev\n", "timing.json": "{}\n" };
+    for (const [f, body] of Object.entries(own)) { mkdirSync(join(out, f, ".."), { recursive: true }); writeFileSync(join(out, f), body); }
+    writeFileSync(join(out, "compositions", "gone.html"), "old");
+    writeFileSync(join(out, "assets", "voice", "extra.mp3"), "old");
+    writeFileSync(join(project, "compositions", "card.html"), '<div style="top: 300px">y</div>\n');
+    writeFileSync(join(project, "PLAN.md"), "# PLAN v2\n");
+    assert.equal(main([project, "--ratio", "9x16", "--force"], capture().io), 0);
+    for (const [f, body] of Object.entries(own)) assert.equal(readFileSync(join(out, f), "utf8"), body, f);
+    assert.equal(readFileSync(join(out, "compositions", "card.html"), "utf8"), '<div style="top: 300px">y</div>\n');
+    assert.equal(readFileSync(join(out, "PLAN.md"), "utf8"), "# PLAN v2\n");
+    assert.equal(existsSync(join(out, "compositions", "gone.html")), false, "compositions/ mirrors the master");
+    assert.equal(existsSync(join(out, "assets", "voice", "extra.mp3")), false, "assets/ mirrors the master");
+    assert.ok(existsSync(join(out, MARKER)));
   } finally { rmSync(parent, { recursive: true, force: true }); }
 });
 

@@ -6,8 +6,11 @@
 //   node reframe.mjs <project> --ratio 9x16|1x1 [--out <dir>] [--force]
 //   node reframe.mjs --help | -h
 // --out    edition directory (default <project>-9x16 or <project>-1x1 next to the project).
-// --force  replace an edition this script wrote before (it holds .reframe.json naming the same
+// --force  rewrite an edition this script wrote before (it holds .reframe.json naming the same
 //          master) or an empty directory. Any other existing directory is refused, even with --force.
+//          Only what reframe writes is replaced (index.html, BRIEF.md, compositions/, assets/, the
+//          copied files and .reframe.json); the edition's renders/, demo/, DEMO.md, QA.md,
+//          REVISIONS.md, timing.json and any other file stay.
 // Writes: index.html (root data-width/data-height 1080x1920 or 1080x1080, <html> data-ratio and
 //   data-resolution, viewport, --W/--H), BRIEF.md (frontmatter aspect: 9:16 or 1:1), copies of
 //   compositions/, hyperframes.json, package.json and PLAN.md, and assets/ cloned file by file
@@ -34,6 +37,8 @@ export const RATIOS = {
 };
 export const MARKER = ".reframe.json";
 const COPIED = ["hyperframes.json", "package.json", "PLAN.md"];
+// Everything reframe writes into an edition; --force removes these and nothing else.
+export const OWNED = [MARKER, "index.html", "BRIEF.md", "compositions", "assets", ...COPIED];
 const LAYOUT_PX = 1080;
 
 // html[data-ratio="…"] rule blocks: written for the edition's frame, so not scanned.
@@ -175,7 +180,7 @@ export function main(argv = process.argv.slice(2), { out = (s) => process.stdout
 
   let assets = { files: 0, skipped: [] };
   try {
-    if (existsSync(dest)) rmSync(dest, { recursive: true, force: true });
+    for (const name of OWNED) rmSync(join(dest, name), { recursive: true, force: true });
     mkdirSync(dest, { recursive: true });
     writeFileSync(join(dest, MARKER), `${JSON.stringify({ master: realpathSync(project), ratio: o.ratio }, null, 2)}\n`);
     writeFileSync(join(dest, "index.html"), html);

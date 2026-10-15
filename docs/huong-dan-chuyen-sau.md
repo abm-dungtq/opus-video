@@ -1059,7 +1059,7 @@ cd ../<project>-9x16 && npx --yes hyperframes@0.8.144 lint
 
 - Lệnh tạo `../<project>-9x16/` với khung 1080×1920 (1:1 là 1080×1080, `data-resolution="square"`), giữ nguyên giọng, nhạc, TIMING và bản mix. `assets/` là bản clone APFS của bản gốc (chép thường khi khác ổ): ghi ở bản dọc không đổi file của bản gốc. Asset sinh lại ở bản gốc chỉ sang bản dọc sau khi chạy lại `--force`.
 - Mỗi dòng `WARN layout` chỉ một giá trị `left/top/width/height` từ 1080 px trở lên nằm ngoài khối override. Lệnh không bắt `x:` hay `translate(...px)` của GSAP, `right/bottom/inset`, cũng không bắt `data-width="1920"` của composition con. Vẫn phải xem bản dọc bằng mắt.
-- Bản gốc đổi thì chạy lại với `--force`. `--force` chỉ thay thư mục rỗng hoặc thư mục do chính `reframe.mjs` tạo cho bản gốc này.
+- Bản gốc đổi thì chạy lại với `--force`. `--force` chỉ thay thư mục rỗng hoặc thư mục do chính `reframe.mjs` tạo cho bản gốc này, và chỉ thay các tệp do lệnh sinh ra. `renders/`, `demo/`, `DEMO.md`, `QA.md`, `REVISIONS.md` của bản dọc được giữ.
 - Animatic dọc: `make-demo.mjs --project ./ --animatic --aspect 9x16 --hyperframes ../<project>-9x16`.
 - Dự án cũ, dự án tạo bằng `new-project.sh --legacy-pair` và workflow frame-worker vẫn làm bản 9:16 bằng project riêng như mục 5.2.
 

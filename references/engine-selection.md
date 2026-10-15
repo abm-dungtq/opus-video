@@ -57,7 +57,7 @@ Dự án mới có `aspect: both` chỉ có một thư mục và một `index.ht
 
 Giới hạn cần biết:
 
-- `--force` chỉ thay thư mục rỗng hoặc thư mục do chính `reframe.mjs` tạo cho bản gốc này (có tệp `.reframe.json`). Thư mục khác bị từ chối, kể cả khi có `--force`.
+- `--force` chỉ thay thư mục rỗng hoặc thư mục do chính `reframe.mjs` tạo cho bản gốc này (có tệp `.reframe.json`). Thư mục khác bị từ chối, kể cả khi có `--force`. Khi chạy lại, lệnh chỉ thay những gì nó sinh ra (`index.html`, `BRIEF.md`, `compositions/`, `assets/`, `PLAN.md`, `package.json`, `hyperframes.json`, `.reframe.json`). `renders/`, `demo/`, `DEMO.md`, `QA.md`, `REVISIONS.md` và mọi tệp khác của bản dọc được giữ.
 - Dòng `WARN layout` chỉ quét `left/top/width/height` trong CSS và `style=""`. Lệnh không bắt `x:` hay `translate(...px)` của GSAP, không bắt `right/bottom/inset`, cũng không bắt `data-width="1920"` ở root của composition con trong `compositions/`. Hết WARN chưa có nghĩa bố cục đã vừa khung: vẫn phải xem bản dọc.
 - `assets/` của bản dọc là bản clone (copy-on-write trên APFS, chép thường khi khác ổ). Ghi vào `assets/` của bản dọc không đổi file của bản gốc, và ngược lại. Asset sinh lại ở bản gốc chỉ tới bản dọc sau khi chạy lại `reframe.mjs --force`.
 - Bản 1:1 ghi `data-resolution="square"`. Đây là tên preset 1080×1080 có trong `hyperframes render --resolution` của 0.8.144. Đã kiểm: `npx --yes hyperframes@0.8.144 lint` trên một bản 1:1 trong `/tmp` cho 0 lỗi (2026-10-15).
