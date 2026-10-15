@@ -6,7 +6,8 @@
 //   node timing.mjs --project <dir> [--html index.html] [--music <file>] [--dry]
 //   node timing.mjs --help | -h
 // Scenes: one per "## Cảnh" row, id s<#> (the # column), start/end from Thời điểm ("2.5–5.8s").
-// Voice: <audio>/<video> whose id starts with "vo-" or with data-audio-group="voiceover"; words
+// Voice: <audio>/<video> whose id starts with "vo-" or ends with "-voice", with
+//   data-audio-group="voiceover", or with a src under assets/voice/ (isVoice in audio-mix.mjs); words
 //   from <src>.words.json ([{text, start, end}], seconds from the head of the file). A word is
 //   heard at data-start + (start − data-media-start) / data-playback-rate; words cut by
 //   data-media-start or data-duration are dropped. Each word goes to the scene holding its start.
@@ -35,7 +36,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { SECTIONS, fold, parsePlan, parseTable, spanBounds } from "./check-preflight.mjs";
-import { parseTracks } from "./audio-mix.mjs";
+import { isVoice, parseTracks } from "./audio-mix.mjs";
 import { trackWords } from "./balance-measure.mjs";
 
 export const DEFAULTS = { fps: 30, beat0: 0, beatLen: 0, kick: [], drops: [] };
@@ -45,8 +46,6 @@ const MARK_END = /\/\*\s*TIMING:END\s*\*\//g;
 const BLOCK = /([ \t]*)(\/\*\s*TIMING:BEGIN\s*\*\/)[\s\S]*?(\/\*\s*TIMING:END\s*\*\/)/;
 const NO_VOICE = /^(?:|-|—|–)$/;
 const r3 = (n) => Math.round(n * 1000) / 1000;
-
-const isVoice = (t) => (t.id && t.id.startsWith("vo-")) || t.group === "voiceover";
 
 // Phrase matching, the same rule as W()/WE() in templates/composition/index-skeleton.html (keep
 // both in step): a word's key is fold() with punctuation dropped, so "nguồn," matches "nguồn".

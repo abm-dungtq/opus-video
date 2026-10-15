@@ -114,13 +114,26 @@ test("voiceWords: data-media-start, playback rate and data-duration shift and tr
   try {
     writeFileSync(join(dir, "index.html"), `<div data-composition-id="main" data-duration="8">
       <audio id="narr" src="assets/voice/01.mp3" data-start="1" data-media-start="0.5" data-playback-rate="2" data-duration="0.5" data-audio-group="voiceover"></audio>
-      <audio id="music" src="assets/voice/01.mp3" data-start="0"></audio></div>`);
+      <audio id="music" src="assets/bgm/bed.mp3" data-start="0"></audio></div>`);
     const { words, warnings } = voiceWords(dir);
     assert.deepEqual(warnings, []);
     // kept: 0.56 → 1.03, 0.72 → 1.11, 0.96 → 1.23, 1.68 → 1.59 (rel 0.59 ≥ 0.5 dropped), so three words
     assert.deepEqual(words.map((w) => w.text), ["cả", "mã", "nguồn,"]);
     assert.ok(Math.abs(words[0].start - 1.03) < 1e-9);
     assert.ok(words.every((w) => w.id === "narr"));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("voiceWords: an el-NN-…-voice id with no group is a voice track", () => {
+  const dir = project();
+  try {
+    writeFileSync(join(dir, "index.html"), `<div data-composition-id="main" data-duration="8">
+      <audio id="el-01-intro-voice" src="assets/voice/01.mp3" data-start="1"></audio>
+      <audio id="sfx-pop" src="assets/sfx/pop.mp3" data-start="0"></audio></div>`);
+    const { words, tracks, warnings } = voiceWords(dir);
+    assert.deepEqual(warnings, []);
+    assert.deepEqual(tracks.map((t) => t.id), ["el-01-intro-voice"]);
+    assert.ok(words.length > 0 && words.every((w) => w.id === "el-01-intro-voice"));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

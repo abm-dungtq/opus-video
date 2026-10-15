@@ -23,8 +23,9 @@
 //   Malformed data-fx-carve JSON: exit 2.
 // --loudnorm: two-pass loudnorm of the mix to -14 LUFS, -1.5 dBTP, LRA 11 (linear), through a
 //   work WAV in a temp folder next to --out (removed afterwards).
-// --stems <dir>: also writes <dir>/voice.wav (tracks with id vo-*, group voiceover, or a carve
-//   source) and <dir>/music.wav (beds: carve on, group music, or a src under bgm/; after ducking),
+// --stems <dir>: also writes <dir>/voice.wav (tracks with id vo-* or *-voice, group voiceover, a
+//   src under assets/voice/, or a carve source) and <dir>/music.wav (beds: carve on, group music,
+//   or a src under bgm/; after ducking),
 //   each only when such tracks exist, same length as the mix, before --loudnorm.
 // --dry-run prints the ffmpeg commands and writes nothing next to --out (a ducked bed still gets its
 // voice level and undocked mix measured, in a temp folder that is removed). Every output: 48 kHz stereo WAV, capped at the expected size (sample-count
@@ -112,7 +113,9 @@ export function dynamicAudio(html) {
 
 // Roles used for ducking and stems.
 export const VOICE_GROUP = "voiceover";
-export const isVoice = (t) => Boolean(t.id && t.id.startsWith("vo-")) || t.group === VOICE_GROUP;
+// Narration: id vo-* or *-voice (faceless-explainer names them el-NN-…-voice), group voiceover, or a
+// src under assets/voice/. The one voice rule for audio-mix, mix-balance, timing and word-sync.
+export const isVoice = (t) => Boolean(t.id && (t.id.startsWith("vo-") || t.id.endsWith("-voice"))) || t.group === VOICE_GROUP || /(?:^|[\\/])assets[\\/]voice[\\/]/.test(t.src ?? "");
 export const isBed = (t) => Boolean(t.carve?.enabled) || t.group === "music" || /(?:^|[\\/])bgm[\\/]/.test(t.src);
 // Indices of the tracks that key the duck of tracks[bed]: ids or group names listed in its carve sources.
 export function carveKeys(tracks, bed) {
@@ -121,7 +124,7 @@ export function carveKeys(tracks, bed) {
   return tracks.map((t, i) => i).filter((i) => i !== bed && (c.sources.includes(tracks[i].id) || (tracks[i].group != null && c.sources.includes(tracks[i].group))));
 }
 
-// Indices of the tracks on the voice stem: id vo-*, group voiceover, or a key of any carve bed.
+// Indices of the tracks on the voice stem: isVoice, or a key of any carve bed.
 export function voiceIndices(tracks) {
   const keyed = new Set(tracks.flatMap((_, b) => carveKeys(tracks, b)));
   return tracks.map((_, i) => i).filter((i) => isVoice(tracks[i]) || keyed.has(i));

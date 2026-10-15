@@ -9,7 +9,8 @@
 //   (diacritics optional, "chu:" too) is a keyword row; the rest of the cell is the phrase, quotes
 //   and trailing punctuation dropped. A phrase that opens with a quote ends at its closing quote. Âm thanh is usually "—", so sfx-sync skips the row.
 //   Example: | 5.8 | chữ: "kiểm thử" | — |
-// Spoken words: voice tracks of the HTML (id "vo-*" or data-audio-group="voiceover") and their
+// Spoken words: voice tracks of the HTML (id "vo-*" or "*-voice", data-audio-group="voiceover", or
+//   src under assets/voice/) and their
 //   <src>.words.json, on the root timeline, the same reader as timing.mjs. A phrase matches
 //   consecutive words after fold() with punctuation dropped, the rule of W() in the skeleton; the
 //   occurrence nearest the row's time is measured.

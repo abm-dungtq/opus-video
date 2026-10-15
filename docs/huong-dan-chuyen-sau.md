@@ -994,7 +994,7 @@ node $OV/scripts/timing.mjs --project . [--music assets/bgm/bgm.mp3] [--dry]
 
 - `composition.mjs init` chép `templates/composition/index-skeleton.html` thành `index.html`, đặt kích thước khung theo `aspect` của BRIEF (`both` bắt đầu từ 16:9). Lệnh không ghi đè file đã có.
 - Skeleton có sẵn bộ hàm hoạt hình (`pop`, `rise`, `draw`, `slideX`, `flipIn`, `typeIn`, `odo`, `slam`, `settleCam`, `shake`…), cộng ba hàm mốc: `W("s2", "mã nguồn")` trả giây lúc giọng đọc nói cụm đó trong cảnh s2, `WE` trả lúc cụm nói xong, `B(n)` trả giây của phách thứ n.
-- `timing.mjs` đọc bảng `## Cảnh` của `PLAN.md` và mọi `words.json` của track giọng (id `vo-*` hoặc `data-audio-group="voiceover"`), rồi ghi đè khối nằm giữa `TIMING:BEGIN` và `TIMING:END`. Sửa giọng xong chỉ cần chạy lại lệnh này, không sửa tay số giây.
+- `timing.mjs` đọc bảng `## Cảnh` của `PLAN.md` và mọi `words.json` của track giọng (id `vo-*` hoặc `*-voice`, `data-audio-group="voiceover"`, hoặc file nằm trong `assets/voice/`), rồi ghi đè khối nằm giữa `TIMING:BEGIN` và `TIMING:END`. Sửa giọng xong chỉ cần chạy lại lệnh này, không sửa tay số giây.
 - Cụm từ khớp theo chữ đã bỏ dấu câu và gộp hoa thường, nên "mã nguồn" khớp với hai token "mã" và "nguồn,". Không khớp thì `W` in `W miss: <cảnh> <cụm>` và trả lúc bắt đầu cảnh.
 - Giọng kéo quá `data-duration` của root thì lệnh in WARN và không tự kéo dài video.
 
@@ -1046,7 +1046,7 @@ node $OV/scripts/mix-balance.mjs --project . [--write-qa] [--json]
 
 Kết quả là một dòng như `PASS BALANCE nhạc dưới giọng 6.1 dB (lúc có lời), nhạc lúc không lời −22.3 dBFS`. Từ 4 đến 7 dB là PASS, 2–4 hoặc 7–10 dB là WARN, ngoài khoảng đó là FAIL. Khoảng này có lý do: motion-video ghi lại rằng khi nhạc thấp hơn giọng khoảng 10 dB, người xem báo là "không có nhạc". Cổng final chạy phép đo này với dự án có `index.html`.
 
-Giới hạn: track giọng phải có id `vo-*`, group `voiceover`, hoặc là nguồn của một carve. Dự án faceless-explainer đặt tên giọng kiểu `el-01-…-voice`, nên lệnh in `PASS BALANCE không có giọng đọc`. Muốn đo thì chép `index.html` ra một file khác, đổi id giọng thành `vo-…` rồi chạy với `--html <file đó>`.
+Track giọng được nhận khi có id `vo-*` hoặc `*-voice` (dự án faceless-explainer đặt `el-01-…-voice`), group `voiceover`, file nằm trong `assets/voice/`, hoặc là nguồn của một carve. Dự án có lời mà lệnh vẫn in `PASS BALANCE không có giọng đọc` thì đặt lại id hoặc group của track giọng.
 
 ### 14.5 Một index.html cho 16:9, 9:16 và 1:1
 

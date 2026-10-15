@@ -105,7 +105,7 @@ node $OV/scripts/mix-balance.mjs --project . [--write-qa]
 - Lệnh dựng lại tiếng bằng `audio-mix.mjs`, tách hai stem giọng và nhạc, rồi so RMS của hai stem trong những đoạn đang có lời (lấy từ `words.json`). Kết quả là một dòng, ví dụ `PASS BALANCE nhạc dưới giọng 6.1 dB (lúc có lời), nhạc lúc không lời −22.3 dBFS`.
 - Ngưỡng: 4–7 dB là PASS, 2–4 hoặc 7–10 dB là WARN, ngoài khoảng đó là FAIL. Dự án cũ chỉ nhận WARN. Cổng `check-preflight --stage final` chạy phép đo này với dự án có `index.html`.
 - Lý do chọn khoảng này: theo `audio-and-beat-sync.md` của motion-video (AgentKit), khi nhạc thấp hơn giọng khoảng 10 dB, người xem báo là "không có nhạc". Dưới 4 dB thì nhạc dễ lấn lời.
-- Vai trò track: giọng là id `vo-*`, `data-audio-group="voiceover"` hoặc nguồn của một carve; nhạc nền là track có carve, group `music` hoặc file nằm trong `bgm/`. Track giọng đặt tên khác (ví dụ `el-01-…-voice` do `assemble-index` của faceless-explainer sinh) chưa được nhận, lệnh sẽ in `PASS BALANCE không có giọng đọc`. Gặp dòng này ở dự án có lời thì đo trên bản sao HTML đã đổi id giọng thành `vo-…` (`--html`).
+- Vai trò track: giọng là id `vo-*` hoặc `*-voice` (ví dụ `el-01-…-voice` do `assemble-index` của faceless-explainer sinh), `data-audio-group="voiceover"`, file nằm trong `assets/voice/` hoặc nguồn của một carve; nhạc nền là track có carve, group `music` hoặc file nằm trong `bgm/`. Dự án có lời mà vẫn in `PASS BALANCE không có giọng đọc` thì track giọng không theo quy tắc nào ở trên: đặt lại id hoặc group.
 
 ### Giảm nhạc theo giọng (`data-fx-carve`)
 
@@ -120,7 +120,7 @@ node $OV/scripts/mix-balance.mjs --project . [--write-qa]
 | Dự án | BALANCE | Ghi chú |
 |---|---|---|
 | `gemini-argon-dot2-9x16` (có carve, strength 0,8) | PASS 6,1 dB | nhạc tự nhiên 3,7 dB dưới giọng, duck thêm 2,4 dB; bản mix −14,0 LUFS, đỉnh −1,5 dBFS |
-| `claude-code-ceo-sme` (dự án cũ, nhạc `data-volume` 0,2, không carve) | WARN 8,4 dB khi đổi id giọng thành `vo-…`; HTML gốc cho `PASS … không có giọng đọc` | ngoài khoảng 4–7 dB; ngưỡng giữ nguyên, chờ người dùng nghe |
+| `claude-code-ceo-sme` (dự án cũ, nhạc `data-volume` 0,2, không carve) | WARN 8,4 dB (id giọng `el-NN-…-voice`) | ngoài khoảng 4–7 dB; ngưỡng giữ nguyên, chờ người dùng nghe |
 
 - Trong HyperFrames, đặt volume theo `hyperframes-audio`. Ducking dùng `data-fx-carve` trên track nhạc (mục trên); bản giao do `audio-mix.mjs` thực hiện.
 - Chỉnh mức bằng lệnh thay vì thử tay: `hyperframes normalize-audio --lufs=-16 --target <id> --write` cho từng track voice; đặt limiter ở bus master theo `hyperframes-audio` để đạt −1 dBTP. Sau đó đo lại trên file render.

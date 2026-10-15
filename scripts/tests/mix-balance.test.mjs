@@ -57,6 +57,16 @@ test("checkBalance: no words.json falls back to the voice clip; no music bed →
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test("checkBalance: a faceless-explainer voice id (el-NN-…-voice, no group) is measured", { skip: !hasFfmpeg && "ffmpeg missing" }, () => {
+  const dir = project(5);
+  try {
+    writeFileSync(join(dir, "index.html"), readFileSync(join(dir, "index.html"), "utf8").replace('id="vo-01"', 'id="el-01-intro-voice"').replace(' data-audio-group="voiceover"', ""));
+    const r = checkBalance({ dir });
+    assert.equal(r.level, "PASS", r.line);
+    assert.ok(Math.abs(r.under_db - 5) < 0.3, `under ${r.under_db}`);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test("checkBalance: a carve bed is aimed at its target; --json reports natural, target and reduction", { skip: !hasFfmpeg && "ffmpeg missing" }, () => {
   const dir = project(0);
   try {

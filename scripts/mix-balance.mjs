@@ -5,8 +5,9 @@
 //   node mix-balance.mjs --help | -h
 // Runs audio-mix.mjs --stems into a temp folder (the length is the root data-duration, else the
 // end of the last track), decodes voice.wav and music.wav to 16 kHz mono and takes RMS (dBFS):
-//   speech = the spoken words of words.json next to each voice track (id vo-*, group voiceover or a
-//   carve source), words closer than 0.3 s merged; a voice track without words.json counts as
+//   speech = the spoken words of words.json next to each voice track (id vo-* or *-voice, group
+//   voiceover, src under assets/voice/ or a carve source), words closer than 0.3 s merged; a voice
+//   track without words.json counts as
 //   speaking for its whole clip (balance-measure.mjs, shared with audio-mix's duck).
 //   under = voice RMS − music RMS during speech; music RMS outside speech is reported as is.
 // Verdict: PASS 4 ≤ under ≤ 7 dB · WARN 2–4 or 7–10 dB · FAIL under 2 or over 10 dB.

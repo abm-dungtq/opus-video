@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseTracks, buildArgs, dynamicAudio, carveKeys, voiceIndices, keyLevelArgs, parseMeanVolume, parseLoudnorm, loudnormPass1Args, loudnormPass2Args, duckTarget, duckReduction, thresholdAt, searchDrop, CARVE_FLOOR_DB, MAX_REDUCTION_DB } from "../audio-mix.mjs";
+import { parseTracks, buildArgs, dynamicAudio, carveKeys, isVoice, voiceIndices, keyLevelArgs, parseMeanVolume, parseLoudnorm, loudnormPass1Args, loudnormPass2Args, duckTarget, duckReduction, thresholdAt, searchDrop, CARVE_FLOOR_DB, MAX_REDUCTION_DB } from "../audio-mix.mjs";
 
 const CLI = fileURLToPath(new URL("../audio-mix.mjs", import.meta.url));
 const BASE = "/proj";
@@ -25,6 +25,21 @@ test("parseTracks: audio + unmuted video, defaults, skips muted, volume 0 and co
   assert.deepEqual(t[0], { id: "vo", src: "/proj/assets/vo.mp3", start: 1.5, duration: 4, volume: 1, mediaStart: 0, rate: 1, group: "voiceover", carve: null });
   assert.deepEqual(t[1], { id: "bgm", src: "/proj/assets/bgm.mp3", start: 0, duration: 10, volume: 0.3, mediaStart: 2, rate: 1, group: null, carve: null });
   assert.deepEqual(t[2], { id: "talk", src: "/proj/assets/talk.mp4", start: 3, duration: 6, volume: 1, mediaStart: 0, rate: 1.25, group: null, carve: null });
+});
+
+test("isVoice: vo-*, *-voice, group voiceover and a src under assets/voice/ speak; beds and sfx do not", () => {
+  const t = parseTracks(`
+<audio id="vo-01" src="assets/a.mp3"></audio>
+<audio id="el-01-three-jobs-voice" src="assets/el/01.mp3"></audio>
+<audio id="narr" src="assets/voice/02.mp3"></audio>
+<audio id="n2" src="x.mp3" data-audio-group="voiceover"></audio>
+<audio id="bgm" src="assets/bgm/bed.mp3" data-audio-group="music"></audio>
+<audio id="sfx-whoosh" src="assets/sfx/whoosh.mp3"></audio>
+<audio id="voice-intro" src="assets/voiceover/intro.mp3"></audio>
+<audio src="assets/sfx/pop.mp3"></audio>`, BASE);
+  assert.deepEqual(t.filter(isVoice).map((x) => x.id), ["vo-01", "el-01-three-jobs-voice", "narr", "n2"]);
+  assert.deepEqual(voiceIndices(t), [0, 1, 2, 3]);
+  assert.equal(isVoice({ id: null, src: "C:\\proj\\assets\\voice\\01.mp3", group: null }), true, "Windows separators");
 });
 
 test("parseTracks: a tag without an id gives id null", () => {

@@ -6,7 +6,7 @@ Why: every project started from an empty `index.html` with seconds typed by hand
 
 ### New scripts
 - `scripts/composition.mjs init`: starts `index.html` from `templates/composition/index-skeleton.html` (HyperFrames 0.8.144, Be Vietnam Pro): 19 helpers: animation (`pop`, `rise`, `draw`, `slideX`, `typeIn`, `odo`, `slam`, `settleCam`, `shake`…) and anchors, `W(scene, phrase)` / `WE` on the spoken phrase, `B(n)` on the measured beat, an empty TIMING block, ratio-aware CSS (`html[data-ratio]`, `--W/--H`). The frame follows `--aspect` or BRIEF `aspect` (`both` starts at 16:9). Never overwrites.
-- `scripts/timing.mjs`: fills the TIMING block (between `TIMING:BEGIN` and `TIMING:END`) and `timing.json` from PLAN.md `## Cảnh`, every voice word (`vo-*` or group `voiceover`, from `words.json`) on the root timeline and the beat grid of `*.beats.json`. `--music` picks the bed when there are several; a file without markers is refused. Re-run after every voice change.
+- `scripts/timing.mjs`: fills the TIMING block (between `TIMING:BEGIN` and `TIMING:END`) and `timing.json` from PLAN.md `## Cảnh`, every voice word (id `vo-*` or `*-voice`, group `voiceover` or a src under `assets/voice/`, from `words.json`) on the root timeline and the beat grid of `*.beats.json`. `--music` picks the bed when there are several; a file without markers is refused. Re-run after every voice change.
 - `scripts/beat-grid.mjs`: BPM, BEAT0, kicks and drops of a music bed (port of `fit-beat-grid.py`: two ffmpeg decodes, onset of log RMS, constant-tempo grid search, octave check). `--write` writes `<music>.beats.json` only when stable; `--json`. Measures only, never splices.
 - `scripts/word-sync.mjs`: `chữ: "…"` rows of `## Sự kiện` against the moment the phrase is spoken (same phrase rule as `W()`), the nearest occurrence to the row's time. `--json`, `--write-qa`.
 - `scripts/mix-balance.mjs`: how far the music sits under the voice while words are spoken, from the voice and music stems of the `audio-mix` rebuild. One `BALANCE` line, `--json` adds each duck's natural, target and achieved reduction.
@@ -25,7 +25,7 @@ Why: every project started from an empty `index.html` with seconds typed by hand
 - Word sync: PASS within 150 ms, WARN within 250 ms, FAIL beyond (plan acceptance criterion; the 150 ms hand check of the QA list is gone).
 - Beat grid: 45 ms. At the first 25 ms, four of six real beds in the workspace (abm-intro 35 ms, viet-pro-intro 34, grok-bot-sme-9x16 40, opus-video-smoke 36) were flagged although their tempo read right; at 45 ms all six are stable and a 100→140 BPM drift (about 100 ms) still fails. A slow bed read at double tempo: `--max-bpm 100`. Octave check: the double tempo wins at 90 % of the best score (a 150 BPM four-on-the-floor read 75 without it).
 - Reframe safe areas for 9:16: 12 % top, 20 % bottom, type about 1.3×. Scene sheets: 18 frames, 320 px wide, none for a scene under 0.5 s.
-- Calibration on copies in `/tmp`: Gemini 4 Argon (carve, strength 0.8) `PASS BALANCE` 6.1 dB, mix −14.0 LUFS / −1.5 dBFS peak, two keyword rows PASS at 0 ms; Claude Code CEO SME (older project, no carve) 8.4 dB once its voice ids are renamed (below), one keyword at −360 ms (WARN as an older project). Thresholds unchanged.
+- Calibration on copies in `/tmp`: Gemini 4 Argon (carve, strength 0.8) `PASS BALANCE` 6.1 dB, mix −14.0 LUFS / −1.5 dBFS peak, two keyword rows PASS at 0 ms; Claude Code CEO SME (older project, no carve, voice ids `el-NN-…-voice`) 8.4 dB, one keyword at −360 ms (WARN as an older project). Thresholds unchanged.
 
 ### Docs
 - New: `references/motion-craft.md` (motion standard in Vietnamese, per-scene checklist), `references/style-system.md` (two axes, budget-friendly reading, 7 resolve rules), `references/styles/detail/` (three verbatim detail documents), chapter 14 of `docs/huong-dan-chuyen-sau.md`.
@@ -35,6 +35,7 @@ Why: every project started from an empty `index.html` with seconds typed by hand
 ### Compatibility
 - Older projects (no `direction:` and no `brief_version: 2`): every new check is a WARN. `check-preflight --stage final` gives the same exit code as v1.1.0: `bds-ban-do-pip-9x16` 0, `abm-intro` 1.
 - `new-project.sh --aspect both` (studio script, outside this repo) now makes one folder and calls `composition.mjs init`; `--legacy-pair` keeps the two-folder layout.
+- Voice tracks: id `vo-*` or `*-voice` (faceless-explainer's `el-NN-…-voice`), group `voiceover`, a src under `assets/voice/`, or a carve source; one rule (`isVoice` in `audio-mix.mjs`) for `audio-mix`, `mix-balance`, `timing` and `word-sync`. `check-preflight --stage final` on `claude-code-ceo-sme` now adds `WARN BALANCE` 8.4 dB (exit 0, as before).
 - `timing.mjs` refuses several `assets/bgm/*.beats.json` without `--music` (exit 2).
 
 ### Known limitations
@@ -42,7 +43,6 @@ Why: every project started from an empty `index.html` with seconds typed by hand
 - `styles.mjs find` does not score like the Python original (`difflib`): an exact id or alias scores 1, otherwise the best of 0.7 × name similarity (bigram Dice, counted from 0.5) and 0.6 × the share of query words found in the descriptions. Rankings can differ from motion-video for the same query.
 - `reframe.mjs` layout WARN only reads `left/top/width/height` in CSS and `style=""`. It misses GSAP `x:` and `translate(...px)`, `right/bottom/inset`, and a `data-width="1920"` root of a sub-composition in `compositions/`. Assets are hard links: a tool writing into the edition's `assets/` changes the master too.
 - `data-resolution="square"` on the 1:1 edition: `square` is the 1080×1080 preset of `hyperframes render --resolution` in 0.8.144, and `npx --yes hyperframes@0.8.144 lint` on a 1:1 edition in `/tmp` reports 0 errors. A full 1:1 render was not run.
-- Voice tracks are found by id `vo-*`, group `voiceover` or carve source. Projects assembled by the faceless-explainer workflow name them `el-NN-…-voice`, so `mix-balance` reports "không có giọng đọc" and `timing`/`word-sync` find no words there until the ids are renamed.
 - The carve duck matches HyperFrames' duck level only, not its multi-band EQ.
 
 ## v1.1.0 (2026-10-14): picture-event sync, readable hold, revision loop
