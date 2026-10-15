@@ -158,6 +158,7 @@ test("BRIEF style_layers and PLAN scene types feed resolve --project; --markdown
   assert.deepEqual(planSceneList(plan), [{ id: "s1", type: "cover" }, { id: "s2", type: "ui-demo" }, { id: "s3", type: null }]);
   assert.throws(() => planSceneList(plan.replace("cover", "intro")), /loại cảnh "intro"/);
   assert.deepEqual(planSceneList("## Cảnh\n| Thời điểm | Hình |\n|---|---|\n| 0–2s | a |\n"), [{ id: "s1", type: null }]);
+  assert.deepEqual(planSceneList("## Cảnh\n| # | Thời điểm |\n|---|---|\n| s1 | 0–2s |\n| S2 | 2–4s |\n| 3 | 4–6s |\n").map((s) => s.id), ["s1", "s2", "s3"], "a # cell already written s1 is not ss1");
 
   const d = tmp();
   try {

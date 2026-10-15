@@ -42,7 +42,7 @@ import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { OV_DIR } from "./skill-paths.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
-import { PLACEHOLDER, SECTIONS, fold, parsePlan, parseTable } from "./check-preflight.mjs";
+import { PLACEHOLDER, SECTIONS, fold, parsePlan, parseTable, sceneId } from "./check-preflight.mjs";
 import { loadDirections } from "./directions.mjs";
 
 export const STYLES_DIR = join(OV_DIR, "data", "styles");
@@ -211,7 +211,7 @@ export function planSceneList(planText) {
   const ni = t.headers.indexOf("#");
   const li = t.headers.findIndex((h) => /^loai\b/.test(h));
   return t.rows.map((r, i) => {
-    const id = `s${ni >= 0 && String(r[ni] || "").trim() ? String(r[ni]).trim() : i + 1}`;
+    const id = sceneId(ni >= 0 ? r[ni] : "", i);
     const raw = li >= 0 ? String(r[li] || "").replace(/`/g, "").trim().toLowerCase() : "";
     if (!raw || /^[-—–]$/.test(raw)) return { id, type: null };
     if (!SCENE_TYPES.includes(raw)) throw new StyleError(`PLAN.md "## Cảnh" ${id}: loại cảnh "${raw}" không có; dùng một trong ${SCENE_TYPES.join(", ")}`);

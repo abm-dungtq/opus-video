@@ -36,7 +36,7 @@ import { existsSync, readFileSync, readdirSync, realpathSync, writeFileSync } fr
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
-import { MUSIC_ONLY, SECTIONS, fold, parsePlan, parseTable, spanBounds } from "./check-preflight.mjs";
+import { MUSIC_ONLY, SECTIONS, fold, parsePlan, parseTable, sceneId, spanBounds } from "./check-preflight.mjs";
 import { isVoice, parseTracks } from "./audio-mix.mjs";
 import { trackWords } from "./balance-measure.mjs";
 
@@ -98,7 +98,7 @@ export function planScenes(planText) {
   const vi = table.headers.findIndex((h) => /loi doc/.test(h));
   if (ti < 0) throw new Error('bảng "## Cảnh" thiếu cột Thời điểm');
   return table.rows.map((r, i) => {
-    const sid = `s${ni >= 0 && String(r[ni] || "").trim() ? String(r[ni]).trim() : i + 1}`;
+    const sid = sceneId(ni >= 0 ? r[ni] : "", i);
     const b = spanBounds(r[ti]);
     if (!b) throw new Error(`${sid}: Thời điểm "${String(r[ti] || "").trim()}" không đọc được (ghi dạng 2.5–5.8s)`);
     return { sid, start: b.start, end: b.end, spoken: vi >= 0 && !MUSIC_ONLY.test(fold(String(r[vi] || ""))) };

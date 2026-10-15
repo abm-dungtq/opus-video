@@ -123,6 +123,12 @@ export function parsePlan(text) {
   return { sections, scenes, demo: times(sections[SECTIONS.demo]), demo916: k916 ? times(sections[k916]) : null };
 }
 
+// Scene id from the "#" cell of "## Cảnh" (row index i when empty): "2" → "s2"; a cell already
+// written "s2" (or "S2") stays "s2", never "ss2". One rule for timing.mjs and styles.mjs.
+export const sceneId = (cell, i) => {
+  const c = String(cell ?? "").trim();
+  return c ? `s${c.replace(/^s(?=.)/i, "")}` : `s${i + 1}`;
+};
 // A folded Lời đọc cell that means no speech in the scene (also read by timing.mjs).
 export const MUSIC_ONLY = /^(?:|-|—|–|\(?nhac\)?|\(?chi nhac\)?|khong loi|\(khong loi\)|\(im lang\)|im lang|music only)$/;
 // "0–1.5s", "1.5 - 3s", "0.0s - 4.9s" → seconds (0 when unreadable)

@@ -158,6 +158,8 @@ test("planScenes: ids from #, unreadable time throws, missing table throws", () 
   assert.deepEqual(s, [{ sid: "s1", start: 0, end: 2.5, spoken: false }, { sid: "s2", start: 2.5, end: 4, spoken: true }]);
   assert.throws(() => planScenes("## Cảnh\n| # | Thời điểm |\n|---|---|\n| 1 | sớm |\n"), /s1: Thời điểm "sớm"/);
   assert.throws(() => planScenes("## Mục tiêu\nx\n"), /## Cảnh/);
+  const pre = planScenes("## Cảnh\n| # | Thời điểm |\n|---|---|\n| s1 | 0–2s |\n| S2 | 2–4s |\n|  | 4–6s |\n");
+  assert.deepEqual(pre.map((s) => s.sid), ["s1", "s2", "s3"], "a # cell already written s1 is not ss1");
 });
 
 test("beats.json in assets/bgm fills the beat grid", () => {
