@@ -36,6 +36,7 @@ import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { SECTIONS, fold, parsePlan, parseTable, spanBounds } from "./check-preflight.mjs";
 import { parseTracks } from "./audio-mix.mjs";
+import { trackWords } from "./balance-measure.mjs";
 
 export const DEFAULTS = { fps: 30, beat0: 0, beatLen: 0, kick: [], drops: [] };
 export const NO_MARKERS = "index.html không có TIMING:BEGIN/END (tạo bằng composition.mjs init)";
@@ -47,17 +48,6 @@ const r3 = (n) => Math.round(n * 1000) / 1000;
 
 const isVoice = (t) => (t.id && t.id.startsWith("vo-")) || t.group === "voiceover";
 
-// Reads <src>.words.json → [{ text, start, end }] (entries without numeric start/end dropped).
-// Throws with a short reason when the file is missing or not a JSON array.
-function readWords(src) {
-  const file = `${src}.words.json`;
-  if (!existsSync(file)) throw new Error(`không có ${file}`);
-  let data;
-  try { data = JSON.parse(readFileSync(file, "utf8")); } catch (e) { throw new Error(`${file} không đọc được: ${e.message}`); }
-  if (!Array.isArray(data)) throw new Error(`${file} không phải mảng [{text,start,end}]`);
-  return data.filter((w) => w && typeof w.text === "string" && Number.isFinite(w.start) && Number.isFinite(w.end));
-}
-
 // Spoken words of a composition on the root timeline.
 // dir: project directory; html: HTML path relative to dir (default index.html).
 // Returns { words: [{ id, text, start, end }] sorted by start, tracks: the voice tracks, warnings: [text] }.
@@ -67,15 +57,9 @@ export function voiceWords(dir, html = "index.html") {
   const tracks = parseTracks(readFileSync(htmlPath, "utf8"), dirname(htmlPath), root).filter(isVoice);
   const words = [], warnings = [];
   for (const t of tracks) {
-    let list;
-    try { list = readWords(t.src); } catch (e) { warnings.push(`${t.id ?? t.src}: ${e.message}`); continue; }
-    for (const w of list) {
-      const rel = (w.start - t.mediaStart) / t.rate;
-      if (rel < 0 || (t.duration != null && rel >= t.duration)) continue; // trimmed away, never heard
-      const relEnd = (w.end - t.mediaStart) / t.rate;
-      const end = t.duration != null ? Math.min(relEnd, t.duration) : relEnd;
-      words.push({ id: t.id ?? t.src, text: w.text, start: t.start + rel, end: t.start + end });
-    }
+    const r = trackWords(t);
+    if (r.error) { warnings.push(`${t.id ?? t.src}: ${r.error}`); continue; } // no words: skipped, not counted as speech
+    for (const w of r.words) if (typeof w.text === "string") words.push({ id: t.id ?? t.src, ...w });
   }
   words.sort((a, b) => a.start - b.start);
   return { words, tracks, warnings };

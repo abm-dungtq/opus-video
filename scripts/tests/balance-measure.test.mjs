@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { speechSpans, speechWindows, rmsDb, measureBalance } from "../balance-measure.mjs";
+import { speechSpans, speechWindows, rmsDb, measureBalance, trackWords } from "../balance-measure.mjs";
 
 test("speechWindows: words closer than 0.3 s merge, sorted", () => {
   assert.deepEqual(speechWindows([[3, 3.5], [1, 1.4], [1.6, 2], [2.35, 2.6]]), [[1, 2], [2.35, 2.6], [3, 3.5]]);
@@ -38,4 +38,16 @@ test("measureBalance: RMS of voice and music inside the speech windows, music ou
   assert.ok(Math.abs(m.musicQuiet - 20 * Math.log10(0.1)) < 1e-6);
   assert.equal(rmsDb(new Float32Array(10)), -Infinity);
   assert.equal(measureBalance({ voice, music, windows: [[0, 4]], rate }).musicQuiet, null, "no quiet part");
+});
+
+test("trackWords: text kept on the root timeline; a missing or broken words.json is an error, not a throw", () => {
+  const dir = mkdtempSync(join(tmpdir(), "balance-measure-"));
+  try {
+    const a = join(dir, "a.mp3"), b = join(dir, "b.mp3");
+    writeFileSync(`${a}.words.json`, JSON.stringify([{ text: "một", start: 0.5, end: 1 }, { text: "hai", start: "x", end: 2 }]));
+    writeFileSync(`${b}.words.json`, JSON.stringify({ text: "x" }));
+    assert.deepEqual(trackWords({ src: a, start: 2, duration: null, mediaStart: 0, rate: 2 }), { words: [{ text: "một", start: 2.25, end: 2.5 }], error: null });
+    assert.match(trackWords({ src: b, start: 0, duration: null, mediaStart: 0, rate: 1 }).error, /không phải mảng/);
+    assert.match(trackWords({ src: join(dir, "c.mp3"), start: 0, duration: null, mediaStart: 0, rate: 1 }).error, /^không có .*c\.mp3\.words\.json$/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

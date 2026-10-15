@@ -2,6 +2,7 @@
 // (to aim its duck) and mix-balance.mjs (to report it), so both read the same speech windows the
 // same way. Library only, no CLI. Node built-ins only: audio-mix imports this file, so it must not
 // import audio-mix, timing or check-preflight (no import cycle).
+//   trackWords(track) — words of one voice track's <src>.words.json on the root timeline.
 //   speechSpans(voiceTracks, total) — spoken spans on the root timeline from <src>.words.json
 //     (a track without a readable words.json counts as speaking for its whole clip).
 //   speechWindows(spans) — spans closer than 0.3 s merged.
@@ -13,24 +14,27 @@ import { existsSync, readFileSync } from "node:fs";
 export const RATE = 16000;
 export const MERGE_GAP_S = 0.3;
 
-// Words of one track's <src>.words.json mapped to the root timeline: words trimmed away by
-// data-media-start / data-duration are dropped, a word cut by data-duration ends there.
-// Returns [[start, end]] or null when the file is missing or not a [{text,start,end}] array.
-function trackWordSpans(t) {
+// Words of one voice track's <src>.words.json on the root timeline, the one reader shared by
+// timing.mjs and the mix balance. Entries without numeric start/end are dropped; words trimmed away
+// by data-media-start / data-duration are dropped; a word cut by data-duration ends there.
+// t: a parsed track { id, src, start, duration, mediaStart, rate } (audio-mix parseTracks).
+// Returns { words: [{ text, start, end }], error: null } or { words: [], error: reason } when the
+// file is missing, unreadable or not a [{text,start,end}] array.
+export function trackWords(t) {
   const file = `${t.src}.words.json`;
-  if (!existsSync(file)) return null;
+  if (!existsSync(file)) return { words: [], error: `không có ${file}` };
   let data;
-  try { data = JSON.parse(readFileSync(file, "utf8")); } catch { return null; }
-  if (!Array.isArray(data)) return null;
-  const out = [];
+  try { data = JSON.parse(readFileSync(file, "utf8")); } catch (e) { return { words: [], error: `${file} không đọc được: ${e.message}` }; }
+  if (!Array.isArray(data)) return { words: [], error: `${file} không phải mảng [{text,start,end}]` };
+  const words = [];
   for (const w of data) {
     if (!w || !Number.isFinite(w.start) || !Number.isFinite(w.end)) continue;
     const rel = (w.start - t.mediaStart) / t.rate;
-    if (rel < 0 || (t.duration != null && rel >= t.duration)) continue;
+    if (rel < 0 || (t.duration != null && rel >= t.duration)) continue; // trimmed away, never heard
     const relEnd = (w.end - t.mediaStart) / t.rate;
-    out.push([t.start + rel, t.start + (t.duration != null ? Math.min(relEnd, t.duration) : relEnd)]);
+    words.push({ text: w.text, start: t.start + rel, end: t.start + (t.duration != null ? Math.min(relEnd, t.duration) : relEnd) });
   }
-  return out;
+  return { words, error: null };
 }
 
 // voiceTracks: parsed tracks (audio-mix parseTracks) that speak. total: root length in seconds.
@@ -38,8 +42,8 @@ function trackWordSpans(t) {
 export function speechSpans(voiceTracks, total) {
   const spans = [], noWords = [];
   for (const t of voiceTracks) {
-    const words = trackWordSpans(t);
-    if (words) spans.push(...words);
+    const { words, error } = trackWords(t);
+    if (!error) spans.push(...words.map((w) => [w.start, w.end]));
     else {
       noWords.push(t.id ?? t.src);
       spans.push([t.start, t.start + (t.duration ?? Math.max(0, total - t.start))]);
