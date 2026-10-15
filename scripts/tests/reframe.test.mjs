@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { editionBrief, editionHtml, layoutWarnings, main, MARKER } from "../reframe.mjs";
+import { editionBrief, editionHtml, inside, layoutWarnings, main, MARKER } from "../reframe.mjs";
 
 const capture = () => {
   const buf = { out: "", err: "" };
@@ -165,6 +165,13 @@ test("--force keeps the edition's renders, demo and approval files, and rewrites
     assert.equal(existsSync(join(out, "assets", "voice", "extra.mp3")), false, "assets/ mirrors the master");
     assert.ok(existsSync(join(out, MARKER)));
   } finally { rmSync(parent, { recursive: true, force: true }); }
+});
+
+test("inside: case-insensitive on darwin, exact elsewhere", () => {
+  assert.equal(inside("/Volumes/2/edit-video/demo/x", "/Volumes/2/Edit-Video/demo", "darwin"), true);
+  assert.equal(inside("/Volumes/2/edit-video/demo/x", "/Volumes/2/Edit-Video/demo", "linux"), false);
+  assert.equal(inside("/Volumes/2/Edit-Video/demo-9x16", "/Volumes/2/Edit-Video/demo", "darwin"), false);
+  assert.equal(inside("/a/b", "/a/b", "linux"), true);
 });
 
 test("frame-worker project, missing root composition and bad usage", () => {

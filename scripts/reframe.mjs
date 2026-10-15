@@ -124,8 +124,13 @@ export function cloneTree(src, dst) {
   return res;
 }
 
-// child is parent itself or lies under it.
-const inside = (child, parent) => { const r = relative(parent, child); return r !== ".." && !r.startsWith(`..${sep}`) && !isAbsolute(r); };
+// child is parent itself or lies under it. macOS volumes (APFS, HFS+) are case-insensitive by
+// default, so on darwin /Volumes/2/edit-video and /Volumes/2/Edit-Video are the same folder.
+export const inside = (child, parent, platform = process.platform) => {
+  const fold = platform === "darwin" ? (s) => s.toLowerCase() : (s) => s;
+  const r = relative(fold(parent), fold(child));
+  return r !== ".." && !r.startsWith(`..${sep}`) && !isAbsolute(r);
+};
 
 // A directory --force may replace: empty, or an edition of this same master.
 function replaceable(out, project) {
