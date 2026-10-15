@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { check, checkCreative, checkRevisions, parsePlan, isPng, readableHold, holdWarnings, parseTable, spanBounds, spanSeconds } from "../check-preflight.mjs";
+import { check, checkCreative, checkRevisions, verticalHint, parsePlan, isPng, readableHold, holdWarnings, parseTable, spanBounds, spanSeconds } from "../check-preflight.mjs";
 import { main as renderFinal, PREFLIGHT_EXIT } from "../render-final.mjs";
 import { writeDemoMd } from "../make-demo.mjs";
 
@@ -393,4 +393,30 @@ test("final stage: word-sync FAIL lines block, WARN lines warn, an error blocks;
     const r = check({ project: legacy, stage: "final", words: () => { throw new Error("legacy project must not run word-sync"); } });
     assert.equal(r.pass, true, JSON.stringify(r.errors));
   } finally { rmSync(legacy, { recursive: true, force: true }); }
+});
+
+test("aspect both: a missing or landscape animatic_9x16 points at the reframe edition next to the project first", () => {
+  assert.match(verticalHint("/w/promo"), /^reframe\.mjs \. --ratio 9x16, then make-demo\.mjs --animatic --aspect 9x16 --hyperframes \.\.\/promo-9x16 /);
+  assert.match(verticalHint("/w/promo/"), /--hyperframes \.\.\/promo-9x16 /, "trailing slash");
+  const d = mkdtempSync(join(tmpdir(), "pf-vertical-"));
+  cpSync(fileURLToPath(new URL("./fixtures/creative-good", import.meta.url)), d, { recursive: true });
+  try {
+    writeFileSync(join(d, "BRIEF.md"), readFileSync(join(d, "BRIEF.md"), "utf8").replace(/^aspect: .*$/m, "aspect: both"));
+    past(join(d, "PLAN.md"), 300);
+    mkdirSync(join(d, "demo", "9x16"), { recursive: true });
+    for (const f of ["animatic.mp4", join("9x16", "animatic.mp4")]) writeFileSync(join(d, "demo", f), "x");
+    const brief = readFileSync(join(d, "BRIEF.md"), "utf8"), plan = parsePlan(readFileSync(join(d, "PLAN.md"), "utf8"));
+    const run = (demoMd) => {
+      writeFileSync(join(d, "DEMO.md"), demoMd);
+      const errors = [];
+      checkCreative({ dir: d, plan, brief, stage: "final", errors, warnings: [], motion: () => ({ frames: 90, still: 0, ratio: 0, peak: 9 }), probe: () => ({ width: 960, height: 540 }), sync: () => ({ errors: [], warnings: [], none: true }), words: () => ({ errors: [], warnings: [] }) });
+      return errors;
+    };
+    const edition = `--hyperframes ../${d.split(/[\\/]/).pop()}-9x16`;
+    const missing = run("animatic: demo/animatic.mp4\n").find((e) => e.includes("no `animatic_9x16:`"));
+    assert.ok(missing && missing.includes("reframe.mjs . --ratio 9x16") && missing.includes(edition), missing);
+    assert.ok(missing.indexOf("reframe.mjs") < missing.indexOf("compositions/main-9x16.html"), "the reframe edition comes before the legacy composition");
+    const landscape = run("animatic: demo/animatic.mp4\nanimatic_9x16: demo/9x16/animatic.mp4\n").find((e) => e.includes("not portrait"));
+    assert.ok(landscape && landscape.includes(edition), landscape);
+  } finally { rmSync(d, { recursive: true, force: true }); }
 });

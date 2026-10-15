@@ -29,8 +29,8 @@
 //   - Rows whose Lời đọc cell is empty / "—" / "(nhạc)" / "không lời" add up to at least
 //     BRIEF `music_only_s` seconds (default from the direction's energy, 2s).
 //   - final: DEMO.md `animatic: <mp4>` (plus `animatic_9x16:` for aspect both, which must be portrait:
-//     make-demo.mjs --animatic --aspect 9x16 --composition compositions/main-9x16.html, or
-//     --hyperframes ../<project-9x16>) newer than PLAN.md, index.html
+//     reframe.mjs . --ratio 9x16, then make-demo.mjs --animatic --aspect 9x16 --hyperframes
+//     ../<project>-9x16; older projects with compositions/main-9x16.html pass --composition) newer than PLAN.md, index.html
 //     and compositions/*.html, whose
 //     motion passes qc-mp4 MOTION (FAIL when ≥60% near-still frames and 90th-pct YDIF < 1.5), and
 //     build/RECIPES.md (recipe-pack.mjs) newer than PLAN.md.
@@ -63,7 +63,7 @@
 // Exit: 0 pass · 1 blocked · 2 bad usage.
 
 import { existsSync, readFileSync, readdirSync, statSync, openSync, readSync, closeSync, realpathSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
@@ -75,8 +75,13 @@ import { resolveProject } from "./styles.mjs";
 import { checkWords } from "./word-sync.mjs";
 import { checkBalance } from "./mix-balance.mjs";
 
-// make-demo needs the 9:16 composition named, else hyperframes renders the 16:9 index.html.
-const VERTICAL_HINT = "make-demo.mjs --animatic --aspect 9x16 --composition compositions/main-9x16.html (or --hyperframes ../<project-9x16> for a separate 9:16 project)";
+// make-demo needs the 9:16 source named, else hyperframes renders the 16:9 index.html. The default
+// source is the edition reframe.mjs derives next to the project; a project that still keeps its own
+// compositions/main-9x16.html names that file instead.
+export const verticalHint = (dir) => {
+  const edition = `../${basename(resolve(dir))}-9x16`;
+  return `reframe.mjs . --ratio 9x16, then make-demo.mjs --animatic --aspect 9x16 --hyperframes ${edition} (a project with its own compositions/main-9x16.html: --composition compositions/main-9x16.html instead)`;
+};
 
 // Width and height of the first video stream; throws when ffprobe cannot read the file.
 export function probeSize(file, run = spawnSync) {
@@ -266,13 +271,13 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
     for (const key of keys) {
       const anim = animaticOf(demoText, key);
       const animPath = anim ? resolve(dir, anim) : "";
-      const rerun = key === "animatic_9x16" ? VERTICAL_HINT : "make-demo.mjs --animatic";
+      const rerun = key === "animatic_9x16" ? verticalHint(dir) : "make-demo.mjs --animatic";
       let bad;
       if (!anim) errors.push(`DEMO.md has no \`${key}:\` — run ${rerun} so the user approves motion, not stills`);
       else if (!existsSync(animPath)) errors.push(`DEMO.md animatic ${anim} not found`);
       else if (statSync(animPath).mtimeMs < planTime) errors.push(`animatic ${anim} is older than PLAN.md; re-run ${rerun}`);
       else if (newerThan(dir, statSync(animPath).mtimeMs).length) errors.push(`${newerThan(dir, statSync(animPath).mtimeMs).join(", ")} newer than the animatic ${anim}; the user approved older motion, re-run ${rerun}`);
-      else if (key === "animatic_9x16" && (bad = notPortrait(probe, animPath, anim))) errors.push(bad);
+      else if (key === "animatic_9x16" && (bad = notPortrait(probe, animPath, anim, rerun))) errors.push(bad);
       else {
         let m;
         try { m = motion(animPath); } catch (e) { errors.push(`cannot measure motion of ${anim}: ${e.message}`); }
@@ -321,10 +326,10 @@ export function checkStyle({ dir, brief, errors, warnings, resolveFn = resolvePr
 
 // A 9:16 animatic rendered without the vertical composition is landscape; the user would approve the
 // 16:9 motion as the vertical cut. Returns the error, or "" when height > width.
-function notPortrait(probe, path, anim) {
+function notPortrait(probe, path, anim, hint) {
   let s;
   try { s = probe(path); } catch (e) { return `cannot read the frame size of ${anim}: ${e.message}`; }
-  return s.height > s.width ? "" : `animatic ${anim} is ${s.width}×${s.height}, not portrait; re-run ${VERTICAL_HINT}`;
+  return s.height > s.width ? "" : `animatic ${anim} is ${s.width}×${s.height}, not portrait; re-run ${hint}`;
 }
 
 // index.html and compositions/*.html edited after `time` (the build the user has not seen).
