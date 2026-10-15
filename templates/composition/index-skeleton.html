@@ -95,10 +95,11 @@
         const isKick = (n) => (T.kick || []).some(([a, b]) => n >= a && n < b);
         // [first word, last word] of the nth occurrence of a phrase in a scene: consecutive spoken
         // words, joined by one space, must equal the folded phrase. null (and one warning) on a miss.
+        // The words of every voice line are sorted by start, so several tracks interleave in spoken order.
         // phraseHits() in scripts/timing.mjs is a second copy of this match: change both together.
         const hit = (sid, phrase, nth) => {
           const want = key(phrase);
-          const ws = (SC[sid]?.lines || []).flatMap((l) => l.words).map((w) => ({ w, k: key(w[0]) })).filter((x) => x.k);
+          const ws = (SC[sid]?.lines || []).flatMap((l) => l.words).sort((a, b) => a[1] - b[1]).map((w) => ({ w, k: key(w[0]) })).filter((x) => x.k);
           let seen = 0;
           for (let i = 0; want && i < ws.length; i++) {
             let s = "";

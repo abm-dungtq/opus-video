@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
-import { buildTiming, injectTiming, planScenes, voiceWords, main, NO_MARKERS } from "../timing.mjs";
+import { buildTiming, injectTiming, phraseHits, planScenes, voiceWords, main, NO_MARKERS } from "../timing.mjs";
 import { SKELETON } from "../composition.mjs";
 
 const FIXTURE = fileURLToPath(new URL("./fixtures/timing", import.meta.url));
@@ -257,6 +257,19 @@ test("skeleton W/WE match a folded phrase across punctuation; a miss warns and f
     assert.equal(W("s9", "ảnh"), 0);
     assert.deepEqual(warns, ["W miss: s2 không có", "W miss: s9 ảnh"]);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("several voice tracks: phraseHits and the skeleton W/WE order the words by time, not by track", () => {
+  // vo-02 is listed first but speaks later; one "mã nguồn" spans both tracks.
+  const lines = [
+    { id: "vo-02", words: [["mã", 1.0, 1.2], ["nguồn", 1.2, 1.5], ["nguồn", 3.2, 3.6]] },
+    { id: "vo-01", words: [["mã", 0.2, 0.4], ["nguồn", 0.4, 0.6], ["mã", 3.0, 3.2]] },
+  ];
+  const { window } = runSkeleton({ fps: 30, duration: 10, scenes: { s1: { start: 0, end: 5, lines } }, beat0: 0, beatLen: 0, kick: [], drops: [] });
+  const { W, WE } = window.__probe;
+  const node = phraseHits(lines.flatMap((l) => l.words).map(([text, start, end]) => ({ text, start, end })), "mã nguồn");
+  assert.deepEqual(node, [{ start: 0.2, end: 0.6 }, { start: 1.0, end: 1.5 }, { start: 3.0, end: 3.6 }]);
+  node.forEach((h, n) => { assert.equal(W("s1", "mã nguồn", n + 1), h.start); assert.equal(WE("s1", "mã nguồn", n + 1), h.end); });
 });
 
 test("skeleton B throws without a beat grid", () => {
