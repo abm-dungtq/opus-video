@@ -312,7 +312,7 @@ Mọi script đều có `--help` / `-h` (in phần mô tả đầu file, thoát 
 | `scripts/word-sync.mjs` | So hàng `chữ:` trong `## Sự kiện` với lúc giọng nói tới (PASS ≤ 150 ms, WARN ≤ 250 ms) |
 | `scripts/audio-mix.mjs` | Dựng lại tiếng của composition bằng ffmpeg; giảm nhạc theo giọng từ `data-fx-carve`; `--loudnorm`, `--stems` |
 | `scripts/mix-balance.mjs` | Đo nhạc thấp hơn giọng bao nhiêu dB lúc có lời (PASS 4–7 dB) |
-| `scripts/reframe.mjs` | Sinh bản 9:16 hoặc 1:1 từ một `index.html` có khối `html[data-ratio=…]`; asset hard-link |
+| `scripts/reframe.mjs` | Sinh bản 9:16 hoặc 1:1 từ một `index.html` có khối `html[data-ratio=…]`; asset clone APFS |
 | `scripts/styles.mjs` | 61 style: `find`, `show`, `css`, `suggest --direction`, `resolve --project` (style theo cảnh), `validate` |
 | `scripts/source-ingest.mjs` | Lưu văn bản gốc của URL, PDF, trang abstract arXiv (toàn văn thì truyền `https://arxiv.org/pdf/<id>`) vào `sources/` và ghi mục nguồn vào `SOURCES.md`; PDF cần `pdftotext` (poppler) |
 

@@ -10,9 +10,10 @@
 //          master) or an empty directory. Any other existing directory is refused, even with --force.
 // Writes: index.html (root data-width/data-height 1080x1920 or 1080x1080, <html> data-ratio and
 //   data-resolution, viewport, --W/--H), BRIEF.md (frontmatter aspect: 9:16 or 1:1), copies of
-//   compositions/, hyperframes.json, package.json and PLAN.md, and assets/ hard-linked file by file
-//   (copied with one WARN when the disk refuses hard links). renders/, demo/, qa/, qc/ and
-//   .hyperframes/ are not carried over. A hard-linked asset is the master's file: edit the master.
+//   compositions/, hyperframes.json, package.json and PLAN.md, and assets/ cloned file by file
+//   (APFS copy-on-write clone: no extra space until one side changes; a plain copy where the disk
+//   cannot clone, e.g. another volume). A write into the edition's assets/ never reaches the
+//   master's file. renders/, demo/, qa/, qc/ and .hyperframes/ are not carried over.
 // WARN layout  one line per left/top/width/height ≥ 1080 px in a <style> block or a style=""
 //   attribute (index.html and compositions/) outside any html[data-ratio=…] block: a 1920x1080
 //   value that will not fit the new frame.
@@ -22,7 +23,7 @@
 // Exit: 0 written (WARN lines allowed) · 1 edition exists, frame-worker project, no root
 //   composition, or a write failed · 2 bad usage, or the project / its index.html is missing.
 
-import { copyFileSync, cpSync, existsSync, linkSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { constants, copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
@@ -94,10 +95,12 @@ export function layoutWarnings(text) {
 
 const htmlFiles = (dir) => (existsSync(dir) ? readdirSync(dir, { recursive: true }).map(String).filter((f) => f.endsWith(".html")).sort() : []);
 
-// Hard-links every file under src into dst (symlinks followed, loops skipped).
-// Returns { linked, copied, skipped: [path] }.
-export function linkTree(src, dst, { link = linkSync } = {}) {
-  const res = { linked: 0, copied: 0, skipped: [] };
+// Clones every file under src into dst (symlinks followed, loops skipped). COPYFILE_FICLONE makes
+// an APFS copy-on-write clone and falls back to a real copy where cloning is unsupported; never a
+// hard link, which would let a write in the edition (a new voice take, beat-grid --write) change
+// the master's file. Returns { files, skipped: [path] }.
+export function cloneTree(src, dst) {
+  const res = { files: 0, skipped: [] };
   const walk = (s, d, chain) => {
     const real = realpathSync(s);
     if (chain.includes(real)) { res.skipped.push(s); return; }
@@ -108,9 +111,8 @@ export function linkTree(src, dst, { link = linkSync } = {}) {
       try { st = statSync(sp); } catch { res.skipped.push(sp); continue; } // broken symlink
       if (st.isDirectory()) { walk(sp, dp, [...chain, real]); continue; }
       if (!st.isFile()) { res.skipped.push(sp); continue; }
-      const target = realpathSync(sp);
-      try { link(target, dp); res.linked++; }
-      catch { copyFileSync(target, dp); res.copied++; } // other disk (EXDEV) or a file system without hard links
+      copyFileSync(realpathSync(sp), dp, constants.COPYFILE_FICLONE);
+      res.files++;
     }
   };
   walk(src, dst, []);
@@ -131,7 +133,7 @@ function replaceable(out, project) {
   return { ok: true };
 }
 
-export function main(argv = process.argv.slice(2), { out = (s) => process.stdout.write(s), err = (s) => process.stderr.write(s), link = linkSync } = {}) {
+export function main(argv = process.argv.slice(2), { out = (s) => process.stdout.write(s), err = (s) => process.stderr.write(s) } = {}) {
   if (wantsHelp(argv)) { out(helpText(import.meta.url)); return 0; }
   const usage = "usage: node reframe.mjs <project> --ratio 9x16|1x1 [--out <dir>] [--force]";
   const o = { project: null, ratio: null, out: null, force: false };
@@ -171,7 +173,7 @@ export function main(argv = process.argv.slice(2), { out = (s) => process.stdout
     }
   }
 
-  let assets = { linked: 0, copied: 0, skipped: [] };
+  let assets = { files: 0, skipped: [] };
   try {
     if (existsSync(dest)) rmSync(dest, { recursive: true, force: true });
     mkdirSync(dest, { recursive: true });
@@ -181,14 +183,13 @@ export function main(argv = process.argv.slice(2), { out = (s) => process.stdout
     const brief = join(project, "BRIEF.md");
     if (existsSync(brief)) writeFileSync(join(dest, "BRIEF.md"), editionBrief(readFileSync(brief, "utf8"), o.ratio));
     if (existsSync(join(project, "compositions"))) cpSync(join(project, "compositions"), join(dest, "compositions"), { recursive: true, dereference: true });
-    if (existsSync(join(project, "assets"))) assets = linkTree(join(project, "assets"), join(dest, "assets"), { link });
+    if (existsSync(join(project, "assets"))) assets = cloneTree(join(project, "assets"), join(dest, "assets"));
   } catch (e) { err(`reframe: cannot write ${dest}: ${e.message}\n`); return 1; }
-  if (assets.copied) lines.push(`WARN  assets ${assets.copied} tệp được chép thay vì hard-link (khác ổ hoặc ổ không hỗ trợ hard link); tốn thêm dung lượng`);
   for (const s of assets.skipped) lines.push(`WARN  assets bỏ qua ${relative(project, s)} (liên kết hỏng, vòng lặp hoặc không phải tệp)`);
 
   const f = RATIOS[o.ratio];
   out(lines.map((l) => `${l}\n`).join(""));
-  out(`OK    reframe ${o.ratio} ${f.width}x${f.height} → ${dest} (assets: ${assets.linked} hard-link, ${assets.copied} chép)\n`);
+  out(`OK    reframe ${o.ratio} ${f.width}x${f.height} → ${dest} (assets: ${assets.files} tệp clone)\n`);
   out(`next: cd ${dest} && npx --yes hyperframes@0.8.144 lint && npx --yes hyperframes@0.8.144 check\n`);
   return 0;
 }

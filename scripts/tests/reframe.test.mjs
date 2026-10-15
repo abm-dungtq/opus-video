@@ -1,4 +1,4 @@
-// reframe.mjs: 9:16 / 1:1 edition of a ratio-aware 16:9 project, assets hard-linked, layout WARNs
+// reframe.mjs: 9:16 / 1:1 edition of a ratio-aware 16:9 project, assets cloned, layout WARNs
 // for 1920x1080 pixel values outside html[data-ratio] blocks, never overwriting a foreign directory.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -75,7 +75,7 @@ test("layoutWarnings: px ≥ 1080 in CSS or style attributes outside html[data-r
   assert.deepEqual(layoutWarnings("<p>left: 1400px in text</p>"), [], "text outside CSS is not layout");
 });
 
-test("9x16 edition: hard-linked assets, root 1080x1920, BRIEF aspect, one layout WARN, no renders", () => {
+test("9x16 edition: cloned assets, root 1080x1920, BRIEF aspect, one layout WARN, no renders", () => {
   const { parent, project } = master();
   try {
     const c = capture();
@@ -83,12 +83,13 @@ test("9x16 edition: hard-linked assets, root 1080x1920, BRIEF aspect, one layout
     const out = join(parent, "demo-9x16");
     const warns = c.buf.out.split("\n").filter((l) => l.startsWith("WARN  layout"));
     assert.deepEqual(warns, ["WARN  layout index.html:7 left: 1400px nằm ngoài khối html[data-ratio=…]; khung 9x16 chỉ rộng 1080px"]);
-    assert.match(c.buf.out, /^OK {4}reframe 9x16 1080x1920 → .*demo-9x16 \(assets: 1 hard-link, 0 chép\)$/m);
+    assert.match(c.buf.out, /^OK {4}reframe 9x16 1080x1920 → .*demo-9x16 \(assets: 1 tệp clone\)$/m);
     const html = readFileSync(join(out, "index.html"), "utf8");
     assert.match(html, /data-width="1080" data-height="1920"/);
     assert.match(html, /data-ratio="9x16"/);
     const a = join("assets", "voice", "01.words.json");
-    assert.equal(statSync(join(out, a)).ino, statSync(join(project, a)).ino, "asset is a hard link to the master file");
+    assert.notEqual(statSync(join(out, a)).ino, statSync(join(project, a)).ino, "asset is its own file, not a hard link");
+    assert.equal(readFileSync(join(out, a), "utf8"), "[]\n");
     assert.match(readFileSync(join(out, "BRIEF.md"), "utf8"), /^aspect: 9:16$/m);
     for (const f of ["PLAN.md", "hyperframes.json", "package.json", join("compositions", "card.html"), MARKER]) assert.ok(existsSync(join(out, f)), f);
     assert.equal(existsSync(join(out, "renders")), false);
@@ -133,16 +134,15 @@ test("existing edition: exit 1 without --force; --force replaces its own edition
   } finally { rmSync(parent, { recursive: true, force: true }); }
 });
 
-test("a disk without hard links: assets copied, one WARN", () => {
+test("writing into an edition asset leaves the master's file byte-identical", () => {
   const { parent, project } = master();
   try {
-    const c = capture();
-    const link = () => { const e = new Error("cross-device link"); e.code = "EXDEV"; throw e; };
-    assert.equal(main([project, "--ratio", "9x16"], { ...c.io, link }), 0, c.buf.err);
-    assert.match(c.buf.out, /^WARN {2}assets 1 tệp được chép thay vì hard-link/m);
     const a = join("assets", "voice", "01.words.json");
-    assert.notEqual(statSync(join(parent, "demo-9x16", a)).ino, statSync(join(project, a)).ino);
-    assert.equal(readFileSync(join(parent, "demo-9x16", a), "utf8"), "[]\n");
+    const before = readFileSync(join(project, a));
+    assert.equal(main([project, "--ratio", "9x16"], capture().io), 0);
+    writeFileSync(join(parent, "demo-9x16", a), "edition-regen"); // O_TRUNC in place, as eleven.mjs writes
+    assert.deepEqual(readFileSync(join(project, a)), before);
+    assert.equal(readFileSync(join(parent, "demo-9x16", a), "utf8"), "edition-regen");
   } finally { rmSync(parent, { recursive: true, force: true }); }
 });
 
