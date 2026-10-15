@@ -1,5 +1,50 @@
 # Changelog
 
+## v1.2.0 (2026-10-15): composition template, measured mix, word and beat sync, reframe, 61 styles
+
+Why: every project started from an empty `index.html` with seconds typed by hand, so a new voice take meant re-timing every tween. The final mix never lowered the music under the voice: a measured HyperFrames render of a `data-fx-carve` project (no `data-fx-chain`) showed a constant 2 dB offset, not a duck. The BPM was only a word in the music prompt, on-screen keywords had no check against the spoken word, the 9:16 edition was a second hand-built composition, and the look of a video had no vocabulary beyond the direction's style keyword. The workflows of the motion-video skill of AgentKit (MIT, v1.3.0) cover these; they are rewritten here in Node and ffmpeg, with no Python at run time.
+
+### New scripts
+- `scripts/composition.mjs init`: starts `index.html` from `templates/composition/index-skeleton.html` (HyperFrames 0.8.144, Be Vietnam Pro): 19 helpers: animation (`pop`, `rise`, `draw`, `slideX`, `typeIn`, `odo`, `slam`, `settleCam`, `shake`…) and anchors, `W(scene, phrase)` / `WE` on the spoken phrase, `B(n)` on the measured beat, an empty TIMING block, ratio-aware CSS (`html[data-ratio]`, `--W/--H`). The frame follows `--aspect` or BRIEF `aspect` (`both` starts at 16:9). Never overwrites.
+- `scripts/timing.mjs`: fills the TIMING block (between `TIMING:BEGIN` and `TIMING:END`) and `timing.json` from PLAN.md `## Cảnh`, every voice word (`vo-*` or group `voiceover`, from `words.json`) on the root timeline and the beat grid of `*.beats.json`. `--music` picks the bed when there are several; a file without markers is refused. Re-run after every voice change.
+- `scripts/beat-grid.mjs`: BPM, BEAT0, kicks and drops of a music bed (port of `fit-beat-grid.py`: two ffmpeg decodes, onset of log RMS, constant-tempo grid search, octave check). `--write` writes `<music>.beats.json` only when stable; `--json`. Measures only, never splices.
+- `scripts/word-sync.mjs`: `chữ: "…"` rows of `## Sự kiện` against the moment the phrase is spoken (same phrase rule as `W()`), the nearest occurrence to the row's time. `--json`, `--write-qa`.
+- `scripts/mix-balance.mjs`: how far the music sits under the voice while words are spoken, from the voice and music stems of the `audio-mix` rebuild. One `BALANCE` line, `--json` adds each duck's natural, target and achieved reduction.
+- `scripts/reframe.mjs`: derives the 9:16 or 1:1 edition of a one-`index.html` project into `<project>-9x16` / `-1x1` (frame size, `data-ratio`, `data-resolution`, BRIEF aspect; `assets/` hard-linked file by file, copied with one WARN across disks). `WARN layout` for 1920-wide values outside the override blocks. `--force` replaces only an edition it wrote; frame-worker projects are refused.
+- `scripts/styles.mjs`: `index`, `validate`, `find`, `show`, `css`, `suggest --direction`, `resolve --project` over `data/styles/` (61 profiles converted once from the motion-video YAML, every key and value kept, plus `ten_vi` and `mo_ta_vi`). `resolve` applies BRIEF `style_profile:` and the `## style_layers` array per PLAN scene (by id or by the optional `Loại` column) and prints a block for `## Ý đồ sáng tạo`.
+- `scripts/balance-measure.mjs` (library): the one reader of voice `words.json` shared by `timing`, `audio-mix` and `mix-balance`.
+- `audio-mix.mjs`: `data-audio-group` and `data-fx-carve` become an ffmpeg sidechain (they no longer force the HyperFrames mix); `--loudnorm` (two-pass, −14 LUFS, −1.5 dBTP; always on in `render-final`), `--stems <dir>`. `make-demo.mjs --animatic` also cuts one 6×3 contact sheet per scene (`scene_sheets:`, `scene_sheets_9x16:` in DEMO.md). `make-pitch` assigns a style per styleframe and `choose` writes `style_profile:` (`--style-profile`). `directions.json` gives every direction 4 suggested styles.
+
+### New gates
+- `check-preflight --stage final`, projects with `index.html`: `mix-balance` (FAIL blocks, WARN warns, a measuring error only warns). Creative projects: `word-sync` (FAIL blocks). Both stages: `style_profile:` must resolve with its layers (FAIL for new projects, WARN for older ones; a creative project without it gets a WARN). `REVISIONS.md` fixes that do not name their scene sheet warn once DEMO.md lists sheets.
+- `beat-grid`: `UNSTABLE` (exit 1, no file written) when the spread is over 45 ms or fewer than 4 onsets can be measured. `B()` throws `B() cần beat-grid.mjs` on an unmeasured grid.
+- For `aspect: both`, a missing or landscape `animatic_9x16` now points at `reframe.mjs . --ratio 9x16` and `make-demo --hyperframes ../<project>-9x16` first, `--composition compositions/main-9x16.html` for older projects.
+
+### Thresholds and sources
+- Music under voice: PASS 4–7 dB, WARN 2–4 or 7–10 dB, FAIL beyond. Source: motion-video `audio-and-beat-sync.md`, where music about 10 dB under the voice was reported as "there is no music". Duck target `4 + 2.5 × strength` dB (0.8 → 6 dB), found by a closed-loop search (re-measure after each trial, at most 6 passes, ±0.3 dB, cap 12 dB): a fixed slope did not hold, the sweep on the Gemini copy gave about 3.9 + 0.52 × drop.
+- Word sync: PASS within 150 ms, WARN within 250 ms, FAIL beyond (plan acceptance criterion; the 150 ms hand check of the QA list is gone).
+- Beat grid: 45 ms. At the first 25 ms, four of six real beds in the workspace (abm-intro 35 ms, viet-pro-intro 34, grok-bot-sme-9x16 40, opus-video-smoke 36) were flagged although their tempo read right; at 45 ms all six are stable and a 100→140 BPM drift (about 100 ms) still fails. A slow bed read at double tempo: `--max-bpm 100`. Octave check: the double tempo wins at 90 % of the best score (a 150 BPM four-on-the-floor read 75 without it).
+- Reframe safe areas for 9:16: 12 % top, 20 % bottom, type about 1.3×. Scene sheets: 18 frames, 320 px wide, none for a scene under 0.5 s.
+- Calibration on copies in `/tmp`: Gemini 4 Argon (carve, strength 0.8) `PASS BALANCE` 6.1 dB, mix −14.0 LUFS / −1.5 dBFS peak, two keyword rows PASS at 0 ms; Claude Code CEO SME (older project, no carve) 8.4 dB once its voice ids are renamed (below), one keyword at −360 ms (WARN as an older project). Thresholds unchanged.
+
+### Docs
+- New: `references/motion-craft.md` (motion standard in Vietnamese, per-scene checklist), `references/style-system.md` (two axes, budget-friendly reading, 7 resolve rules), `references/styles/detail/` (three verbatim detail documents), chapter 14 of `docs/huong-dan-chuyen-sau.md`.
+- Updated: `audio-pipeline.md` (beat grid, mix target in dB under the voice, carve ducking, calibration), `qa-checklist.md` (BALANCE and WORD rows, the narrowed meaning of the word-sync scene WARN), `engine-selection.md` (one-`index.html` path, reframe limits), `plan-demo.md`, `brief-template.md`, `revisions.md`, `edit-method.md`, `creative-directions.md`, SKILL.md steps 1b, 4, 5, 6, 6b, 8 and the reference table, README.
+- `NOTICE` credits AgentKit; its license is in `third_party/agentkit-motion-video/LICENSE`.
+
+### Compatibility
+- Older projects (no `direction:` and no `brief_version: 2`): every new check is a WARN. `check-preflight --stage final` gives the same exit code as v1.1.0: `bds-ban-do-pip-9x16` 0, `abm-intro` 1.
+- `new-project.sh --aspect both` (studio script, outside this repo) now makes one folder and calls `composition.mjs init`; `--legacy-pair` keeps the two-folder layout.
+- `timing.mjs` refuses several `assets/bgm/*.beats.json` without `--music` (exit 2).
+
+### Known limitations
+- `render-final` runs the duck search twice: once inside the final preflight (`mix-balance`) and again for the delivered mix. Each pass is a short ffmpeg mix (about 0.3 s per 15 s of video), so it costs time, not correctness.
+- `styles.mjs find` does not score like the Python original (`difflib`): an exact id or alias scores 1, otherwise the best of 0.7 × name similarity (bigram Dice, counted from 0.5) and 0.6 × the share of query words found in the descriptions. Rankings can differ from motion-video for the same query.
+- `reframe.mjs` layout WARN only reads `left/top/width/height` in CSS and `style=""`. It misses GSAP `x:` and `translate(...px)`, `right/bottom/inset`, and a `data-width="1920"` root of a sub-composition in `compositions/`. Assets are hard links: a tool writing into the edition's `assets/` changes the master too.
+- `data-resolution="square"` on the 1:1 edition: `square` is the 1080×1080 preset of `hyperframes render --resolution` in 0.8.144, and `npx --yes hyperframes@0.8.144 lint` on a 1:1 edition in `/tmp` reports 0 errors. A full 1:1 render was not run.
+- Voice tracks are found by id `vo-*`, group `voiceover` or carve source. Projects assembled by the faceless-explainer workflow name them `el-NN-…-voice`, so `mix-balance` reports "không có giọng đọc" and `timing`/`word-sync` find no words there until the ids are renamed.
+- The carve duck matches HyperFrames' duck level only, not its multi-band EQ.
+
 ## v1.1.0 (2026-10-14): picture-event sync, readable hold, revision loop
 
 Why: three faults slipped past every existing gate. A sound effect could ring after the moment it belongs to (a click heard after the button is pressed), because many SFX files start with silence and `data-start` only marks where the file begins. On-screen text could leave before a viewer can read it. And each fix meant re-rendering the whole video, with no record of what had changed.
