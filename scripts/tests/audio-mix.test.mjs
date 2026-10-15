@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseTracks, buildArgs, dynamicAudio, carveKeys, isVoice, voiceIndices, keyLevelArgs, parseMeanVolume, parseLoudnorm, loudnormPass1Args, loudnormPass2Args, duckTarget, duckReduction, thresholdAt, searchDrop, CARVE_FLOOR_DB, MAX_REDUCTION_DB } from "../audio-mix.mjs";
+import { parseTracks, buildArgs, dynamicAudio, carveKeys, isVoice, voiceIndices, keyLevelArgs, parseMeanVolume, parseLoudnorm, loudnormPass1Args, staticGain, gainArgs, duckTarget, duckReduction, thresholdAt, searchDrop, CARVE_FLOOR_DB, MAX_REDUCTION_DB } from "../audio-mix.mjs";
 
 const CLI = fileURLToPath(new URL("../audio-mix.mjs", import.meta.url));
 const BASE = "/proj";
@@ -221,14 +221,22 @@ test("buildArgs: a carve bed is sidechain-ducked by the sum of its sources; stem
   assert.ok(!plain.join(" ").includes("sidechaincompress") && !plain.includes("[voice]"), "no carve, no stems: graph unchanged");
 });
 
-test("loudnorm: pass 1 prints JSON at -14 LUFS / -1.5 dBTP / LRA 11; pass 2 is linear with the measured values", () => {
+test("loudnorm: pass 1 prints JSON at -14 LUFS / -1.5 dBTP / LRA 11; pass 2 is one static gain, never loudnorm", () => {
   assert.ok(loudnormPass1Args("/tmp/m.wav").includes("loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json"));
   const stderr = `[Parsed_loudnorm_0 @ 0x1]\n{\n\t"input_i" : "-21.30",\n\t"input_tp" : "-3.10",\n\t"input_lra" : "6.20",\n\t"input_thresh" : "-31.70",\n\t"output_i" : "-14.02",\n\t"target_offset" : "0.02"\n}\n`;
   const m = parseLoudnorm(stderr);
   assert.equal(m.input_i, "-21.30");
   assert.throws(() => parseLoudnorm("nothing"), /no measurement/);
-  const a = loudnormPass2Args("/tmp/m.wav", m, 15, "/tmp/o.wav");
-  assert.match(a[a.indexOf("-af") + 1], /^loudnorm=I=-14:TP=-1\.5:LRA=11:measured_I=-21\.30:measured_TP=-3\.10:measured_LRA=6\.20:measured_thresh=-31\.70:offset=0\.02:linear=true,aresample=48000,apad=whole_dur=15,atrim=end_sample=720000$/);
+  // Peak-limited: +7.3 dB would reach -14 LUFS but the peak allows +1.6 dB only.
+  assert.deepEqual(staticGain(m), { gain: 1.6, outputI: -19.7, peakLimited: true });
+  // Room under the ceiling: the full gain, also when it is a cut.
+  assert.deepEqual(staticGain({ input_i: "-20.00", input_tp: "-12.00" }), { gain: 6, outputI: -14, peakLimited: false });
+  assert.deepEqual(staticGain({ input_i: "-10.00", input_tp: "0.50" }), { gain: -4, outputI: -14, peakLimited: false });
+  // Within 0.5 LU of the target: no warning.
+  assert.equal(staticGain({ input_i: "-16.00", input_tp: "-3.90" }).peakLimited, false);
+  assert.throws(() => staticGain({ input_i: "-inf", input_tp: "-inf" }), /measured I=-inf/);
+  const a = gainArgs("/tmp/m.wav", 1.6, 15, "/tmp/o.wav");
+  assert.equal(a[a.indexOf("-af") + 1], "volume=1.6dB,apad=whole_dur=15,atrim=end_sample=720000");
   assert.deepEqual(a.slice(-9), ["-ar", "48000", "-ac", "2", "-t", "15", "-fs", String(720000 * 4 + (1 << 20)), "/tmp/o.wav"]);
   assert.equal(parseMeanVolume("[Parsed_volumedetect_0] mean_volume: -19.6 dB"), -19.6);
   assert.equal(parseMeanVolume("mean_volume: -inf dB"), -Infinity);
@@ -262,7 +270,9 @@ test("CLI: a carve bed ducks to 6 dB under the voice (strength 0.8), the mix lan
     const dry = spawnSync("node", [CLI, "--html", html, "--duration", "6", "--out", out, "--stems", stems, "--loudnorm", "--dry-run"], { encoding: "utf8" });
     assert.equal(dry.status, 0, dry.stderr);
     assert.match(dry.stdout, /sidechaincompress=threshold=/);
-    assert.match(dry.stdout, /loudnorm=I=-14:TP=-1\.5:LRA=11/);
+    assert.match(dry.stdout, /loudnorm=I=-14:TP=-1\.5:LRA=11:print_format=json/);
+    assert.match(dry.stdout, /volume=/);
+    assert.equal(dry.stdout.match(/loudnorm=/g).length, 1, "loudnorm only measures");
     assert.deepEqual(readdirSync(dir).sort(), ["bed.wav", "index.html", "vo.wav"], "dry run writes nothing");
     const r = spawnSync("node", [CLI, "--html", html, "--duration", "6", "--out", out, "--stems", stems, "--loudnorm"], { encoding: "utf8" });
     assert.equal(r.status, 0, r.stderr);

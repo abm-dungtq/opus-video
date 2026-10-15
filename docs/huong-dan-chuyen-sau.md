@@ -1036,7 +1036,7 @@ node $OV/scripts/word-sync.mjs --project . --write-qa
 `audio-mix.mjs` (bản giao của `render-final.mjs` đi qua lệnh này) đọc `data-audio-group` và `data-fx-carve` rồi đổi thành sidechain ffmpeg. Không phải sửa HTML của dự án cũ.
 
 - Đích là nhạc thấp hơn giọng `4 + 2,5 × strength` dB lúc có lời (strength 0,8 cho 6 dB). Lệnh đo mức tự nhiên, rồi tìm ngưỡng compressor bằng cách đo lại sau mỗi lần thử.
-- `--loudnorm` chuẩn hoá bản mix về −14 LUFS, đỉnh −1,5 dBTP. `render-final.mjs` luôn bật cờ này.
+- `--loudnorm` tăng hoặc giảm cả bản mix một mức cố định để về −14 LUFS, nhưng không vượt đỉnh −1,5 dBTP. Khi đỉnh chặn, bản mix nhỏ hơn −14 LUFS và lệnh in `WARN LOUDNESS`. `render-final.mjs` luôn bật cờ này.
 
 Đo kết quả:
 

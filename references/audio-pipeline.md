@@ -94,7 +94,7 @@ node $OV/scripts/timing.mjs --project .
 | Nhạc nền khi có giọng | thấp hơn giọng 4–7 dB, đo bằng `mix-balance.mjs` |
 | Nhạc nền khi không có giọng | khoảng −20 LUFS |
 | SFX | khoảng −20 LUFS, đỉnh không quá −3 dBTP |
-| Bản master giao cho mạng xã hội | khoảng −14 LUFS integrated, −1,5 dBTP (`audio-mix --loudnorm`) |
+| Bản master giao cho mạng xã hội | khoảng −14 LUFS integrated, −1,5 dBTP (`audio-mix --loudnorm`; thấp hơn −14 khi đỉnh không cho tăng đủ) |
 
 ### Nhạc dưới giọng 4–7 dB
 
@@ -113,13 +113,13 @@ node $OV/scripts/mix-balance.mjs --project . [--write-qa]
 
 - Độ giảm có đích: `4 + 2,5 × strength` dB nhạc dưới giọng (strength 0,8 cho 6 dB). Lệnh trộn thử một bản không giảm để đo mức tự nhiên, rồi tìm ngưỡng compressor bằng cách đo lại sau mỗi lần thử (tối đa 6 lần), không dùng hằng số cố định. stderr in một dòng `duck #music: natural … target … wanted … got …`.
 - Đây là xấp xỉ phần mức của carve trong HyperFrames, không tái tạo EQ nhiều dải. Trên bản render HyperFrames thật của dự án Gemini, carve không có `data-fx-chain` không làm nhạc nhỏ đi khi có lời.
-- `--loudnorm` chuẩn hoá hai lượt về −14 LUFS, đỉnh −1,5 dBTP. `--stems <dir>` ghi `voice.wav` và `music.wav` (mức trước loudnorm). `render-final.mjs` luôn gọi `--loudnorm`.
+- `--loudnorm` đo bản mix bằng loudnorm, rồi nhân cả bản mix với một mức tăng cố định: `min(−14 − I đo được, −1,5 − TP đo được)` dB, áp bằng `volume`. Không có xử lý động nên khoảng cách nhạc dưới giọng mà duck đã ngắm được giữ nguyên. Khi đỉnh chặn mức tăng và bản mix thấp hơn −14 LUFS quá 0,5 LU, lệnh in `WARN LOUDNESS <I> LUFS (đỉnh giới hạn mức tăng)` kèm số đo. Bản giao khi đó nhỏ hơn −14 LUFS, và đó là lựa chọn có chủ ý. `--stems <dir>` ghi `voice.wav` và `music.wav` (mức trước loudnorm). `render-final.mjs` luôn gọi `--loudnorm`.
 
 ### Kết quả hiệu chỉnh (2026-10-15, bản sao trong `/tmp`)
 
 | Dự án | BALANCE | Ghi chú |
 |---|---|---|
-| `gemini-argon-dot2-9x16` (có carve, strength 0,8) | PASS 6,1 dB | nhạc tự nhiên 3,7 dB dưới giọng, duck thêm 2,4 dB; bản mix −14,0 LUFS, đỉnh −1,5 dBFS |
+| `gemini-argon-dot2-9x16` (có carve, strength 0,8) | PASS 6,1 dB | nhạc tự nhiên 3,7 dB dưới giọng, duck thêm 2,4 dB; bản mix −15,6 LUFS, đỉnh −1,5 dBTP (đỉnh giới hạn mức tăng ở +1,4 dB) |
 | `claude-code-ceo-sme` (dự án cũ, nhạc `data-volume` 0,2, không carve) | WARN 8,4 dB (id giọng `el-NN-…-voice`) | ngoài khoảng 4–7 dB; ngưỡng giữ nguyên, chờ người dùng nghe |
 
 - Trong HyperFrames, đặt volume theo `hyperframes-audio`. Ducking dùng `data-fx-carve` trên track nhạc (mục trên); bản giao do `audio-mix.mjs` thực hiện.

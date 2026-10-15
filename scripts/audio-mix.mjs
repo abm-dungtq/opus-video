@@ -21,7 +21,10 @@
 //   release 350 ms. No reduction wanted or music silent during speech: not ducked. A silent voice
 //   key: WARN, not ducked. Each bed prints natural, target, wanted, got and threshold on stderr.
 //   Malformed data-fx-carve JSON: exit 2.
-// --loudnorm: two-pass loudnorm of the mix to -14 LUFS, -1.5 dBTP, LRA 11 (linear), through a
+// --loudnorm: measures the mix with loudnorm (pass 1, -14 LUFS / -1.5 dBTP), then applies one static
+//   gain = min(-14 - measured I, -1.5 - measured TP) dB with `volume`: no dynamic processing, so the
+//   balance of the duck is kept. When the peak caps the gain and the mix lands more than 0.5 LU
+//   under -14 LUFS: "WARN LOUDNESS <I> LUFS (đỉnh giới hạn mức tăng)" with the numbers. Through a
 //   work WAV in a temp folder next to --out (removed afterwards).
 // --stems <dir>: also writes <dir>/voice.wav (tracks with id vo-* or *-voice, group voiceover, a
 //   src under assets/voice/, or a carve source) and <dir>/music.wav (beds: carve on, group music,
@@ -271,11 +274,22 @@ export function parseLoudnorm(stderr) {
   return JSON.parse(m[m.length - 1]);
 }
 
-export function loudnormPass2Args(inWav, m, totalSeconds, outWav) {
+// A second loudnorm pass turns dynamic whenever the peak leaves no room for the full gain (and
+// whenever measured LRA is 0 or over 11): it then rides the gain over time and moves the music
+// away from the distance the duck aimed at. One static gain from pass 1 instead: the loudness
+// target, capped by the true-peak ceiling. Returns { gain, outputI, peakLimited } in dB / LUFS.
+export const LOUDNESS_TOLERANCE = 0.5;
+export function staticGain(m) {
+  const i = Number(m.input_i), tp = Number(m.input_tp);
+  if (!Number.isFinite(i) || !Number.isFinite(tp)) throw new Error(`loudnorm measured I=${m.input_i}, TP=${m.input_tp}`);
+  const gain = +Math.min(LOUDNORM.I - i, LOUDNORM.TP - tp).toFixed(2);
+  const outputI = +(i + gain).toFixed(2);
+  return { gain, outputI, peakLimited: outputI < LOUDNORM.I - LOUDNESS_TOLERANCE };
+}
+
+export function gainArgs(inWav, gainDb, totalSeconds, outWav) {
   const samples = Math.round(totalSeconds * 48000);
-  const f = `${LOUDNORM_BASE}:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`;
-  // loudnorm resamples to 192 kHz internally: back to 48 kHz, then the same sample-count bound.
-  return ["-hide_banner", "-nostdin", "-v", "error", "-y", "-i", inWav, "-af", `${f},aresample=48000,apad=whole_dur=${totalSeconds},atrim=end_sample=${samples}`, ...outputArgs(samples, totalSeconds, outWav)];
+  return ["-hide_banner", "-nostdin", "-v", "error", "-y", "-i", inWav, "-af", `volume=${gainDb}dB,apad=whole_dur=${totalSeconds},atrim=end_sample=${samples}`, ...outputArgs(samples, totalSeconds, outWav)];
 }
 
 const shellQuote = (a) => (/^[\w@%+=:,./-]+$/.test(a) ? a : `'${a.replace(/'/g, "'\\''")}'`);
@@ -373,7 +387,7 @@ export function main(argv = process.argv.slice(2), { spawn = spawnSync, log = co
       const mix = join(dirname(out), ".audio-mix-XXXXXX", "mix.wav");
       show(buildArgs(tracks, total, mix, { thresholds, stems }));
       show(loudnormPass1Args(mix));
-      show(loudnormPass2Args(mix, { input_i: "<I>", input_tp: "<TP>", input_lra: "<LRA>", input_thresh: "<thresh>", target_offset: "<offset>" }, total, out));
+      show(gainArgs(mix, "<min(-14-I, -1.5-TP)>", total, out));
       return 0;
     }
     if (stems) mkdirSync(stems, { recursive: true });
@@ -381,7 +395,9 @@ export function main(argv = process.argv.slice(2), { spawn = spawnSync, log = co
     run(buildArgs(tracks, total, mix, { thresholds, stems }));
     const m = parseLoudnorm(run(loudnormPass1Args(mix), MEASURE).stderr);
     if (!Number.isFinite(Number(m.input_i))) { err("audio-mix: the mix is silent; loudnorm skipped"); renameSync(mix, out); return 0; }
-    run(loudnormPass2Args(mix, m, total, out));
+    const g = staticGain(m);
+    if (g.peakLimited) err(`audio-mix: WARN LOUDNESS ${g.outputI.toFixed(1)} LUFS (đỉnh giới hạn mức tăng): mix ${m.input_i} LUFS, đỉnh ${m.input_tp} dBTP, tăng ${g.gain} dB tới trần ${LOUDNORM.TP} dBTP; mục tiêu ${LOUDNORM.I} LUFS`);
+    run(gainArgs(mix, g.gain, total, out));
     return 0;
   } catch (e) {
     err(`audio-mix: ${e.message}`);
