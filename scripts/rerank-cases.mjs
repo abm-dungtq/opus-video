@@ -2,14 +2,14 @@
 // rerank-cases.mjs — OPTIONAL TypeSafe (Jev) rerank on top of find-cases.mjs.
 //   node rerank-cases.mjs --brief-json BRIEF.json | --brief "<English brief>" | --brief-file BRIEF.md
 //                         [--mode composite|single] [--aspect 16:9|9:16|both]
-//                         [--category c] [--keyword k]... [--tag t] [--full-only]
+//                         [--category c] [--keyword k]... [--tag t] [--full-only] [--include-removed]
 //                         [--pool 40|all] [--shortlist N] [--pair N] [--weights '{"style":0.3}']
 //                         [--detail-weight 0.5] [--limit 5] [--max-chars 1200] [--json] [--stats]
 //   node rerank-cases.mjs --help | -h
 // Candidate pool: --pool N (default 40) = find-cases.mjs category+keywords, then category-only,
 //   then keywords in any category; --pool all = that 40-case keyword pool PLUS every other case
-//   whose prompt is >= 40 chars (738 of the 813 cases; the other 75 are title/caption-only), so
-//   ~740 cases are scored per run (≈ 768k input tokens, ≈ 0.03 USD).
+//   whose prompt is >= 40 chars (928 of the 1003 shown cases; the other 75 are title/caption-only),
+//   so ~930 cases are scored per run (≈ 0.04 USD). Cases removed upstream are skipped.
 // --mode composite (default when data/case-features.jsonl exists; round-2 pilot winner):
 //   1 request classifies the brief (genre/subject Choice + wants_* Nouls), then 3 atomic Scores per
 //   candidate (kind-of-video fit, topic fit, visual style/technique fit). Code combines them with the
@@ -60,18 +60,18 @@ function find(args) {
 }
 
 // Candidate pool, in baseline (keyword) order. Index 0..limit-1 == plain find-cases output.
-export function buildPool({ category, keywords = [], tag, fullOnly, pool = 40 }) {
+export function buildPool({ category, keywords = [], tag, fullOnly, includeRemoved, pool = 40 }) {
   if (pool === "all") {
-    const base = buildPool({ category, keywords, tag, fullOnly, pool: 40 });
+    const base = buildPool({ category, keywords, tag, fullOnly, includeRemoved, pool: 40 });
     const seen = new Set(base.map((r) => r.id));
     const rest = readFileSync(new URL("../data/cases.jsonl", import.meta.url), "utf8")
       .split("\n").filter(Boolean).map((l) => JSON.parse(l))
-      .filter((r) => !seen.has(r.id) && r.prompt_len >= 40)
+      .filter((r) => !seen.has(r.id) && r.prompt_len >= 40 && (includeRemoved || !r.upstream_removed))
       .filter((r) => (!tag || r.tags.includes(tag)) && (!fullOnly || r.has_full_prompt));
     return [...base, ...rest];
   }
   pool = Number(pool);
-  const common = [...(tag ? ["--tag", tag] : []), ...(fullOnly ? ["--full-only"] : [])];
+  const common = [...(tag ? ["--tag", tag] : []), ...(fullOnly ? ["--full-only"] : []), ...(includeRemoved ? ["--include-removed"] : [])];
   const kw = keywords.flatMap((k) => ["--keyword", k]);
   const cat = category ? ["--category", category] : [];
   const n = ["--limit", String(pool)];
@@ -161,7 +161,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (!a.startsWith("--")) continue;
     const k = a.slice(2);
-    if (["full-only", "json", "stats"].includes(k)) o[k] = true;
+    if (["full-only", "json", "stats", "include-removed"].includes(k)) o[k] = true;
     else if (k === "keyword") o.keywords.push(String(argv[++i] ?? "").toLowerCase());
     else o[k] = argv[++i];
   }
@@ -191,7 +191,7 @@ async function main() {
   const o = parseArgs(argv);
   const brief = readBrief(o);
   const limit = Number(o.limit);
-  const candidates = buildPool({ category: o.category, keywords: o.keywords, tag: o.tag, fullOnly: o["full-only"], pool: o.pool === "all" ? "all" : Number(o.pool) });
+  const candidates = buildPool({ category: o.category, keywords: o.keywords, tag: o.tag, fullOnly: o["full-only"], includeRemoved: o["include-removed"], pool: o.pool === "all" ? "all" : Number(o.pool) });
   const detailWeight = o["detail-weight"] === undefined ? 0.5 : Number(o["detail-weight"]);
   const features = loadFeatures();
   const mode = o.mode || (features.size ? "composite" : "single");

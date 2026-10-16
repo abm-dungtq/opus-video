@@ -153,3 +153,9 @@ test("one failing chunk falls back to keyword order (all-or-nothing)", async () 
   assert.equal(out.reranked, false);
   assert.deepEqual(out.results.map((r) => r.id), ["x0", "x1"]);
 });
+
+test("buildPool hides upstream_removed cases unless includeRemoved", () => {
+  const hidden = buildPool({ pool: "all" });
+  assert.ok(hidden.length > 0 && hidden.every((r) => !r.upstream_removed));
+  assert.ok(buildPool({ pool: "all", includeRemoved: true }).some((r) => r.upstream_removed));
+});

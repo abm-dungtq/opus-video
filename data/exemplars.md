@@ -60,7 +60,7 @@ Ghi chú: brief ngắn nhưng có trạng thái đầu và cuối rõ ràng (ly 
 
 ### Infinite zoom kiểu After Effects
 @koldo2k · https://x.com/koldo2k/status/2103129343253778767 · tags: canvas, ai-image · nhóm: Explainer/giáo dục
-Ghi chú: prompt dạy toán của cú zoom liên tục (tốc độ hằng, thời lượng tỷ lệ với log zoom) và parallax ba lớp. Phần sinh ảnh bằng AI nằm ngoài phạm vi skill này.
+Ghi chú: Upstream đã gỡ case này ở 92aee2f (không làm từ một prompt Opus 5.5 đơn thuần): chỉ đọc để học cách viết, không coi là mẫu Opus 5.5. prompt dạy toán của cú zoom liên tục (tốc độ hằng, thời lượng tỷ lệ với log zoom) và parallax ba lớp. Phần sinh ảnh bằng AI nằm ngoài phạm vi skill này.
 ```
 Build a looping "infinite zoom" animation, After Effects style: the camera
 travels from landscape to landscape by flying through vintage objects.
@@ -209,7 +209,7 @@ HTML Canvas でアニメーションを書き、Playwright で 1 フレームず
 
 ### Phim ngắn ngoài không gian — shot list hai góc máy
 @alexwtlf · https://x.com/alexwtlf/status/2103713416367981005 · tags: canvas · nhóm: Tự sự/music video
-Ghi chú: cách viết bản đồ không gian và hình học cố định cho cả phim để giữ continuity, kèm mốc thời gian chính xác cho từng cut.
+Ghi chú: Upstream đã gỡ case này ở 92aee2f (không làm từ một prompt Opus 5.5 đơn thuần): chỉ đọc để học cách viết, không coi là mẫu Opus 5.5. cách viết bản đồ không gian và hình học cố định cho cả phim để giữ continuity, kèm mốc thời gian chính xác cho từng cut.
 ```
 SCENE CONTEXT
 … 25 seconds, seven cuts between two camera positions: OUTSIDE, looking at the window from space, and INSIDE, her own eyes looking out through the porthole.

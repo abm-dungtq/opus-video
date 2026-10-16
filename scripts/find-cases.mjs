@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // find-cases.mjs — search the bundled Opus 5.5 video corpus (data/cases.jsonl).
 //   node find-cases.mjs [--category c] [--tag t] [--keyword k]... [--full-only]
-//                       [--limit 5] [--max-chars 1200] [--json]
+//                       [--limit 5] [--max-chars 1200] [--json] [--include-removed]
+// Cases upstream removed (`upstream_removed: true`) are hidden unless --include-removed.
 // Categories: motion · explainer · 3d · interactive · product · story-music.
 // Every result carries author + source URL; prompts belong to their authors.
 
@@ -16,7 +17,7 @@ for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (!a.startsWith("--")) { console.error(`find-cases: unexpected "${a}"; search with --keyword "<word>" (repeatable), --category or --tag`); process.exit(2); }
   const k = a.slice(2);
-  if (k === "full-only" || k === "json") opts[k] = true;
+  if (k === "full-only" || k === "json" || k === "include-removed") opts[k] = true;
   else if (k === "keyword") keywords.push(String(argv[++i] ?? "").toLowerCase());
   else opts[k] = argv[++i];
 }
@@ -27,6 +28,7 @@ const rows = readFileSync(new URL("../data/cases.jsonl", import.meta.url), "utf8
   .map((l) => JSON.parse(l));
 
 const scored = rows
+  .filter((r) => opts["include-removed"] || !r.upstream_removed)
   .filter((r) => !opts.category || r.category === opts.category)
   .filter((r) => !opts.tag || r.tags.includes(opts.tag))
   .filter((r) => !opts["full-only"] || r.has_full_prompt)

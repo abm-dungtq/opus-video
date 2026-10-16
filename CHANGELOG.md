@@ -15,6 +15,8 @@ Why: the 45 KB root `SKILL.md` loaded every rule of every step into each session
 - `scripts/manifest-import.mjs`: `project.json` for a project made before the manifest (shots from PLAN.md, scene sub-compositions, audio_meta voices or the root; lines by midpoint; text from `script/NN.txt`, audio_meta or the `words.json` sidecar). It only adds `project.json` and `.opus/`; projects without TIMING markers are view only.
 - `timing.mjs` on a project with `project.json` goes through `gateway.mjs derive`.
 - `setup-check.mjs` prints `opus-video plugin: installed|missing` (a WARN, never MISSING).
+- Corpus: yihui refreshed to `92aee2f` (703 cases, 295 new). The 105 cases upstream removed stay in `data/cases.jsonl` with `upstream_removed: true`; `find-cases` and `rerank-cases` hide them unless `--include-removed`. `build-case-index.mjs` takes `--yihui-commit`, `--chus-commit`, `--previous` and prints `ADDED · KEPT · REMOVED · TOTAL`.
+- `scripts/case-template.mjs` (quick mode): one case → `build/TEMPLATE.md` (prompt verbatim, author, URL, license, brief topic and aspect, adaptation checklist) and `creative_override: nhanh theo case <id>`. `check-preflight` keeps the final-stage animatic gate for that override.
 
 ## v1.2.0 (2026-10-15): composition template, measured mix, word and beat sync, reframe, 61 styles
 

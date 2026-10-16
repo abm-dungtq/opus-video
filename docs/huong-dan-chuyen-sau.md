@@ -211,7 +211,7 @@ Bắt buộc với video tiếng Việt. Chi tiết ở mục 8.
 
 ## 4. Tra case mẫu
 
-Skill mang theo chỉ mục 813 video làm bằng Opus 5.5 trong `data/cases.jsonl`. Không đọc file này trực tiếp, luôn tra bằng script.
+Skill mang theo chỉ mục 1003 video làm bằng Opus 5.5 trong `data/cases.jsonl` (cộng 105 case upstream đã gỡ, bị ẩn khi tra). Không đọc file này trực tiếp, luôn tra bằng script.
 
 ### 4.1 Tra nhanh bằng `find-cases`
 
@@ -230,7 +230,7 @@ node $OV/scripts/rerank-cases.mjs --brief-json BRIEF.case-query.json --aspect <1
      --category <nhóm> --keyword <từ khoá tiếng Anh>
 ```
 
-- `--pool all` chấm khoảng 740 case có prompt từ 40 ký tự trở lên theo loại video, chủ đề và phong cách hình, rồi code cộng thêm độ chi tiết của prompt và luật khổ hình (case dọc được đẩy lên cho brief 9:16). Mất khoảng 1 giây và khoảng 0,03 USD.
+- `--pool all` chấm khoảng 930 case có prompt từ 40 ký tự trở lên theo loại video, chủ đề và phong cách hình, rồi code cộng thêm độ chi tiết của prompt và luật khổ hình (case dọc được đẩy lên cho brief 9:16). Mất khoảng 1 giây và khoảng 0,04 USD.
 - Luôn kèm `--category` và `--keyword`: thiếu key, lỗi API hay hết giờ thì script tự trả kết quả `find-cases` với đúng các cờ đó và vẫn thoát 0.
 - Dòng `###` có `· jev 0.xx (…)` nghĩa là Jev đã xếp hạng. Không có `jev` nghĩa là đang ở chế độ dự phòng.
 - `--stats` in một dòng JSON ra stderr có trường `case_search`. Chép nguyên giá trị vào `BRIEF.md`, ví dụ `case_search: jev` hoặc `case_search: find-cases (HTTP 401)`.

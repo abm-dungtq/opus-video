@@ -27,3 +27,11 @@ test("a bare query without --keyword exits 2 instead of returning the unfiltered
   assert.equal(r.status, 2);
   assert.match(r.stderr, /--keyword/);
 });
+
+test("upstream_removed cases are hidden unless --include-removed", () => {
+  const all = JSON.parse(run("--limit", "5000", "--json"));
+  assert.ok(all.length > 0 && all.every((r) => !r.upstream_removed));
+  const withRemoved = JSON.parse(run("--limit", "5000", "--json", "--include-removed"));
+  assert.ok(withRemoved.some((r) => r.upstream_removed));
+  assert.equal(withRemoved.length - all.length, withRemoved.filter((r) => r.upstream_removed).length);
+});

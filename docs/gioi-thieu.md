@@ -4,9 +4,9 @@ Bạn gõ một câu: "làm video 60 giây giới thiệu sản phẩm, cả 16:
 
 opus-video là skill điều phối biến agent lập trình thành một xưởng làm video. Nó không thay thế công cụ nào. Nó bắt các công cụ tốt nhất làm việc theo đúng thứ tự và không cho bước sau chạy khi bước trước chưa đạt.
 
-## Đứng trên 813 video
+## Đứng trên hơn 1.000 video
 
-Mỗi lựa chọn dựng hình bắt đầu từ dữ liệu. Skill mang theo chỉ mục 813 video làm bằng Opus 5.5, lấy từ hai bộ sưu tập mã nguồn mở có giấy phép MIT, kèm prompt gốc và link tác giả. Trước khi viết storyboard, agent tra những case gần nhất với brief của bạn. Nếu có key TypeSafe Jev, khoảng 740 case có prompt đầy đủ được xếp hạng theo loại video, chủ đề và phong cách hình ảnh, trong khoảng một giây với chi phí khoảng 0,03 USD. Không có key, skill tự quay về tra theo nhóm và từ khoá, quy trình vẫn chạy tiếp.
+Mỗi lựa chọn dựng hình bắt đầu từ dữ liệu. Skill mang theo chỉ mục 1003 video làm bằng Opus 5.5, lấy từ hai bộ sưu tập mã nguồn mở có giấy phép MIT, kèm prompt gốc và link tác giả. Trước khi viết storyboard, agent tra những case gần nhất với brief của bạn. Nếu có key TypeSafe Jev, khoảng 930 case có prompt dùng được được xếp hạng theo loại video, chủ đề và phong cách hình ảnh, trong khoảng một giây với chi phí khoảng 0,04 USD. Không có key, skill tự quay về tra theo nhóm và từ khoá, quy trình vẫn chạy tiếp.
 
 Từ case mẫu, agent chọn kỹ thuật dựng cụ thể trong thư viện pattern: blueprint, preset, hiệu ứng có sẵn trong catalog HyperFrames. Hình ảnh vì thế có cấu trúc đã được kiểm chứng, không phải ngẫu hứng.
 

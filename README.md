@@ -7,7 +7,7 @@
 ![Node ≥ 22](https://img.shields.io/badge/node-%E2%89%A5%2022-339933.svg)
 ![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Antigravity-6f42c1.svg)
 ![OS](https://img.shields.io/badge/OS-macOS%20%C2%B7%20Linux%20%C2%B7%20WSL%20%C2%B7%20Windows-555.svg)
-![Tests](https://img.shields.io/badge/tests-440%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-448%20passing-brightgreen.svg)
 
 Chạy trên **Claude Code** (dạng plugin `opus-video` gồm 11 skill), **OpenAI Codex, Google Antigravity (app và CLI)** và mọi agent đọc được thư mục skill có `SKILL.md`.
 
@@ -331,8 +331,9 @@ Mọi script đều có `--help` / `-h` (in phần mô tả đầu file, thoát 
 | `scripts/eleven.mjs` | `doctor`, `tts`, `sfx`, `music`, `audio-meta` (cầu nối sang workflow HyperFrames) |
 | `scripts/check-viet-pro.mjs` | Cổng viet-pro: biên bản `## viet_pro`, `script-table.v1.md` + compare, lint từng file lời đọc và `SCRIPT.md`, `CAPTIONS.md` khi giao; dự án `voice_source: clip` lint `script/captions.txt` và `script/on-screen.txt` thay cho bảng kịch bản; `--jev-audit` (tuỳ chọn) chỉ in WARN |
 | `scripts/voice-gate.mjs` | Cổng mà `eleven.mjs tts`/`audio-meta` gọi trước khi tạo giọng (exit 4) |
-| `scripts/find-cases.mjs` | Tra 813 case mẫu theo nhóm và từ khoá |
-| `scripts/rerank-cases.mjs` | (Tuỳ chọn, cần `TYPESAFE_API_KEY`) Jev xếp hạng ~740 case theo brief; thiếu key hoặc lỗi API thì trả kết quả như `find-cases` |
+| `scripts/find-cases.mjs` | Tra 1003 case mẫu theo nhóm và từ khoá |
+| `scripts/case-template.mjs` | Hướng nhanh: tạo `build/TEMPLATE.md` từ một case đã chọn |
+| `scripts/rerank-cases.mjs` | (Tuỳ chọn, cần `TYPESAFE_API_KEY`) Jev xếp hạng khoảng 930 case theo brief; thiếu key hoặc lỗi API thì trả kết quả như `find-cases` |
 | `scripts/case-features.mjs` | Gắn nhãn một lần cho mọi case vào `data/case-features.jsonl`; chạy lại khi `data/cases.jsonl` đổi |
 | `scripts/jev-audit.mjs`, `scripts/jev-audit-eval.mjs` | (Tuỳ chọn) Jev rà lời đọc; đo precision theo pattern |
 | `scripts/video-lint.mjs` | Bắt chữ bị ép thường, chữ quá nhỏ, nội dung lấn vùng UI ở khổ 9:16, nhãn rào đón trên hình (`HEDGE_LABEL`: ERROR khi `voice_source: clip`, còn lại WARN) |

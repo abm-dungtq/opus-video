@@ -201,7 +201,7 @@ HyperFrames: blueprint `camera-journey` · rule `coordinate-target-zoom`, `camer
 
 ### Thẻ 6 — Vòng lặp liền mạch
 Frame cuối trùng frame đầu, gồm cả vị trí và vận tốc con trỏ, nếu không vòng lặp sẽ giật. Cảnh cuối dẫn ngược về hình mở đầu chứ không fade. Với infinite zoom: zoom mũ về một điểm cố định, thời lượng mỗi đoạn tỷ lệ với log(zoom), cắt khi "cổng" lấp đầy khung và kiểm tra từng frame quanh điểm cắt.
-Case: `y:demonugc-525162`, `y:koldo2k-778767`
+Case: `y:demonugc-525162`
 HyperFrames: blueprint `zoom-out-workspace-reveal` · rule `sine-wave-loop` · `catalog --query "loop"` (block: `drift-hold`) · preset `cartesian`
 
 ### Thẻ 7 — Mask và line reveal
