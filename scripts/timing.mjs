@@ -218,6 +218,7 @@ export function main(argv = process.argv.slice(2), { out = (s) => process.stdout
   const dir = resolve(o.project);
   // A project with project.json takes its scene windows from the manifest, through the gateway.
   if (existsSync(join(dir, "project.json"))) {
+    if (o.html !== "index.html" || o.music) err("timing: dự án có project.json, bỏ qua --html/--music (html và nhạc lấy từ project.json)\n");
     const r = derive(dir, { dry: o.dry });
     if (r.code) { err(`timing: ${r.error}\n`); return r.code === 4 ? 1 : r.code; }
     out([...r.lines, ...r.warnings.map((w) => `WARN ${w}`)].join("\n") + "\n");

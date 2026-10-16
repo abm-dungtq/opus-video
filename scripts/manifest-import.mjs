@@ -19,13 +19,13 @@
 // Prints `IMPORT <dir> shots=N lines=N music=N editable=<bool>` and the WARN lines.
 // --force  import again over an existing project.json, as the next version (history is kept).
 // Exit: 0 ok · 1 unreadable project or invalid result · 2 bad usage or no index.html ·
-// 6 project.json exists (use --force).
+// 6 project.json exists (use --force) · 8 BUSY (another writer holds .opus/lock).
 import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { basename, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { SCHEMA, load, validate, r3 } from "./manifest.mjs";
-import { record } from "./gateway.mjs";
+import { record, takeLock } from "./gateway.mjs";
 import { planScenes } from "./timing.mjs";
 import { parseTracks, isVoice, isBed } from "./audio-mix.mjs";
 
@@ -161,6 +161,13 @@ export function main(argv = process.argv.slice(2), { out = (s) => process.stdout
   if (!o.project) { err(`manifest-import: --project is required\n${usage}\n`); return 2; }
   const dir = resolve(o.project);
   if (!existsSync(join(dir, "index.html"))) { err(`manifest-import: không có index.html trong ${dir}\n`); return 2; }
+  // Hold the gateway lock so a Studio or director write cannot take the same version number.
+  const release = o.write ? takeLock(dir) : () => {};
+  if (!release) { err(`manifest-import: BUSY: project.json đang được ghi bởi tiến trình khác, thử lại sau\n`); return 8; }
+  try { return run(dir, o, out, err); } finally { release(); }
+}
+
+function run(dir, o, out, err) {
   const existing = load(dir);
   if (existing && !o.force) { err(`manifest-import: ${dir}/project.json đã có (thêm --force để nhập lại thành phiên bản mới)\n`); return 6; }
   let r;

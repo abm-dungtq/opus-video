@@ -20,13 +20,16 @@
 //   { "op": "add_shot", "after": "s2" | null, "name": "…", "duration": 3 }   later shots ripple
 //   { "op": "remove_shot", "id": "s4" }                      refused while a line belongs to it
 // --base is the version the caller last saw; another version is a CONFLICT and nothing is written.
-// Writers are serialized by .opus/lock (a lock older than 30 s is stale and removed).
+// Writers are serialized by .opus/lock (a lock older than 30 s is stale and removed); a writer
+// that cannot get it within 5 s exits 8 BUSY and may retry. The derived files are written before
+// project.json, so a new version number means its HTML, PLAN.md and timing.json are in place.
 // undo reverts the newest change not yet undone by restoring the snapshot before it, as a new
-// version (actor "undo"), so history only grows.
+// version (actor "undo"), so history only grows. It never reaches past the latest import.
 // A project whose index.html has no TIMING:BEGIN/END (capabilities.editable false, every project
 // imported from before the skeleton) is view only: patch, undo and derive exit 4.
 // Exit: 0 ok · 1 cannot read or write · 2 bad usage · 3 CONFLICT · 4 view-only project ·
-// 5 INVALID (unknown op or id, or the result breaks project.json rules) · 7 nothing to undo.
+// 5 INVALID (unknown op or id, or the result breaks project.json rules) · 7 nothing to undo ·
+// 8 BUSY (another writer holds the lock).
 import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,7 +38,7 @@ import { load, save, validate, r3 } from "./manifest.mjs";
 import { buildTiming, injectTiming, manifestScenes } from "./timing.mjs";
 import { SECTIONS, fold, parseTable, sceneId } from "./check-preflight.mjs";
 
-export const EXIT = { ok: 0, io: 1, usage: 2, conflict: 3, viewOnly: 4, invalid: 5, nothingToUndo: 7 };
+export const EXIT = { ok: 0, io: 1, usage: 2, conflict: 3, viewOnly: 4, invalid: 5, nothingToUndo: 7, busy: 8 };
 export const ACTORS = ["human", "director", "timing", "import", "undo"];
 const VIEW_ONLY = "dự án chỉ xem: index.html không có TIMING:BEGIN/END";
 const LOCK_STALE_MS = 30_000;
@@ -91,6 +94,7 @@ export function applyOps(m, ops) {
         const delta = newEnd - s.end;
         receipt.push(`${s.id}: ${fmt(s.end - s.start)} → ${fmt(d)}`);
         s.end = newEnd;
+        for (const l of next.lines) if (l.shot === s.id && l.start >= newEnd - EPS) receipt.push(`CẢNH BÁO ${l.id}: bắt đầu ${fmt(l.start)}, sau khi ${s.id} kết thúc ${fmt(newEnd)}`);
         ripple(i + 1, delta);
         retime(before);
         break;
@@ -161,15 +165,17 @@ export function applyOps(m, ops) {
 }
 
 // Blocks until .opus/lock is ours; returns a release function, or null after LOCK_WAIT_MS.
-function takeLock(dir) {
+export function takeLock(dir) {
   mkdirSync(opusDir(dir), { recursive: true });
   const f = join(opusDir(dir), "lock");
   const until = Date.now() + LOCK_WAIT_MS;
   const nap = new Int32Array(new SharedArrayBuffer(4));
   for (;;) {
     try {
-      writeFileSync(f, String(process.pid), { flag: "wx" });
-      return () => rmSync(f, { force: true });
+      const token = `${process.pid}:${Date.now()}:${Math.random()}`;
+      writeFileSync(f, token, { flag: "wx" });
+      // Remove only our own lock: a waiter may have swept it as stale and taken a new one.
+      return () => { try { if (readFileSync(f, "utf8") === token) rmSync(f, { force: true }); } catch { /* already gone */ } };
     } catch (e) {
       if (e.code !== "EEXIST") throw e;
       try { if (Date.now() - statSync(f).mtimeMs > LOCK_STALE_MS) { rmSync(f, { force: true }); continue; } } catch { continue; }
@@ -203,7 +209,7 @@ export function readHistory(dir) {
 // Shared tail of patch() and undo(): lock, base check, validate, write, derive.
 function commit(dir, { base, actor, build }) {
   const release = takeLock(dir);
-  if (!release) return { code: EXIT.conflict, error: "project.json đang được ghi bởi tiến trình khác" };
+  if (!release) return { code: EXIT.busy, error: "BUSY: project.json đang được ghi bởi tiến trình khác, thử lại sau" };
   try {
     const m = load(dir);
     if (!m) return { code: EXIT.usage, error: `không có project.json trong ${dir}` };
@@ -221,12 +227,13 @@ function commit(dir, { base, actor, build }) {
     if (!existsSync(snapPath(dir, m.version))) { mkdirSync(join(opusDir(dir), "versions"), { recursive: true }); writeJson(snapPath(dir, m.version), m); }
     r.next.version = m.version + 1;
     r.next.updated = new Date().toISOString();
-    // Derive first, so a composition that cannot take the change leaves every file as it was.
+    // Derive first, so a composition that cannot take the change leaves every file as it was,
+    // then write it, and project.json last: a reader that sees v+1 also sees its derived files.
     const d = derive(dir, { manifest: r.next, dry: true });
     if (d.code) return d;
-    record(dir, r.next, { actor, base: m.version, ops: r.ops, receipt: r.receipt, ...(r.extra ?? {}) });
     const w = derive(dir, { manifest: r.next });
     if (w.code) return w;
+    record(dir, r.next, { actor, base: m.version, ops: r.ops, receipt: r.receipt, ...(r.extra ?? {}) });
     return { code: EXIT.ok, version: r.next.version, receipt: r.receipt, lines: w.lines, warnings: w.warnings };
   } finally { release(); }
 }
@@ -240,9 +247,11 @@ export function undo(dir, { base }) {
   return commit(dir, {
     base, actor: "undo",
     build: (m) => {
-      const hist = readHistory(dir);
+      const all = readHistory(dir);
+      // An import replaces the whole manifest: undo stays on this side of the latest one.
+      const hist = all.slice(all.findLastIndex((h) => h.actor === "import") + 1);
       const undone = new Set(hist.filter((h) => h.actor === "undo").map((h) => h.undoes));
-      const target = [...hist].reverse().find((h) => h.actor !== "undo" && h.actor !== "import" && h.v > 1 && !undone.has(h.v));
+      const target = [...hist].reverse().find((h) => h.actor !== "undo" && h.v > 1 && !undone.has(h.v));
       if (!target) throw Object.assign(new Error("không còn thay đổi nào để hoàn tác"), { code: "NOTHING" });
       const prev = JSON.parse(readFileSync(snapPath(dir, target.v - 1), "utf8"));
       const next = { ...prev, version: m.version, updated: m.updated };
@@ -259,18 +268,34 @@ const setAttr = (tag, name, value) => {
 };
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-// HTML text + manifest → HTML with the root data-duration and each voice line's data-start /
-// data-duration set. Only those attribute values change.
+// Rewrites the first match of re outside an HTML comment (the skeleton documents its tags in
+// comments, and the renderer ignores those). Returns { text, hit }.
+function replaceLive(html, re, fn) {
+  const comments = [...html.matchAll(/<!--[\s\S]*?-->/g)].map((c) => [c.index, c.index + c[0].length]);
+  const g = new RegExp(re.source, re.flags.includes("g") ? re.flags : re.flags + "g");
+  for (const x of html.matchAll(g)) {
+    if (comments.some(([a, b]) => x.index >= a && x.index < b)) continue;
+    return { text: html.slice(0, x.index) + fn(x[0]) + html.slice(x.index + x[0].length), hit: true };
+  }
+  return { text: html, hit: false };
+}
+
+// HTML text + manifest → { html, missing }: the root data-duration and each voice line's
+// data-start / data-duration set (only those attribute values change); missing lists the line ids
+// with no live <audio>/<video> tag.
 export function deriveHtml(html, m) {
-  let out = html.replace(/<[a-z][^>]*\sdata-composition-id\s*=[^>]*>/i, (tag) => setAttr(tag, "data-duration", m.duration));
+  let out = replaceLive(html, /<[a-z][^>]*\sdata-composition-id\s*=[^>]*>/i, (tag) => setAttr(tag, "data-duration", m.duration)).text;
+  const missing = [];
   for (const l of m.lines) {
-    out = out.replace(new RegExp(`<(?:audio|video)\\b[^>]*\\sid\\s*=\\s*["']${esc(l.id)}["'][^>]*>`, "i"), (tag) => {
+    const r = replaceLive(out, new RegExp(`<(?:audio|video)\\b[^>]*\\sid\\s*=\\s*["']${esc(l.id)}["'][^>]*>`, "i"), (tag) => {
       let t = setAttr(tag, "data-start", r3(l.start));
       if (l.duration != null) t = setAttr(t, "data-duration", r3(l.duration));
       return t;
     });
+    out = r.text;
+    if (!r.hit) missing.push(l.id);
   }
-  return out;
+  return { html: out, missing };
 }
 
 // PLAN.md text + manifest → PLAN.md with the "## Cảnh" rows in shot order and each Thời điểm cell
@@ -290,14 +315,24 @@ export function derivePlan(text, m) {
   const ni = table.headers.findIndex((x) => x === "#");
   const ti = table.headers.findIndex((x) => /thoi diem/.test(x));
   if (ti < 0) return text;
-  const bySid = new Map(table.rows.map((r, i) => [sceneId(ni >= 0 ? r[ni] : "", i), r]));
+  const head = /^\s*\|[\s|:-]+\|\s*$/.test(lines[a + 1] ?? "") ? 2 : 1;
+  // Existing rows keep every byte but the Thời điểm cell; the raw row and parsed row line up.
+  const raw = block.slice(head);
+  const bySid = new Map(table.rows.map((r, i) => [sceneId(ni >= 0 ? r[ni] : "", i), raw[i]]));
+  const when = (s) => `${r3(s.start).toFixed(1)}–${r3(s.end).toFixed(1)}s`;
   const rows = m.shots.map((s) => {
-    const r = [...(bySid.get(s.id) ?? table.headers.map(() => "…"))];
-    if (ni >= 0 && !bySid.has(s.id)) r[ni] = s.id.replace(/^s/, "");
-    r[ti] = `${r3(s.start).toFixed(1)}–${r3(s.end).toFixed(1)}s`;
+    const old = bySid.get(s.id);
+    if (old != null) {
+      const cells = old.split("|");
+      const c = cells[ti + 1];
+      cells[ti + 1] = /\S/.test(c) ? c.replace(/\S(.*\S)?/, when(s)) : ` ${when(s)} `;
+      return cells.join("|");
+    }
+    const r = table.headers.map(() => "…");
+    if (ni >= 0) r[ni] = s.id.replace(/^s/, "");
+    r[ti] = when(s);
     return `| ${r.join(" | ")} |`;
   });
-  const head = /^\s*\|[\s|:-]+\|\s*$/.test(lines[a + 1] ?? "") ? 2 : 1;
   return [...lines.slice(0, a + head), ...rows, ...lines.slice(b)].join("\n");
 }
 
@@ -310,9 +345,11 @@ export function derive(dir, { manifest = null, dry = false } = {}) {
   if (!m.capabilities?.editable) return { code: EXIT.viewOnly, error: VIEW_ONLY };
   const htmlPath = join(root, m.html);
   const planPath = join(root, "PLAN.md");
-  let html, plan = null, r, next;
+  let html, plan = null, r, next, missing = [];
   try {
-    html = deriveHtml(readFileSync(htmlPath, "utf8"), m);
+    const dh = deriveHtml(readFileSync(htmlPath, "utf8"), m);
+    html = dh.html;
+    missing = dh.missing;
     if (existsSync(planPath)) plan = derivePlan(readFileSync(planPath, "utf8"), m);
     const bed = m.music.find((b) => existsSync(join(root, `${b.file}.beats.json`)));
     r = buildTiming({ dir: root, html: m.html, music: bed?.file ?? null, scenes: manifestScenes(m), htmlText: html });
@@ -325,7 +362,8 @@ export function derive(dir, { manifest = null, dry = false } = {}) {
       writeAtomic(join(root, "timing.json"), JSON.stringify(r.timing, null, 2) + "\n");
     } catch (e) { return { code: EXIT.io, error: `không ghi được: ${e.message}` }; }
   }
-  return { code: EXIT.ok, lines: r.lines, warnings: r.warnings };
+  const warnings = [...missing.map((id) => `${id}: không có thẻ <audio>/<video id="${id}"> trong ${m.html}, thời điểm không được ghi`), ...r.warnings];
+  return { code: EXIT.ok, lines: r.lines, warnings };
 }
 
 function writeAtomic(f, text) {

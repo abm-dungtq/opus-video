@@ -142,7 +142,8 @@ test("derivePlan keeps rows of known shots, drops removed ones and adds placehol
 
 test("deriveHtml adds a missing data-duration and leaves unknown tracks alone", () => {
   const html = '<div data-composition-id="main" data-start="0"><audio id="vo-01" src="a.mp3"></audio><audio id="bgm" src="b.mp3" data-start="0"></audio></div>';
-  const out = deriveHtml(html, { duration: 4, lines: [{ id: "vo-01", start: 1, duration: 2 }] });
+  const { html: out, missing } = deriveHtml(html, { duration: 4, lines: [{ id: "vo-01", start: 1, duration: 2 }, { id: "vo-09", start: 3 }] });
+  assert.deepEqual(missing, ["vo-09"]);
   assert.match(out, /data-composition-id="main" data-start="0" data-duration="4"/);
   assert.match(out, /<audio id="vo-01" src="a\.mp3" data-start="1" data-duration="2">/);
   assert.match(out, /<audio id="bgm" src="b\.mp3" data-start="0">/);
@@ -201,4 +202,57 @@ test("a stale lock older than 30 s is removed", () => withProject((dir) => {
   const r = patch(dir, { actor: "human", base: 1, ops: [{ op: "resize_shot", id: "s1", duration: 3 }] });
   assert.equal(r.code, EXIT.ok, r.error);
   assert.ok(!existsSync(lock));
+}));
+
+test("deriveHtml skips tags inside comments, as in the skeleton's sound example", () => {
+  const html = '<!-- root: <div data-composition-id="x" data-duration="…"> -->\n<div data-composition-id="main" data-duration="8">\n<!-- sound: <audio id="vo-01" src="assets/voice/01.mp3" data-start="…"> -->\n<audio id="vo-01" src="assets/voice/01.mp3" data-start="2.5" data-duration="3"></audio></div>';
+  const { html: out, missing } = deriveHtml(html, { duration: 9, lines: [{ id: "vo-01", start: 3.5, duration: 3 }] });
+  assert.deepEqual(missing, []);
+  assert.match(out, /<!-- root: <div data-composition-id="x" data-duration="…"> -->/);
+  assert.match(out, /<!-- sound: <audio id="vo-01" src="assets\/voice\/01\.mp3" data-start="…"> -->/);
+  assert.match(out, /<div data-composition-id="main" data-duration="9">/);
+  assert.match(out, /<audio id="vo-01" src="assets\/voice\/01\.mp3" data-start="3\.5" data-duration="3">/);
+});
+
+test("a line with no live tag is a derive WARN, not a silent no-op", () => withProject((dir) => {
+  const f = join(dir, "index.html");
+  writeFileSync(f, readFileSync(f, "utf8").replace(/<audio([^>]*)\sid="vo-01"/, "<!-- <audio$1 id=\"vo-01\" --><audio$1 id=\"vo-x\""));
+  const r = derive(dir, { dry: true });
+  assert.equal(r.code, EXIT.ok, r.error);
+  assert.ok(r.warnings.some((w) => /vo-01: không có thẻ/.test(w)), r.warnings.join("\n"));
+}));
+
+test("derivePlan keeps every byte of a row but its Thời điểm cell", () => {
+  const plan = readFileSync(join(FIXTURE, "PLAN.md"), "utf8");
+  const next = applyOps(load(FIXTURE), [{ op: "resize_shot", id: "s1", duration: 3.5 }]).next;
+  const before = plan.split("\n"), after = derivePlan(plan, next).split("\n");
+  assert.equal(after.length, before.length);
+  const changed = before.map((l, i) => [l, after[i]]).filter(([x, y]) => x !== y);
+  assert.equal(changed.length, 3, "one Thời điểm cell per shot");
+  for (const [x, y] of changed) assert.equal(x.replace(/\d+(\.\d+)?\s*[–-]\s*\d+(\.\d+)?s/, "T"), y.replace(/\d+(\.\d+)?–\d+(\.\d+)?s/, "T"));
+});
+
+test("shrinking a shot past its own line puts a warning in the receipt", () => {
+  const { receipt } = applyOps(load(FIXTURE), [{ op: "resize_shot", id: "s2", duration: 0.5 }, { op: "resize_shot", id: "s1", duration: 1 }]);
+  assert.ok(!receipt.some((r) => /CẢNH BÁO/.test(r)), "s1 holds no line");
+  const r2 = applyOps(load(FIXTURE), [{ op: "move_line", id: "vo-01", start: 4 }, { op: "resize_shot", id: "s2", duration: 1 }]).receipt;
+  assert.ok(r2.some((r) => /CẢNH BÁO vo-01/.test(r)), r2.join("; "));
+});
+
+test("undo never reaches past the latest import", () => withProject((dir) => {
+  assert.equal(patch(dir, { actor: "human", base: 1, ops: [{ op: "resize_shot", id: "s1", duration: 3 }] }).code, EXIT.ok);
+  const m = load(dir);
+  m.version = 3;
+  save(dir, m);
+  writeFileSync(join(dir, ".opus", "versions", "v3.json"), JSON.stringify(m));
+  writeFileSync(join(dir, ".opus", "history.jsonl"), readFileSync(join(dir, ".opus", "history.jsonl"), "utf8") + JSON.stringify({ v: 3, actor: "import", ops: [] }) + "\n");
+  assert.equal(undo(dir, { base: 3 }).code, EXIT.nothingToUndo);
+}));
+
+test("a held lock is BUSY (exit 8), not a CONFLICT", () => withProject((dir) => {
+  mkdirSync(join(dir, ".opus"), { recursive: true });
+  writeFileSync(join(dir, ".opus", "lock"), "other");
+  const r = patch(dir, { actor: "human", base: 1, ops: [{ op: "resize_shot", id: "s1", duration: 3 }] });
+  assert.equal(r.code, EXIT.busy);
+  assert.equal(readFileSync(join(dir, ".opus", "lock"), "utf8"), "other", "another writer's lock is left alone");
 }));
