@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="studio-token" content="__STUDIO_TOKEN__">
+  <title>Motion Studio · opus-video</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">Motion Studio</div>
+      <select id="project-select" aria-label="Dự án"></select>
+      <div id="project-title" class="title"></div>
+      <div class="spacer"></div>
+      <select id="version-select" aria-label="Phiên bản"></select>
+      <button id="undo-btn" class="btn" title="Hoàn tác (Ctrl/Cmd+Z)">Hoàn tác</button>
+      <button id="export-btn" class="btn primary">Xuất video</button>
+    </header>
+
+    <div id="banner" class="banner" hidden></div>
+
+    <aside class="left">
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="director" class="tab active">Đạo diễn AI</button>
+        <button role="tab" data-tab="quick" class="tab">Nhanh</button>
+        <button role="tab" data-tab="scenes" class="tab">Mẫu cảnh</button>
+        <button role="tab" data-tab="media" class="tab">Media</button>
+        <button role="tab" data-tab="voice" class="tab">Lồng tiếng</button>
+        <button role="tab" data-tab="music" class="tab">Nhạc</button>
+        <button role="tab" data-tab="style" class="tab">Phong cách</button>
+      </nav>
+      <section id="panel" class="panel"></section>
+    </aside>
+
+    <main class="stage">
+      <div id="player" class="player"><div class="player-empty">Chọn một dự án</div></div>
+      <div class="transport">
+        <button id="play-btn" class="btn icon" aria-label="Phát"><span class="glyph play"></span></button>
+        <span id="time" class="time">0:00.0 / 0:00.0</span>
+      </div>
+    </main>
+
+    <aside class="right" id="inspector"></aside>
+
+    <section class="bottom">
+      <div class="timeline-bar">
+        <span class="hint">Kéo mép phải shot để đổi độ dài · kéo câu thoại để dời</span>
+        <div class="spacer"></div>
+        <button id="zoom-out" class="btn icon" aria-label="Thu nhỏ">−</button>
+        <button id="zoom-in" class="btn icon" aria-label="Phóng to">+</button>
+      </div>
+      <div id="timeline" class="timeline"></div>
+    </section>
+  </div>
+  <div id="toast" class="toast" hidden></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

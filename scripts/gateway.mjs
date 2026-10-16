@@ -164,11 +164,12 @@ export function applyOps(m, ops) {
   return { next, receipt };
 }
 
-// Blocks until .opus/lock is ours; returns a release function, or null after LOCK_WAIT_MS.
-export function takeLock(dir) {
+// Blocks until .opus/lock is ours; returns a release function, or null after waitMs. A server
+// (Motion Studio) passes a short waitMs so one contended write does not stall its event loop.
+export function takeLock(dir, waitMs = LOCK_WAIT_MS) {
   mkdirSync(opusDir(dir), { recursive: true });
   const f = join(opusDir(dir), "lock");
-  const until = Date.now() + LOCK_WAIT_MS;
+  const until = Date.now() + waitMs;
   const nap = new Int32Array(new SharedArrayBuffer(4));
   for (;;) {
     try {
@@ -207,8 +208,8 @@ export function readHistory(dir) {
 }
 
 // Shared tail of patch() and undo(): lock, base check, validate, write, derive.
-function commit(dir, { base, actor, build }) {
-  const release = takeLock(dir);
+function commit(dir, { base, actor, build, lockWaitMs }) {
+  const release = takeLock(dir, lockWaitMs);
   if (!release) return { code: EXIT.busy, error: "BUSY: project.json đang được ghi bởi tiến trình khác, thử lại sau" };
   try {
     const m = load(dir);
@@ -239,14 +240,14 @@ function commit(dir, { base, actor, build }) {
 }
 
 // note: optional free text kept in the history line (the director's reason, a Studio request id).
-export function patch(dir, { actor, base, ops, note }) {
+export function patch(dir, { actor, base, ops, note, lockWaitMs }) {
   if (!ACTORS.includes(actor) || actor === "undo" || actor === "import") return { code: EXIT.usage, error: `actor phải là human | director | timing` };
-  return commit(dir, { base, actor, build: (m) => ({ ...applyOps(m, ops), ops, ...(note ? { extra: { note: String(note) } } : {}) }) });
+  return commit(dir, { base, actor, lockWaitMs, build: (m) => ({ ...applyOps(m, ops), ops, ...(note ? { extra: { note: String(note) } } : {}) }) });
 }
 
-export function undo(dir, { base }) {
+export function undo(dir, { base, lockWaitMs }) {
   return commit(dir, {
-    base, actor: "undo",
+    base, actor: "undo", lockWaitMs,
     build: (m) => {
       const all = readHistory(dir);
       // An import replaces the whole manifest: undo stays on this side of the latest one.

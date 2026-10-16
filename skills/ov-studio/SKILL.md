@@ -9,7 +9,7 @@ description: "Hướng timeline của opus-video: manifest project.json (shot, c
 
 ## Phạm vi
 
-Skill này sở hữu manifest `project.json`, cổng lệnh ghi duy nhất `gateway.mjs`, việc nhập dự án cũ, Motion Studio và yêu cầu gửi cho đạo diễn AI. Motion Studio (giao diện web trên máy) **chưa có trong bản này**. Dùng được: hai CLI dưới đây và MCP server `opus-video` cho đạo diễn AI.
+Skill này sở hữu manifest `project.json`, cổng lệnh ghi duy nhất `gateway.mjs`, việc nhập dự án cũ, Motion Studio và yêu cầu gửi cho đạo diễn AI. Dùng được: hai CLI dưới đây, Motion Studio (giao diện web trên máy) và MCP server `opus-video` cho đạo diễn AI.
 
 ## Đã dùng được
 
@@ -28,6 +28,24 @@ Skill này sở hữu manifest `project.json`, cổng lệnh ghi duy nhất `gat
   ```
   Exit 3 CONFLICT: phiên bản đã đổi, đọc lại bằng `show` rồi làm lại. Exit 8 BUSY: tiến trình khác đang ghi, thử lại sau. Exit 5 INVALID: op sai hoặc kết quả phá luật manifest (đọc lý do tiếng Việt). Danh sách op ở `--help`.
 - Sửa lời một câu (`set_line_text`) đặt `gate: stale`: chạy lại `ov-script` cho câu đó, rồi `ov-audio` tạo lại giọng, rồi `ov-deliver`.
+
+## Motion Studio
+
+Giao diện web trên máy để xem và sửa timeline: player, timeline (Shot, Lồng tiếng, Nhạc), inspector của shot và bảy tab (Đạo diễn AI, Nhanh, Mẫu cảnh, Media, Lồng tiếng, Nhạc, Phong cách).
+
+```bash
+node $OV/scripts/studio.mjs start --background   # http://127.0.0.1:4317, gốc /Volumes/2/Edit-Video
+node $OV/scripts/studio.mjs start --background --root <thư mục chứa các dự án>
+node $OV/scripts/studio.mjs status               # running <url> (pid, root, từ …) | stopped
+node $OV/scripts/studio.mjs stop                 # dừng khi xong việc
+```
+
+- Mỗi máy chỉ một server. `start` khi server đang chạy cho cùng thư mục gốc thì in URL; cho thư mục gốc khác thì từ chối (exit 3), dừng nó trước. Cổng 4317 bị tiến trình khác giữ: exit 3, không đổi cổng. Log nền: `~/.config/opus-video/studio.log`.
+- Dự án là thư mục con trực tiếp của thư mục gốc có `project.json`. Thư mục có `index.html` và `BRIEF.md` mà chưa có manifest hiện nút **Nhập dự án** (chạy `manifest-import --write`).
+- Mọi thao tác sửa đi qua gateway với actor `human`: kéo mép phải shot (`resize_shot`, bước 0,1 s, tối thiểu 0,5 s), kéo câu thoại (`move_line`), Áp dụng trong inspector (`set_shot`, `resize_shot`), sửa lời (`set_line_text`, gate thành `stale`), thanh âm lượng nhạc (`set_music`), Hoàn tác hoặc Ctrl/Cmd+Z (`undo`). Phiên bản đã đổi (409) thì Studio tải lại và báo "Đã có thay đổi mới, đã tải lại".
+- Dự án chỉ xem hiện banner "Dự án nhập từ bản cũ: chỉ xem, sửa qua đạo diễn" và khoá mọi thao tác sửa.
+- Bảo mật: chỉ nghe 127.0.0.1, kiểm tra Host và Origin, POST cần token của lần chạy (lưu trong `~/.config/opus-video/studio.json`, chmod 600). Không phục vụ `.env`, `.git` hay dotfile ngoài `.opus/`. Tiến trình cùng user trên máy nằm trong vùng tin cậy.
+- Chưa nối đạo diễn: "Nhờ đạo diễn sửa", "Dùng mẫu này" và Xuất video mới chỉ báo "Chưa nối đạo diễn". Chưa có nút đưa lại hay huỷ một yêu cầu đang chạy bị kẹt.
 
 ## MCP server cho đạo diễn AI
 
