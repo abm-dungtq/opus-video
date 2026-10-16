@@ -35,8 +35,17 @@ function writeState(s) {
   chmodSync(tmp, 0o600);
   renameSync(tmp, STATE);
 }
-const live = () => { const s = readState(); return s && alive(s.pid) ? s : null; };
-const portOwner = () => { try { return execFileSync("lsof", ["-ti", `tcp:${PORT}`, "-sTCP:LISTEN"], { encoding: "utf8" }).trim().split("\n")[0] || null; } catch { return null; } };
+// lsof missing (Windows): undefined; nobody listening: null.
+const portOwner = () => { try { return execFileSync("lsof", ["-ti", `tcp:${PORT}`, "-sTCP:LISTEN"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim().split("\n")[0] || null; } catch (e) { return e.code === "ENOENT" ? undefined : null; } };
+const answers = async (s) => { try { const r = await fetch(new URL("/api/projects", s.url), { signal: AbortSignal.timeout(1500) }); return r.ok; } catch { return false; } };
+// The state file survives a crash or kill -9, and after a reboot its pid may belong to another
+// process: it is live only while that pid holds the port (or, without lsof, the URL answers).
+async function live() {
+  const s = readState();
+  if (!s || !alive(s.pid)) return null;
+  const owner = portOwner();
+  return (owner === undefined ? await answers(s) : owner === String(s.pid)) ? s : null;
+}
 const rootOf = (o) => realpathSync(resolve(o.root || process.env.OPUS_STUDIO_ROOT || "/Volumes/2/Edit-Video"));
 
 async function serve(root) {
@@ -59,7 +68,7 @@ async function serve(root) {
 
 async function start(o) {
   const root = rootOf(o);
-  const s = live();
+  const s = await live();
   if (s) {
     if (s.root === root) { console.log(`đang chạy: ${s.url} (pid ${s.pid})`); return 0; }
     console.error(`studio: đang chạy cho ${s.root} (pid ${s.pid}); dừng nó trước (node studio.mjs stop)`);
@@ -84,16 +93,16 @@ async function start(o) {
   return 1;
 }
 
-function status() {
-  const s = live();
+async function status() {
+  const s = await live();
   if (!s) { if (readState()) rmSync(STATE, { force: true }); console.log("stopped"); return 0; }
   console.log(`running ${s.url} (pid ${s.pid}, root ${s.root}, từ ${s.started})`);
   return 0;
 }
 
 async function stop() {
-  const s = readState();
-  if (!s || !alive(s.pid)) { rmSync(STATE, { force: true }); console.log("stopped"); return 0; }
+  const s = await live();
+  if (!s) { rmSync(STATE, { force: true }); console.log("stopped"); return 0; }
   process.kill(s.pid, "SIGTERM");
   for (let i = 0; i < 50 && alive(s.pid); i++) await new Promise((r) => setTimeout(r, 100));
   if (alive(s.pid)) { console.error(`studio: pid ${s.pid} chưa dừng sau 5 s`); return 1; }

@@ -7,7 +7,7 @@
 ![Node ≥ 22](https://img.shields.io/badge/node-%E2%89%A5%2022-339933.svg)
 ![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Antigravity-6f42c1.svg)
 ![OS](https://img.shields.io/badge/OS-macOS%20%C2%B7%20Linux%20%C2%B7%20WSL%20%C2%B7%20Windows-555.svg)
-![Tests](https://img.shields.io/badge/tests-461%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-462%20passing-brightgreen.svg)
 
 Chạy trên **Claude Code** (dạng plugin `opus-video` gồm 11 skill), **OpenAI Codex, Google Antigravity (app và CLI)** và mọi agent đọc được thư mục skill có `SKILL.md`.
 
