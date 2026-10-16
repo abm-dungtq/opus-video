@@ -16,8 +16,11 @@
 //     resets it to pending whenever it captures new frames.
 //   - WARN only: a composition file (index.html, compositions/*.html) newer than the newest
 //     demo frame (the demo may not show the current build).
-// Creative gate (SKILL.md step 1b; data/directions.json), both stages, unless BRIEF.md frontmatter
-//   has `creative_override: <reason ≥10 chars>` (printed as a WARN). Active when BRIEF has
+// Creative gate (skill ov-direction, step 1b; data/directions.json), both stages, unless BRIEF.md
+//   frontmatter has `creative_override: <reason ≥10 chars>` (printed as a WARN). Quick mode
+//   (`creative_override: nhanh theo case <id>`, skill ov-cases) skips the direction checks but
+//   keeps the final-stage animatic gate: DEMO.md `animatic:` (and `animatic_9x16:`) present, newer
+//   than PLAN.md and the composition, portrait for 9:16, and passing MOTION. Active when BRIEF has
 //   `direction:` or `brief_version: 2`; older briefs get one WARN:
 //   - BRIEF.md `direction: <A1..A8>` naming a direction in data/directions.json.
 //   - PLAN.md "## Ý đồ sáng tạo" with lines for Hướng, Chuyển cảnh and Luật chống slideshow.
@@ -69,7 +72,7 @@ import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
 import { loadDirections, classifySeams, tokenExists, upstream, wordBudget } from "./directions.mjs";
-import { measureMotion, motionVerdict } from "./qc-mp4.mjs";
+import { measureMotion, motionVerdict, QUICK_MODE } from "./qc-mp4.mjs";
 import { checkSync, parseEventsBody, isLegacy } from "./sfx-sync.mjs";
 import { resolveProject } from "./styles.mjs";
 import { checkWords } from "./word-sync.mjs";
@@ -194,13 +197,51 @@ export function holdWarnings(table) {
   return out;
 }
 
+export { QUICK_MODE };
+
+// The approved animatic (and the 9:16 one when required) exists, is newer than PLAN.md and the
+// composition, is portrait for 9:16, and moves (qc-mp4 MOTION). Records motion into out.
+function checkAnimatic({ dir, fm, out, errors, warnings, motion, probe }) {
+  const planTime = statSync(join(dir, "PLAN.md")).mtimeMs;
+  const demoMd = join(dir, "DEMO.md");
+  const demoText = existsSync(demoMd) ? readFileSync(demoMd, "utf8") : "";
+  // aspect both renders a second animatic (make-demo --aspect 9x16 → animatic_9x16:); measure each one.
+  const keys = ["animatic", ...(String(fm.aspect || "").trim() === "both" || animaticOf(demoText, "animatic_9x16") ? ["animatic_9x16"] : [])];
+  for (const key of keys) {
+    const anim = animaticOf(demoText, key);
+    const animPath = anim ? resolve(dir, anim) : "";
+    const rerun = key === "animatic_9x16" ? verticalHint(dir) : "make-demo.mjs --animatic";
+    let bad;
+    if (!anim) errors.push(`DEMO.md has no \`${key}:\` — run ${rerun} so the user approves motion, not stills`);
+    else if (!existsSync(animPath)) errors.push(`DEMO.md animatic ${anim} not found`);
+    else if (statSync(animPath).mtimeMs < planTime) errors.push(`animatic ${anim} is older than PLAN.md; re-run ${rerun}`);
+    else if (newerThan(dir, statSync(animPath).mtimeMs).length) errors.push(`${newerThan(dir, statSync(animPath).mtimeMs).join(", ")} newer than the animatic ${anim}; the user approved older motion, re-run ${rerun}`);
+    else if (key === "animatic_9x16" && (bad = notPortrait(probe, animPath, anim, rerun))) errors.push(bad);
+    else {
+      let m;
+      try { m = motion(animPath); } catch (e) { errors.push(`cannot measure motion of ${anim}: ${e.message}`); }
+      if (m !== undefined) {
+        const v = motionVerdict(m, fm);
+        out[key === "animatic" ? "motion" : "motion_9x16"] = { ...m, level: v.level };
+        if (v.level === "FAIL") errors.push(`animatic ${anim}: ${v.detail}`);
+        else if (v.level === "WARN") warnings.push(`animatic ${anim}: ${v.detail}`);
+      }
+    }
+  }
+}
+
 // Creative gate on PLAN.md + BRIEF.md. Pushes into errors/warnings; returns a summary or null.
 export function checkCreative({ dir, plan, brief, stage, errors, warnings, data = loadDirections(), up = upstream(), motion = measureMotion, probe = probeSize, sync = checkSync, words = checkWords }) {
   const fm = frontmatter(brief);
   if (fm.creative_override) {
-    if (fm.creative_override.trim().length < 10) errors.push("BRIEF.md creative_override needs a reason of at least 10 characters");
-    else warnings.push(`creative gate skipped: creative_override "${fm.creative_override.trim()}"`);
-    return null;
+    const reason = fm.creative_override.trim();
+    if (reason.length < 10) { errors.push("BRIEF.md creative_override needs a reason of at least 10 characters"); return null; }
+    const quick = reason.match(QUICK_MODE);
+    if (!quick) { warnings.push(`creative gate skipped: creative_override "${reason}"`); return null; }
+    warnings.push(`creative direction checks skipped: quick mode from case ${quick[1]} (the animatic gate stays)`);
+    const out = { quick: quick[1] };
+    if (stage === "final") checkAnimatic({ dir, fm, out, errors, warnings, motion, probe });
+    return out;
   }
   const id = String(fm.direction || "").trim().toUpperCase().split(/\s/)[0];
   if (!id) {
@@ -271,31 +312,7 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
 
   if (stage === "final") {
     const planTime = statSync(join(dir, "PLAN.md")).mtimeMs;
-    const demoMd = join(dir, "DEMO.md");
-    const demoText = existsSync(demoMd) ? readFileSync(demoMd, "utf8") : "";
-    // aspect both renders a second animatic (make-demo --aspect 9x16 → animatic_9x16:); measure each one.
-    const keys = ["animatic", ...(String(fm.aspect || "").trim() === "both" || animaticOf(demoText, "animatic_9x16") ? ["animatic_9x16"] : [])];
-    for (const key of keys) {
-      const anim = animaticOf(demoText, key);
-      const animPath = anim ? resolve(dir, anim) : "";
-      const rerun = key === "animatic_9x16" ? verticalHint(dir) : "make-demo.mjs --animatic";
-      let bad;
-      if (!anim) errors.push(`DEMO.md has no \`${key}:\` — run ${rerun} so the user approves motion, not stills`);
-      else if (!existsSync(animPath)) errors.push(`DEMO.md animatic ${anim} not found`);
-      else if (statSync(animPath).mtimeMs < planTime) errors.push(`animatic ${anim} is older than PLAN.md; re-run ${rerun}`);
-      else if (newerThan(dir, statSync(animPath).mtimeMs).length) errors.push(`${newerThan(dir, statSync(animPath).mtimeMs).join(", ")} newer than the animatic ${anim}; the user approved older motion, re-run ${rerun}`);
-      else if (key === "animatic_9x16" && (bad = notPortrait(probe, animPath, anim, rerun))) errors.push(bad);
-      else {
-        let m;
-        try { m = motion(animPath); } catch (e) { errors.push(`cannot measure motion of ${anim}: ${e.message}`); }
-        if (m !== undefined) {
-          const v = motionVerdict(m, fm);
-          out[key === "animatic" ? "motion" : "motion_9x16"] = { ...m, level: v.level };
-          if (v.level === "FAIL") errors.push(`animatic ${anim}: ${v.detail}`);
-          else if (v.level === "WARN") warnings.push(`animatic ${anim}: ${v.detail}`);
-        }
-      }
-    }
+    checkAnimatic({ dir, fm, out, errors, warnings, motion, probe });
     let s;
     try { s = sync({ dir }); } catch (e) { errors.push(`sfx-sync: ${e.message}`); }
     if (s) {

@@ -9,7 +9,7 @@ description: "Hướng timeline của opus-video: manifest project.json (shot, c
 
 ## Phạm vi
 
-Skill này sở hữu manifest `project.json`, cổng lệnh ghi duy nhất `gateway.mjs`, việc nhập dự án cũ, Motion Studio và yêu cầu gửi cho đạo diễn AI. Motion Studio (giao diện web trên máy), MCP server và đạo diễn AI **chưa dùng được trước phase 4** của kế hoạch nâng cấp; tới lúc đó chỉ dùng hai CLI dưới đây.
+Skill này sở hữu manifest `project.json`, cổng lệnh ghi duy nhất `gateway.mjs`, việc nhập dự án cũ, Motion Studio và yêu cầu gửi cho đạo diễn AI. Motion Studio (giao diện web trên máy), MCP server và đạo diễn AI **chưa có trong bản này**; hiện chỉ dùng hai CLI dưới đây.
 
 ## Đã dùng được
 

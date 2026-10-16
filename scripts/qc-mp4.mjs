@@ -60,9 +60,13 @@ export function parseMotion(stderr) {
 }
 
 // → { level: PASS|WARN|FAIL, detail } for a motion measurement and BRIEF frontmatter (or null).
+// `creative_override: nhanh theo case <id>`: quick mode (skill ov-cases) keeps the creative motion limits.
+export const QUICK_MODE = /^nhanh theo case\s+(\S+)/i;
+
 export function motionVerdict(motion, brief) {
   if (!motion) return { level: "WARN", detail: "không đo được chuyển động (signalstats)" };
-  const creative = !!(brief && brief.direction && !brief.creative_override);
+  const quick = !!(brief && QUICK_MODE.test(String(brief.creative_override || "").trim()));
+  const creative = quick || !!(brief && brief.direction && !brief.creative_override);
   const key = brief && String(brief.energy || "").trim() === "em" ? "em" : "default";
   const fail = LIMITS.motionFail[key], warn = LIMITS.motionWarn[key];
   const pct = (x) => `${Math.round(x * 100)}%`;

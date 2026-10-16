@@ -50,6 +50,15 @@ $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 function Install-SkillDir($src, $name) {
   foreach ($dir in $targets) {
     $dest = Join-Path $dir $name
+    # A host without a plugin loader needs its own copy with the router SKILL.md at the root; a link
+    # to the Claude Code checkout cannot get one (Claude Code would load the router twice).
+    $item = Get-Item $dest -Force -ErrorAction SilentlyContinue
+    if ($name -eq "opus-video" -and $item -and $item.LinkType -and $dir -ne $map["claude"]) {
+      $bk = Join-Path $H ".opus-video-backups\$stamp"
+      New-Item -ItemType Directory -Force $bk | Out-Null
+      Move-Item $dest (Join-Path $bk ($name + "_link_" + ($dir -replace '[\\:]', '_')))
+      Say "link $dest moved to $bk — installing a copy"
+    }
     if (Test-Path (Join-Path $dest ".git")) { Say "$dest is a git checkout — left as is (git -C `"$dest`" pull)"; continue }
     New-Item -ItemType Directory -Force $dir | Out-Null
     if (Test-Path $dest) {

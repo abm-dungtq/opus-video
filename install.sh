@@ -128,6 +128,13 @@ expose_skills() { # $1 = skills root, $2 = plugin root ($1/opus-video)
 }
 for dir in "${TARGETS[@]}"; do
   dest="$dir/opus-video"
+  # A host without a plugin loader needs its own copy with the router SKILL.md at the root; a link
+  # to the Claude Code checkout cannot get one (Claude Code would load the router twice).
+  if [ -L "$dest" ]; then case "$dir" in */.claude/skills) ;; *)
+    mkdir -p "$HOME/.opus-video-backups/$STAMP"
+    mv "$dest" "$HOME/.opus-video-backups/$STAMP/$(echo "$dir" | tr '/' '_')"
+    say "link $dest moved to ~/.opus-video-backups/$STAMP/ — installing a copy"
+  ;; esac; fi
   if [ -d "$dest/.git" ] && [ "$(cd "$dest" && pwd -P)" != "$(cd "$SRC" && pwd -P)" ]; then
     say "$dest is a git checkout — left as is (update it with: git -C \"$dest\" pull)"
   elif [ "$(cd "$dest" 2>/dev/null && pwd -P)" = "$(cd "$SRC" && pwd -P)" ]; then
@@ -146,9 +153,6 @@ for dir in "${TARGETS[@]}"; do
   expose_skills "$dir" "$dest"
   [ -z "$PRIMARY" ] && PRIMARY="$dest"
 done
-if [ "$WANT_CLAUDE" = true ] || [ "$WORKSPACE" = true ]; then
-  say "Claude Code elsewhere (opus-video not under a skills dir): claude plugin marketplace add <path-to-opus-video> && claude plugin install opus-video@opus-video-private"
-fi
 
 if [ "$SKIP_DEPS" = false ]; then
   # 5. viet-pro for the same hosts

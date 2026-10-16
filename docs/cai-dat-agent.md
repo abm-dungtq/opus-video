@@ -99,7 +99,7 @@ Agent nào đọc được file và chạy được shell đều dùng được 
 Đọc <đường dẫn>/opus-video/skills/opus-video/SKILL.md và làm đúng quy trình trong đó để làm video 30 giây giới thiệu <sản phẩm>.
 ```
 
-Nếu agent hỗ trợ file hướng dẫn cố định cho dự án (như `AGENTS.md`), thêm một dòng trỏ tới `SKILL.md` để agent tự đọc mỗi khi được yêu cầu làm video.
+Nếu agent hỗ trợ file hướng dẫn cố định cho dự án (như `AGENTS.md`), thêm một dòng trỏ tới `skills/opus-video/SKILL.md` để agent tự đọc mỗi khi được yêu cầu làm video.
 
 ### Windows
 
@@ -198,7 +198,7 @@ Sau đó kiểm kết nối ElevenLabs:
 node ~/.claude/skills/opus-video/scripts/eleven.mjs doctor
 ```
 
-Lệnh đạt khi exit 0 và in `tier`, `tts model`, `voice`. Cuối cùng, mở phiên agent mới để agent nạp skill vừa cài. `SKILL.md` yêu cầu agent tự chạy `setup-check` ở bước 0, nên máy thiếu gì agent sẽ dừng và báo trước khi làm video.
+Lệnh đạt khi exit 0 và in `tier`, `tts model`, `voice`. Cuối cùng, mở phiên agent mới để agent nạp skill vừa cài. Skill điểm vào `opus-video` (và `ov-setup`) yêu cầu agent tự chạy `setup-check` ở bước 0, nên máy thiếu gì agent sẽ dừng và báo trước khi làm video.
 
 Muốn chắc chắn bộ script chạy đúng trên máy mới, chạy test:
 
@@ -208,7 +208,7 @@ node --test ~/.claude/skills/opus-video/scripts/tests/
 
 ## 8. Các cổng agent phải qua
 
-Cài xong, agent làm video theo chín bước trong `SKILL.md`. Có năm chốt chặn bằng script, agent không tự bỏ qua được:
+Cài xong, agent làm video theo chín bước, chia cho các skill `ov-*` mà `skills/opus-video/SKILL.md` điều phối. Có năm chốt chặn bằng script, agent không tự bỏ qua được:
 
 | Chốt | Lệnh | Khi chặn |
 |---|---|---|

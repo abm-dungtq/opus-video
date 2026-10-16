@@ -509,3 +509,35 @@ test("check-viet-pro: BRIEF word_budget blocks a script that talks over the pict
     assert.ok(r.errors.some((e) => e.includes("VOICE_OVER_BUDGET") && e.includes("26")), JSON.stringify(r.errors));
   } finally { rmSync(vp, { recursive: true, force: true }); rmSync(d, { recursive: true, force: true }); }
 });
+
+test("checkCreative quick mode: direction checks skipped, the final-stage animatic gate stays", () => {
+  const d = tmp();
+  try {
+    writeFileSync(join(d, "PLAN.md"), "# Plan\n");
+    past(join(d, "PLAN.md"), 300);
+    const brief = "---\naspect: 16:9\nbrief_version: 2\ncreative_override: nhanh theo case 0412\n---\n";
+    const plan = parsePlan("# Plan\n");
+    const run = (stage, motion = () => ({ frames: 90, still: 0, ratio: 0, peak: 9 })) => {
+      const errors = [], warnings = [];
+      const out = checkCreative({ dir: d, plan, brief, stage, errors, warnings, motion, probe: () => ({ width: 640, height: 360 }) });
+      return { out, errors, warnings };
+    };
+    let r = run("plan");
+    assert.deepEqual(r.errors, []);
+    assert.equal(r.out.quick, "0412");
+    assert.ok(r.warnings.some((w) => w.includes("quick mode from case 0412")));
+    r = run("final");
+    assert.ok(r.errors.some((e) => e.includes("no `animatic:`")), JSON.stringify(r.errors));
+    mkdirSync(join(d, "demo"));
+    writeFileSync(join(d, "demo", "animatic.mp4"), "x");
+    writeFileSync(join(d, "DEMO.md"), "animatic: demo/animatic.mp4\n");
+    r = run("final");
+    assert.deepEqual(r.errors, []);
+    assert.equal(r.out.motion.level, "PASS");
+    r = run("final", () => ({ frames: 90, still: 90, ratio: 1, peak: 0 }));
+    assert.ok(r.errors.some((e) => e.includes("animatic demo/animatic.mp4")), JSON.stringify(r.errors));
+    const other = [];
+    checkCreative({ dir: d, plan, brief: "---\ncreative_override: dự án cũ chỉ có footage\n---\n", stage: "final", errors: other, warnings: [] });
+    assert.deepEqual(other, [], "a non-quick override still skips the whole gate");
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});

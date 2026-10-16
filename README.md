@@ -7,7 +7,7 @@
 ![Node ≥ 22](https://img.shields.io/badge/node-%E2%89%A5%2022-339933.svg)
 ![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Antigravity-6f42c1.svg)
 ![OS](https://img.shields.io/badge/OS-macOS%20%C2%B7%20Linux%20%C2%B7%20WSL%20%C2%B7%20Windows-555.svg)
-![Tests](https://img.shields.io/badge/tests-274%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-440%20passing-brightgreen.svg)
 
 Chạy trên **Claude Code** (dạng plugin `opus-video` gồm 11 skill), **OpenAI Codex, Google Antigravity (app và CLI)** và mọi agent đọc được thư mục skill có `SKILL.md`.
 
@@ -136,7 +136,7 @@ Dùng sâu: [hướng dẫn chuyên sâu về các tính năng](docs/huong-dan-c
 
 Installer cài **toàn bộ** những gì skill cần, cho mọi agent tìm thấy trên máy:
 
-- opus-video vào thư mục skill của từng agent (bản cũ được chuyển vào `~/.opus-video-backups/`, không xoá; thư mục là git checkout thì để nguyên). Claude Code nạp thư mục `~/.claude/skills/opus-video` tại chỗ thành plugin `opus-video@skills-dir`, nên **không** chạy thêm `claude plugin install` trên máy đó. Codex và Antigravity chưa có plugin: installer chép `SKILL.md` điểm vào ra gốc thư mục `opus-video` và tạo link `ov-*` cạnh nó (Windows: bản sao);
+- opus-video vào thư mục skill của từng agent (bản cũ được chuyển vào `~/.opus-video-backups/`, không xoá; thư mục là git checkout thì để nguyên). Claude Code nạp thư mục `~/.claude/skills/opus-video` tại chỗ thành plugin `opus-video@skills-dir`, nên **không** chạy thêm `claude plugin install` trên máy đó; skill điểm vào gọi bằng `/opus-video:opus-video` (các skill khác: `/opus-video:ov-brief`…). Codex và Antigravity chưa có plugin: installer chép `SKILL.md` điểm vào ra gốc thư mục `opus-video` và tạo link `ov-*` cạnh nó (Windows: bản sao);
 - `viet-pro` v5.3.0 (bằng installer của chính nó, cùng các agent);
 - CLI `hyperframes` và **mọi** skill HyperFrames (`hyperframes`, `hyperframes-core/-animation/-keyframes/-creative/-audio/-cli/-registry/-studio`, `media-use` và mọi workflow: `general-video`, `faceless-explainer`, `product-launch-video`, `pr-to-video`, `motion-graphics`, `music-to-video`, `slideshow`, `embedded-captions`, `talking-head-recut`, `remotion-to-hyperframes`) qua `npx hyperframes skills`;
 - file key mẫu `~/.config/opus-video/.env` (quyền chỉ chủ sở hữu đọc được);
