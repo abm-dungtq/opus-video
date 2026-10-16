@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.0.0 (2026-10-16): plugin with eleven skills, four operating modes, project.json manifest
+
+Why: the 45 KB root `SKILL.md` loaded every rule of every step into each session, could not be routed by intent (a quick template video and a timeline edit read the same 253 lines), and the timeline had no single source of truth: seconds lived in PLAN.md, the TIMING block and the voice tags at once, with nothing to undo a change.
+
+### Breaking
+- The root `SKILL.md` is gone. The repo is the Claude Code plugin `opus-video` (`.claude-plugin/plugin.json`, private marketplace `opus-video-private` in `.claude-plugin/marketplace.json`) with eleven skills under `skills/`: `opus-video` (router), `ov-setup`, `ov-brief`, `ov-direction`, `ov-cases`, `ov-script`, `ov-audio`, `ov-build`, `ov-footage`, `ov-deliver`, `ov-studio`. Every rule of the old file moved into exactly one skill (text moved, not paraphrased); `scripts/tests/plugin-layout.test.mjs` checks names, descriptions, length (≤ 150 lines) and every `$OV/scripts|references` path.
+- Under `~/.claude/skills/opus-video` Claude Code loads the checkout in place as `opus-video@skills-dir`; do not also install it from the marketplace on that machine. `install.sh` / `install.ps1` detect a local checkout by `skills/opus-video/SKILL.md`, and for Codex and Antigravity copy the router `SKILL.md` to the plugin root and link (Windows: copy) each `ov-*` skill beside it.
+
+### New
+- Four operating modes in the router: `dao-dien` (full director, default), `nhanh` (one case instead of three styleframes; BRIEF records `creative_override: nhanh theo case <id>`, the animatic gate stays), `tu-nhac` (music or footage first), `timeline` (edit an existing project through `ov-studio`).
+- `scripts/manifest.mjs`: `project.json` schema `opus-video/project@1` (shots back to back from 0, voice lines, music beds, assets, version) and `validate` with Vietnamese errors.
+- `scripts/gateway.mjs`: the one writer of `project.json`. `patch` (ops `resize_shot` with ripple, `move_line`, `set_shot`, `set_line_text` → gate `stale`, `set_music`, `add_shot`, `remove_shot`), `undo` (a new version restoring the previous snapshot, never past the latest import), `log`, `show`, `derive`. Each change is a version with a snapshot in `.opus/versions/` and a line in `.opus/history.jsonl`, serialized by `.opus/lock`. Derived files (TIMING block, voice `data-start`/`data-duration`, root `data-duration`, PLAN.md Thời điểm cells, `timing.json`) are written before `project.json`; tags inside HTML comments are skipped and a line without a live tag is a WARN. Exit 3 CONFLICT, 4 view only, 5 INVALID, 7 nothing to undo, 8 BUSY.
+- `scripts/manifest-import.mjs`: `project.json` for a project made before the manifest (shots from PLAN.md, scene sub-compositions, audio_meta voices or the root; lines by midpoint; text from `script/NN.txt`, audio_meta or the `words.json` sidecar). It only adds `project.json` and `.opus/`; projects without TIMING markers are view only.
+- `timing.mjs` on a project with `project.json` goes through `gateway.mjs derive`.
+- `setup-check.mjs` prints `opus-video plugin: installed|missing` (a WARN, never MISSING).
+
 ## v1.2.0 (2026-10-15): composition template, measured mix, word and beat sync, reframe, 61 styles
 
 Why: every project started from an empty `index.html` with seconds typed by hand, so a new voice take meant re-timing every tween. The final mix never lowered the music under the voice: a measured HyperFrames render of a `data-fx-carve` project (no `data-fx-chain`) showed a constant 2 dB offset, not a duck. The BPM was only a word in the music prompt, on-screen keywords had no check against the spoken word, the 9:16 edition was a second hand-built composition, and the look of a video had no vocabulary beyond the direction's style keyword. The workflows of the motion-video skill of AgentKit (MIT, v1.3.0) cover these; they are rewritten here in Node and ffmpeg, with no Python at run time.

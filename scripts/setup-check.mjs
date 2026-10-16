@@ -12,7 +12,9 @@
 //   style/seam in the installed HyperFrames (directions.mjs check; skipped while
 //   hyperframes-animation is missing).
 // Optional (WARN, never fails): agy (judge.mjs video QA), TYPESAFE_API_KEY (Jev), a Remotion
-//   skill (only for engine: remotion).
+//   skill (only for engine: remotion), and `opus-video plugin: installed|missing`: whether this
+//   checkout is the Claude Code plugin layout (.claude-plugin/plugin.json + skills/). Codex and
+//   Antigravity load the skills the installer exposes, so missing never fails.
 // Keys are read from the environment, else the opus-video env file in ~/.config; values are
 // never printed.
 // Exit: 0 ready · 1 something required is missing.
@@ -31,6 +33,7 @@ export const MIN_HYPERFRAMES = "0.8.144";
 export const CORE_SKILLS = ["hyperframes", "hyperframes-core", "hyperframes-animation", "hyperframes-keyframes", "hyperframes-creative", "hyperframes-audio", "hyperframes-cli", "hyperframes-registry", "hyperframes-studio", "media-use"];
 export const WORKFLOW_SKILLS = ["general-video", "faceless-explainer", "product-launch-video", "pr-to-video", "motion-graphics", "music-to-video", "slideshow", "embedded-captions", "talking-head-recut", "remotion-to-hyperframes"];
 const ENV_FILE = join(homedir(), ".config", "opus-video", ".env");
+const PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const WIN = process.platform === "win32";
 
 const FIX = {
@@ -61,7 +64,16 @@ const version = (cmd, args = ["--version"]) => {
   return r.status === 0 ? `${r.stdout || ""}${r.stderr || ""}`.trim().split("\n")[0] : null;
 };
 
-export function runChecks({ findSkillImpl = findSkill, versionImpl = version, keys = envKeys(), directionsImpl = () => checkData(loadDirections()) } = {}) {
+// The Claude Code plugin layout of this checkout: manifest and router skill present.
+export function pluginStatus(root = PLUGIN_ROOT) {
+  const manifest = join(root, ".claude-plugin", "plugin.json");
+  if (!existsSync(manifest) || !existsSync(join(root, "skills", "opus-video", "SKILL.md"))) return { installed: false, detail: "missing" };
+  let version = "?";
+  try { version = JSON.parse(readFileSync(manifest, "utf8")).version ?? "?"; } catch { /* unreadable manifest: still the layout */ }
+  return { installed: true, detail: `installed (v${version}, ${root})` };
+}
+
+export function runChecks({ findSkillImpl = findSkill, versionImpl = version, keys = envKeys(), directionsImpl = () => checkData(loadDirections()), pluginRoot = PLUGIN_ROOT } = {}) {
   const items = [];
   const add = (level, name, detail, fixCmd) => items.push({ level, name, detail, fix: level === "ok" ? undefined : fixCmd });
 
@@ -94,6 +106,8 @@ export function runChecks({ findSkillImpl = findSkill, versionImpl = version, ke
 
   add(versionImpl("agy", ["--version"]) ? "ok" : "warn", "agy (optional)", "Gemini video judge for judge.mjs; without it QA uses still frames", "install Antigravity CLI and sign in: https://antigravity.google");
   add(keys.has("TYPESAFE_API_KEY") ? "ok" : "warn", "TYPESAFE_API_KEY (optional)", keys.has("TYPESAFE_API_KEY") ? "present" : "absent — Jev ranking/audit off", "add TYPESAFE_API_KEY=… to the env file");
+  const plugin = pluginStatus(pluginRoot);
+  add(plugin.installed ? "ok" : "warn", "opus-video plugin", plugin.detail, "Claude Code: clone the repo to ~/.claude/skills/opus-video (it loads in place as opus-video@skills-dir); Codex/Antigravity: run install.sh");
   const remotion = findSkillImpl("ak-remotion") || findSkillImpl("remotion") || findSkillImpl("remotion-best-practices");
   add(remotion ? "ok" : "warn", "Remotion skill (optional)", remotion || "only needed when BRIEF engine: remotion", "npx skills add remotion-dev/skills");
   return items;

@@ -4,7 +4,7 @@ Tài liệu này dành cho người cài opus-video lên một agent bất kỳ,
 
 ## 1. opus-video cần gì từ agent
 
-opus-video là một thư mục skill gồm `SKILL.md`, `references/`, `scripts/` và `data/`. Agent đọc `SKILL.md` rồi chạy các script Node trong `scripts/`. Vì vậy agent chỉ cần bốn năng lực:
+opus-video là một plugin gồm 11 skill trong `skills/` (điểm vào là `skills/opus-video/SKILL.md`), cùng `references/`, `scripts/` và `data/` dùng chung. Agent đọc skill rồi chạy các script Node trong `scripts/`. Vì vậy agent chỉ cần bốn năng lực:
 
 | Năng lực | Dùng vào |
 |---|---|
@@ -29,7 +29,7 @@ Mỗi agent nạp skill từ một thư mục riêng. opus-video được cài v
 
 Nhờ vậy opus-video có thể nằm ở một agent trong khi viet-pro nằm ở agent khác mà vẫn chạy được. Muốn chỉ định viet-pro ở một nơi cụ thể, đặt biến môi trường `VIET_PRO_DIR` hoặc truyền `--vp <thư mục>` cho `check-viet-pro.mjs`.
 
-Trong `SKILL.md`, `$OV` là thư mục chứa chính file `SKILL.md` đó. Agent tự thay `$OV` bằng đường dẫn thật khi chạy lệnh; trên PowerShell, viết đầy đủ đường dẫn.
+Trong mọi skill, `$OV` là thư mục gốc plugin opus-video, tức thư mục chứa `skills/` và `scripts/`. Agent tự thay `$OV` bằng đường dẫn thật khi chạy lệnh; trên PowerShell, viết đầy đủ đường dẫn.
 
 ## 3. Chuẩn bị máy
 
@@ -96,7 +96,7 @@ Skill được chép vào `./.claude/skills/` và `./.agents/skills/` của dự
 Agent nào đọc được file và chạy được shell đều dùng được opus-video, kể cả agent không có khái niệm "skill". Cài vào một thư mục bất kỳ (ví dụ cài cho Claude Code như trên, hoặc `git clone`), rồi bảo agent:
 
 ```
-Đọc <đường dẫn>/opus-video/SKILL.md và làm đúng quy trình trong đó để làm video 30 giây giới thiệu <sản phẩm>.
+Đọc <đường dẫn>/opus-video/skills/opus-video/SKILL.md và làm đúng quy trình trong đó để làm video 30 giây giới thiệu <sản phẩm>.
 ```
 
 Nếu agent hỗ trợ file hướng dẫn cố định cho dự án (như `AGENTS.md`), thêm một dòng trỏ tới `SKILL.md` để agent tự đọc mỗi khi được yêu cầu làm video.

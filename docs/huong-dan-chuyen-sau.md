@@ -2,11 +2,11 @@
 
 Tài liệu này dành cho người đã cài xong opus-video và muốn hiểu kỹ từng bước: file nào do ai ghi, cổng nào chặn ở đâu, mã thoát nghĩa là gì và gặp lỗi thì sửa thế nào. Phần cài đặt không nhắc lại ở đây, xem [README.md](../README.md) và [hướng dẫn cài cho từng agent](cai-dat-agent.md). Phần giới thiệu ngắn nằm ở [gioi-thieu.md](gioi-thieu.md). Muốn có sẵn câu lệnh để giao việc cho agent, xem [thư viện prompt mẫu](thu-vien-prompt/README.md).
 
-Nguồn sự thật luôn là [SKILL.md](../SKILL.md), các file trong `references/` và phần `--help` của từng script. Tài liệu này chỉ giải thích và dẫn đường. Khi hai bên khác nhau, tin vào script.
+Nguồn sự thật luôn là [skills/](../skills/opus-video/SKILL.md), các file trong `references/` và phần `--help` của từng script. Tài liệu này chỉ giải thích và dẫn đường. Khi hai bên khác nhau, tin vào script.
 
 Quy ước trong tài liệu:
 
-- `$OV` là thư mục chứa `SKILL.md` của opus-video trên agent đang chạy (Claude Code dùng `~/.claude/skills/opus-video`).
+- `$OV` là thư mục gốc plugin opus-video (thư mục chứa `skills/` và `scripts/`) trên agent đang chạy (Claude Code dùng `~/.claude/skills/opus-video`).
 - `$VP` là thư mục skill viet-pro. `node $OV/scripts/setup-check.mjs` in đường dẫn thật.
 - Mọi lệnh chạy trong thư mục dự án video, trừ khi ghi khác. Mọi script của opus-video đều có `--help`.
 - CLI `hyperframes` gọi trực tiếp hoặc qua `npx hyperframes`, hai cách như nhau.
@@ -40,7 +40,7 @@ Mỗi quyết định được ghi vào một file trong thư mục dự án: bi
 
 ## 2. Giải phẫu thư mục dự án
 
-Bố cục chuẩn theo [SKILL.md](../SKILL.md). Bảng dưới đây ghi rõ ai tạo từng file và ở bước nào.
+Bố cục chuẩn theo [skills/](../skills/opus-video/SKILL.md). Bảng dưới đây ghi rõ ai tạo từng file và ở bước nào.
 
 | File hoặc thư mục | Ai ghi | Bước | Ghi chú |
 |---|---|---|---|
@@ -131,7 +131,7 @@ Cổng chỉ in WARN, không chặn, khi gặp câu mồi tương tác, lời k�
 
 `--jev-audit` là tuỳ chọn khi có `TYPESAFE_API_KEY`: Jev rà từng `script/NN.txt` về Humanizer 1 đến 5, câu mồi, trải nghiệm tự bịa và số liệu không nguồn. Lệnh chỉ in WARN và không đổi mã thoát.
 
-Video TikTok, Reels, Shorts vẫn theo viet-pro đầy đủ, với thêm các luật kênh ngắn trong [SKILL.md](../SKILL.md): hook 1 đến 3 giây vào thẳng ý, một video một insight, giọng "mình" và "bạn", không bịa trải nghiệm, tối đa một CTA cụ thể và không dùng câu mồi tương tác.
+Video TikTok, Reels, Shorts vẫn theo viet-pro đầy đủ, với thêm các luật kênh ngắn trong [ov-script](../skills/ov-script/SKILL.md): hook 1 đến 3 giây vào thẳng ý, một video một insight, giọng "mình" và "bạn", không bịa trải nghiệm, tối đa một CTA cụ thể và không dùng câu mồi tương tác.
 
 Bỏ cổng chỉ hợp lệ khi người dùng nói rõ là bỏ viet-pro: ghi `viet_pro_override: <lý do ít nhất 10 ký tự>` vào frontmatter `BRIEF.md` rồi thêm cờ `--skip-viet-pro-gate` cho `eleven.mjs`. Lý do được in ra mỗi lần chạy. Cổng giao sẽ chặn chừng nào dòng override còn đó.
 
@@ -647,7 +647,7 @@ Cảnh con là các file nhúng qua `data-composition-src` (đệ quy). Composit
 
 ## 12. Hướng sáng tạo, brand kit và dữ liệu thật
 
-Chương này gom các công cụ của bước 1b và các cổng chống slideshow. Lý do có chúng nằm ở [SKILL.md](../SKILL.md): khi agent tự điền phong cách, nó chọn kiểu an toàn nhất là nền tối và thẻ chữ trượt lên rồi mờ dần, mỗi câu một thẻ. Vì vậy người dùng chọn hướng bằng mắt trên 3 styleframe dựng từ chính chủ đề của họ, kịch bản viết sau khi đã có hướng. Máy chặn kiểu slideshow ở PLAN, ở clip nháp và ở bản render.
+Chương này gom các công cụ của bước 1b và các cổng chống slideshow. Lý do có chúng nằm ở [skills/](../skills/opus-video/SKILL.md): khi agent tự điền phong cách, nó chọn kiểu an toàn nhất là nền tối và thẻ chữ trượt lên rồi mờ dần, mỗi câu một thẻ. Vì vậy người dùng chọn hướng bằng mắt trên 3 styleframe dựng từ chính chủ đề của họ, kịch bản viết sau khi đã có hướng. Máy chặn kiểu slideshow ở PLAN, ở clip nháp và ở bản render.
 
 Các cổng này chỉ bật khi `BRIEF.md` có `direction:` hoặc `brief_version: 2`. Dự án cũ không có hai dòng đó chỉ nhận một dòng WARN `creative gate skipped: BRIEF.md has no direction: and no brief_version: 2 (dự án cũ)` và đi theo cổng cũ.
 

@@ -2,14 +2,14 @@
 
 **Agent skill dựng video tiếng Việt từ một brief tới file MP4 giao khách.** Bạn nói chủ đề; agent dựng 3 hướng hình ảnh để bạn chọn, viết kịch bản, tạo giọng, dựng, kiểm tra rồi xuất bản giao 16:9, 9:16 hoặc cả hai. Mỗi bước có cổng kiểm tra chặn lại khi chưa đạt.
 
-[![Release](https://img.shields.io/badge/release-v1.1.0-orange.svg)](https://github.com/abm-dungtq/opus-video/releases/tag/v1.1.0)
+[![Release](https://img.shields.io/badge/release-v2.0.0-orange.svg)](https://github.com/abm-dungtq/opus-video/releases/tag/v2.0.0)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Node ≥ 22](https://img.shields.io/badge/node-%E2%89%A5%2022-339933.svg)
 ![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Antigravity-6f42c1.svg)
 ![OS](https://img.shields.io/badge/OS-macOS%20%C2%B7%20Linux%20%C2%B7%20WSL%20%C2%B7%20Windows-555.svg)
 ![Tests](https://img.shields.io/badge/tests-274%20passing-brightgreen.svg)
 
-Chạy trên **Claude Code, OpenAI Codex, Google Antigravity (app và CLI)** và mọi agent đọc được thư mục skill có `SKILL.md`.
+Chạy trên **Claude Code** (dạng plugin `opus-video` gồm 11 skill), **OpenAI Codex, Google Antigravity (app và CLI)** và mọi agent đọc được thư mục skill có `SKILL.md`.
 
 [Video demo](#video-demo) · [Có gì mới](#có-gì-mới) · [Cách hoạt động](#cách-hoạt-động) · [Cài đặt](#1-cài-đặt-nhanh-khuyên-dùng) · [Dùng](#6-dùng) · [Script](#7-script) · [Xử lý sự cố](#10-xử-lý-sự-cố)
 
@@ -49,6 +49,12 @@ Các video dưới đây do opus-video dựng. Bấm vào ảnh để mở file 
 </table>
 
 ## Có gì mới
+
+### v2.0.0 (2026-10-16): plugin 11 skill, bốn hướng vận hành, project.json
+
+- **Plugin thay cho một file `SKILL.md` 45 KB.** Repo là plugin Claude Code `opus-video` (`.claude-plugin/plugin.json`). Quy trình tách thành 11 skill nhỏ trong `skills/`: `opus-video` (điểm vào, chọn hướng), `ov-setup`, `ov-brief`, `ov-direction`, `ov-cases`, `ov-script`, `ov-audio`, `ov-build`, `ov-footage`, `ov-deliver`, `ov-studio`. Không bỏ luật nào: mỗi luật của bản cũ nằm trong đúng một skill.
+- **Bốn hướng vận hành:** `dao-dien` (đầy đủ, mặc định), `nhanh` (theo một case mẫu thay cho 3 styleframe), `tu-nhac` (bắt đầu từ bài nhạc hoặc footage), `timeline` (sửa dự án đã có). Bảng ở mục 6.
+- **`project.json` và cổng lệnh.** Mỗi dự án có thể có một manifest (shot, câu thoại, nhạc, phiên bản). `gateway.mjs` là đường ghi duy nhất: mỗi thay đổi là một phiên bản mới có undo, và gateway tự ghi lại khối TIMING, `data-start` của giọng và cột Thời điểm của PLAN.md. `manifest-import.mjs` tạo manifest cho dự án cũ mà không đổi file gốc nào. Đây là nền cho Motion Studio ở các bản sau.
 
 ### v1.2.0 (2026-10-15): template, style và đồng bộ
 
@@ -130,7 +136,7 @@ Dùng sâu: [hướng dẫn chuyên sâu về các tính năng](docs/huong-dan-c
 
 Installer cài **toàn bộ** những gì skill cần, cho mọi agent tìm thấy trên máy:
 
-- opus-video vào thư mục skill của từng agent (bản cũ được chuyển vào `~/.opus-video-backups/`, không xoá; thư mục là git checkout thì để nguyên);
+- opus-video vào thư mục skill của từng agent (bản cũ được chuyển vào `~/.opus-video-backups/`, không xoá; thư mục là git checkout thì để nguyên). Claude Code nạp thư mục `~/.claude/skills/opus-video` tại chỗ thành plugin `opus-video@skills-dir`, nên **không** chạy thêm `claude plugin install` trên máy đó. Codex và Antigravity chưa có plugin: installer chép `SKILL.md` điểm vào ra gốc thư mục `opus-video` và tạo link `ov-*` cạnh nó (Windows: bản sao);
 - `viet-pro` v5.3.0 (bằng installer của chính nó, cùng các agent);
 - CLI `hyperframes` và **mọi** skill HyperFrames (`hyperframes`, `hyperframes-core/-animation/-keyframes/-creative/-audio/-cli/-registry/-studio`, `media-use` và mọi workflow: `general-video`, `faceless-explainer`, `product-launch-video`, `pr-to-video`, `motion-graphics`, `music-to-video`, `slideshow`, `embedded-captions`, `talking-head-recut`, `remotion-to-hyperframes`) qua `npx hyperframes skills`;
 - file key mẫu `~/.config/opus-video/.env` (quyền chỉ chủ sở hữu đọc được);
@@ -242,20 +248,49 @@ node ~/.claude/skills/opus-video/scripts/setup-check.mjs
 
 Windows không có `curl | bash` cho viet-pro: `git clone --depth 1 --branch v5.3.0 https://github.com/abm-dungtq/viet-pro-codex.git`, rồi copy thư mục `skills\viet-pro` vào thư mục skill của agent (ví dụ `%USERPROFILE%\.claude\skills\viet-pro`).
 
-Cài opus-video bằng `git clone` thì cập nhật bằng `git -C <thư mục> pull`; installer không ghi đè git checkout.
+Cài opus-video bằng `git clone` thì cập nhật bằng `git -C <thư mục> pull`; installer không ghi đè git checkout. Với Codex/Antigravity, clone xong phải tự đưa skill ra: chép `skills/opus-video/SKILL.md` thành `opus-video/SKILL.md` và link từng `skills/ov-*` vào thư mục skill của agent (installer làm việc này khi cài từ bản sao).
+
+Máy dùng Claude Code mà opus-video không nằm trong `~/.claude/skills`: `claude plugin marketplace add <đường dẫn tới opus-video>` rồi `claude plugin install opus-video@opus-video-private` (marketplace riêng ở `.claude-plugin/marketplace.json`).
 
 ## 6. Dùng
 
 | Agent | Gọi skill |
 |---|---|
-| Claude Code | `/opus-video làm video 30 giây giới thiệu <sản phẩm>, cả 16:9 và 9:16` |
+| Claude Code | `/opus-video làm video 30 giây giới thiệu <sản phẩm>, cả 16:9 và 9:16` (skill của plugin có tiền tố `opus-video:`, ví dụ `opus-video:ov-audio`) |
 | OpenAI Codex | `$opus-video làm video 30 giây giới thiệu <sản phẩm>, cả 16:9 và 9:16` |
 | Google Antigravity (app/CLI) | `/opus-video …` hoặc nói "dùng skill opus-video để …" |
-| Agent khác | "Đọc `<thư mục skill>/opus-video/SKILL.md` và làm đúng quy trình trong đó để …" |
+| Agent khác | "Đọc `<thư mục opus-video>/skills/opus-video/SKILL.md` và làm đúng quy trình trong đó để …" |
 
 Agent nào cũng có thể chọn skill tự động khi bạn nói muốn làm video.
 
-### Quy trình (chi tiết trong `SKILL.md`)
+### Bốn hướng vận hành
+
+| Hướng | Bạn nói | Chuỗi skill |
+|---|---|---|
+| `dao-dien` (mặc định) | "làm video", "explainer", "quảng cáo" | ov-setup → ov-brief → ov-direction → ov-script → ov-audio → ov-build → ov-deliver |
+| `nhanh` | "làm nhanh", "theo mẫu", "giống video này" | ov-setup → ov-brief → ov-cases → ov-script → ov-audio → ov-build → ov-deliver |
+| `tu-nhac` | "từ bài nhạc", "theo beat", "clip quay sẵn" | ov-setup → ov-brief → ov-audio hoặc ov-footage → ov-direction → ov-script → ov-build → ov-deliver |
+| `timeline` | "sửa video", "mở studio", "đổi shot" | ov-studio → gateway → ov-audio (câu đã đổi) → ov-deliver |
+
+Hướng nào cũng giữ cổng viet-pro, PLAN.md, clip nháp đã duyệt và `render-final.mjs`.
+
+### 11 skill
+
+| Skill | Việc |
+|---|---|
+| `opus-video` | Điểm vào: chọn hướng, bốn cổng, thư mục dự án, ranh giới |
+| `ov-setup` | Bước 0: `setup-check`, `eleven.mjs doctor`, key |
+| `ov-brief` | Bước 1: `BRIEF.md`, brand kit |
+| `ov-direction` | Bước 1b: 3 styleframe, chọn hướng và style |
+| `ov-cases` | Tra case (Jev hoặc `find-cases`), hướng nhanh theo mẫu |
+| `ov-script` | Bước 2: cổng viet-pro đầy đủ, kiểm chứng nguồn |
+| `ov-audio` | Bước 5: giọng, SFX, nhạc, TIMING, mix |
+| `ov-build` | Bước 3, 4, 4b, 6, 6b, 7: storyboard, PLAN.md, dựng, animatic, render nháp |
+| `ov-footage` | Footage thật, clip làm trục |
+| `ov-deliver` | Bước 7–9: render bản giao, QA, caption, xuất |
+| `ov-studio` | `project.json`, gateway, nhập dự án cũ; Motion Studio ở bản sau |
+
+### Quy trình (chi tiết trong `skills/`)
 
 | Bước | Việc | Cổng |
 |---|---|---|

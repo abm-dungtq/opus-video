@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { semverGte, envKeys, runChecks, CORE_SKILLS, WORKFLOW_SKILLS } from "../setup-check.mjs";
+import { semverGte, envKeys, runChecks, pluginStatus, CORE_SKILLS, WORKFLOW_SKILLS } from "../setup-check.mjs";
 import { findSkill, skillRoots } from "../skill-paths.mjs";
 
 test("semverGte", () => {
@@ -57,4 +57,19 @@ test("runChecks: everything present → no MISSING", () => {
     keys: new Set(["ELEVENLABS_API_KEY", "OPUS_VIDEO_VOICE_ID", "TYPESAFE_API_KEY"]),
   });
   assert.deepEqual(items.filter((i) => i.level !== "ok"), []);
+});
+
+test("opus-video plugin line: installed for the plugin layout, a WARN (never MISSING) otherwise", () => {
+  const dir = mkdtempSync(join(tmpdir(), "plugin-"));
+  try {
+    assert.equal(pluginStatus(dir).installed, false);
+    const item = runChecks({ findSkillImpl: () => "", versionImpl: () => null, keys: new Set(), pluginRoot: dir }).find((i) => i.name === "opus-video plugin");
+    assert.equal(item.level, "warn");
+    assert.equal(item.detail, "missing");
+    mkdirSync(join(dir, ".claude-plugin"));
+    mkdirSync(join(dir, "skills", "opus-video"), { recursive: true });
+    writeFileSync(join(dir, ".claude-plugin", "plugin.json"), JSON.stringify({ version: "2.0.0" }));
+    writeFileSync(join(dir, "skills", "opus-video", "SKILL.md"), "x");
+    assert.match(pluginStatus(dir).detail, /^installed \(v2\.0\.0/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

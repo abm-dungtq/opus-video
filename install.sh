@@ -7,7 +7,9 @@
 #   ./install.sh --claude                                 # from a clone
 #
 # Steps: check git/node/ffmpeg → copy opus-video into each host's skills dir (old copy moved to
-# ~/.opus-video-backups/) → install viet-pro (its own installer, same hosts) → install every
+# ~/.opus-video-backups/) → expose its eleven skills (Claude Code loads the copy in place as the
+# plugin opus-video@skills-dir; Codex and Antigravity get the router SKILL.md at the plugin root
+# and a link per ov-* skill beside it) → install viet-pro (its own installer, same hosts) → install every
 # HyperFrames skill (`npx hyperframes skills`, all supported agents) → create the key file
 # template → run scripts/setup-check.mjs. Nothing is deleted; a git checkout is never overwritten.
 set -euo pipefail
@@ -72,7 +74,7 @@ command -v ffmpeg >/dev/null || echo "WARN: ffmpeg not found — $(os_fix ffmpeg
 SCRIPT_DIR=""
 if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; fi
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-if [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/SKILL.md" ] && [ -f "$SCRIPT_DIR/scripts/eleven.mjs" ]; then
+if [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/skills/opus-video/SKILL.md" ] && [ -f "$SCRIPT_DIR/scripts/eleven.mjs" ]; then
   SRC="$SCRIPT_DIR"
 else
   say "downloading opus-video ($REF)"
@@ -101,6 +103,29 @@ fi
 # 4. copy opus-video into each target
 STAMP="$(date +%Y%m%d-%H%M%S)-$$"
 PRIMARY=""
+
+# Codex and Antigravity have no plugin loader: copy the router SKILL.md to the plugin root and link
+# every other skill beside it, so the host sees eleven skills and $OV stays <root>/opus-video.
+expose_skills() { # $1 = skills root, $2 = plugin root ($1/opus-video)
+  case "$1" in
+    */.claude/skills) say "Claude Code loads $2 in place as the plugin opus-video@skills-dir (no claude plugin install)"; return ;;
+  esac
+  if [ -d "$2/.git" ]; then say "$2 is a git checkout — skill links not added (install from a copy)"; return; fi
+  cp "$2/skills/opus-video/SKILL.md" "$2/SKILL.md"
+  local n=0 name link
+  for s in "$2"/skills/*/; do
+    name="$(basename "$s")"
+    [ "$name" = opus-video ] && continue
+    link="$1/$name"
+    if [ -e "$link" ] && [ ! -L "$link" ]; then
+      mkdir -p "$HOME/.opus-video-backups/$STAMP"
+      mv "$link" "$HOME/.opus-video-backups/$STAMP/$(echo "$link" | tr '/' '_')"
+    fi
+    ln -sfn "opus-video/skills/$name" "$link"
+    n=$((n + 1))
+  done
+  say "exposed opus-video + $n ov-* skills in $1"
+}
 for dir in "${TARGETS[@]}"; do
   dest="$dir/opus-video"
   if [ -d "$dest/.git" ] && [ "$(cd "$dest" && pwd -P)" != "$(cd "$SRC" && pwd -P)" ]; then
@@ -118,8 +143,12 @@ for dir in "${TARGETS[@]}"; do
     (cd "$SRC" && tar --exclude .git -cf - .) | (cd "$dest" && tar -xf -)
     say "installed $dest"
   fi
+  expose_skills "$dir" "$dest"
   [ -z "$PRIMARY" ] && PRIMARY="$dest"
 done
+if [ "$WANT_CLAUDE" = true ] || [ "$WORKSPACE" = true ]; then
+  say "Claude Code elsewhere (opus-video not under a skills dir): claude plugin marketplace add <path-to-opus-video> && claude plugin install opus-video@opus-video-private"
+fi
 
 if [ "$SKIP_DEPS" = false ]; then
   # 5. viet-pro for the same hosts

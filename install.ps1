@@ -4,6 +4,8 @@
 # Hosts: claude (~\.claude\skills), codex (~\.agents\skills), agy (~\.gemini\config\skills),
 #        agy-cli (~\.gemini\antigravity-cli\skills). Default: every host found, else claude.
 # Steps: check git/node/ffmpeg → copy opus-video (old copy moved to ~\.opus-video-backups) →
+# expose its eleven skills (Claude Code loads the copy in place as the plugin opus-video@skills-dir;
+# Codex and Antigravity get the router SKILL.md at the plugin root and a copy of each ov-* skill) →
 # viet-pro (git clone of viet-pro-codex at its release tag, skills\viet-pro copied the same way)
 # → `npx hyperframes skills` (all HyperFrames skills, all supported agents) → key file template
 # → scripts\setup-check.mjs. Nothing is deleted; a git checkout is never overwritten.
@@ -61,10 +63,33 @@ function Install-SkillDir($src, $name) {
     Say "installed $dest"
   }
 }
+# Codex and Antigravity have no plugin loader: copy the router SKILL.md to the plugin root and each
+# ov-* skill beside it (copies: symlinks need admin rights on Windows), so $OV stays <root>\opus-video.
+function Expose-OvSkills {
+  foreach ($dir in $targets) {
+    $root = Join-Path $dir "opus-video"
+    if ($dir -eq $map["claude"]) { Say "Claude Code loads $root in place as the plugin opus-video@skills-dir (no claude plugin install)"; continue }
+    if (Test-Path (Join-Path $root ".git")) { Say "$root is a git checkout — skills not copied (install from a copy)"; continue }
+    Copy-Item (Join-Path $root "skills\opus-video\SKILL.md") (Join-Path $root "SKILL.md") -Force
+    $n = 0
+    foreach ($s in Get-ChildItem (Join-Path $root "skills") -Directory | Where-Object { $_.Name -ne "opus-video" }) {
+      $dest = Join-Path $dir $s.Name
+      if (Test-Path $dest) {
+        $bk = Join-Path $H ".opus-video-backups\$stamp"
+        New-Item -ItemType Directory -Force $bk | Out-Null
+        Move-Item $dest (Join-Path $bk ($s.Name + "_" + ($dir -replace '[\\:]', '_')))
+      }
+      Copy-Item $s.FullName $dest -Recurse
+      $n++
+    }
+    Say "exposed opus-video + $n ov-* skills in $dir"
+  }
+}
 try {
   Say "downloading opus-video ($Ref)"
   git clone --quiet --depth 1 --branch $Ref $Repo (Join-Path $tmp "opus-video")
   Install-SkillDir (Join-Path $tmp "opus-video") "opus-video"
+  Expose-OvSkills
 
   if (-not $SkipDeps) {
     Say "installing viet-pro $VpRef"
