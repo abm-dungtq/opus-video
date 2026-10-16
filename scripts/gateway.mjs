@@ -238,9 +238,10 @@ function commit(dir, { base, actor, build }) {
   } finally { release(); }
 }
 
-export function patch(dir, { actor, base, ops }) {
+// note: optional free text kept in the history line (the director's reason, a Studio request id).
+export function patch(dir, { actor, base, ops, note }) {
   if (!ACTORS.includes(actor) || actor === "undo" || actor === "import") return { code: EXIT.usage, error: `actor phải là human | director | timing` };
-  return commit(dir, { base, actor, build: (m) => ({ ...applyOps(m, ops), ops }) });
+  return commit(dir, { base, actor, build: (m) => ({ ...applyOps(m, ops), ops, ...(note ? { extra: { note: String(note) } } : {}) }) });
 }
 
 export function undo(dir, { base }) {

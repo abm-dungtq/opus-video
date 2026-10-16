@@ -7,7 +7,7 @@
 ![Node ≥ 22](https://img.shields.io/badge/node-%E2%89%A5%2022-339933.svg)
 ![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Antigravity-6f42c1.svg)
 ![OS](https://img.shields.io/badge/OS-macOS%20%C2%B7%20Linux%20%C2%B7%20WSL%20%C2%B7%20Windows-555.svg)
-![Tests](https://img.shields.io/badge/tests-448%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-455%20passing-brightgreen.svg)
 
 Chạy trên **Claude Code** (dạng plugin `opus-video` gồm 11 skill), **OpenAI Codex, Google Antigravity (app và CLI)** và mọi agent đọc được thư mục skill có `SKILL.md`.
 
@@ -55,6 +55,7 @@ Các video dưới đây do opus-video dựng. Bấm vào ảnh để mở file 
 - **Plugin thay cho một file `SKILL.md` 45 KB.** Repo là plugin Claude Code `opus-video` (`.claude-plugin/plugin.json`). Quy trình tách thành 11 skill nhỏ trong `skills/`: `opus-video` (điểm vào, chọn hướng), `ov-setup`, `ov-brief`, `ov-direction`, `ov-cases`, `ov-script`, `ov-audio`, `ov-build`, `ov-footage`, `ov-deliver`, `ov-studio`. Không bỏ luật nào: mỗi luật của bản cũ nằm trong đúng một skill.
 - **Bốn hướng vận hành:** `dao-dien` (đầy đủ, mặc định), `nhanh` (theo một case mẫu thay cho 3 styleframe), `tu-nhac` (bắt đầu từ bài nhạc hoặc footage), `timeline` (sửa dự án đã có). Bảng ở mục 6.
 - **`project.json` và cổng lệnh.** Mỗi dự án có thể có một manifest (shot, câu thoại, nhạc, phiên bản). `gateway.mjs` là đường ghi duy nhất: mỗi thay đổi là một phiên bản mới có undo, và gateway tự ghi lại khối TIMING, `data-start` của giọng và cột Thời điểm của PLAN.md. `manifest-import.mjs` tạo manifest cho dự án cũ mà không đổi file gốc nào. Đây là nền cho Motion Studio ở các bản sau.
+- **MCP server `opus-video`.** Plugin khai báo một MCP server (`mcp/server.mjs`, chỉ dùng Node có sẵn). Phiên Claude Code nào cũng đọc được dự án (`project_get`, `project_log`), sửa timeline với actor `director` (`project_patch`, `project_undo`) và nhận yêu cầu từ hàng đợi Studio (`studio_request_next`, `studio_request_done`).
 
 ### v1.2.0 (2026-10-15): template, style và đồng bộ
 
@@ -288,7 +289,7 @@ Hướng nào cũng giữ cổng viet-pro, PLAN.md, clip nháp đã duyệt và 
 | `ov-build` | Bước 3, 4, 4b, 6, 6b, 7: storyboard, PLAN.md, dựng, animatic, render nháp |
 | `ov-footage` | Footage thật, clip làm trục |
 | `ov-deliver` | Bước 7–9: render bản giao, QA, caption, xuất |
-| `ov-studio` | `project.json`, gateway, nhập dự án cũ; Motion Studio ở bản sau |
+| `ov-studio` | `project.json`, gateway, nhập dự án cũ, MCP server cho đạo diễn AI; Motion Studio ở bản sau |
 
 ### Quy trình (chi tiết trong `skills/`)
 

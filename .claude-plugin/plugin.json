@@ -7,5 +7,8 @@
   "repository": "https://github.com/abm-dungtq/opus-video",
   "license": "MIT",
   "keywords": ["video", "hyperframes", "elevenlabs", "viet-pro", "motion-graphics"],
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "mcpServers": {
+    "opus-video": { "command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server.mjs"] }
+  }
 }

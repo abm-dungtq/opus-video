@@ -9,7 +9,7 @@ description: "Hướng timeline của opus-video: manifest project.json (shot, c
 
 ## Phạm vi
 
-Skill này sở hữu manifest `project.json`, cổng lệnh ghi duy nhất `gateway.mjs`, việc nhập dự án cũ, Motion Studio và yêu cầu gửi cho đạo diễn AI. Motion Studio (giao diện web trên máy), MCP server và đạo diễn AI **chưa có trong bản này**; hiện chỉ dùng hai CLI dưới đây.
+Skill này sở hữu manifest `project.json`, cổng lệnh ghi duy nhất `gateway.mjs`, việc nhập dự án cũ, Motion Studio và yêu cầu gửi cho đạo diễn AI. Motion Studio (giao diện web trên máy) **chưa có trong bản này**. Dùng được: hai CLI dưới đây và MCP server `opus-video` cho đạo diễn AI.
 
 ## Đã dùng được
 
@@ -28,3 +28,23 @@ Skill này sở hữu manifest `project.json`, cổng lệnh ghi duy nhất `gat
   ```
   Exit 3 CONFLICT: phiên bản đã đổi, đọc lại bằng `show` rồi làm lại. Exit 8 BUSY: tiến trình khác đang ghi, thử lại sau. Exit 5 INVALID: op sai hoặc kết quả phá luật manifest (đọc lý do tiếng Việt). Danh sách op ở `--help`.
 - Sửa lời một câu (`set_line_text`) đặt `gate: stale`: chạy lại `ov-script` cho câu đó, rồi `ov-audio` tạo lại giọng, rồi `ov-deliver`.
+
+## MCP server cho đạo diễn AI
+
+Claude Code nạp server `opus-video` (`$OV/mcp/server.mjs`, khai báo trong `.claude-plugin/plugin.json`) ở phiên mới. Mọi tool nhận `project` là đường dẫn **tuyệt đối** tới thư mục có `project.json`.
+
+| Tool | Đầu vào | Việc |
+|---|---|---|
+| `project_get` | `project` | đọc manifest |
+| `project_log` | `project`, `limit?` | N dòng lịch sử mới nhất |
+| `project_patch` | `project`, `base`, `ops`, `receipt_note?` | sửa qua gateway với actor `director`; trả phiên bản mới và biên nhận, hoặc `CONFLICT`/`INVALID` (isError) |
+| `project_undo` | `project`, `base` | hoàn tác thay đổi mới nhất |
+| `studio_request_next` | `project` | nhận yêu cầu Studio cũ nhất đang chờ (runner `mcp`); `null` khi trống |
+| `studio_request_done` | `project`, `id`, `ok`, `receipt` hoặc `error` | đóng yêu cầu: `done` hoặc `failed` |
+
+Luật của đạo diễn:
+
+- Luôn gọi `project_get` trước, rồi patch với đúng `base` vừa đọc. `CONFLICT` thì đọc lại và làm lại, không đoán phiên bản.
+- Sửa chuyển động bên trong một shot bằng cách sửa HTML của cảnh đó. Mọi thay đổi về thời gian (độ dài shot, vị trí câu thoại, nhạc) chỉ đi qua `project_patch`, không sửa tay số giây.
+- Đổi lời một câu (`set_line_text`) để `gate: "stale"` cho tới khi câu đó qua cổng `ov-script`; chỉ khi đó mới tạo lại giọng của riêng câu đó qua `ov-audio`.
+- Xong yêu cầu thì gọi `studio_request_done` với biên nhận tiếng Việt liệt kê mọi file và op đã đổi; không làm được thì `ok: false` kèm lý do.
