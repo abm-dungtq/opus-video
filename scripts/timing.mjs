@@ -39,6 +39,7 @@ import { wantsHelp, helpText } from "./cli-help.mjs";
 import { MUSIC_ONLY, SECTIONS, fold, parsePlan, parseTable, sceneId, spanBounds } from "./check-preflight.mjs";
 import { isVoice, parseTracks } from "./audio-mix.mjs";
 import { trackWords } from "./balance-measure.mjs";
+import { derive } from "./gateway.mjs";
 
 export const DEFAULTS = { fps: 30, beat0: 0, beatLen: 0, kick: [], drops: [] };
 export const NO_MARKERS = "index.html không có TIMING:BEGIN/END (tạo bằng composition.mjs init)";
@@ -73,11 +74,12 @@ export function phraseHits(words, phrase) {
 
 // Spoken words of a composition on the root timeline.
 // dir: project directory; html: HTML path relative to dir (default index.html).
+// htmlText: the HTML to read instead of the file (gateway.mjs derive passes the not yet written text).
 // Returns { words: [{ id, text, start, end }] sorted by start, tracks: the voice tracks, warnings: [text] }.
-export function voiceWords(dir, html = "index.html") {
+export function voiceWords(dir, html = "index.html", htmlText = null) {
   const root = resolve(dir);
   const htmlPath = resolve(root, html);
-  const tracks = parseTracks(readFileSync(htmlPath, "utf8"), dirname(htmlPath), root).filter(isVoice);
+  const tracks = parseTracks(htmlText ?? readFileSync(htmlPath, "utf8"), dirname(htmlPath), root).filter(isVoice);
   const words = [], warnings = [];
   for (const t of tracks) {
     const r = trackWords(t);
@@ -139,11 +141,16 @@ export function readBeats(dir, music = null) {
   }
 }
 
+// project.json shots → the planScenes() shape; a shot is spoken when a voice line belongs to it.
+export const manifestScenes = (m) => m.shots.map((s) => ({ sid: s.id, start: s.start, end: s.end, spoken: m.lines.some((l) => l.shot === s.id) }));
+
 // Builds the TIMING object. Throws (exit 1) on plan or root problems.
+// scenes: scene windows to use instead of PLAN.md "## Cảnh" (manifestScenes of project.json);
+// htmlText: the HTML to read instead of the file.
 // Returns { timing, lines: [text], warnings: [text] }.
-export function buildTiming({ dir, html = "index.html", music = null }) {
+export function buildTiming({ dir, html = "index.html", music = null, scenes: given = null, htmlText: givenHtml = null }) {
   const root = resolve(dir);
-  const htmlText = readFileSync(resolve(root, html), "utf8");
+  const htmlText = givenHtml ?? readFileSync(resolve(root, html), "utf8");
   const rootTag = htmlText.replace(/<!--[\s\S]*?-->/g, " ").match(/<[a-z][^>]*\sdata-composition-id\s*=[^>]*>/i);
   const duration = Number(rootTag?.[0].match(/\sdata-duration\s*=\s*["']?([\d.]+)/i)?.[1]);
   if (!Number.isFinite(duration) || duration <= 0) throw new Error(`${html}: root composition không có data-duration`);
@@ -152,8 +159,8 @@ export function buildTiming({ dir, html = "index.html", music = null }) {
   if (existsSync(hf)) {
     try { const v = Number(JSON.parse(readFileSync(hf, "utf8")).fps); if (v > 0) fps = v; } catch { /* unreadable hyperframes.json: HyperFrames itself reports it; keep the default fps */ }
   }
-  const scenes = planScenes(readFileSync(join(root, "PLAN.md"), "utf8"));
-  const voice = voiceWords(root, html);
+  const scenes = given ?? planScenes(readFileSync(join(root, "PLAN.md"), "utf8"));
+  const voice = voiceWords(root, html, htmlText);
   const beats = readBeats(root, music);
   const warnings = [...voice.warnings, ...beats.warnings];
 
@@ -209,6 +216,14 @@ export function main(argv = process.argv.slice(2), { out = (s) => process.stdout
   }
   if (!o.project) { err(`timing: --project is required\n${usage}\n`); return 2; }
   const dir = resolve(o.project);
+  // A project with project.json takes its scene windows from the manifest, through the gateway.
+  if (existsSync(join(dir, "project.json"))) {
+    const r = derive(dir, { dry: o.dry });
+    if (r.code) { err(`timing: ${r.error}\n`); return r.code === 4 ? 1 : r.code; }
+    out([...r.lines, ...r.warnings.map((w) => `WARN ${w}`)].join("\n") + "\n");
+    if (!o.dry) out("đã ghi TIMING từ project.json (gateway.mjs derive)\n");
+    return 0;
+  }
   const htmlPath = resolve(dir, o.html);
   if (!existsSync(join(dir, "PLAN.md"))) { err(`timing: PLAN.md not found in ${dir}\n`); return 2; }
   if (!existsSync(htmlPath)) { err(`timing: HTML not found: ${htmlPath}\n`); return 2; }

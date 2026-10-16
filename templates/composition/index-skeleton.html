@@ -4,7 +4,9 @@
   Create with `node scripts/composition.mjs init --project <dir>`, then run
   `node scripts/timing.mjs --project <dir>`: it rewrites the window.TIMING block below from
   PLAN.md "## Cảnh" and the voice words.json files. Never edit seconds in that block by hand;
-  re-run timing.mjs after every voice change.
+  re-run timing.mjs after every voice change. Once the project has project.json, shot windows
+  come from it instead: change them with `node scripts/gateway.mjs patch`, which re-derives the
+  TIMING block, the voice data-start/data-duration and the PLAN.md times.
   Every time comes from TIMING: W(sid, phrase) is the moment a phrase is spoken in scene sid,
   WE(sid, phrase) the moment it ends, B(n) quarter note n of the measured beat grid.
   Layout reads the frame size from --W/--H; ratio-specific layout goes in html[data-ratio="..."].

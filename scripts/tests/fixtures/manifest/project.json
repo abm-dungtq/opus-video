@@ -1,0 +1,22 @@
+{
+  "schema": "opus-video/project@1",
+  "title": "manifest fixture",
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "duration": 8,
+  "html": "index.html",
+  "capabilities": { "timing_markers": true, "editable": true },
+  "shots": [
+    { "id": "s1", "name": "Tiêu đề", "start": 0, "end": 2.5, "transition_in": "", "motion_note": "", "assets": [] },
+    { "id": "s2", "name": "Ba chip", "start": 2.5, "end": 5.8, "transition_in": "", "motion_note": "", "assets": [] },
+    { "id": "s3", "name": "Kết quả", "start": 5.8, "end": 8, "transition_in": "", "motion_note": "", "assets": [] }
+  ],
+  "lines": [
+    { "id": "vo-01", "shot": "s2", "text": "Bạn đưa cả mã nguồn, ảnh chụp.", "file": "assets/voice/01.mp3", "start": 2.5, "duration": 3, "gate": "pass" }
+  ],
+  "music": [],
+  "assets": [],
+  "version": 1,
+  "updated": "2026-10-16T00:00:00.000Z"
+}
