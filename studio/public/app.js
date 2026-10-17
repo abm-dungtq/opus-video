@@ -84,7 +84,7 @@ const ctx = {
 const player = mountPlayer(ctx, $("player"), { playBtn: $("play-btn"), timeEl: $("time") });
 mountTimeline(ctx, $("timeline"), { zoomIn: $("zoom-in"), zoomOut: $("zoom-out") });
 mountInspector(ctx, $("inspector"));
-mountPanels(ctx, document.querySelector(".tabs"), $("panel"));
+mountPanels(ctx, document.querySelector(".rail"), $("panel"));
 
 function setManifest(m) {
   ctx.state.m = m;

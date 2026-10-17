@@ -23,16 +23,8 @@
     <div id="banner" class="banner" hidden></div>
 
     <aside class="left">
-      <nav class="tabs" role="tablist">
-        <button role="tab" data-tab="director" class="tab active">Đạo diễn AI</button>
-        <button role="tab" data-tab="quick" class="tab">Nhanh</button>
-        <button role="tab" data-tab="scenes" class="tab">Mẫu cảnh</button>
-        <button role="tab" data-tab="media" class="tab">Media</button>
-        <button role="tab" data-tab="voice" class="tab">Lồng tiếng</button>
-        <button role="tab" data-tab="music" class="tab">Nhạc</button>
-        <button role="tab" data-tab="style" class="tab">Phong cách</button>
-      </nav>
-      <section id="panel" class="panel"></section>
+      <nav class="rail" role="tablist" aria-label="Khu làm việc" aria-orientation="vertical"></nav>
+      <section id="panel" class="panel" role="tabpanel" tabindex="-1"></section>
     </aside>
 
     <main class="stage">
