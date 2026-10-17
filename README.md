@@ -50,6 +50,13 @@ Các video dưới đây do opus-video dựng. Bấm vào ảnh để mở file 
 
 ## Có gì mới
 
+### v2.3.0 (2026-10-17): timeline sửa nhanh
+
+- **SFX và nhạc sửa ngay trên timeline.** Cổng lệnh có thêm op `update_music`, `move_event`, `add_event`, `remove_event`. SFX thêm từ Studio tự có thẻ `<audio>` trong `index.html`; Studio chỉ xoá SFX do chính nó thêm, SFX của đạo diễn thì nhờ đạo diễn.
+- **Cắt, fade và âm lượng nhạc vào tới bản xuất.** `gain` giờ được ghi ra `data-volume` (trước đây không đổi tiếng bản render). Fade vào/ra được `audio-mix.mjs` áp khi xuất video; player xem trước không fade.
+- **Làm lại.** Lệnh `gateway.mjs redo` và `STUDIO_API = 3` cho Motion Studio v1.1.0 (phím Cmd/Ctrl+Shift+Z).
+- **Nhập lại không mất SFX.** `manifest-import --force` giữ các SFX đã thêm từ Studio.
+
 ### v2.2.0 (2026-10-17): Motion Studio thành repo riêng
 
 - **Motion Studio ở [abm-dungtq/motion-studio](https://github.com/abm-dungtq/motion-studio).** Clone về `~/Projects/motion-studio` rồi chạy `node bin/motion-studio.mjs start --background`. Lệnh cũ `node scripts/studio.mjs start --background` của plugin vẫn dùng được: nó tìm Studio rồi chạy hộ. Studio chỉ đọc plugin qua `scripts/studio-api.mjs` và báo rõ khi bản plugin không tương thích.

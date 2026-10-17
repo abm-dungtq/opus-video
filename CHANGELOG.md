@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.3.0 (2026-10-17): timeline sửa nhanh
+
+Why: Motion Studio's timeline could only resize shots and move lines; sound effects, music trims and fades, and redo still needed the director or a hand edit. The gateway now has the ops a CapCut-style timeline sends, one version per drop, and the render hears what the timeline shows.
+
+### New
+- Gateway ops `update_music` (several fields of a bed at once: `start`, `end` or `null` to the end, `media_start`, `gain`, `fade_in`, `fade_out`), `move_event`, `add_event` and `remove_event`. `add_event` creates a studio event (`studio: true`, default id the lowest free `sfx-<n>` that is not already an `<audio>` id, volume 0.8); derive inserts its `<audio … data-studio-sfx>` tag after the last live `<audio>` with `data-track-index` ≥ 30 and removes the tag when the event goes. Tags without `data-studio-sfx` are never removed.
+- `remove_event` accepts only studio events; an event the director placed is INVALID (Studio shows "Nhờ đạo diễn" for it). A studio event whose id is already on another `<audio>` tag is refused before any file is written (exit 5, HTTP 422 in Studio).
+- `gateway.mjs redo` re-applies the change the newest undo reverted, as a new version (actor `redo`); any other change clears what can be redone. Exit 9 nothing to redo.
+- `scripts/studio-api.mjs`: `STUDIO_API = 3`, exports `redo` and the pure `redoTarget(history)` (whether and what redo would re-apply). Motion Studio v1.1.0 requires `STUDIO_API >= 3`.
+- Derive writes each music bed's `data-media-start`, `data-fade-in` and `data-fade-out` (removed when 0), and each event's `data-volume`. `audio-mix.mjs` applies `afade` in and out to a bed, so fades are heard in the exported video; the preview player does not fade.
+- `manifest-import --force` keeps the studio events of the old manifest whose shot still exists (others are dropped with a WARN).
+- MCP `project_patch` lists the new ops for the director.
+
+### Fixed
+- A music bed's `gain` is now written to `data-volume`. Before, changing `gain` (the Studio volume slider, `set_music`) did not change the render.
+
 ## v2.2.0 (2026-10-17): Motion Studio tách repo
 
 Why: the plugin and the web app have different users and release pace; Studio now lives in [abm-dungtq/motion-studio](https://github.com/abm-dungtq/motion-studio) (v1.0.0, history kept) and reads the plugin only through `scripts/studio-api.mjs`.

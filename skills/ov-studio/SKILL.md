@@ -1,6 +1,6 @@
 ---
 name: ov-studio
-description: "Hướng timeline của opus-video: manifest project.json (shot, câu thoại, nhạc, phiên bản), nhập dự án cũ thành project.json mà không đổi file gốc (manifest-import.mjs), sửa timeline qua cổng lệnh gateway.mjs (patch, undo, log, show, derive) và Motion Studio chạy trên máy. Dùng khi người dùng nói sửa video, mở studio, tạo dự án hay giao việc cho đạo diễn trong Studio, đổi shot, kéo dài cảnh hoặc dời câu thoại của một dự án đã có. Không dùng để làm video mới từ đầu trong terminal (opus-video chọn hướng dao-dien hoặc nhanh), tạo lại giọng (ov-audio) hay render bản giao (ov-deliver)."
+description: "Hướng timeline của opus-video: manifest project.json (shot, câu thoại, nhạc, phiên bản), nhập dự án cũ thành project.json mà không đổi file gốc (manifest-import.mjs), sửa timeline qua cổng lệnh gateway.mjs (patch, undo, redo, log, show, derive) và Motion Studio chạy trên máy. Dùng khi người dùng nói sửa video, mở studio, tạo dự án hay giao việc cho đạo diễn trong Studio, đổi shot, kéo dài cảnh hoặc dời câu thoại của một dự án đã có. Không dùng để làm video mới từ đầu trong terminal (opus-video chọn hướng dao-dien hoặc nhanh), tạo lại giọng (ov-audio) hay render bản giao (ov-deliver)."
 ---
 
 # ov-studio: project.json, gateway, Motion Studio
@@ -9,7 +9,7 @@ description: "Hướng timeline của opus-video: manifest project.json (shot, c
 
 ## Phạm vi
 
-Skill này sở hữu manifest `project.json`, cổng lệnh ghi duy nhất `gateway.mjs`, việc nhập dự án cũ, Motion Studio và yêu cầu gửi cho đạo diễn AI. Studio import plugin chỉ qua `scripts/studio-api.mjs` (`STUDIO_API = 2`, `PLUGIN_VERSION`, quyền của đạo diễn). Dùng được: hai CLI dưới đây, Motion Studio (giao diện web trên máy) và MCP server `opus-video` cho đạo diễn AI.
+Skill này sở hữu manifest `project.json`, cổng lệnh ghi duy nhất `gateway.mjs`, việc nhập dự án cũ, Motion Studio và yêu cầu gửi cho đạo diễn AI. Studio import plugin chỉ qua `scripts/studio-api.mjs` (`STUDIO_API = 3`, `PLUGIN_VERSION`, quyền của đạo diễn, `redo` và hàm thuần `redoTarget(history)` cho biết còn gì để làm lại). Dùng được: hai CLI dưới đây, Motion Studio (giao diện web trên máy) và MCP server `opus-video` cho đạo diễn AI.
 
 ## Đã dùng được
 
@@ -23,16 +23,22 @@ Skill này sở hữu manifest `project.json`, cổng lệnh ghi duy nhất `gat
   ```bash
   node $OV/scripts/gateway.mjs show  --project <dir>
   node $OV/scripts/gateway.mjs patch --project <dir> --actor director --base <phiên bản đang thấy> --ops '[{"op":"resize_shot","id":"s2","duration":5.5}]'
+  node $OV/scripts/gateway.mjs patch --project <dir> --actor human --base <n> --ops '[{"op":"update_music","id":"bgm","gain":0.5,"fade_in":1,"fade_out":2}]'
+  node $OV/scripts/gateway.mjs patch --project <dir> --actor human --base <n> --ops '[{"op":"add_event","start":5,"sound":"assets/sfx/whoosh.mp3"}]'
+  # op khác: {"op":"move_event","id":"sfx-1","start":3.5} · {"op":"remove_event","id":"sfx-1"}
   node $OV/scripts/gateway.mjs undo  --project <dir> --base <phiên bản đang thấy>
+  node $OV/scripts/gateway.mjs redo  --project <dir> --base <phiên bản đang thấy>
   node $OV/scripts/gateway.mjs log   --project <dir>
   ```
-  Exit 3 CONFLICT: phiên bản đã đổi, đọc lại bằng `show` rồi làm lại. Exit 8 BUSY: tiến trình khác đang ghi, thử lại sau. Exit 5 INVALID: op sai hoặc kết quả phá luật manifest (đọc lý do tiếng Việt). Danh sách op ở `--help`.
+  Exit 3 CONFLICT: phiên bản đã đổi, đọc lại bằng `show` rồi làm lại. Exit 8 BUSY: tiến trình khác đang ghi, thử lại sau. Exit 5 INVALID: op sai hoặc kết quả phá luật manifest (đọc lý do tiếng Việt). Exit 7: không còn gì để hoàn tác. Exit 9: không còn gì để làm lại (`redo` chỉ chạy khi các thay đổi cuối là undo/redo; patch mới xoá khả năng làm lại). Danh sách op ở `--help`.
+- Nhạc: `update_music` đổi nhiều trường của một khối một lần (`start`, `end` hoặc `null` = tới hết video, `media_start`, `gain`, `fade_in`, `fade_out`). Derive ghi `data-volume` (= `gain`), `data-media-start`, `data-fade-in`, `data-fade-out` lên thẻ `<audio>` của nhạc (bỏ thuộc tính khi bằng 0). `audio-mix.mjs` áp `afade`, nên fade chỉ nghe trong bản xuất, không nghe trong player xem trước.
 - Hiệu ứng âm thanh gắn sự kiện nằm trong `events` của `project.json` (`{id, shot, offset, sound, label}`): `id` là id của thẻ `<audio>`, gateway ghi `data-start` = đầu shot + `offset`. `manifest-import` lấy chúng từ các hàng `## Sự kiện` của PLAN.md có file âm thanh, khớp thẻ `<audio>` theo `src` (thẻ cần `id`). Đổi, thêm, xoá shot thì SFX đi theo shot và `sfx-sync` vẫn PASS, không sửa tay `data-start` của SFX. Xoá shot thì sự kiện của nó bị bỏ (biên nhận cảnh báo, thẻ `<audio>` vẫn ở HTML); hoàn tác trả lại cả sự kiện lẫn hàng PLAN.md. `move_line` không đụng SFX, chỉ dời các hàng `chữ:` nằm trong câu đó.
+- SFX thêm từ Studio hay qua `add_event` là sự kiện `studio: true` (id mặc định `sfx-<n>` chưa dùng, `volume` 0.8). Derive chèn thẻ `<audio … data-studio-sfx>` cho nó (`data-track-index` ≥ 30, sau thẻ `<audio>` cuối) và xoá thẻ đó khi sự kiện mất (`remove_event` hay hoàn tác `add_event`). Thẻ không có `data-studio-sfx` không bao giờ bị xoá. `remove_event` chỉ nhận sự kiện `studio: true`; SFX do đạo diễn đặt thì nhờ đạo diễn xoá. Id trùng một thẻ `<audio>` đã có (thẻ viết tay) bị từ chối: exit 5, Studio nhận HTTP 422, không file nào bị ghi. Sửa tay trên thẻ `data-studio-sfx` sẽ mất khi xoá rồi hoàn tác, vì thẻ được dựng lại từ manifest. `manifest-import --force` giữ các sự kiện studio của manifest cũ (sự kiện có shot không còn thì bỏ, kèm WARN).
 - Sửa lời một câu (`set_line_text`) đặt `gate: stale`: chạy lại `ov-script` cho câu đó, rồi `ov-audio` tạo lại giọng, rồi `ov-deliver`.
 
 ## Motion Studio
 
-Giao diện web trên máy để làm video từ đầu tới bản giao: tạo dự án, nạp footage, giao việc cho đạo diễn AI, bấm duyệt, xem và sửa timeline, xuất MP4. Gồm player, timeline (Shot, Lồng tiếng, Nhạc), inspector của shot và thanh bên sáu mục: Giao việc cho AI, Footage & chất liệu, Lời & giọng, Nhạc & âm thanh, Thư viện mẫu, Xuất bản (Alt+1…6; tab đang mở giữ trong `?tab=`).
+Giao diện web trên máy để làm video từ đầu tới bản giao: tạo dự án, nạp footage, giao việc cho đạo diễn AI, bấm duyệt, xem và sửa timeline, xuất MP4. Gồm player, timeline (Shot, Lồng tiếng, Nhạc, SFX), inspector theo khối đang chọn (shot, câu, nhạc, SFX) và thanh bên sáu mục: Giao việc cho AI, Footage & chất liệu, Lời & giọng, Nhạc & âm thanh, Thư viện mẫu, Xuất bản (Alt+1…6; tab đang mở giữ trong `?tab=`).
 
 Studio là repo riêng [abm-dungtq/motion-studio](https://github.com/abm-dungtq/motion-studio), thường clone ở `~/Projects/motion-studio`. `$OV/scripts/studio.mjs` là shim: tìm Studio ở `MOTION_STUDIO_HOME`, rồi `~/Projects/motion-studio`, và chạy `bin/motion-studio.mjs` với cùng tham số. Chưa có Studio thì shim in lệnh `git clone` và exit 2.
 
@@ -48,7 +54,17 @@ node $OV/scripts/studio.mjs stop                 # dừng khi xong việc
 - **Footage & chất liệu:** duyệt thư mục trên máy (trong home và `/Volumes`) rồi đăng ký file video, âm thanh, ảnh. File đã nằm trong `footage/`, `shared-assets/` hoặc `assets/` của dự án được dùng tại chỗ; file khác được chép vào `footage/raw/` (tên trùng thành `-2`, `-3`, không ghi đè). Mọi đường dẫn kiểm bằng realpath. Metadata lấy bằng ffprobe, lưu ở `.opus/media.json` cho đạo diễn đọc. API: `GET /api/media/browse`, `POST /api/media/register`, `GET /api/media`.
 - **Chip agent** (góc phải thanh trên): `claude` có không, phiên bản, đã đăng nhập chưa (chỉ đọc cờ `loggedIn` của `claude auth status`), runner, job gần nhất, ffprobe và ffmpeg. API: `GET /api/agent`.
 - Dự án là thư mục con trực tiếp của thư mục gốc có `project.json`. Thư mục có `index.html` và `BRIEF.md` mà chưa có manifest hiện nút **Nhập dự án** (chạy `manifest-import --write`).
-- Mọi thao tác sửa đi qua gateway với actor `human`: kéo mép phải shot (`resize_shot`, bước 0,1 s, tối thiểu 0,5 s), kéo câu thoại (`move_line`), Áp dụng trong inspector (`set_shot`, `resize_shot`), sửa lời (`set_line_text`, gate thành `stale`), thanh âm lượng nhạc (`set_music`), Hoàn tác hoặc Ctrl/Cmd+Z (`undo`). Phiên bản đã đổi (409) thì Studio tải lại và báo "Đã có thay đổi mới, đã tải lại".
+- Mọi thao tác sửa đi qua gateway với actor `human`: kéo mép phải shot (`resize_shot`, bước 0,1 s, tối thiểu 0,5 s), kéo câu thoại (`move_line`), Áp dụng trong inspector (`set_shot`, `resize_shot`), sửa lời (`set_line_text`, gate thành `stale`), thanh âm lượng nhạc (`set_music`), khối nhạc và SFX (`update_music`, `move_event`, `add_event`, `remove_event`, xem "Timeline"), Hoàn tác hoặc Ctrl/Cmd+Z (`undo`), Làm lại hoặc Ctrl/Cmd+Shift+Z (`redo`). Kéo chuột chỉ xem trước tại chỗ, thả ra mới gửi đúng một patch. Phiên bản đã đổi (409) thì Studio tải lại và báo "Đã có thay đổi mới, đã tải lại".
+- **Timeline.**
+  - Track SFX hiện mọi `events`: kéo khối gửi `move_event`; chuột phải "Thêm SFX tại đây…" chọn file trong `assets/` hoặc `shared-assets/sfx/` (file chung được chép vào dự án, trùng tên thành `-2`) rồi gửi `add_event`. Delete và "Xoá SFX" chỉ áp cho SFX thêm từ Studio; SFX do đạo diễn đặt có "Nhờ đạo diễn" thay vào.
+  - Cắt shot: chọn shot, đặt playhead bên trong, bấm S. Một patch `resize_shot` + `add_shot` (+ `move_line`/`move_event` cho phần sau điểm cắt), tổng thời lượng không đổi. Shot mới **trống** (chưa có cảnh HTML, preflight final FAIL); Studio báo và đưa nút "Nhờ đạo diễn dựng shot mới".
+  - Nhạc: kéo thân dời `start`, kéo mép trái cắt đầu (`start` + `media_start`), kéo mép phải cắt cuối (`end`); inspector chỉnh `gain`, `fade_in`, `fade_out`. Mỗi thao tác một `update_music`. Fade chỉ nghe trong bản xuất (audio-mix), player xem trước không fade.
+  - Phím tắt (không chạy khi con trỏ ở ô nhập liệu): Space phát/dừng, J lùi một giây, K dừng, L phát, ←/→ một khung, Shift+←/→ một giây, Home/End về đầu/cuối, S cắt shot, Delete (hoặc Backspace) xoá SFX studio, +/− zoom, N bật/tắt hít, Cmd/Ctrl+Z hoàn tác, Cmd/Ctrl+Shift+Z làm lại, Shift+Z vừa khung. Kéo thước hoặc playhead để tua; Ctrl/Cmd+cuộn để zoom quanh con trỏ.
+  - Nút Làm lại luôn bật trên dự án sửa được; không còn gì để làm lại thì hiện toast "Không còn gì để làm lại".
+  - Hít (phím N hoặc nút "Hít"): khi kéo, mép khối hít vào playhead, mép shot, đầu/cuối câu, SFX, phách nhạc và đầu từ trong 8px, có vạch hít.
+  - Trợ giúp nhìn: sóng âm trên khối giọng và nhạc (SFX không vẽ), vạch phách trên thước, chấm đầu từ khi zoom đủ lớn, nút "Vừa khung".
+  - M/S (tắt tiếng/solo) trên nhãn track Lồng tiếng, Nhạc, SFX chỉ đổi player xem trước, không đổi `project.json` hay bản xuất.
+  - Chip cổng cạnh nút Xuất video (`GET /api/gates`, chạy `check-preflight --stage final --json`): "Cần duyệt lại animatic" (bấm mở tab Giao việc cho AI) hoặc "Chưa đủ cổng xuất"; tab Xuất bản liệt kê các dòng FAIL phía trên nút Xuất video.
 - Dự án chỉ xem hiện banner "Dự án nhập từ bản cũ: chỉ xem, sửa qua đạo diễn" và khoá mọi thao tác sửa.
 - Bảo mật: chỉ nghe 127.0.0.1, kiểm tra Host và Origin, POST cần token của lần chạy (lưu trong `~/.config/opus-video/studio.json`, chmod 600). Không phục vụ `.env`, `.git` hay dotfile ngoài `.opus/`. Tiến trình cùng user trên máy nằm trong vùng tin cậy.
 

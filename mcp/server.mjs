@@ -22,7 +22,7 @@ const RUNNER = process.env.OPUS_STUDIO_RUNNER === "cli" ? "cli" : "mcp";
 // stdout carries JSON-RPC only: anything a library logs goes to stderr.
 console.log = (...a) => console.error(...a);
 
-export const SERVER = { name: "opus-video", version: "2.2.0" };
+export const SERVER = { name: "opus-video", version: "2.3.0" };
 const PROJECT = { type: "string", description: "Đường dẫn tuyệt đối tới thư mục dự án có project.json" };
 const BASE = { type: "integer", description: "Phiên bản project.json bạn vừa đọc (project_get → version)" };
 
@@ -39,7 +39,7 @@ export const TOOLS = [
   },
   {
     name: "project_patch",
-    description: "Sửa timeline qua cổng lệnh với actor director: một danh sách op (resize_shot, move_line, set_shot, set_line_text, set_music, add_shot, remove_shot) thành một phiên bản mới, kèm biên nhận tiếng Việt. Sai base trả CONFLICT, op sai trả INVALID.",
+    description: "Sửa timeline qua cổng lệnh với actor director: một danh sách op (resize_shot, move_line, set_shot, set_line_text, set_music, update_music, move_event, add_event, remove_event, add_shot, remove_shot) thành một phiên bản mới, kèm biên nhận tiếng Việt. Sai base trả CONFLICT, op sai trả INVALID.",
     inputSchema: {
       type: "object",
       properties: {
