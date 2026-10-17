@@ -8,7 +8,10 @@
 //     lines:  [{ id, shot, text, file, start, duration, gate: "pass"|"stale"|"unknown" }],
 //     music:  [{ id, file, start, end, gain }],
 //     assets: [{ path, kind }],
+//     events: [{ id, shot, offset, sound?, label }],   optional
 //     version, updated }
+// An event is a sound effect tied to a shot: id names its <audio id> in the HTML, whose data-start
+// the gateway writes as shot.start + offset, so the sound moves with its shot. sound is the src.
 // Seconds are rounded to 3 decimals. Shots are sorted, back to back from 0, and the last shot's
 // end is the duration. Paths are relative and stay inside the project.
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -71,6 +74,24 @@ export function validate(m) {
     if (!isNum(b?.start) || b.start < 0 || (b.end != null && (!isNum(b.end) || b.end <= b.start))) errs.push(`${tag}: cần 0 ≤ start < end`);
   });
   m.assets.forEach((a, i) => { if (!insidePath(a?.path)) errs.push(`asset #${i + 1}: path phải là đường dẫn tương đối trong dự án`); });
+  if (m.events != null) {
+    if (!Array.isArray(m.events)) { errs.push("events phải là mảng"); return errs; }
+    const evIds = new Set();
+    const shotOf = new Map(m.shots.map((s) => [s.id, s]));
+    m.events.forEach((e, i) => {
+      const tag = e?.id ?? `event #${i + 1}`;
+      if (!e?.id || typeof e.id !== "string") errs.push(`${tag}: sự kiện cần id (id của thẻ <audio>)`);
+      else if (evIds.has(e.id)) errs.push(`${e.id}: id sự kiện bị trùng`);
+      else if (lineIds.has(e.id)) errs.push(`${e.id}: id sự kiện trùng id câu thoại`);
+      evIds.add(e?.id);
+      const s = shotOf.get(e?.shot);
+      if (!s) errs.push(`${tag}: shot "${e?.shot}" không tồn tại`);
+      if (!isNum(e?.offset)) errs.push(`${tag}: offset phải là số giây`);
+      else if (s && s.start + e.offset < -EPS) errs.push(`${tag}: thời điểm ${r3(s.start + e.offset)}s trước 0s`);
+      if (e?.sound != null && !insidePath(e.sound)) errs.push(`${tag}: sound phải là đường dẫn tương đối trong dự án`);
+      if (typeof e?.label !== "string") errs.push(`${tag}: label phải là chuỗi`);
+    });
+  }
   return errs;
 }
 

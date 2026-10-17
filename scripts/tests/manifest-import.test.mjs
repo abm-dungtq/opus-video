@@ -46,7 +46,7 @@ test("--write adds only project.json and .opus/, and every existing file keeps i
     const added = Object.keys(after).filter((f) => !(f in before)).sort();
     assert.deepEqual(added, [".opus/history.jsonl", ".opus/versions/v1.json", "project.json"]);
     assert.equal(readHistory(dir)[0].actor, "import");
-    assert.match(buf.out, /IMPORT .* shots=3 lines=1 music=0 editable=true/);
+    assert.match(buf.out, /IMPORT .* shots=3 lines=1 music=0 events=0 editable=true/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

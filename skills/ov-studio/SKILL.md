@@ -27,6 +27,7 @@ Skill này sở hữu manifest `project.json`, cổng lệnh ghi duy nhất `gat
   node $OV/scripts/gateway.mjs log   --project <dir>
   ```
   Exit 3 CONFLICT: phiên bản đã đổi, đọc lại bằng `show` rồi làm lại. Exit 8 BUSY: tiến trình khác đang ghi, thử lại sau. Exit 5 INVALID: op sai hoặc kết quả phá luật manifest (đọc lý do tiếng Việt). Danh sách op ở `--help`.
+- Hiệu ứng âm thanh gắn sự kiện nằm trong `events` của `project.json` (`{id, shot, offset, sound, label}`): `id` là id của thẻ `<audio>`, gateway ghi `data-start` = đầu shot + `offset`. `manifest-import` lấy chúng từ các hàng `## Sự kiện` của PLAN.md có file âm thanh, khớp thẻ `<audio>` theo `src` (thẻ cần `id`). Đổi, thêm, xoá shot thì SFX đi theo shot và `sfx-sync` vẫn PASS, không sửa tay `data-start` của SFX. Xoá shot thì sự kiện của nó bị bỏ (biên nhận cảnh báo, thẻ `<audio>` vẫn ở HTML); hoàn tác trả lại cả sự kiện lẫn hàng PLAN.md. `move_line` không đụng SFX, chỉ dời các hàng `chữ:` nằm trong câu đó.
 - Sửa lời một câu (`set_line_text`) đặt `gate: stale`: chạy lại `ov-script` cho câu đó, rồi `ov-audio` tạo lại giọng, rồi `ov-deliver`.
 
 ## Motion Studio

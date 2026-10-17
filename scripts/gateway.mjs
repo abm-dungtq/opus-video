@@ -3,8 +3,9 @@
 // timing.mjs, an undo) is a list of ops applied here as one new version, with a Vietnamese receipt,
 // a full snapshot in .opus/versions/v<N>.json and a line in .opus/history.jsonl. After each change
 // of an editable project it re-derives what the renderer reads: the TIMING block and the voice
-// <audio>/<video> data-start/data-duration of index.html, the root data-duration, the Thời điểm
-// cells of PLAN.md "## Cảnh", and timing.json. Never hand-edit those seconds.
+// <audio>/<video> data-start/data-duration of index.html, the SFX <audio> data-start of each
+// manifest event (shot.start + offset), the root data-duration, the Thời điểm cells of PLAN.md
+// "## Cảnh" and "## Sự kiện", and timing.json. Never hand-edit those seconds.
 //   node gateway.mjs patch  --project <dir> --actor <human|director|timing> --base <n> (--ops '<json>' | --ops-file <f>)
 //   node gateway.mjs undo   --project <dir> --base <n>
 //   node gateway.mjs log    --project <dir> [--json]
@@ -12,19 +13,21 @@
 //   node gateway.mjs derive --project <dir> [--dry]
 //   node gateway.mjs --help | -h
 // Ops (JSON array):
-//   { "op": "resize_shot", "id": "s2", "duration": 5.5 }   end moves; later shots and their lines ripple
-//   { "op": "move_line", "id": "vo-02", "start": 3.1 }       the line joins the shot holding its new start
+//   { "op": "resize_shot", "id": "s2", "duration": 5.5 }   end moves; later shots, their lines and events ripple
+//   { "op": "move_line", "id": "vo-02", "start": 3.1 }       the line joins the shot holding its new start;
+//                                                            events stay, its "chữ:" rows in PLAN.md follow it
 //   { "op": "set_shot", "id": "s2", "field": "name|transition_in|motion_note|assets", "value": … }
 //   { "op": "set_line_text", "id": "vo-02", "text": "…" }    gate becomes "stale" (viet-pro again)
 //   { "op": "set_music", "id": "bgm", "field": "gain|start|end", "value": 0.3 }
 //   { "op": "add_shot", "after": "s2" | null, "name": "…", "duration": 3 }   later shots ripple
-//   { "op": "remove_shot", "id": "s4" }                      refused while a line belongs to it
+//   { "op": "remove_shot", "id": "s4" }                      refused while a line belongs to it; its events are dropped
 // --base is the version the caller last saw; another version is a CONFLICT and nothing is written.
 // Writers are serialized by .opus/lock (a lock older than 30 s is stale and removed); a writer
 // that cannot get it within 5 s exits 8 BUSY and may retry. The derived files are written before
 // project.json, so a new version number means its HTML, PLAN.md and timing.json are in place.
 // undo reverts the newest change not yet undone by restoring the snapshot before it, as a new
-// version (actor "undo"), so history only grows. It never reaches past the latest import.
+// version (actor "undo"), so history only grows. It never reaches past the latest import. The
+// "## Sự kiện" rows a change dropped are kept in its history line and put back by its undo.
 // A project whose index.html has no TIMING:BEGIN/END (capabilities.editable false, every project
 // imported from before the skeleton) is view only: patch, undo and derive exit 4.
 // Exit: 0 ok · 1 cannot read or write · 2 bad usage · 3 CONFLICT · 4 view-only project ·
@@ -65,7 +68,8 @@ export function applyOps(m, ops) {
     return i;
   };
   const lineOf = (id) => next.lines.find((l) => l.id === id) ?? (() => { throw new OpError(`không có câu thoại ${id}`); })();
-  // Shift every shot from index i on, and the lines that belong to them, by delta seconds.
+  // Shift every shot from index i on, and the lines that belong to them, by delta seconds. Events
+  // are stored as an offset inside their shot, so they move with it.
   const ripple = (i, delta) => {
     if (Math.abs(delta) < EPS) return;
     const moved = new Set(next.shots.slice(i).map((s) => s.id));
@@ -96,6 +100,7 @@ export function applyOps(m, ops) {
         receipt.push(`${s.id}: ${fmt(s.end - s.start)} → ${fmt(d)}`);
         s.end = newEnd;
         for (const l of next.lines) if (l.shot === s.id && l.start >= newEnd - EPS) receipt.push(`CẢNH BÁO ${l.id}: bắt đầu ${fmt(l.start)}, sau khi ${s.id} kết thúc ${fmt(newEnd)}`);
+        for (const e of next.events ?? []) if (e.shot === s.id && s.start + e.offset >= newEnd - EPS) receipt.push(`CẢNH BÁO sự kiện ${e.id}: ${fmt(s.start + e.offset)}, sau khi ${s.id} kết thúc ${fmt(newEnd)}`);
         ripple(i + 1, delta);
         retime(before);
         break;
@@ -154,6 +159,10 @@ export function applyOps(m, ops) {
         if (next.shots.length === 1) throw new OpError("không xoá được shot cuối cùng");
         next.shots.splice(i, 1);
         receipt.push(`xoá ${s.id}`);
+        if (next.events) {
+          for (const e of next.events.filter((e) => e.shot === s.id)) receipt.push(`CẢNH BÁO bỏ sự kiện ${e.id}: ${s.id} đã xoá, thẻ <audio id="${e.id}"> vẫn ở HTML với data-start cũ, xoá thẻ hoặc gắn lại`);
+          next.events = next.events.filter((e) => e.shot !== s.id);
+        }
         ripple(i, -(s.end - s.start));
         retime(before);
         break;
@@ -231,11 +240,12 @@ function commit(dir, { base, actor, build, lockWaitMs }) {
     r.next.updated = new Date().toISOString();
     // Derive first, so a composition that cannot take the change leaves every file as it was,
     // then write it, and project.json last: a reader that sees v+1 also sees its derived files.
-    const d = derive(dir, { manifest: r.next, prev: m, dry: true });
+    const d = derive(dir, { manifest: r.next, prev: m, dry: true, restoreRows: r.restoreRows });
     if (d.code) return d;
-    const w = derive(dir, { manifest: r.next, prev: m });
+    const w = derive(dir, { manifest: r.next, prev: m, restoreRows: r.restoreRows });
     if (w.code) return w;
-    record(dir, r.next, { actor, base: m.version, ops: r.ops, receipt: [...r.receipt, ...w.events], ...(r.extra ?? {}) });
+    // Dropped "## Sự kiện" rows are kept in the history line, so an undo can put them back.
+    record(dir, r.next, { actor, base: m.version, ops: r.ops, receipt: [...r.receipt, ...w.events], ...(w.dropped.length ? { dropped_rows: w.dropped } : {}), ...(r.extra ?? {}) });
     return { code: EXIT.ok, version: r.next.version, receipt: r.receipt, lines: w.lines, warnings: w.warnings };
   } finally { release(); }
 }
@@ -258,7 +268,7 @@ export function undo(dir, { base, lockWaitMs }) {
       if (!target) throw Object.assign(new Error("không còn thay đổi nào để hoàn tác"), { code: "NOTHING" });
       const prev = JSON.parse(readFileSync(snapPath(dir, target.v - 1), "utf8"));
       const next = { ...prev, version: m.version, updated: m.updated };
-      return { next, ops: [], receipt: [`hoàn tác v${target.v}: ${(target.receipt ?? []).join("; ")}`], extra: { undoes: target.v } };
+      return { next, ops: [], receipt: [`hoàn tác v${target.v}: ${(target.receipt ?? []).join("; ")}`], extra: { undoes: target.v }, restoreRows: target.dropped_rows ?? [] };
     },
   });
 }
@@ -283,9 +293,12 @@ function replaceLive(html, re, fn) {
   return { text: html, hit: false };
 }
 
-// HTML text + manifest → { html, missing }: the root data-duration and each voice line's
-// data-start / data-duration set (only those attribute values change); missing lists the line ids
-// with no live <audio>/<video> tag.
+// Root-timeline data-start of a manifest event.
+const eventStart = (e, shotOf) => r3(shotOf.get(e.shot).start + e.offset);
+
+// HTML text + manifest → { html, missing, missingEvents }: the root data-duration, each voice
+// line's data-start / data-duration and each event's <audio> data-start (shot.start + offset) set
+// (only those attribute values change); missing / missingEvents list the ids with no live tag.
 export function deriveHtml(html, m) {
   let out = replaceLive(html, /<[a-z][^>]*\sdata-composition-id\s*=[^>]*>/i, (tag) => setAttr(tag, "data-duration", m.duration)).text;
   const missing = [];
@@ -298,7 +311,14 @@ export function deriveHtml(html, m) {
     out = r.text;
     if (!r.hit) missing.push(l.id);
   }
-  return { html: out, missing };
+  const missingEvents = [];
+  const shotOf = new Map((m.shots ?? []).map((s) => [s.id, s]));
+  for (const e of m.events ?? []) {
+    const r = replaceLive(out, new RegExp(`<audio\\b[^>]*\\sid\\s*=\\s*["']${esc(e.id)}["'][^>]*>`, "i"), (tag) => setAttr(tag, "data-start", eventStart(e, shotOf)));
+    out = r.text;
+    if (!r.hit) missingEvents.push(e.id);
+  }
+  return { html: out, missing, missingEvents };
 }
 
 // PLAN.md text + manifest → PLAN.md with the "## Cảnh" rows in shot order and each Thời điểm cell
@@ -341,57 +361,83 @@ export function derivePlan(text, m) {
 
 // PLAN.md text + the manifest before and after a change → { text, receipt }: each "## Sự kiện"
 // row keeps its offset inside the shot that held it (half-open windows, the last shot takes the
-// end), so word and SFX rows follow a resized, added or removed shot. Rows of a removed shot are
-// dropped; a row left past its shot's new end stays, with a warning. Only the number changes.
-export function remapEvents(text, prev, m) {
+// end), so word and SFX rows follow a resized, added or removed shot. A "chữ:" row inside a voice
+// line's window (start … start + duration) keeps its offset inside that line instead, so it also
+// follows move_line. Rows of a removed shot are dropped; a row left past its shot's new end
+// stays, with a warning, and dropped lists the rows dropped with their index in the table, so
+// undo can put them back: restore takes that list and re-inserts the rows as they were.
+export function remapEvents(text, prev, m, restore = []) {
   const receipt = [];
   const lines = text.split("\n");
+  const same = { text, receipt, dropped: [] };
   const h = lines.findIndex((l) => /^##\s+/.test(l) && fold(l.replace(/^##\s+/, "")) === EVENTS_SECTION);
-  if (h < 0 || !prev?.shots?.length) return { text, receipt };
+  if (h < 0 || !prev?.shots?.length) return same;
   let a = h + 1;
   while (a < lines.length && !/^\s*\|/.test(lines[a]) && !/^##\s+/.test(lines[a])) a++;
-  if (a >= lines.length || !/^\s*\|/.test(lines[a])) return { text, receipt };
+  if (a >= lines.length || !/^\s*\|/.test(lines[a])) return same;
   let b = a;
   while (b < lines.length && /^\s*\|/.test(lines[b])) b++;
-  const ti = parseTable(lines.slice(a, b).join("\n")).headers.findIndex((x) => /thoi diem/.test(x));
-  if (ti < 0) return { text, receipt };
+  const headers = parseTable(lines.slice(a, b).join("\n")).headers;
+  const ti = headers.findIndex((x) => /thoi diem/.test(x));
+  const li = headers.findIndex((x) => /su kien/.test(x));
+  if (ti < 0) return same;
+  const lineAt = (t) => prev.lines?.find((l) => l.duration != null && t >= l.start - EPS && t <= l.start + l.duration + EPS);
   const head = /^\s*\|[\s|:-]+\|\s*$/.test(lines[a + 1] ?? "") ? 2 : 1;
   const holder = (t) => prev.shots.find((s, i) => t >= s.start && (t < s.end || i === prev.shots.length - 1)) ?? prev.shots.at(-1);
+  // Only the number changes, kept with at least its decimals and its separator ("3.0" stays "3.0").
+  const retime = (cell, t2) => cell.replace(/\d+(?:([.,])(\d+))?/, (tok, sep, dec) => {
+    const s = dec && !String(t2).includes(".") ? t2.toFixed(dec.length) : String(t2);
+    return sep === "," ? s.replace(".", ",") : s;
+  });
   const rows = [];
-  for (const row of lines.slice(a + head, b)) {
+  const dropped = [];
+  lines.slice(a + head, b).forEach((row, index) => {
     const cells = row.split("|");
     const { t } = eventTime(cells[ti + 1]?.trim());
+    const word = Number.isFinite(t) && li >= 0 && /^chu\s*:/.test(fold(cells[li + 1] ?? "").trim());
+    const said = word ? lineAt(t) : null;
+    const saidNow = said && m.lines?.find((l) => l.id === said.id);
+    if (saidNow) {
+      const t2 = r3(t + saidNow.start - said.start);
+      if (t2 !== t) cells[ti + 1] = retime(cells[ti + 1], t2);
+      rows.push(cells.join("|"));
+      return;
+    }
     const old = Number.isFinite(t) ? holder(t) : null;
     const now = old && m.shots.find((s) => s.id === old.id);
-    if (!old) { rows.push(row); continue; }
-    if (!now) { receipt.push(`bỏ hàng sự kiện ${t}s: ${old.id} đã xoá`); continue; }
+    if (!old) { rows.push(row); return; }
+    if (!now) { receipt.push(`bỏ hàng sự kiện ${t}s: ${old.id} đã xoá`); dropped.push({ index, row }); return; }
     const t2 = r3(now.start + (t - old.start));
-    if (t2 !== t) cells[ti + 1] = cells[ti + 1].replace(/\d+(?:[.,]\d+)?/, String(t2));
+    if (t2 !== t) cells[ti + 1] = retime(cells[ti + 1], t2);
     if (t2 > now.end) receipt.push(`CẢNH BÁO sự kiện ${t2}s nằm ngoài ${now.id} (hết ở ${r3(now.end)}s)`);
     rows.push(cells.join("|"));
-  }
-  return { text: [...lines.slice(0, a + head), ...rows, ...lines.slice(b)].join("\n"), receipt };
+  });
+  for (const d of [...restore].sort((x, y) => x.index - y.index)) rows.splice(Math.min(d.index, rows.length), 0, d.row);
+  return { text: [...lines.slice(0, a + head), ...rows, ...lines.slice(b)].join("\n"), receipt, dropped };
 }
 
 // Re-derives the renderer's inputs from project.json (or opts.manifest). dry: compute only.
-// prev: the manifest before the change, so "## Sự kiện" rows follow their shots.
-// Returns { code, lines, warnings, events, error }.
-export function derive(dir, { manifest = null, prev = null, dry = false } = {}) {
+// prev: the manifest before the change, so "## Sự kiện" rows follow their shots. restoreRows: rows
+// to put back (an undo of a change that dropped them). Returns { code, lines, warnings, events,
+// dropped, error }; dropped lists the "## Sự kiện" rows this change removed.
+export function derive(dir, { manifest = null, prev = null, dry = false, restoreRows = [] } = {}) {
   const root = resolve(dir);
   const m = manifest ?? load(root);
   if (!m) return { code: EXIT.usage, error: `không có project.json trong ${root}` };
   if (!m.capabilities?.editable) return { code: EXIT.viewOnly, error: VIEW_ONLY };
   const htmlPath = join(root, m.html);
   const planPath = join(root, "PLAN.md");
-  let html, plan = null, r, next, missing = [], events = [];
+  let html, plan = null, r, next, missing = [], missingEvents = [], events = [], dropped = [];
   try {
     const dh = deriveHtml(readFileSync(htmlPath, "utf8"), m);
     html = dh.html;
     missing = dh.missing;
+    missingEvents = dh.missingEvents;
     if (existsSync(planPath)) {
-      const ev = remapEvents(readFileSync(planPath, "utf8"), prev, m);
+      const ev = remapEvents(readFileSync(planPath, "utf8"), prev, m, restoreRows);
       plan = derivePlan(ev.text, m);
       events = ev.receipt;
+      dropped = ev.dropped;
     }
     const bed = m.music.find((b) => existsSync(join(root, `${b.file}.beats.json`)));
     r = buildTiming({ dir: root, html: m.html, music: bed?.file ?? null, scenes: manifestScenes(m), htmlText: html });
@@ -404,8 +450,12 @@ export function derive(dir, { manifest = null, prev = null, dry = false } = {}) 
       writeAtomic(join(root, "timing.json"), JSON.stringify(r.timing, null, 2) + "\n");
     } catch (e) { return { code: EXIT.io, error: `không ghi được: ${e.message}` }; }
   }
-  const warnings = [...missing.map((id) => `${id}: không có thẻ <audio>/<video id="${id}"> trong ${m.html}, thời điểm không được ghi`), ...r.warnings];
-  return { code: EXIT.ok, lines: r.lines, warnings, events };
+  const warnings = [
+    ...missing.map((id) => `${id}: không có thẻ <audio>/<video id="${id}"> trong ${m.html}, thời điểm không được ghi`),
+    ...missingEvents.map((id) => `sự kiện ${id}: không có thẻ <audio id="${id}"> trong ${m.html}, thời điểm không được ghi`),
+    ...r.warnings,
+  ];
+  return { code: EXIT.ok, lines: r.lines, warnings, events, dropped };
 }
 
 function writeAtomic(f, text) {

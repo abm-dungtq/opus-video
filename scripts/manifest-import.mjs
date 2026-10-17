@@ -13,6 +13,10 @@
 //   data-duration; text from script/<NN>.txt matching the voice file name, else the audio_meta.json
 //   words, else the <voice>.words.json sidecar; gate "unknown". Each line belongs to the shot holding its midpoint.
 // Music: the bed tracks (isBed) with data-volume as gain.
+// Events: each PLAN.md "## Sự kiện" row that names a sound file, matched to an <audio id> of that
+//   src (the one with the nearest data-start, each tag used once), in the shot holding the row's
+//   time, with offset = data-start − shot start. A row with no tag, or a tag with no id, is a WARN.
+//   The key is left out when no event is found.
 // capabilities.timing_markers and editable: whether index.html has TIMING:BEGIN. A project without
 //   it is view only in Studio and the gateway (the director edits its HTML directly).
 // Without --write the manifest is printed and nothing is written.
@@ -28,6 +32,7 @@ import { SCHEMA, load, validate, r3 } from "./manifest.mjs";
 import { record, takeLock } from "./gateway.mjs";
 import { planScenes } from "./timing.mjs";
 import { parseTracks, isVoice, isBed } from "./audio-mix.mjs";
+import { parseEvents } from "./sfx-sync.mjs";
 
 const EPS = 1e-3;
 const KINDS = { ".png": "image", ".jpg": "image", ".jpeg": "image", ".webp": "image", ".gif": "image", ".svg": "image", ".mp4": "video", ".mov": "video", ".webm": "video" };
@@ -137,6 +142,24 @@ export function importProject(dir) {
   });
   const music = tracks.filter((t) => isBed(t) && !isVoice(t)).map((t, i) => ({ id: t.id ?? `bgm-${i + 1}`, file: rel(root, t.src), start: r3(t.start), end: t.duration != null ? r3(t.start + t.duration) : r3(info.duration), gain: Math.min(1, r3(t.volume)) }));
 
+  const events = [];
+  if (existsSync(join(root, "PLAN.md"))) {
+    const used = new Set();
+    const lineIds = new Set(lines.map((l) => l.id));
+    const at = (t) => shots.find((s, i) => t >= s.start && (t < s.end || i === shots.length - 1)) ?? shots[0];
+    for (const e of parseEvents(readFileSync(join(root, "PLAN.md"), "utf8")).events) {
+      if (!Number.isFinite(e.t)) { warnings.push(`sự kiện "${e.label}": thời điểm "${e.raw}" không đọc được, bỏ qua`); continue; }
+      const want = resolve(root, e.sound);
+      const cands = tracks.filter((t) => t.src === want && !used.has(t) && !isVoice(t) && !isBed(t));
+      if (!cands.length) { warnings.push(`sự kiện ${e.t}s "${e.label}": không có thẻ <audio src="${e.sound}"> trong index.html, bỏ qua`); continue; }
+      const tr = cands.reduce((a, b) => (Math.abs(b.start - e.t) < Math.abs(a.start - e.t) ? b : a));
+      used.add(tr);
+      if (!tr.id || lineIds.has(tr.id) || events.some((x) => x.id === tr.id)) { warnings.push(`sự kiện ${e.t}s "${e.label}": thẻ <audio src="${e.sound}"> cần id riêng để gateway ghi data-start, bỏ qua`); continue; }
+      const s = at(e.t);
+      events.push({ id: tr.id, shot: s.id, offset: r3(tr.start - s.start), sound: rel(root, tr.src), label: e.label });
+    }
+  }
+
   let fps = 30;
   try { const v = Number(JSON.parse(readFileSync(join(root, "hyperframes.json"), "utf8")).fps); if (v > 0) fps = v; } catch { /* no hyperframes.json or no fps: HyperFrames defaults to 30 */ }
   const markers = /\/\*\s*TIMING:BEGIN\s*\*\//.test(html);
@@ -144,6 +167,7 @@ export function importProject(dir) {
     schema: SCHEMA, title: title(root), fps, width: info.width, height: info.height, duration: last.end, html: "index.html",
     capabilities: { timing_markers: markers, editable: markers },
     shots, lines, music, assets: listAssets(root),
+    ...(events.length ? { events } : {}),
     version: 1, updated: new Date().toISOString(),
   };
   return { manifest, warnings, source };
@@ -176,7 +200,7 @@ function run(dir, o, out, err) {
   const errors = validate(r.manifest);
   if (errors.length) { err(`manifest-import: kết quả không hợp lệ: ${errors.join("; ")}\n`); return 1; }
   const m = r.manifest;
-  out(`IMPORT ${dir} shots=${m.shots.length} lines=${m.lines.length} music=${m.music.length} editable=${m.capabilities.editable} (shot từ ${r.source})\n`);
+  out(`IMPORT ${dir} shots=${m.shots.length} lines=${m.lines.length} music=${m.music.length} events=${m.events?.length ?? 0} editable=${m.capabilities.editable} (shot từ ${r.source})\n`);
   for (const w of r.warnings) out(`WARN ${w}\n`);
   if (!o.write) { out(JSON.stringify(m, null, 2) + "\n"); return 0; }
   if (existing) m.version = existing.version + 1;

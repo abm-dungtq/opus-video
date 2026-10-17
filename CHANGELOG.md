@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### New
+- SFX events in `project.json`: an optional `events` array of `{id, shot, offset, sound?, label}`, validated with Vietnamese errors (projects without it stay valid). `gateway.mjs` derive writes each event's `<audio id>` `data-start` as shot start + offset, so `resize_shot`, `add_shot` and undo move sound effects with their shot and `sfx-sync` stays PASS with no hand edit (in the v2.0.0 E2E the director copied two values from `sfx-sync --fix`). `remove_shot` drops the shot's events with a receipt warning; undo restores them and the `## Sự kiện` rows the change dropped (kept in the history line as `dropped_rows`). `move_line` leaves events alone and moves the `chữ:` rows inside the moved line. A remapped Thời điểm keeps its decimals (`3.0` stays `3.0`).
+- `manifest-import.mjs` imports events from the PLAN.md `## Sự kiện` rows that name a sound file, matching `<audio>` tags by src (nearest `data-start`, each tag once); a row with no tag or a tag with no id is a WARN. The IMPORT line prints `events=N`.
+
 ## v2.0.0 (2026-10-16): plugin with eleven skills, four operating modes, project.json manifest
 
 Why: the 45 KB root `SKILL.md` loaded every rule of every step into each session, could not be routed by intent (a quick template video and a timeline edit read the same 253 lines), and the timeline had no single source of truth: seconds lived in PLAN.md, the TIMING block and the voice tags at once, with nothing to undo a change.
