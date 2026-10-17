@@ -15,14 +15,23 @@
 // Their start/log/exit events reach the page as SSE "job"; every job stops with the server.
 // Writes wait at most LOCK_WAIT_MS for the project lock and answer 503 "đang bận" when busy, so
 // one contended write never stalls SSE or the player.
+// Front door: POST /api/projects/new runs <root>/scripts/new-project.sh (studio/create.mjs);
+// GET /api/media/browse lists home and /Volumes folders, POST /api/media/register adds a file to
+// .opus/media.json (studio/media.mjs); GET /api/agent reports claude/runner/ffmpeg
+// (studio/agent.mjs); POST /api/director/answer answers a director card and writes the human gate
+// (studio/gates.mjs). createServer's run and mediaRoots options exist for tests.
 import { createServer as httpServer } from "node:http";
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync, watch, createReadStream } from "node:fs";
 import { execFile, execFileSync } from "node:child_process";
 import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { load, patch, undo, readHistory, EXIT, enqueue, cancelRequest, list as listRequests, SCRIPTS, DIRECTIONS_FILE as DIRECTIONS } from "../scripts/studio-api.mjs";
+import { load, patch, undo, readHistory, EXIT, enqueue, cancelRequest, expireWaiting, list as listRequests, SCRIPTS, DIRECTIONS_FILE as DIRECTIONS } from "../scripts/studio-api.mjs";
 import { events as jobEvents, startJob, cancel as cancelJob, listJobs, running, stopAll } from "./jobs.mjs";
 import { KIND as DIRECTOR, pump, runnerSetting } from "./director.mjs";
+import { createProject, runFile } from "./create.mjs";
+import { browse, register, readMedia, BROWSE_ROOTS } from "./media.mjs";
+import { agentStatus } from "./agent.mjs";
+import { answerCard } from "./gates.mjs";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const PUBLIC = join(HERE, "public");
@@ -92,7 +101,7 @@ export function projectFile(projectDir, rel) {
   return { file: real, parts };
 }
 
-export function createServer({ root, token, runtime = undefined }) {
+export function createServer({ root, token, runtime = undefined, run: runCmd = runFile, mediaRoots = BROWSE_ROOTS }) {
   root = realpathSync(resolve(root));
   const runtimeFor = (dir) => (runtime === undefined ? findRuntime(dir) : runtime);
   const watchers = new Map(); // name → { clients:Set, close() }
@@ -206,7 +215,22 @@ export function createServer({ root, token, runtime = undefined }) {
       if (p === "/api/projects") return send(res, 200, projectsOf(root));
       if (p === "/api/project") { const pd = withManifest(q("name")); return pd.error ? send(res, pd.status, { error: pd.error }) : send(res, 200, load(pd.dir)); }
       if (p === "/api/log") { const pd = withManifest(q("name")); return pd.error ? send(res, pd.status, { error: pd.error }) : send(res, 200, readHistory(pd.dir)); }
-      if (p === "/api/requests") { const pd = withManifest(q("name")); return pd.error ? send(res, pd.status, { error: pd.error }) : send(res, 200, listRequests(pd.dir)); }
+      if (p === "/api/requests") {
+        const pd = withManifest(q("name"));
+        if (pd.error) return send(res, pd.status, { error: pd.error });
+        expireWaiting(pd.dir);
+        return send(res, 200, listRequests(pd.dir));
+      }
+      if (p === "/api/agent") {
+        const name = q("name");
+        const pd = name ? projectDir(name) : {};
+        if (pd.error) return send(res, pd.status, { error: pd.error });
+        return send(res, 200, await agentStatus({ name }));
+      }
+      if (p === "/api/media/browse") {
+        try { return send(res, 200, browse(q("path") || undefined, { roots: mediaRoots })); } catch (e) { return send(res, e.status ?? 500, { error: e.message }); }
+      }
+      if (p === "/api/media") { const pd = projectDir(q("name")); return pd.error ? send(res, pd.status, { error: pd.error }) : send(res, 200, readMedia(pd.dir)); }
       if (p === "/api/jobs") { const pd = projectDir(q("name")); return pd.error ? send(res, pd.status, { error: pd.error }) : send(res, 200, listJobs(q("name"))); }
       if (p === "/api/settings") return send(res, 200, { director: { runner: runnerSetting() } });
       if (p === "/api/files") {
@@ -285,6 +309,23 @@ export function createServer({ root, token, runtime = undefined }) {
         const job = busy ? null : pump(b.name, pd.dir);
         const now = listRequests(pd.dir).find((x) => x.id === r.id) ?? r;
         return send(res, 200, { request: now, runner, job, message: busy ? "Đạo diễn đang làm yêu cầu trước; yêu cầu này chờ tới lượt" : null });
+      }
+      if (p === "/api/projects/new") {
+        const r = await createProject(root, b, { run: runCmd });
+        if (r.status === 200 && r.body.request) pump(r.body.name, r.dir);
+        return send(res, r.status, r.body);
+      }
+      if (p === "/api/media/register") {
+        const pd = projectDir(b.name);
+        if (pd.error) return send(res, pd.status, { error: pd.error });
+        try { return send(res, 200, await register(root, pd.dir, b.src, { roots: mediaRoots })); } catch (e) { return send(res, e.status ?? 500, { error: e.message }); }
+      }
+      if (p === "/api/director/answer") {
+        const pd = withManifest(b.name);
+        if (pd.error) return send(res, pd.status, { error: pd.error });
+        const r = await answerCard(pd.dir, { id: b.id, value: b.value }, { run: runCmd });
+        if (r.status === 200) pump(b.name, pd.dir);
+        return send(res, r.status, r.body);
       }
       if (p === "/api/director/cancel") {
         const pd = withManifest(b.name);

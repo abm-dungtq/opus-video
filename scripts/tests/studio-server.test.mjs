@@ -154,3 +154,28 @@ test("export: a project without demo approval stops at the gate (exit 5) and is 
   assert.equal((await http("GET", "/api/files?name=old&dir=renders")).json.some((f) => /-final\.mp4$/.test(f.path)), false);
   assert.equal((await post("/api/export", { name: "old", ratio: "9x16" })).status, 400);
 });
+
+test("GET /api/agent reports claude, runner, last job and ffmpeg; no claude on PATH is found: false", async () => {
+  const keys = ["claude", "runner", "last_job", "ffprobe", "ffmpeg"];
+  const prevPath = process.env.PATH;
+  const empty = mkdtempSync(join(tmpdir(), "studio-empty-path-"));
+  process.env.PATH = empty;
+  try {
+    const r = await http("GET", "/api/agent?name=demo");
+    assert.equal(r.status, 200, r.text);
+    for (const k of keys) assert.ok(k in r.json, k);
+    assert.equal(r.json.claude.found, false);
+    assert.equal(r.json.claude.logged_in, null);
+    assert.ok(["cli", "mcp"].includes(r.json.runner));
+    assert.equal(r.json.last_job, null);
+    assert.equal(typeof r.json.ffprobe, "boolean");
+    assert.equal((await http("GET", "/api/agent?name=..")).status, 400);
+  } finally {
+    process.env.PATH = prevPath;
+    rmSync(empty, { recursive: true, force: true });
+  }
+  const r = await http("GET", "/api/agent");
+  assert.equal(r.status, 200);
+  assert.deepEqual(Object.keys(r.json).sort(), [...keys].sort());
+  assert.deepEqual(Object.keys(r.json.claude).sort(), ["found", "logged_in", "version"]);
+});
