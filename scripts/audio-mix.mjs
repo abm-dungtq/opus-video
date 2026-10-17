@@ -2,6 +2,7 @@
 // audio-mix.mjs — rebuild a composition's sound as one WAV with ffmpeg, from the static audio
 // attributes in its HTML: every <audio> and every <video> without `muted` (data-volume="0" skipped).
 // Reads data-start, data-duration, data-volume, data-media-start, data-playback-rate,
+// data-fade-in, data-fade-out (seconds of afade at the clip's head and tail on the timeline),
 // data-audio-group and data-fx-carve. Ignores data-fx-chain, data-automation and audio inside
 // sub-composition files (render-final keeps the HyperFrames mix for those).
 //   node audio-mix.mjs --html <file> --duration <seconds> --out <wav> [--base <project dir>]
@@ -100,6 +101,8 @@ export function parseTracks(html, baseDir, fallbackDir) {
       volume,
       mediaStart: num(attr(tag, "data-media-start"), 0),
       rate: num(attr(tag, "data-playback-rate"), 1),
+      fadeIn: num(attr(tag, "data-fade-in"), 0),
+      fadeOut: num(attr(tag, "data-fade-out"), 0),
       group: attr(tag, "data-audio-group") ?? null,
       carve: parseCarve(tag),
     });
@@ -189,13 +192,17 @@ function atempoChain(rate) {
   return parts;
 }
 
-// Trim, tempo and volume of one track (input i), without placing it on the timeline.
+// Trim, tempo, volume and fades of one track (input i), without placing it on the timeline. The
+// fades run after asetpts and atempo, so their times are seconds of the clip on the timeline; a
+// fade-out needs the clip's duration.
 function trackFilters(t) {
   const trim = [`start=${t.mediaStart}`];
   if (t.duration != null) trim.push(`duration=${+(t.duration * t.rate).toFixed(6)}`);
   const f = [`atrim=${trim.join(":")}`, "asetpts=PTS-STARTPTS"];
   if (t.rate !== 1) f.push(...atempoChain(t.rate));
   f.push(`volume=${t.volume}`);
+  if (t.fadeIn > 0) f.push(`afade=t=in:st=0:d=${t.fadeIn}`);
+  if (t.fadeOut > 0 && t.duration != null) f.push(`afade=t=out:st=${+(t.duration - t.fadeOut).toFixed(6)}:d=${t.fadeOut}`);
   return f;
 }
 

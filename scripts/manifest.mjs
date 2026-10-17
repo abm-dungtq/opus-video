@@ -8,10 +8,13 @@
 //     lines:  [{ id, shot, text, file, start, duration, gate: "pass"|"stale"|"unknown" }],
 //     music:  [{ id, file, start, end, gain }],
 //     assets: [{ path, kind }],
-//     events: [{ id, shot, offset, sound?, label }],   optional
+//     events: [{ id, shot, offset, sound?, label, volume?, studio? }],   optional
 //     version, updated }
 // An event is a sound effect tied to a shot: id names its <audio id> in the HTML, whose data-start
-// the gateway writes as shot.start + offset, so the sound moves with its shot. sound is the src.
+// the gateway writes as shot.start + offset, so the sound moves with its shot. sound is the src,
+// volume (0–1) its data-volume; studio: true marks an event the gateway added (add_event), whose
+// <audio data-studio-sfx> tag derive inserts and removes. A music bed's media_start is the second
+// of its file played at start (a trimmed head); fade_in / fade_out are seconds of fade in the mix.
 // Seconds are rounded to 3 decimals. Shots are sorted, back to back from 0, and the last shot's
 // end is the duration. Paths are relative and stay inside the project.
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -72,6 +75,10 @@ export function validate(m) {
     if (!insidePath(b?.file)) errs.push(`${tag}: file phải là đường dẫn tương đối trong dự án`);
     if (!isNum(b?.gain) || b.gain < 0 || b.gain > 1) errs.push(`${tag}: gain phải trong 0–1`);
     if (!isNum(b?.start) || b.start < 0 || (b.end != null && (!isNum(b.end) || b.end <= b.start))) errs.push(`${tag}: cần 0 ≤ start < end`);
+    if (b?.media_start != null && (!isNum(b.media_start) || b.media_start < 0)) errs.push(`${tag}: media_start phải ≥ 0`);
+    const fadeIn = b?.fade_in != null && (!isNum(b.fade_in) || b.fade_in < 0) ? (errs.push(`${tag}: fade_in phải ≥ 0`), null) : b?.fade_in ?? 0;
+    const fadeOut = b?.fade_out != null && (!isNum(b.fade_out) || b.fade_out < 0) ? (errs.push(`${tag}: fade_out phải ≥ 0`), null) : b?.fade_out ?? 0;
+    if (fadeIn != null && fadeOut != null && isNum(b?.start) && fadeIn + fadeOut > (b.end ?? m.duration) - b.start + EPS) errs.push(`${tag}: fade_in + fade_out dài hơn khối nhạc`);
   });
   m.assets.forEach((a, i) => { if (!insidePath(a?.path)) errs.push(`asset #${i + 1}: path phải là đường dẫn tương đối trong dự án`); });
   if (m.events != null) {
@@ -90,6 +97,8 @@ export function validate(m) {
       else if (s && s.start + e.offset < -EPS) errs.push(`${tag}: thời điểm ${r3(s.start + e.offset)}s trước 0s`);
       if (e?.sound != null && !insidePath(e.sound)) errs.push(`${tag}: sound phải là đường dẫn tương đối trong dự án`);
       if (typeof e?.label !== "string") errs.push(`${tag}: label phải là chuỗi`);
+      if (e?.volume != null && (!isNum(e.volume) || e.volume < 0 || e.volume > 1)) errs.push(`${tag}: volume phải trong 0–1`);
+      if (e?.studio != null && typeof e.studio !== "boolean") errs.push(`${tag}: studio phải là boolean`);
     });
   }
   return errs;

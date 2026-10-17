@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
-import { applyOps, patch, undo, derive, readHistory, deriveHtml, derivePlan, remapEvents, EXIT } from "../gateway.mjs";
+import { applyOps, patch, undo, redo, derive, readHistory, deriveHtml, derivePlan, remapEvents, EXIT } from "../gateway.mjs";
 import { load, save } from "../manifest.mjs";
 import { main as timingMain } from "../timing.mjs";
 
@@ -153,7 +153,7 @@ test("deriveHtml sets each music bed's data-start and data-duration from m.music
   const html = '<div data-composition-id="main" data-duration="10"><audio id="bgm" src="assets/bgm/bgm.mp3" data-start="0" data-duration="10" data-volume="0.3"></audio><audio id="bed2" src="b.mp3"></audio></div>';
   const { html: out, missing } = deriveHtml(html, { duration: 10.55, shots: [], lines: [], music: [{ id: "bgm", start: 0, end: 10.55, gain: 0.3 }, { id: "bed2", start: 2, end: null, gain: 1 }, { id: "gone", start: 0, end: 4, gain: 1 }] });
   assert.match(out, /<audio id="bgm" src="assets\/bgm\/bgm\.mp3" data-start="0" data-duration="10\.55" data-volume="0\.3">/);
-  assert.match(out, /<audio id="bed2" src="b\.mp3" data-start="2" data-duration="8\.55">/, "a bed with no end runs to the root duration");
+  assert.match(out, /<audio id="bed2" src="b\.mp3" data-start="2" data-duration="8\.55" data-volume="1">/, "a bed with no end runs to the root duration");
   assert.deepEqual(missing, ["gone"]);
 });
 
@@ -296,3 +296,156 @@ test("patch moves Sự kiện rows with their shot and undo puts the table back"
   assert.equal(undo(dir, { base: 2 }).code, 0);
   assert.equal(events(), before);
 }));
+
+// The fixture has no music: a "bgm" bed in project.json and its <audio> tag after vo-01.
+const withBgm = (dir) => {
+  const m = load(dir);
+  m.music = [{ id: "bgm", file: "assets/bgm/bgm.mp3", start: 0, end: 8, gain: 1 }];
+  save(dir, m);
+  const f = join(dir, "index.html");
+  writeFileSync(f, readFileSync(f, "utf8").replace(/(<audio id="vo-01"[^>]*><\/audio>)/, '$1\n      <audio id="bgm" src="assets/bgm/bgm.mp3" data-start="0" data-duration="8" data-volume="1"></audio>'));
+};
+const html = (dir) => readFileSync(join(dir, "index.html"), "utf8");
+
+test("update_music sets several fields of a bed in one op; fades longer than the bed are INVALID", () => withProject((dir) => {
+  withBgm(dir);
+  const r = patch(dir, { actor: "human", base: 1, ops: [{ op: "update_music", id: "bgm", start: 1, end: 9, media_start: 0.5, gain: 0.6, fade_in: 1, fade_out: 2 }] });
+  assert.equal(r.code, EXIT.ok, r.error);
+  assert.deepEqual(r.receipt, ["bgm: start = 1, end = 9, media_start = 0.5, gain = 0.6, fade_in = 1, fade_out = 2"]);
+  assert.deepEqual(load(dir).music[0], { id: "bgm", file: "assets/bgm/bgm.mp3", start: 1, end: 9, gain: 0.6, media_start: 0.5, fade_in: 1, fade_out: 2 });
+  assert.match(html(dir), /<audio id="bgm" src="assets\/bgm\/bgm\.mp3" data-start="1" data-duration="8" data-volume="0\.6" data-media-start="0\.5" data-fade-in="1" data-fade-out="2">/);
+  const bad = patch(dir, { actor: "human", base: 2, ops: [{ op: "update_music", id: "bgm", start: 0, end: 8, fade_in: 5, fade_out: 5 }] });
+  assert.equal(bad.code, EXIT.invalid);
+  assert.match(bad.error, /fade_in \+ fade_out dài hơn khối nhạc/);
+  const m = load(FIXTURE);
+  m.music = [{ id: "bgm", file: "a.mp3", start: 0, end: 8, gain: 1 }];
+  assert.throws(() => applyOps(m, [{ op: "update_music", id: "bgm" }]), /update_music: cần ít nhất một trường/);
+  assert.throws(() => applyOps(m, [{ op: "update_music", id: "x", gain: 1 }]), /không có nhạc x/);
+  assert.throws(() => applyOps(m, [{ op: "update_music", id: "bgm", volume: 1 }]), /update_music: trường phải là start \| end \| media_start \| gain \| fade_in \| fade_out/);
+  assert.equal(applyOps(m, [{ op: "update_music", id: "bgm", end: null }]).next.music[0].end, null, "end null runs to the end of the video");
+}));
+
+test("deriveHtml writes the music bed's volume, media start and fades, and removes the ones at 0", () => {
+  const src = '<div data-composition-id="main" data-duration="10"><audio id="bgm" src="a.mp3" data-start="0" data-duration="10" data-volume="1" data-fade-out="3"></audio></div>';
+  const m = { duration: 10, shots: [], lines: [], music: [{ id: "bgm", file: "a.mp3", start: 1, end: 9, gain: 0.5, media_start: 2, fade_in: 1, fade_out: 0 }] };
+  const tag = deriveHtml(src, m).html.match(/<audio id="bgm"[^>]*>/)[0];
+  for (const a of ['data-start="1"', 'data-duration="8"', 'data-volume="0.5"', 'data-media-start="2"', 'data-fade-in="1"']) assert.ok(tag.includes(a), `${a} in ${tag}`);
+  assert.doesNotMatch(tag, /data-fade-out/);
+  const plain = deriveHtml(tag + "</audio>", { ...m, music: [{ ...m.music[0], media_start: 0, fade_in: undefined }] }).html;
+  assert.doesNotMatch(plain, /data-media-start|data-fade-in/);
+});
+
+test("move_event, add_event and remove_event edit SFX events by absolute time", () => {
+  const m = { ...load(FIXTURE), events: [{ id: "sfx-a", shot: "s1", offset: 1, sound: "assets/sfx/a.mp3", label: "a" }] };
+  const moved = applyOps(m, [{ op: "move_event", id: "sfx-a", start: 3.5 }]);
+  assert.deepEqual([moved.next.events[0].shot, moved.next.events[0].offset], ["s2", 1]);
+  assert.deepEqual(moved.receipt, ["sfx-a: 1.0s → 3.5s (sang s2)"]);
+  const added = applyOps(moved.next, [{ op: "add_event", start: 6, sound: "assets/sfx/a.mp3" }]);
+  assert.deepEqual(added.next.events[1], { id: "sfx-1", shot: "s3", offset: 0.2, sound: "assets/sfx/a.mp3", label: "a", volume: 0.8, studio: true });
+  assert.deepEqual(added.receipt, ["thêm sfx-1 lúc 6.0s"]);
+  assert.equal(applyOps(added.next, [{ op: "add_event", start: 8, sound: "x/b.wav" }]).next.events[2].id, "sfx-2", "the end of the video belongs to the last shot");
+  const removed = applyOps(added.next, [{ op: "remove_event", id: "sfx-a" }, { op: "remove_event", id: "sfx-1" }]);
+  assert.deepEqual(removed.next.events, []);
+  assert.deepEqual(removed.receipt, ["xoá sfx-a", "xoá sfx-1"]);
+  assert.throws(() => applyOps(m, [{ op: "move_event", id: "sfx-a", start: 99 }]), /nằm ngoài video/);
+  assert.throws(() => applyOps(m, [{ op: "move_event", id: "sfx-z", start: 1 }]), /không có sự kiện sfx-z/);
+  assert.throws(() => applyOps(load(FIXTURE), [{ op: "add_event", start: 1 }]), /add_event: cần sound/);
+  assert.equal(applyOps(load(FIXTURE), [{ op: "add_event", start: 1, sound: "assets/sfx/a.mp3" }]).next.events.length, 1, "events is created when absent");
+});
+
+test("deriveHtml inserts a studio event's tag once, removes it when the event goes, and never touches other tags", () => {
+  const src = '<div data-composition-id="main" data-duration="8">\n      <audio id="vo-01" src="v.mp3" data-start="2.5" data-duration="3" data-track-index="10"></audio>\n      <audio id="bgm" src="b.mp3" data-start="0" data-duration="8" data-track-index="20"></audio>\n      <!-- <audio id="x" src="x.mp3"></audio> -->\n      <audio id="sfx-old" src="o.mp3" data-start="1"></audio>\n</div>';
+  const base = { ...load(FIXTURE), music: [] };
+  const ev = { id: "sfx-1", shot: "s3", offset: 0.2, sound: "assets/sfx/a.mp3", label: "a", volume: 0.8, studio: true };
+  const a = deriveHtml(src, { ...base, events: [ev] });
+  assert.equal(a.html.match(/id="sfx-1"/g).length, 1);
+  assert.deepEqual(a.missingEvents, []);
+  assert.ok(a.html.indexOf('id="sfx-1"') > a.html.indexOf('id="bgm"'), "after the bgm tag");
+  assert.ok(a.html.indexOf('id="sfx-1"') > a.html.indexOf('id="sfx-old"'), "after the last live <audio>");
+  assert.match(a.html, /<audio id="sfx-1" src="assets\/sfx\/a\.mp3" data-start="6" data-track-index="21" data-volume="0\.8" data-audio-group="sfx" data-studio-sfx><\/audio>/);
+  const b = deriveHtml(a.html, { ...base, events: [ev] });
+  assert.equal(b.html.match(/id="sfx-1"/g).length, 1, "derive again does not insert twice");
+  assert.equal(b.html, a.html);
+  const c = deriveHtml(b.html, { ...base, events: [] });
+  assert.doesNotMatch(c.html, /sfx-1/);
+  assert.equal(c.html, src, "the line break and indent before the tag go with it");
+  assert.match(c.html, /<audio id="sfx-old" src="o\.mp3" data-start="1"><\/audio>/, "a tag without data-studio-sfx stays");
+  const quiet = deriveHtml(src, { ...base, events: [{ id: "sfx-old", shot: "s1", offset: 1.5, label: "o", volume: 0.4 }] }).html;
+  assert.match(quiet, /<audio id="sfx-old" src="o\.mp3" data-start="1\.5" data-volume="0\.4">/);
+  assert.deepEqual(deriveHtml('<div data-composition-id="main"></div>', { ...base, events: [ev] }).missingEvents, ["sfx-1"], "no live <audio>: nothing inserted");
+});
+
+const runCli = (args) => new Promise((ok) => {
+  const p = spawn(process.execPath, [GATEWAY, ...args]);
+  let out = "", err = "";
+  p.stdout.on("data", (d) => { out += d; });
+  p.stderr.on("data", (d) => { err += d; });
+  p.on("close", (code) => ok({ code, out, err }));
+});
+
+test("CLI: add_event and remove_event write and remove the studio tag; undo reverses each", async () => {
+  const dir = project();
+  try {
+    const cli = (cmd, base, ops) => runCli([cmd, "--project", dir, "--base", String(base), ...(ops ? ["--actor", "human", "--ops", JSON.stringify(ops)] : [])]);
+    let r = await cli("patch", 1, [{ op: "add_event", id: "sfx-1", start: 6, sound: "assets/sfx/a.mp3" }]);
+    assert.equal(r.code, 0, r.err);
+    assert.match(html(dir), /<audio id="sfx-1"[^>]*data-studio-sfx><\/audio>/);
+    r = await cli("undo", 2);
+    assert.equal(r.code, 0, r.err);
+    assert.doesNotMatch(html(dir), /id="sfx-1"/);
+    r = await cli("redo", 3);
+    assert.equal(r.code, 0, r.err);
+    assert.match(html(dir), /id="sfx-1"/);
+    r = await cli("patch", 4, [{ op: "remove_event", id: "sfx-1" }]);
+    assert.equal(r.code, 0, r.err);
+    assert.doesNotMatch(html(dir), /id="sfx-1"/);
+    r = await cli("undo", 5);
+    assert.equal(r.code, 0, r.err);
+    assert.equal(html(dir).match(/id="sfx-1"/g).length, 1, "the tag is back");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("redo re-applies what undo reverted, only while the last changes are undos and redos", async () => withProject((dir) => {
+  const v1 = load(dir).shots;
+  const A = [{ op: "resize_shot", id: "s1", duration: 3.5 }];
+  assert.equal(patch(dir, { actor: "human", base: 1, ops: A }).code, EXIT.ok);
+  const v2 = load(dir).shots;
+  const html2 = html(dir);
+  const step = (fn, base, shots) => {
+    const r = fn(dir, { base });
+    assert.equal(r.code, EXIT.ok, r.error);
+    assert.equal(load(dir).version, base + 1);
+    assert.deepEqual(load(dir).shots, shots);
+  };
+  step(undo, 2, v1);
+  step(redo, 3, v2);
+  assert.equal(html(dir), html2, "index.html is back to v2");
+  assert.equal(readHistory(dir).at(-1).actor, "redo");
+  assert.equal(readHistory(dir).at(-1).redoes, 3);
+  step(undo, 4, v1);
+  step(redo, 5, v2);
+  const nothing = redo(dir, { base: 6 });
+  assert.equal(nothing.code, EXIT.nothingToRedo);
+  assert.match(nothing.error, /không còn gì để làm lại/);
+  assert.equal(patch(dir, { actor: "redo", base: 6, ops: A }).code, EXIT.usage, "patch refuses actor redo");
+}));
+
+test("a new change after an undo clears redo; redo with no undo is exit 9", async () => {
+  const dir = project();
+  try {
+    const A = JSON.stringify([{ op: "resize_shot", id: "s1", duration: 3.5 }]);
+    const B = JSON.stringify([{ op: "resize_shot", id: "s3", duration: 3 }]);
+    const none = await runCli(["redo", "--project", dir, "--base", "1"]);
+    assert.equal(none.code, 9);
+    assert.match(none.err, /không còn gì để làm lại/);
+    assert.equal((await runCli(["patch", "--project", dir, "--actor", "human", "--base", "1", "--ops", A])).code, 0);
+    assert.equal((await runCli(["undo", "--project", dir, "--base", "2"])).code, 0);
+    assert.equal((await runCli(["patch", "--project", dir, "--actor", "human", "--base", "3", "--ops", B])).code, 0);
+    const shots = load(dir).shots;
+    const r = await runCli(["redo", "--project", dir, "--base", "4"]);
+    assert.equal(r.code, 9);
+    assert.equal(load(dir).version, 4);
+    assert.deepEqual(load(dir).shots, shots);
+    assert.equal((await runCli(["redo", "--project", dir])).code, 2, "redo needs --base");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

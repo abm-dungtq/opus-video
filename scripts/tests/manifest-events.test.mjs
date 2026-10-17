@@ -68,6 +68,22 @@ test("events are optional; each event needs an id, a known shot, a numeric offse
   assert.match(errs, /sự kiện cần id/);
 });
 
+test("music media_start / fade_in / fade_out and event volume / studio are validated", () => {
+  const base = load(FIXTURE);
+  const bed = { id: "bgm", file: "assets/bgm/bgm.mp3", start: 1, end: 9, gain: 0.5, media_start: 2, fade_in: 1, fade_out: 2 };
+  const ok = { ...base, music: [bed], events: [{ ...EVENTS[0], volume: 0.6, studio: true }] };
+  assert.deepEqual(validate(ok), []);
+  assert.deepEqual(validate({ ...ok, music: [{ ...bed, end: null, fade_in: 3, fade_out: 4 }] }), [], "a bed with no end runs to the duration (7 s)");
+  const one = (patchBed, patchEvent = {}) => validate({ ...ok, music: [{ ...bed, ...patchBed }], events: [{ ...ok.events[0], ...patchEvent }] });
+  assert.deepEqual(one({ fade_in: -1 }), ["bgm: fade_in phải ≥ 0"]);
+  assert.deepEqual(one({ fade_out: -1 }), ["bgm: fade_out phải ≥ 0"]);
+  assert.deepEqual(one({ media_start: -0.1 }), ["bgm: media_start phải ≥ 0"]);
+  assert.deepEqual(one({}, { volume: 1.5 }), ["sfx-whoosh: volume phải trong 0–1"]);
+  assert.deepEqual(one({}, { studio: "yes" }), ["sfx-whoosh: studio phải là boolean"]);
+  assert.deepEqual(one({ fade_in: 5, fade_out: 5 }), ["bgm: fade_in + fade_out dài hơn khối nhạc"]);
+  assert.deepEqual(one({ end: null, fade_in: 4, fade_out: 4 }), ["bgm: fade_in + fade_out dài hơn khối nhạc"], "also when end is null");
+});
+
 test("deriveHtml writes each event's <audio> data-start as shot.start + offset", () => {
   const m = { ...load(FIXTURE), events: EVENTS };
   const html = `<div data-composition-id="main" data-duration="8"><audio id="sfx-hit" src="assets/sfx/hit.mp3" data-start="0"></audio><!-- <audio id="sfx-whoosh" src="x.mp3" data-start="9"> --></div>`;

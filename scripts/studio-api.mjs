@@ -2,17 +2,19 @@
 // live in its own repo. It re-exports the manifest, the command gateway and the request queue, and
 // owns the director's tool permissions (they name plugin paths). STUDIO_API is bumped whenever an
 // export Studio relies on changes shape; Studio checks it together with PLUGIN_VERSION.
+// API 3 adds redo (EXIT.nothingToRedo 9) and the gateway ops move_event, add_event, remove_event
+// and update_music.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export { load, validate, SCHEMA, FILE } from "./manifest.mjs";
-export { patch, undo, readHistory, derive, EXIT, ACTORS } from "./gateway.mjs";
+export { patch, undo, redo, readHistory, derive, EXIT, ACTORS } from "./gateway.mjs";
 export { enqueue, list, next, finish, cancelRequest, ask, answer, expireWaiting, STATUSES, ASK_KINDS, ASK_GATES, ID } from "./requests.mjs";
 
 export const OV = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
 export const PLUGIN_VERSION = JSON.parse(readFileSync(join(OV, ".claude-plugin", "plugin.json"), "utf8")).version;
-export const STUDIO_API = 2;
+export const STUDIO_API = 3;
 export const SCRIPTS = join(OV, "scripts");
 export const DIRECTIONS_FILE = join(OV, "data/directions.json");
 

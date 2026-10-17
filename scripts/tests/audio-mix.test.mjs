@@ -22,9 +22,9 @@ const HTML = `
 test("parseTracks: audio + unmuted video, defaults, skips muted, volume 0 and comments", () => {
   const t = parseTracks(HTML, BASE);
   assert.equal(t.length, 3);
-  assert.deepEqual(t[0], { id: "vo", src: "/proj/assets/vo.mp3", start: 1.5, duration: 4, volume: 1, mediaStart: 0, rate: 1, group: "voiceover", carve: null });
-  assert.deepEqual(t[1], { id: "bgm", src: "/proj/assets/bgm.mp3", start: 0, duration: 10, volume: 0.3, mediaStart: 2, rate: 1, group: null, carve: null });
-  assert.deepEqual(t[2], { id: "talk", src: "/proj/assets/talk.mp4", start: 3, duration: 6, volume: 1, mediaStart: 0, rate: 1.25, group: null, carve: null });
+  assert.deepEqual(t[0], { id: "vo", src: "/proj/assets/vo.mp3", start: 1.5, duration: 4, volume: 1, mediaStart: 0, rate: 1, fadeIn: 0, fadeOut: 0, group: "voiceover", carve: null });
+  assert.deepEqual(t[1], { id: "bgm", src: "/proj/assets/bgm.mp3", start: 0, duration: 10, volume: 0.3, mediaStart: 2, rate: 1, fadeIn: 0, fadeOut: 0, group: null, carve: null });
+  assert.deepEqual(t[2], { id: "talk", src: "/proj/assets/talk.mp4", start: 3, duration: 6, volume: 1, mediaStart: 0, rate: 1.25, fadeIn: 0, fadeOut: 0, group: null, carve: null });
 });
 
 test("isVoice: vo-*, *-voice, group voiceover and a src under assets/voice/ speak; beds and sfx do not", () => {
@@ -53,7 +53,7 @@ test("parseTracks: a <video> written over several lines", () => {
     data-start="0.5" data-duration="60.18" data-has-audio="true" data-volume="0.8"></video>`;
   const t = parseTracks(html, BASE);
   assert.equal(t.length, 1);
-  assert.deepEqual(t[0], { id: "pip-video", src: "/proj/assets/video/clip.mp4", start: 0.5, duration: 60.18, volume: 0.8, mediaStart: 0, rate: 1, group: null, carve: null });
+  assert.deepEqual(t[0], { id: "pip-video", src: "/proj/assets/video/clip.mp4", start: 0.5, duration: 60.18, volume: 0.8, mediaStart: 0, rate: 1, fadeIn: 0, fadeOut: 0, group: null, carve: null });
 });
 
 test("buildArgs: per-track filters, adelay in ms, amix without normalize, length bounded by samples and -t", () => {
@@ -69,6 +69,18 @@ test("buildArgs: per-track filters, adelay in ms, amix without normalize, length
   assert.deepEqual(args.slice(-9), ["-ar", "48000", "-ac", "2", "-t", "12", "-fs", String(576000 * 4 + (1 << 20)), "/tmp/out.wav"]);
   assert.ok(args.includes("-nostdin"));
   assert.throws(() => buildArgs([], 3, "/tmp/x.wav"), /no audible tracks/);
+});
+
+test("buildArgs: data-fade-in / data-fade-out become afade after the volume; no fade, no afade", () => {
+  const t = parseTracks(`<audio id="bgm" src="assets/bgm.mp3" data-start="0" data-duration="10" data-volume="0.5" data-fade-in="1" data-fade-out="2"></audio>`, BASE);
+  assert.deepEqual([t[0].fadeIn, t[0].fadeOut], [1, 2]);
+  const fc = (tracks) => { const a = buildArgs(tracks, 12, "/tmp/out.wav"); return a[a.indexOf("-filter_complex") + 1]; };
+  assert.match(fc(t), /volume=0\.5,afade=t=in:st=0:d=1,afade=t=out:st=8:d=2,adelay=0/);
+  const sped = fc([{ ...t[0], rate: 2 }]);
+  assert.match(sped, /atempo=2,volume=0\.5,afade=t=in:st=0:d=1,afade=t=out:st=8:d=2/, "fade times are seconds on the timeline, after atempo");
+  assert.doesNotMatch(fc(parseTracks(HTML, BASE)), /afade/);
+  assert.doesNotMatch(fc([{ ...t[0], duration: null, fadeIn: 0 }]), /afade/, "a fade-out needs the clip's duration");
+  assert.deepEqual(dynamicAudio(`<audio id="bgm" src="a.mp3" data-fade-in="1" data-fade-out="2"></audio>`), [], "a fade is not dynamic audio");
 });
 
 test("CLI: bad usage and missing src exit 2", () => {

@@ -3,11 +3,14 @@
 // timing.mjs, an undo) is a list of ops applied here as one new version, with a Vietnamese receipt,
 // a full snapshot in .opus/versions/v<N>.json and a line in .opus/history.jsonl. After each change
 // of an editable project it re-derives what the renderer reads: the TIMING block and the voice
-// <audio>/<video> data-start/data-duration of index.html, the SFX <audio> data-start of each
-// manifest event (shot.start + offset), the root data-duration, the Thời điểm cells of PLAN.md
-// "## Cảnh" and "## Sự kiện", and timing.json. Never hand-edit those seconds.
+// <audio>/<video> data-start/data-duration of index.html, each music bed's data-start,
+// data-duration, data-volume, data-media-start and fades, the SFX <audio> data-start (shot.start +
+// offset) and data-volume of each manifest event (and the <audio data-studio-sfx> tags of events
+// added here), the root data-duration, the Thời điểm cells of PLAN.md "## Cảnh" and
+// "## Sự kiện", and timing.json. Never hand-edit those seconds.
 //   node gateway.mjs patch  --project <dir> --actor <human|director|timing> --base <n> (--ops '<json>' | --ops-file <f>)
 //   node gateway.mjs undo   --project <dir> --base <n>
+//   node gateway.mjs redo   --project <dir> --base <n>
 //   node gateway.mjs log    --project <dir> [--json]
 //   node gateway.mjs show   --project <dir> [--version <n>]
 //   node gateway.mjs derive --project <dir> [--dry]
@@ -19,6 +22,12 @@
 //   { "op": "set_shot", "id": "s2", "field": "name|transition_in|motion_note|assets", "value": … }
 //   { "op": "set_line_text", "id": "vo-02", "text": "…" }    gate becomes "stale" (viet-pro again)
 //   { "op": "set_music", "id": "bgm", "field": "gain|start|end", "value": 0.3 }
+//   { "op": "update_music", "id": "bgm", "start"?: 1, "end"?: 9 | null, "media_start"?: 0.5,
+//     "gain"?: 0.6, "fade_in"?: 1, "fade_out"?: 2 }          several fields of a bed at once; end null = to the end
+//   { "op": "move_event", "id": "sfx-1", "start": 3.5 }     the event joins the shot holding its new start
+//   { "op": "add_event", "start": 6, "sound": "assets/sfx/a.mp3", "label"?: "…", "volume"?: 0.8, "id"?: "sfx-1" }
+//                                                            a studio event: derive inserts its <audio data-studio-sfx>
+//   { "op": "remove_event", "id": "sfx-1" }                  derive removes its tag only when it is data-studio-sfx
 //   { "op": "add_shot", "after": "s2" | null, "name": "…", "duration": 3 }   later shots ripple
 //   { "op": "remove_shot", "id": "s4" }                      refused while a line belongs to it; its events are dropped
 // --base is the version the caller last saw; another version is a CONFLICT and nothing is written.
@@ -28,11 +37,13 @@
 // undo reverts the newest change not yet undone by restoring the snapshot before it, as a new
 // version (actor "undo"), so history only grows. It never reaches past the latest import. The
 // "## Sự kiện" rows a change dropped are kept in its history line and put back by its undo.
+// redo re-applies the change the newest undo reverted, as a new version (actor "redo"); it works
+// only while the last changes are undos and redos: any other change clears what can be redone.
 // A project whose index.html has no TIMING:BEGIN/END (capabilities.editable false, every project
 // imported from before the skeleton) is view only: patch, undo and derive exit 4.
 // Exit: 0 ok · 1 cannot read or write · 2 bad usage · 3 CONFLICT · 4 view-only project ·
 // 5 INVALID (unknown op or id, or the result breaks project.json rules) · 7 nothing to undo ·
-// 8 BUSY (another writer holds the lock).
+// 8 BUSY (another writer holds the lock) · 9 nothing to redo.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,13 +53,15 @@ import { buildTiming, injectTiming, manifestScenes } from "./timing.mjs";
 import { EVENTS_SECTION, SECTIONS, fold, parseTable, sceneId } from "./check-preflight.mjs";
 import { eventTime } from "./sfx-sync.mjs";
 
-export const EXIT = { ok: 0, io: 1, usage: 2, conflict: 3, viewOnly: 4, invalid: 5, nothingToUndo: 7, busy: 8 };
-export const ACTORS = ["human", "director", "timing", "import", "undo"];
+export const EXIT = { ok: 0, io: 1, usage: 2, conflict: 3, viewOnly: 4, invalid: 5, nothingToUndo: 7, busy: 8, nothingToRedo: 9 };
+export const ACTORS = ["human", "director", "timing", "import", "undo", "redo"];
 const VIEW_ONLY = "dự án chỉ xem: index.html không có TIMING:BEGIN/END";
 const LOCK_STALE_MS = 30_000;
 const LOCK_WAIT_MS = 5_000;
 const SHOT_FIELDS = ["name", "transition_in", "motion_note", "assets"];
 const MUSIC_FIELDS = ["gain", "start", "end"];
+const MUSIC_UPDATE_FIELDS = ["start", "end", "media_start", "gain", "fade_in", "fade_out"];
+const EVENT_VOLUME = 0.8;
 const EPS = 1e-3;
 
 class OpError extends Error {}
@@ -68,6 +81,15 @@ export function applyOps(m, ops) {
     return i;
   };
   const lineOf = (id) => next.lines.find((l) => l.id === id) ?? (() => { throw new OpError(`không có câu thoại ${id}`); })();
+  const eventOf = (id) => (next.events ?? []).find((e) => e.id === id) ?? (() => { throw new OpError(`không có sự kiện ${id}`); })();
+  // The shot holding second t (half-open windows; the very end of the video belongs to the last shot).
+  const holderAt = (t) => next.shots.find((s, i) => t >= s.start && (t < s.end || (i === next.shots.length - 1 && t <= s.end + EPS)))
+    ?? (() => { throw new OpError(`${fmt(t)} nằm ngoài video`); })();
+  const timeOf = (what, v) => {
+    const t = Number(v);
+    if (v == null || v === "" || !Number.isFinite(t) || t < 0) throw new OpError(`${what}: start phải ≥ 0`);
+    return t;
+  };
   // Shift every shot from index i on, and the lines that belong to them, by delta seconds. Events
   // are stored as an offset inside their shot, so they move with it.
   const ripple = (i, delta) => {
@@ -137,6 +159,47 @@ export function applyOps(m, ops) {
         if (!b) throw new OpError(`không có nhạc ${op.id}`);
         b[op.field] = typeof op.value === "number" ? r3(op.value) : op.value;
         receipt.push(`${b.id}: ${op.field} = ${b[op.field]}`);
+        break;
+      }
+      case "update_music": {
+        const b = next.music.find((x) => x.id === op.id);
+        if (!b) throw new OpError(`không có nhạc ${op.id}`);
+        const keys = Object.keys(op).filter((k) => k !== "op" && k !== "id");
+        if (!keys.length) throw new OpError("update_music: cần ít nhất một trường");
+        if (keys.some((k) => !MUSIC_UPDATE_FIELDS.includes(k))) throw new OpError(`update_music: trường phải là ${MUSIC_UPDATE_FIELDS.join(" | ")}`);
+        for (const k of keys) b[k] = typeof op[k] === "number" ? r3(op[k]) : op[k];
+        receipt.push(`${b.id}: ${keys.map((k) => `${k} = ${b[k]}`).join(", ")}`);
+        break;
+      }
+      case "move_event": {
+        const e = eventOf(op.id);
+        const t = timeOf(op.id, op.start);
+        const holder = holderAt(t);
+        const from = next.shots.find((s) => s.id === e.shot);
+        receipt.push(`${e.id}: ${fmt((from?.start ?? 0) + e.offset)} → ${fmt(t)}${holder.id !== e.shot ? ` (sang ${holder.id})` : ""}`);
+        e.shot = holder.id;
+        e.offset = r3(t - holder.start);
+        break;
+      }
+      case "add_event": {
+        const t = timeOf("add_event", op.start);
+        if (typeof op.sound !== "string" || !op.sound) throw new OpError("add_event: cần sound (đường dẫn tương đối trong dự án)");
+        if (op.id != null && (typeof op.id !== "string" || !op.id)) throw new OpError("add_event: id phải là chuỗi");
+        if (op.label != null && typeof op.label !== "string") throw new OpError("add_event: label phải là chuỗi");
+        const holder = holderAt(t);
+        const used = new Set([...(next.events ?? []), ...next.lines].map((x) => x.id));
+        let id = op.id;
+        if (id == null) { let n = 1; while (used.has(`sfx-${n}`)) n++; id = `sfx-${n}`; }
+        const label = op.label ?? op.sound.split(/[\\/]/).pop().replace(/\.[^.]*$/, "");
+        next.events ??= [];
+        next.events.push({ id, shot: holder.id, offset: r3(t - holder.start), sound: op.sound, label, volume: op.volume ?? EVENT_VOLUME, studio: true });
+        receipt.push(`thêm ${id} lúc ${fmt(t)}`);
+        break;
+      }
+      case "remove_event": {
+        const e = eventOf(op.id);
+        next.events = next.events.filter((x) => x !== e);
+        receipt.push(`xoá ${e.id}`);
         break;
       }
       case "add_shot": {
@@ -230,6 +293,7 @@ function commit(dir, { base, actor, build, lockWaitMs }) {
     try { r = build(m); } catch (e) {
       if (e instanceof OpError) return { code: EXIT.invalid, error: `INVALID: ${e.message}` };
       if (e.code === "NOTHING") return { code: EXIT.nothingToUndo, error: e.message };
+      if (e.code === "NOTHING_REDO") return { code: EXIT.nothingToRedo, error: e.message };
       throw e;
     }
     const errors = validate(r.next);
@@ -252,7 +316,7 @@ function commit(dir, { base, actor, build, lockWaitMs }) {
 
 // note: optional free text kept in the history line (the director's reason, a Studio request id).
 export function patch(dir, { actor, base, ops, note, lockWaitMs }) {
-  if (!ACTORS.includes(actor) || actor === "undo" || actor === "import") return { code: EXIT.usage, error: `actor phải là human | director | timing` };
+  if (!ACTORS.includes(actor) || actor === "undo" || actor === "redo" || actor === "import") return { code: EXIT.usage, error: `actor phải là human | director | timing` };
   return commit(dir, { base, actor, lockWaitMs, build: (m) => ({ ...applyOps(m, ops), ops, ...(note ? { extra: { note: String(note) } } : {}) }) });
 }
 
@@ -273,12 +337,37 @@ export function undo(dir, { base, lockWaitMs }) {
   });
 }
 
+// Re-applies the change the newest undo reverted, as a new version. The undos and redos since the
+// last other change form a stack: an undo pushes, a redo pops; any other change empties it.
+export function redo(dir, { base, lockWaitMs }) {
+  return commit(dir, {
+    base, actor: "redo", lockWaitMs,
+    build: (m) => {
+      const all = readHistory(dir);
+      const hist = all.slice(all.findLastIndex((h) => h.actor === "import") + 1);
+      let stack = [];
+      for (const h of hist) {
+        if (h.actor === "undo") stack.push(h);
+        else if (h.actor === "redo") stack.pop();
+        else stack = [];
+      }
+      const target = stack.at(-1);
+      if (!target) throw Object.assign(new Error("không còn gì để làm lại"), { code: "NOTHING_REDO" });
+      const prev = JSON.parse(readFileSync(snapPath(dir, target.undoes), "utf8"));
+      const next = { ...prev, version: m.version, updated: m.updated };
+      return { next, ops: [], receipt: [`làm lại v${target.undoes}`], extra: { redoes: target.v } };
+    },
+  });
+}
+
 // Sets (or adds) one attribute in an HTML start tag.
 const setAttr = (tag, name, value) => {
   const re = new RegExp(`(\\s${name}\\s*=\\s*)(["'])[^"']*\\2`, "i");
   if (re.test(tag)) return tag.replace(re, `$1$2${value}$2`);
   return tag.replace(/\s*(\/?>)$/, ` ${name}="${value}"$1`);
 };
+// Removes one attribute from an HTML start tag (no-op when absent).
+const removeAttr = (tag, name) => tag.replace(new RegExp(`\\s${name}\\s*=\\s*(["'])[^"']*\\1`, "i"), "");
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // Rewrites the first match of re outside an HTML comment (the skeleton documents its tags in
@@ -293,12 +382,24 @@ function replaceLive(html, re, fn) {
   return { text: html, hit: false };
 }
 
+// Live (outside a comment) matches of a global regex.
+function liveMatches(html, re) {
+  const comments = [...html.matchAll(/<!--[\s\S]*?-->/g)].map((c) => [c.index, c.index + c[0].length]);
+  return [...html.matchAll(re)].filter((x) => !comments.some(([a, b]) => x.index >= a && x.index < b));
+}
+
 // Root-timeline data-start of a manifest event.
 const eventStart = (e, shotOf) => r3(shotOf.get(e.shot).start + e.offset);
 
 // HTML text + manifest → { html, missing, missingEvents }: the root data-duration, each voice
-// line's data-start / data-duration and each event's <audio> data-start (shot.start + offset) set
-// (only those attribute values change); missing / missingEvents list the ids with no live tag.
+// line's data-start / data-duration, each music bed's data-start / data-duration / data-volume
+// (gain) / data-media-start / data-fade-in / data-fade-out (the last three only when > 0, removed
+// otherwise) and each event's <audio> data-start (shot.start + offset) and data-volume set.
+// Otherwise only attribute values change, with one exception: the <audio data-studio-sfx> tags
+// the gateway owns. A studio event (studio: true, with a sound) with no live tag gets one,
+// inserted after the last live <audio>; a data-studio-sfx tag whose id is no longer an event is
+// removed. A tag without data-studio-sfx is never inserted or removed. missing / missingEvents
+// list the ids with no live tag.
 export function deriveHtml(html, m) {
   let out = replaceLive(html, /<[a-z][^>]*\sdata-composition-id\s*=[^>]*>/i, (tag) => setAttr(tag, "data-duration", m.duration)).text;
   const missing = [];
@@ -314,18 +415,37 @@ export function deriveHtml(html, m) {
   // Each music bed's data-start / data-duration (end − start; a bed with no end runs to the root
   // duration). Its id joins missing when no live tag carries it.
   for (const b of m.music ?? []) {
-    const r = replaceLive(out, new RegExp(`<(?:audio|video)\\b[^>]*\\sid\\s*=\\s*["']${esc(b.id)}["'][^>]*>`, "i"), (tag) =>
-      setAttr(setAttr(tag, "data-start", r3(b.start)), "data-duration", r3((b.end ?? m.duration) - b.start)));
+    const r = replaceLive(out, new RegExp(`<(?:audio|video)\\b[^>]*\\sid\\s*=\\s*["']${esc(b.id)}["'][^>]*>`, "i"), (tag) => {
+      let t = setAttr(setAttr(tag, "data-start", r3(b.start)), "data-duration", r3((b.end ?? m.duration) - b.start));
+      t = setAttr(t, "data-volume", r3(b.gain));
+      for (const [k, a] of [["media_start", "data-media-start"], ["fade_in", "data-fade-in"], ["fade_out", "data-fade-out"]]) t = b[k] > 0 ? setAttr(t, a, r3(b[k])) : removeAttr(t, a);
+      return t;
+    });
     out = r.text;
     if (!r.hit) missing.push(b.id);
   }
   const missingEvents = [];
   const shotOf = new Map((m.shots ?? []).map((s) => [s.id, s]));
   for (const e of m.events ?? []) {
-    const r = replaceLive(out, new RegExp(`<audio\\b[^>]*\\sid\\s*=\\s*["']${esc(e.id)}["'][^>]*>`, "i"), (tag) => setAttr(tag, "data-start", eventStart(e, shotOf)));
+    const r = replaceLive(out, new RegExp(`<audio\\b[^>]*\\sid\\s*=\\s*["']${esc(e.id)}["'][^>]*>`, "i"), (tag) => {
+      const t = setAttr(tag, "data-start", eventStart(e, shotOf));
+      return e.volume != null ? setAttr(t, "data-volume", e.volume) : t;
+    });
     out = r.text;
-    if (!r.hit) missingEvents.push(e.id);
+    if (r.hit) continue;
+    const last = e.studio === true && e.sound ? liveMatches(out, /<audio\b[^>]*>\s*<\/audio>/gi).at(-1) : null;
+    if (!last) { missingEvents.push(e.id); continue; }
+    // A lane of its own: one past the highest data-track-index in use (29 when none is).
+    const lanes = liveMatches(out, /<[a-z][^>]*\sdata-track-index\s*=\s*["'](\d+)["'][^>]*>/gi).map((x) => Number(x[1]));
+    const idx = (lanes.length ? Math.max(...lanes) : 29) + 1;
+    const at = last.index + last[0].length;
+    out = `${out.slice(0, at)}\n      <audio id="${e.id}" src="${e.sound}" data-start="${eventStart(e, shotOf)}" data-track-index="${idx}" data-volume="${e.volume ?? EVENT_VOLUME}" data-audio-group="sfx" data-studio-sfx></audio>${out.slice(at)}`;
   }
+  // The gateway's own SFX tags whose event is gone; the line break and indent before each go too.
+  const evIds = new Set((m.events ?? []).map((e) => e.id));
+  const stale = liveMatches(out, /(\n[ \t]*)?<audio\b[^>]*\sdata-studio-sfx\b[^>]*>\s*<\/audio>/gi)
+    .filter((x) => !evIds.has(x[0].match(/\sid\s*=\s*["']([^"']*)["']/i)?.[1]));
+  for (const x of stale.reverse()) out = out.slice(0, x.index) + out.slice(x.index + x[0].length);
   return { html: out, missing, missingEvents };
 }
 
@@ -475,7 +595,7 @@ function writeAtomic(f, text) {
 
 export function main(argv = process.argv.slice(2), { out = (s) => process.stdout.write(s), err = (s) => process.stderr.write(s) } = {}) {
   if (wantsHelp(argv)) { out(helpText(import.meta.url)); return 0; }
-  const usage = "usage: node gateway.mjs patch|undo|log|show|derive --project <dir> … (--help)";
+  const usage = "usage: node gateway.mjs patch|undo|redo|log|show|derive --project <dir> … (--help)";
   const [cmd, ...rest] = argv;
   const o = {};
   for (let i = 0; i < rest.length; i++) {
@@ -508,6 +628,9 @@ export function main(argv = process.argv.slice(2), { out = (s) => process.stdout
       case "undo":
         if (o.base == null) { err(`gateway: undo needs --base\n${usage}\n`); return EXIT.usage; }
         return report(undo(dir, { base: Number(o.base) }));
+      case "redo":
+        if (o.base == null) { err(`gateway: redo needs --base\n${usage}\n`); return EXIT.usage; }
+        return report(redo(dir, { base: Number(o.base) }));
       case "log": {
         const h = readHistory(dir);
         if (o.json) out(JSON.stringify(h, null, 2) + "\n");
