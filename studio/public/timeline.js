@@ -7,7 +7,7 @@ const LABEL = 90;
 const MIN_SHOT = 0.5;
 
 export function mountTimeline(ctx, el, { zoomIn, zoomOut }) {
-  let pps = 60, head = null, last = 0;
+  let pps = 60, head = null, last = 0, fitted = null;
   zoomIn.addEventListener("click", () => { pps = Math.min(400, pps * 1.25); render(); });
   zoomOut.addEventListener("click", () => { pps = Math.max(8, pps / 1.25); render(); });
 
@@ -35,7 +35,7 @@ export function mountTimeline(ctx, el, { zoomIn, zoomOut }) {
 
   function shotBlock(s, i) {
     const dur = s.end - s.start;
-    const label = `${i + 1} - ${s.name}`;
+    const label = s.name ? `${i + 1} · ${s.name}` : `${i + 1}`;
     const b = h("div", { class: `blk shot${s.id === ctx.state.sel ? " sel" : ""}`, title: label, "data-id": s.id, style: { left: px(s.start * pps), width: px(dur * pps) }, onclick: () => ctx.select(s.id) }, label);
     const handle = h("div", { class: "handle", title: "Kéo để đổi độ dài" });
     b.append(handle);
@@ -65,6 +65,8 @@ export function mountTimeline(ctx, el, { zoomIn, zoomOut }) {
     const m = ctx.state.m;
     if (!m) { head = null; el.replaceChildren(h("div", { class: "muted", style: { padding: "12px" } }, "Chưa có timeline")); return; }
     const total = Math.max(m.duration || 0, ...m.shots.map((s) => s.end), ...m.lines.map((l) => l.start + l.duration));
+    // First view of a project: zoom so the whole video fills the timeline width.
+    if (fitted !== ctx.state.name && total > 0 && el.clientWidth > 0) { fitted = ctx.state.name; pps = Math.max(8, Math.min(400, (el.clientWidth - LABEL - 60) / total)); }
     const lane = total * pps + 60;
     const ruler = h("div", { class: "tl-ruler", title: "Bấm để tua", style: { width: px(lane) } });
     ruler.addEventListener("click", (e) => { const r = ruler.getBoundingClientRect(); ctx.seek(Math.max(0, Math.min(total, (e.clientX - r.left) / pps))); });
