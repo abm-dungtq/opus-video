@@ -37,7 +37,7 @@ test("initialize, tools/list, project_patch as director, stale base → CONFLICT
     assert.equal(r[1].result.protocolVersion, "2025-06-18");
     assert.deepEqual(r[1].result.capabilities, { tools: {} });
     assert.equal(r[1].result.serverInfo.name, "opus-video");
-    assert.deepEqual(r[2].result.tools.map((t) => t.name).sort(), ["project_get", "project_log", "project_patch", "project_undo", "studio_request_done", "studio_request_next"]);
+    assert.deepEqual(r[2].result.tools.map((t) => t.name).sort(), ["project_get", "project_log", "project_patch", "project_undo", "studio_ask", "studio_request_done", "studio_request_next"]);
     assert.ok(!r[3].result.isError, r[3].result.content[0].text);
     assert.equal(JSON.parse(r[3].result.content[0].text).version, v + 1);
     const last = readFileSync(join(dir, ".opus", "history.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l)).at(-1);
@@ -85,5 +85,31 @@ test("studio_request_next claims the queued request for mcp; studio_request_done
     assert.equal(JSON.parse(r[3].result.content[0].text).status, "done");
     assert.equal(r[4].result.content[0].text, "null");
     assert.equal(r[5].result.isError, true);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("studio_ask moves a running request to waiting_user; a queued one or a bad choice is an error", () => {
+  const dir = mkdtempSync(join(tmpdir(), "mcp-"));
+  try {
+    cpSync(FIXTURE, dir, { recursive: true });
+    const q = enqueue(dir, { scope: "project", base: 1, text: "chọn hướng" });
+    const ask = { project: dir, id: q.id, kind: "choice", question: "Chọn hướng nào?", options: [{ id: "1", label: "A1" }, { id: "2", label: "A2" }], artifacts: ["demo/pitch-1.png"], gate: "direction" };
+    const r = session([
+      init,
+      call(2, "studio_ask", ask),
+      call(3, "studio_request_next", { project: dir }),
+      call(4, "studio_ask", { ...ask, options: [{ id: "1", label: "A1" }] }),
+      call(5, "studio_ask", ask),
+    ]);
+    assert.equal(r[2].result.isError, true);
+    assert.match(r[2].result.content[0].text, /queued/);
+    assert.equal(r[4].result.isError, true);
+    assert.match(r[4].result.content[0].text, /2 option/);
+    assert.ok(!r[5].result.isError, r[5].result.content[0].text);
+    assert.match(r[5].result.content[0].text, /Kết thúc lượt này ngay/);
+    const saved = JSON.parse(readFileSync(join(dir, ".opus", "requests", `${q.id}.json`), "utf8"));
+    assert.equal(saved.status, "waiting_user");
+    assert.equal(saved.ask.gate, "direction");
+    assert.deepEqual(saved.ask.artifacts, ["demo/pitch-1.png"]);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

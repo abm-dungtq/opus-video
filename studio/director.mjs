@@ -7,28 +7,18 @@
 // next time; a failed resume is retried once without it. The director closes the request with
 // studio_request_done (its MCP server runs with OPUS_STUDIO_RUNNER=cli). When the job ends and the
 // request is still running: exit 0 with a final answer → done with that answer as the receipt;
-// anything else → failed with the last 20 log lines.
+// anything else → failed with the last 20 log lines. A request the director left waiting_user
+// (studio_ask) is kept as is until the user answers.
 // Runner "mcp": the request stays queued for an open session (studio_request_next).
 // The runner is `director.runner` in ~/.config/opus-video/studio.json ($OPUS_STUDIO_STATE).
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { load } from "../scripts/manifest.mjs";
-import { finish, list, next } from "../scripts/requests.mjs";
+import { load, finish, list, next, OV, PREFIX, MCP_TOOLS, ALLOWED_TOOLS, DENIED_TOOLS } from "../scripts/studio-api.mjs";
 import { startJob, running } from "./jobs.mjs";
 
-const OV = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
-const PREFIX = "mcp__plugin_opus-video_opus-video__";
-export const MCP_TOOLS = ["project_get", "project_log", "project_patch", "project_undo", "studio_request_next", "studio_request_done"].map((t) => PREFIX + t);
-// No Bash(node:*): under acceptEdits it would allow `node -e` with any code. The scripts rule is a
-// wildcard: the `:*` prefix form needs a word boundary after the prefix, so ".../scripts/:*" never
-// matches ".../scripts/timing.mjs" (checked against claude -p 2.1).
-export const ALLOWED_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep", `Bash(node ${OV}/scripts/*)`, "Bash(npx hyperframes:*)", ...MCP_TOOLS];
-// The plain Edit/Write rules also reach files outside the project, so the plugin is denied by
-// path (`//` marks an absolute path), and a `..` after scripts/ is denied: the `/*` glob alone ran
-// `node $OV/scripts/../../…/x.mjs` (checked against claude -p 2.1 with haiku).
-export const DENIED_TOOLS = ["WebFetch", "WebSearch", `Edit(/${OV}/**)`, `Write(/${OV}/**)`, `Bash(node ${OV}/scripts/*../*)`];
+// The tool permissions live in the plugin (scripts/studio-api.mjs); re-exported for Studio's tests.
+export { MCP_TOOLS, ALLOWED_TOOLS, DENIED_TOOLS };
 export const KIND = "director";
 const RESUME_FAILED = /no conversation found|session.*(not found|does not exist|invalid)|could not resume/i;
 
@@ -55,6 +45,7 @@ export function buildPrompt(dir, req) {
   const line = req.scope === "line" ? m?.lines.find((l) => l.id === req.target) : null;
   const facts = { id: req.id, scope: req.scope, target: req.target, t: req.t, base: req.base, text: req.text };
   return [
+    req.follows ? `Đây là lượt tiếp theo sau câu trả lời của người dùng cho yêu cầu ${req.follows}.` : "",
     `Bạn là đạo diễn AI của opus-video, nhận một yêu cầu từ Motion Studio cho dự án ${dir}.`,
     "",
     "Yêu cầu của người dùng (JSON):",
@@ -72,6 +63,8 @@ export function buildPrompt(dir, req) {
     `7. Xong việc thì gọi studio_request_done với project "${dir}", id "${req.id}", ok true và receipt tiếng Việt liệt kê mọi file và op đã đổi. Không làm được thì ok false kèm error nói lý do. Không gọi studio_request_next: yêu cầu này đã được nhận sẵn cho bạn.`,
     "8. Câu trả lời cuối cùng của bạn là chính biên nhận đó.",
     `9. Đổi thời gian hoặc chuyển động thì chạy lại node ${OV}/scripts/recipe-pack.mjs --project . và node ${OV}/scripts/make-demo.mjs --animatic, rồi ghi trong biên nhận rằng animatic cần người dùng duyệt lại. Không tự ghi dòng approval.`,
+    `10. Cần người dùng chọn hoặc duyệt (hướng đạo diễn, kịch bản, animatic) thì gọi studio_ask với project "${dir}", id "${req.id}", gate "direction" cho chọn hướng (chạy make-pitch.mjs để có các pitch; mỗi option có id là số pick của make-pitch và label là tên hướng; styleframe trong artifacts) hoặc gate "animatic" cho duyệt animatic (kind "approve", artifacts là file animatic và contact sheet). Sau studio_ask, kết thúc lượt ngay, không gọi studio_request_done.`,
+    "11. BRIEF.md và DEMO.md do Studio ghi. Không sửa hai file này; dòng direction: và approval: chỉ đến từ câu trả lời của người dùng.",
   ].filter((x) => x !== "").join("\n");
 }
 
@@ -90,7 +83,7 @@ function reader(dir, state) {
     if (e.type === "system" && e.subtype === "init") {
       if (e.session_id) { state.session = e.session_id; saveSession(dir, e.session_id); }
       const missing = MCP_TOOLS.filter((t) => !(e.tools ?? []).includes(t));
-      return missing.length ? `THIẾU tool MCP: ${missing.join(", ")}` : `Phiên ${e.session_id ?? "?"} · đủ 6 tool opus-video`;
+      return missing.length ? `THIẾU tool MCP: ${missing.join(", ")}` : `Phiên ${e.session_id ?? "?"} · đủ ${MCP_TOOLS.length} tool opus-video`;
     }
     if (e.type === "assistant") {
       const parts = (e.message?.content ?? []).map((c) => (c.type === "text" ? c.text : c.type === "tool_use" ? `→ ${String(c.name).replace(PREFIX, "")}` : null)).filter(Boolean);

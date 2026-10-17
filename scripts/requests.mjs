@@ -1,18 +1,23 @@
 // requests.mjs — the Studio → director request queue, shared by Motion Studio and the MCP server.
 // One file per request: <project>/.opus/requests/<id>.json =
 //   { id, at, scope: "project"|"shot"|"line", target, t, base, text,
-//     status: "queued"|"running"|"done"|"failed", runner: "cli"|"mcp", session, receipt, error }
+//     status: "queued"|"running"|"done"|"failed"|"waiting_user", runner: "cli"|"mcp", session,
+//     receipt, error, follows, ask?, decision? }
 // id = r-<yyyymmddhhmmss>-<4 hex>. Every write is a temp file plus renameSync. next() claims a
 // request by renaming <id>.json to <id>.claim first, so two runners never take the same one;
 // finish() takes the same claim. A claim left by a crashed runner for over 30 s is put back.
 // `at` is strictly increasing within a project, so list() order is enqueue order.
+// A running request may ask the user a question (ask(): status waiting_user). answer() closes it
+// as done and queues a follow-up request (follows: <old id>) in the same session.
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 
 export const SCOPES = ["project", "shot", "line"];
 export const RUNNERS = ["cli", "mcp"];
-export const STATUSES = ["queued", "running", "done", "failed"];
+export const STATUSES = ["queued", "running", "done", "failed", "waiting_user"];
+export const ASK_KINDS = ["choice", "approve", "text"];
+export const ASK_GATES = ["direction", "animatic", null];
 export const ID = /^r-\d{14}-[0-9a-f]{4}$/;
 
 export const requestsDir = (dir) => join(dir, ".opus", "requests");
@@ -32,7 +37,7 @@ export function newId(now = new Date()) {
   return `r-${stamp}-${randomBytes(2).toString("hex")}`;
 }
 
-export function enqueue(dir, { scope, target = null, t = null, base, text, session = null }) {
+export function enqueue(dir, { scope, target = null, t = null, base, text, session = null, follows = null }) {
   if (!SCOPES.includes(scope)) throw new Error(`scope phải là ${SCOPES.join(" | ")}`);
   if (!String(text ?? "").trim()) throw new Error("yêu cầu cần có nội dung (text)");
   if (!Number.isInteger(Number(base))) throw new Error("base phải là số phiên bản");
@@ -41,7 +46,7 @@ export function enqueue(dir, { scope, target = null, t = null, base, text, sessi
   const now = new Date(Math.max(Date.now(), last + 1));
   let id;
   do id = newId(now); while (existsSync(file(dir, id)) || existsSync(file(dir, id, "claim")));
-  const r = { id, at: now.toISOString(), scope, target, t, base: Number(base), text: String(text), status: "queued", runner: null, session, receipt: null, error: null };
+  const r = { id, at: now.toISOString(), scope, target, t, base: Number(base), text: String(text), status: "queued", runner: null, session, receipt: null, error: null, follows };
   writeAtomic(file(dir, id), r);
   return r;
 }
@@ -115,4 +120,69 @@ export function cancelRequest(dir, id, reason = "Đã huỷ trong Studio") {
   const res = withClaim(dir, id, (r) => (r.status === "queued" || r.status === "running" ? { ...r, status: "failed", error: reason, finished: new Date().toISOString() } : null), { tries: 50 });
   if (res.busy) throw new Error(`yêu cầu ${id} đang bị tiến trình khác giữ, thử lại sau`);
   return res.r ?? null;
+}
+
+// withClaim for ask/answer: throws on a bad id, a missing request or a claim held elsewhere.
+function claimOrThrow(dir, id, fn) {
+  if (!ID.test(String(id))) throw new Error(`id không hợp lệ: ${id}`);
+  if (!existsSync(file(dir, id)) && !existsSync(file(dir, id, "claim"))) throw new Error(`không có yêu cầu ${id}`);
+  const res = withClaim(dir, id, fn, { tries: 50 });
+  if (res.busy) throw new Error(`yêu cầu ${id} đang bị tiến trình khác giữ, thử lại sau`);
+  return res.r;
+}
+
+const safeArtifact = (a) => typeof a === "string" && a.trim() !== "" && !a.startsWith("/") && !a.split(/[\\/]/).includes("..");
+
+// A running request asks the user: status waiting_user plus a structured question. With runner,
+// only that runner's claim may ask. Artifacts are paths relative to the project. Returns the request.
+export function ask(dir, id, { kind, question, options = [], artifacts = [], gate = null, runner = null } = {}) {
+  if (!ASK_KINDS.includes(kind)) throw new Error(`kind phải là ${ASK_KINDS.join(" | ")}`);
+  if (!String(question ?? "").trim()) throw new Error("câu hỏi (question) không được rỗng");
+  if (!ASK_GATES.includes(gate)) throw new Error(`gate phải là ${ASK_GATES.filter(Boolean).join(" | ")} hoặc bỏ trống`);
+  if (!Array.isArray(options) || !options.every((o) => o && String(o.id ?? "").trim() && String(o.label ?? "").trim())) throw new Error("mỗi option cần { id, label } khác rỗng");
+  if (kind === "choice" && options.length < 2) throw new Error("câu hỏi choice cần ít nhất 2 option");
+  if (!Array.isArray(artifacts) || !artifacts.every(safeArtifact)) throw new Error("artifacts phải là đường dẫn tương đối trong dự án, không có .. và không bắt đầu bằng /");
+  let bad = null;
+  const r = claimOrThrow(dir, id, (x) => {
+    if (x.status !== "running") { bad = `trạng thái ${x.status}, không phải running`; return null; }
+    if (runner && x.runner !== runner) { bad = `do runner ${x.runner} giữ, không phải ${runner}`; return null; }
+    const q = { kind, question: String(question), options: options.map((o) => ({ id: String(o.id), label: String(o.label) })), artifacts, gate, at: new Date().toISOString() };
+    return { ...x, status: "waiting_user", ask: q };
+  });
+  if (bad) throw new Error(`yêu cầu ${id} ${bad}`);
+  if (!r) throw new Error(`không đọc được yêu cầu ${id}`);
+  return r;
+}
+
+// The user answers a waiting_user request: it becomes done with the decision, and a follow-up
+// request in the same scope and session (follows: id) is queued at the caller's base.
+// Returns { answered, next }.
+export function answer(dir, id, { value, by = "user@studio", base } = {}) {
+  if (!String(value ?? "").trim()) throw new Error("câu trả lời (value) không được rỗng");
+  if (base === null || base === undefined || !Number.isInteger(Number(base))) throw new Error("base phải là số phiên bản");
+  let bad = null;
+  const answered = claimOrThrow(dir, id, (x) => {
+    if (x.status !== "waiting_user") { bad = `trạng thái ${x.status}, không phải waiting_user`; return null; }
+    const at = new Date().toISOString();
+    return { ...x, status: "done", decision: { value: String(value), by: String(by), at }, receipt: `Người dùng đã trả lời: ${value}`, finished: at };
+  });
+  if (bad) throw new Error(`yêu cầu ${id} ${bad}`);
+  if (!answered) throw new Error(`không đọc được yêu cầu ${id}`);
+  const next = enqueue(dir, {
+    scope: answered.scope, target: answered.target, t: answered.t, base, session: answered.session, follows: answered.id,
+    text: `Người dùng trả lời câu hỏi "${answered.ask?.question ?? ""}": ${value}`,
+  });
+  return { answered, next };
+}
+
+// Questions left unanswered for maxMs or longer become failed; the ask is kept so Studio can
+// reopen it. Returns the ids changed.
+export function expireWaiting(dir, { maxMs = 24 * 3600 * 1000 } = {}) {
+  const changed = [];
+  for (const w of list(dir).filter((r) => r.status === "waiting_user")) {
+    if (Date.now() - (Date.parse(w.ask?.at) || 0) < maxMs) continue;
+    const res = withClaim(dir, w.id, (x) => (x.status === "waiting_user" ? { ...x, status: "failed", error: "Hết hạn chờ trả lời; mở lại câu hỏi trong Studio", finished: new Date().toISOString() } : null), { tries: 50 });
+    if (res.r) changed.push(w.id);
+  }
+  return changed;
 }

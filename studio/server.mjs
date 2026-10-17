@@ -20,16 +20,12 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync, watch, c
 import { execFile, execFileSync } from "node:child_process";
 import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { load } from "../scripts/manifest.mjs";
-import { patch, undo, readHistory, EXIT } from "../scripts/gateway.mjs";
-import { enqueue, cancelRequest, list as listRequests } from "../scripts/requests.mjs";
+import { load, patch, undo, readHistory, EXIT, enqueue, cancelRequest, list as listRequests, SCRIPTS, DIRECTIONS_FILE as DIRECTIONS } from "../scripts/studio-api.mjs";
 import { events as jobEvents, startJob, cancel as cancelJob, listJobs, running, stopAll } from "./jobs.mjs";
 import { KIND as DIRECTOR, pump, runnerSetting } from "./director.mjs";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const PUBLIC = join(HERE, "public");
-const SCRIPTS = fileURLToPath(new URL("../scripts/", import.meta.url));
-const DIRECTIONS = fileURLToPath(new URL("../data/directions.json", import.meta.url));
 const COMPRESS = process.env.OPUS_COMPRESS_FINAL || "/Volumes/2/Edit-Video/scripts/compress-final.sh";
 const RATIO = /^\d+x\d+$/;
 export const NAME = /^[A-Za-z0-9._-]+$/;

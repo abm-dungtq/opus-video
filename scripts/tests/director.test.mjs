@@ -7,7 +7,7 @@ import { request } from "node:http";
 import { fileURLToPath } from "node:url";
 import { createServer } from "../../studio/server.mjs";
 import { enqueue, list } from "../requests.mjs";
-import { MCP_TOOLS, ALLOWED_TOOLS, DENIED_TOOLS } from "../../studio/director.mjs";
+import { MCP_TOOLS, ALLOWED_TOOLS, DENIED_TOOLS, buildPrompt } from "../../studio/director.mjs";
 
 const FIXTURE = fileURLToPath(new URL("./fixtures/manifest", import.meta.url));
 const REQUESTS = fileURLToPath(new URL("../requests.mjs", import.meta.url));
@@ -28,7 +28,10 @@ const id = process.env.OPUS_STUDIO_REQUEST;
 setTimeout(async () => {
   if (prompt.includes("[crash]")) { console.error("boom"); process.exit(2); }
   out({ type: "assistant", message: { content: [{ type: "tool_use", name: "mcp__plugin_opus-video_opus-video__project_get" }] } });
-  if (!prompt.includes("[silent]")) {
+  if (prompt.includes("[ask]")) {
+    const { ask } = await import(${JSON.stringify(REQUESTS)});
+    ask(process.cwd(), id, { kind: "approve", question: "Duyệt animatic?", artifacts: ["demo/animatic.mp4"], gate: "animatic", runner: process.env.OPUS_STUDIO_RUNNER });
+  } else if (!prompt.includes("[silent]")) {
     const { finish } = await import(${JSON.stringify(REQUESTS)});
     finish(process.cwd(), id, { ok: true, receipt: "Đã đổi s2", runner: process.env.OPUS_STUDIO_RUNNER });
   }
@@ -153,6 +156,32 @@ test("deny rules: the plugin is not editable and no `..` follows scripts/", () =
   assert.deepEqual(DENIED_TOOLS.slice(0, 2), ["WebFetch", "WebSearch"]);
   assert.ok(DENIED_TOOLS.includes(`Edit(/${ov}/**)`) && DENIED_TOOLS.includes(`Write(/${ov}/**)`), "absolute path rules start with //");
   assert.ok(DENIED_TOOLS.includes(`Bash(node ${ov}/scripts/*../*)`));
+});
+
+test("the gates are the user's: DEMO.md, BRIEF.md and make-pitch choose are denied; studio_ask is allowed", () => {
+  assert.equal(MCP_TOOLS.length, 7);
+  assert.ok(MCP_TOOLS.includes("mcp__plugin_opus-video_opus-video__studio_ask"));
+  assert.ok(DENIED_TOOLS.includes("Edit(BRIEF.md)") && DENIED_TOOLS.includes("Edit(DEMO.md)"));
+  assert.ok(DENIED_TOOLS.some((t) => t.includes("make-pitch.mjs choose")));
+  for (const t of ["Bash(*replace-in-file.mjs*)", "Bash(cp *)", "Bash(mv *)"]) assert.ok(DENIED_TOOLS.includes(t), t);
+  const req = { id: "r-20261017140000-abcd", scope: "project", target: null, t: null, base: 1, text: "chọn hướng" };
+  const p = buildPrompt(dir(), req);
+  assert.match(p, /studio_ask/);
+  assert.match(p, /gate "direction"/);
+  assert.match(p, /BRIEF\.md và DEMO\.md do Studio ghi/);
+  assert.doesNotMatch(p, /lượt tiếp theo/);
+  assert.match(buildPrompt(dir(), { ...req, follows: "r-20261017130000-0000" }), /^Đây là lượt tiếp theo sau câu trả lời của người dùng cho yêu cầu r-20261017130000-0000\./);
+});
+
+test("a job that ends after studio_ask leaves the request waiting_user", async () => {
+  const a = await post("/api/director", { name: "demo", scope: "project", text: "[ask] duyệt animatic" });
+  const b = await post("/api/director", { name: "demo", scope: "project", text: "hai" });
+  // b runs only after a's job has exited and its onExit has run.
+  assert.equal((await ended(b.json.request.id)).status, "done");
+  const ra = list(dir()).find((x) => x.id === a.json.request.id);
+  assert.equal(ra.status, "waiting_user");
+  assert.equal(ra.ask.gate, "animatic");
+  assert.equal(ra.error, null);
 });
 
 test("a request queued before Studio starts is pumped when it listens", async () => {

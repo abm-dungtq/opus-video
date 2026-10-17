@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { enqueue, next, finish, list, requestsDir, ID } from "../requests.mjs";
+import { enqueue, next, finish, list, requestsDir, ID, ask, answer, expireWaiting, STATUSES } from "../requests.mjs";
 
 const mod = fileURLToPath(new URL("../requests.mjs", import.meta.url));
 const tmp = () => mkdtempSync(join(tmpdir(), "rq-"));
@@ -68,5 +68,71 @@ test("requests enqueued in a tight loop keep enqueue order and strictly increasi
     const rows = list(d);
     assert.deepEqual(rows.map((r) => r.id), ids);
     for (let i = 1; i < rows.length; i++) assert.ok(rows[i].at > rows[i - 1].at, rows.map((r) => r.at).join(" "));
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+const CHOICE = { kind: "choice", question: "Chọn hướng nào?", options: [{ id: "1", label: "A1" }, { id: "2", label: "A2" }], artifacts: ["demo/pitch-1.png"], gate: "direction" };
+
+test("ask moves a running request to waiting_user; queued, one-option choice and `..` artifacts are refused", () => {
+  const d = tmp();
+  try {
+    assert.equal(STATUSES.at(-1), "waiting_user");
+    const q = enqueue(d, { scope: "project", base: 1, text: "chọn hướng" });
+    assert.throws(() => ask(d, q.id, CHOICE), /queued/);
+    next(d, "cli", { session: "sess-9" });
+    assert.throws(() => ask(d, q.id, { ...CHOICE, options: [{ id: "1", label: "A1" }] }), /2 option/);
+    assert.throws(() => ask(d, q.id, { ...CHOICE, artifacts: ["../x.png"] }), /artifacts/);
+    assert.throws(() => ask(d, q.id, { ...CHOICE, artifacts: ["/etc/passwd"] }), /artifacts/);
+    assert.throws(() => ask(d, q.id, { ...CHOICE, gate: "final" }), /gate/);
+    assert.throws(() => ask(d, q.id, { ...CHOICE, kind: "pick" }), /kind/);
+    assert.throws(() => ask(d, q.id, { ...CHOICE, question: " " }), /question/);
+    assert.throws(() => ask(d, q.id, { ...CHOICE, runner: "mcp" }), /runner cli/);
+    const w = ask(d, q.id, { ...CHOICE, runner: "cli" });
+    assert.equal(w.status, "waiting_user");
+    assert.equal(w.ask.gate, "direction");
+    assert.deepEqual(w.ask.options.map((o) => o.id), ["1", "2"]);
+    assert.ok(Date.parse(w.ask.at));
+    assert.equal(list(d)[0].status, "waiting_user");
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("answer closes the question and queues a follow-up in the same session; only from waiting_user", () => {
+  const d = tmp();
+  try {
+    const q = enqueue(d, { scope: "shot", target: "s2", t: 1.5, base: 3, text: "duyệt animatic" });
+    next(d, "cli", { session: "sess-9" });
+    assert.throws(() => answer(d, q.id, { value: "ok", base: 3 }), /running/);
+    ask(d, q.id, { kind: "approve", question: "Duyệt animatic?", artifacts: ["demo/animatic.mp4"], gate: "animatic" });
+    assert.throws(() => answer(d, q.id, { value: "  ", base: 3 }), /value/);
+    assert.throws(() => answer(d, q.id, { value: "ok" }), /base/);
+    const { answered, next: n } = answer(d, q.id, { value: "ok", base: 4 });
+    assert.equal(answered.status, "done");
+    assert.equal(answered.decision.value, "ok");
+    assert.equal(answered.decision.by, "user@studio");
+    assert.equal(answered.receipt, "Người dùng đã trả lời: ok");
+    assert.equal(n.status, "queued");
+    assert.equal(n.follows, q.id);
+    assert.equal(n.session, "sess-9");
+    assert.equal(n.scope, "shot");
+    assert.equal(n.target, "s2");
+    assert.equal(n.base, 4);
+    assert.equal(n.text, 'Người dùng trả lời câu hỏi "Duyệt animatic?": ok');
+    assert.throws(() => answer(d, q.id, { value: "ok", base: 4 }), /done/);
+    assert.deepEqual(list(d).map((r) => r.id), [q.id, n.id]);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("expireWaiting fails old questions and keeps the ask", () => {
+  const d = tmp();
+  try {
+    const q = enqueue(d, { scope: "project", base: 1, text: "chọn hướng" });
+    next(d, "cli");
+    ask(d, q.id, CHOICE);
+    assert.deepEqual(expireWaiting(d), [], "a fresh question is kept");
+    assert.deepEqual(expireWaiting(d, { maxMs: 0 }), [q.id]);
+    const r = list(d)[0];
+    assert.equal(r.status, "failed");
+    assert.match(r.error, /Hết hạn chờ trả lời/);
+    assert.equal(r.ask.question, CHOICE.question);
   } finally { rmSync(d, { recursive: true, force: true }); }
 });

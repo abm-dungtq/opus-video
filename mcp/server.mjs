@@ -2,7 +2,7 @@
 // mcp/server.mjs — opus-video MCP server (stdio, Node built-ins only). Its tools wrap the command
 // gateway (scripts/gateway.mjs: the one writer of project.json) and the Studio request queue
 // (scripts/requests.mjs), so a Claude Code session can read a project, patch it as
-// actor "director" and pick up Studio requests.
+// actor "director", pick up Studio requests and ask the user a question through Studio.
 // Transport: newline-delimited JSON-RPC 2.0 on stdin/stdout; logs go to stderr only. Exits 0 when
 // stdin ends. Every tool takes `project`: an absolute path to a directory holding project.json.
 //   node mcp/server.mjs
@@ -12,7 +12,7 @@ import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { load } from "../scripts/manifest.mjs";
 import { patch, undo, readHistory } from "../scripts/gateway.mjs";
-import { next, finish } from "../scripts/requests.mjs";
+import { next, finish, ask, ASK_KINDS } from "../scripts/requests.mjs";
 
 // A director started by Studio (`claude -p`, studio/director.mjs) runs this server with
 // OPUS_STUDIO_RUNNER=cli: it closes the request Studio claimed for it as runner "cli". Any other
@@ -72,6 +72,24 @@ export const TOOLS = [
       additionalProperties: false,
     },
   },
+  {
+    name: "studio_ask",
+    description: "Hỏi người dùng trong Studio (chọn hướng, duyệt kịch bản hay animatic) cho một yêu cầu đang running: yêu cầu chuyển sang waiting_user. Sau khi gọi, kết thúc lượt ngay; câu trả lời đến ở lượt sau.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: PROJECT,
+        id: { type: "string", description: "Id yêu cầu Studio đang running" },
+        kind: { type: "string", enum: ASK_KINDS, description: "choice: chọn một option; approve: duyệt hay không; text: trả lời tự do" },
+        question: { type: "string", description: "Câu hỏi tiếng Việt cho người dùng" },
+        options: { type: "array", items: { type: "object", properties: { id: { type: "string" }, label: { type: "string" } }, required: ["id", "label"], additionalProperties: false }, description: "Các lựa chọn (choice cần ít nhất 2)" },
+        artifacts: { type: "array", items: { type: "string" }, description: "Đường dẫn tương đối trong dự án để người dùng xem (styleframe, animatic, contact sheet)" },
+        gate: { type: "string", enum: ["direction", "animatic"], description: "Cổng duyệt mà câu trả lời quyết định" },
+      },
+      required: ["project", "id", "kind", "question"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 const text = (v) => ({ content: [{ type: "text", text: typeof v === "string" ? v : JSON.stringify(v, null, 2) }] });
@@ -107,6 +125,9 @@ export function callTool(name, args) {
       }
       case "studio_request_done":
         return text(finish(dir, args.id, { ok: Boolean(args.ok), receipt: args.receipt, error: args.error, runner: RUNNER }));
+      case "studio_ask":
+        ask(dir, args.id, { kind: args.kind, question: args.question, options: args.options ?? [], artifacts: args.artifacts ?? [], gate: args.gate ?? null, runner: RUNNER });
+        return text("Đã gửi câu hỏi tới Studio. Kết thúc lượt này ngay; câu trả lời sẽ đến ở lượt sau.");
     }
   } catch (e) { return fail(e.message); }
 }
