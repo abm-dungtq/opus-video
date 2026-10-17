@@ -1,10 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as api from "../studio-api.mjs";
-import * as director from "../../studio/director.mjs";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url)).replace(/\/$/, "");
 
@@ -17,13 +16,5 @@ test("studio-api exposes the plugin surface Studio needs", () => {
   assert.equal(api.STUDIO_API, 2);
   assert.equal(api.SCRIPTS, join(ROOT, "scripts"));
   assert.ok(existsSync(api.DIRECTIONS_FILE));
-  assert.deepEqual(director.DENIED_TOOLS, api.DENIED_TOOLS);
-  assert.deepEqual(director.MCP_TOOLS, api.MCP_TOOLS);
-});
-
-test("Studio reaches the plugin only through studio-api.mjs", () => {
-  const studio = join(ROOT, "studio");
-  for (const f of readdirSync(studio).filter((x) => x.endsWith(".mjs"))) {
-    assert.doesNotMatch(readFileSync(join(studio, f), "utf8"), /from "\.\.\/scripts\/(manifest|gateway|requests)\.mjs"/, f);
-  }
+  for (const k of ["MCP_TOOLS", "ALLOWED_TOOLS", "DENIED_TOOLS"]) assert.ok(Array.isArray(api[k]) && api[k].length, k);
 });

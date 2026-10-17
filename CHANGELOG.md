@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.2.0 (2026-10-17): Motion Studio tách repo
+
+Why: the plugin and the web app have different users and release pace; Studio now lives in [abm-dungtq/motion-studio](https://github.com/abm-dungtq/motion-studio) (v1.0.0, history kept) and reads the plugin only through `scripts/studio-api.mjs`.
+
+### Breaking
+- `studio/` and its tests left the plugin. `scripts/studio.mjs` is now a shim: it runs `bin/motion-studio.mjs` from `$MOTION_STUDIO_HOME` or `~/Projects/motion-studio` with the same arguments and exit code, and without Studio prints the `git clone` command and exits 2.
+
+### Kept
+- `scripts/studio-api.mjs` (`STUDIO_API = 2`) and its surface test stay in the plugin; Studio checks `STUDIO_API`, the manifest schema and plugin major 2 when it starts.
+
 ## v2.1.0 (2026-10-17): Motion Studio làm cửa chính
 
 Why: Studio only opened projects that already existed, had no place to give the AI a task, and the director could not ask the user anything, so a new video still started in the terminal and both human gates (direction, animatic) were written by hand.

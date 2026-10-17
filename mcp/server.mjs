@@ -14,7 +14,7 @@ import { load } from "../scripts/manifest.mjs";
 import { patch, undo, readHistory } from "../scripts/gateway.mjs";
 import { next, finish, ask, ASK_KINDS } from "../scripts/requests.mjs";
 
-// A director started by Studio (`claude -p`, studio/director.mjs) runs this server with
+// A director started by Studio (`claude -p`, director.mjs in the motion-studio repo) runs this server with
 // OPUS_STUDIO_RUNNER=cli: it closes the request Studio claimed for it as runner "cli". Any other
 // session pulls the queue as runner "mcp".
 const RUNNER = process.env.OPUS_STUDIO_RUNNER === "cli" ? "cli" : "mcp";
@@ -22,7 +22,7 @@ const RUNNER = process.env.OPUS_STUDIO_RUNNER === "cli" ? "cli" : "mcp";
 // stdout carries JSON-RPC only: anything a library logs goes to stderr.
 console.log = (...a) => console.error(...a);
 
-export const SERVER = { name: "opus-video", version: "2.1.0" };
+export const SERVER = { name: "opus-video", version: "2.2.0" };
 const PROJECT = { type: "string", description: "Đường dẫn tuyệt đối tới thư mục dự án có project.json" };
 const BASE = { type: "integer", description: "Phiên bản project.json bạn vừa đọc (project_get → version)" };
 

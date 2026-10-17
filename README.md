@@ -50,6 +50,10 @@ Các video dưới đây do opus-video dựng. Bấm vào ảnh để mở file 
 
 ## Có gì mới
 
+### v2.2.0 (2026-10-17): Motion Studio thành repo riêng
+
+- **Motion Studio ở [abm-dungtq/motion-studio](https://github.com/abm-dungtq/motion-studio).** Clone về `~/Projects/motion-studio` rồi chạy `node bin/motion-studio.mjs start --background`. Lệnh cũ `node scripts/studio.mjs start --background` của plugin vẫn dùng được: nó tìm Studio rồi chạy hộ. Studio chỉ đọc plugin qua `scripts/studio-api.mjs` và báo rõ khi bản plugin không tương thích.
+
 ### v2.1.0 (2026-10-17): Motion Studio làm cửa chính
 
 - **Làm video mới ngay trong Studio.** Nút "Dự án mới" hỏi tên, tỷ lệ (16:9, 9:16 hoặc cả hai), chế độ (làm từ đầu, dựng từ video có sẵn kèm B-roll, theo nhạc, mẫu nhanh), thời lượng, chủ đề và việc đầu tiên cho đạo diễn. Studio tạo dự án, mở nó và giao việc luôn.
