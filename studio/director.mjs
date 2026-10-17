@@ -1,7 +1,8 @@
 // studio/director.mjs — runs a Studio request on the user's own Claude Code.
 // Runner "cli" (default): `claude -p <prompt> --output-format stream-json --verbose
-// --permission-mode acceptEdits --allowedTools … --disallowedTools WebFetch WebSearch
-// [--resume <sid>]` in the project directory, one job at a time per project (studio/jobs.mjs).
+// --permission-mode acceptEdits --allowedTools … --disallowedTools … [--resume <sid>]` in the
+// project directory, one job at a time per project (studio/jobs.mjs). No --add-dir: Read and
+// Skill reach the plugin files without it.
 // The session id of the system/init event is kept in <project>/.opus/director.json and resumed
 // next time; a failed resume is retried once without it. The director closes the request with
 // studio_request_done (its MCP server runs with OPUS_STUDIO_RUNNER=cli). When the job ends and the
@@ -24,6 +25,10 @@ export const MCP_TOOLS = ["project_get", "project_log", "project_patch", "projec
 // wildcard: the `:*` prefix form needs a word boundary after the prefix, so ".../scripts/:*" never
 // matches ".../scripts/timing.mjs" (checked against claude -p 2.1).
 export const ALLOWED_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep", `Bash(node ${OV}/scripts/*)`, "Bash(npx hyperframes:*)", ...MCP_TOOLS];
+// The plain Edit/Write rules also reach files outside the project, so the plugin is denied by
+// path (`//` marks an absolute path), and a `..` after scripts/ is denied: the `/*` glob alone ran
+// `node $OV/scripts/../../…/x.mjs` (checked against claude -p 2.1 with haiku).
+export const DENIED_TOOLS = ["WebFetch", "WebSearch", `Edit(/${OV}/**)`, `Write(/${OV}/**)`, `Bash(node ${OV}/scripts/*../*)`];
 export const KIND = "director";
 const RESUME_FAILED = /no conversation found|session.*(not found|does not exist|invalid)|could not resume/i;
 
@@ -72,7 +77,7 @@ export function buildPrompt(dir, req) {
 
 export function claudeArgs(prompt, sid) {
   return ["-p", prompt, "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits",
-    "--allowedTools", ...ALLOWED_TOOLS, "--disallowedTools", "WebFetch", "WebSearch", "--add-dir", OV,
+    "--allowedTools", ...ALLOWED_TOOLS, "--disallowedTools", ...DENIED_TOOLS,
     ...(sid ? ["--resume", sid] : [])];
 }
 

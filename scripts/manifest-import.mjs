@@ -5,7 +5,8 @@
 // project.json and .opus/ (version 1, actor "import").
 //   node manifest-import.mjs --project <dir> [--write] [--force]
 //   node manifest-import.mjs --help | -h
-// Shots, first source found: the PLAN.md "## Cảnh" table · the root's scene sub-compositions
+// Shots, first source found: the PLAN.md "## Cảnh" table (name: the first quoted text of the
+//   Hình / hiệu ứng cell, else its start, at most 40 characters) · the root's scene sub-compositions
 //   (data-composition-src without data-track-kind, each running to the next one's start) · audio_meta.json voices back to
 //   back · one shot over the root data-duration. Windows are snapped back to back from 0 and the
 //   last one reaches the root data-duration; every snap is a WARN line.
@@ -31,12 +32,14 @@ import { wantsHelp, helpText } from "./cli-help.mjs";
 import { SCHEMA, load, validate, r3 } from "./manifest.mjs";
 import { record, takeLock } from "./gateway.mjs";
 import { planScenes } from "./timing.mjs";
+import { SECTIONS, parsePlan, parseTable } from "./check-preflight.mjs";
 import { parseTracks, isVoice, isBed } from "./audio-mix.mjs";
 import { parseEvents } from "./sfx-sync.mjs";
 
 const EPS = 1e-3;
 const KINDS = { ".png": "image", ".jpg": "image", ".jpeg": "image", ".webp": "image", ".gif": "image", ".svg": "image", ".mp4": "video", ".mov": "video", ".webm": "video" };
 const MAX_ASSETS = 500;
+const NAME_MAX = 40;
 const rel = (root, p) => relative(root, p).split("\\").join("/");
 const attr = (tag, name) => tag.match(new RegExp(`\\s${name}\\s*=\\s*["']([^"']*)["']`, "i"))?.[1] ?? null;
 
@@ -81,6 +84,25 @@ function listAssets(root) {
   return out;
 }
 
+// Shot name from a "## Cảnh" Hình / hiệu ứng cell: its first quoted on-screen text, else the cell
+// itself, cut to NAME_MAX characters at a word boundary.
+export function shotName(cell) {
+  const plain = String(cell ?? "").replace(/[*_`]/g, "").replace(/\s+/g, " ").trim();
+  if (/^[—–-]?$/.test(plain)) return "";
+  const q = plain.match(/"([^"]+)"|“([^”]+)”/);
+  const s = (q ? q[1] ?? q[2] : plain).trim();
+  if ([...s].length <= NAME_MAX) return s;
+  const cut = [...s].slice(0, NAME_MAX - 1).join("");
+  return `${(cut.lastIndexOf(" ") > NAME_MAX / 2 ? cut.slice(0, cut.lastIndexOf(" ")) : cut).replace(/[\s,;:.]+$/, "")}…`;
+}
+
+// PLAN.md text → one name per "## Cảnh" row, in row order (planScenes order).
+function planNames(text) {
+  const table = parseTable(parsePlan(text).sections[SECTIONS.scenes]);
+  const hi = table.headers.findIndex((h) => /^hinh/.test(h));
+  return table.rows.map((r) => (hi >= 0 ? shotName(r[hi]) : ""));
+}
+
 // Project dir → { manifest, warnings }. Reads only.
 export function importProject(dir) {
   const root = resolve(dir);
@@ -94,7 +116,12 @@ export function importProject(dir) {
   // Shot windows from the first available source.
   let raw = null, source = "";
   if (existsSync(join(root, "PLAN.md"))) {
-    try { raw = planScenes(readFileSync(join(root, "PLAN.md"), "utf8")).map((s) => ({ id: s.sid, name: "", start: s.start, end: s.end })); source = "PLAN.md"; }
+    try {
+      const text = readFileSync(join(root, "PLAN.md"), "utf8");
+      const names = planNames(text);
+      raw = planScenes(text).map((s, i) => ({ id: s.sid, name: names[i] ?? "", start: s.start, end: s.end }));
+      source = "PLAN.md";
+    }
     catch (e) { warnings.push(`PLAN.md: ${e.message}; lấy shot từ nguồn khác`); }
   }
   if (!raw && info.scenes.length) {

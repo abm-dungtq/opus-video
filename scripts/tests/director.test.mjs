@@ -6,8 +6,8 @@ import { join } from "node:path";
 import { request } from "node:http";
 import { fileURLToPath } from "node:url";
 import { createServer } from "../../studio/server.mjs";
-import { list } from "../requests.mjs";
-import { MCP_TOOLS, ALLOWED_TOOLS } from "../../studio/director.mjs";
+import { enqueue, list } from "../requests.mjs";
+import { MCP_TOOLS, ALLOWED_TOOLS, DENIED_TOOLS } from "../../studio/director.mjs";
 
 const FIXTURE = fileURLToPath(new URL("./fixtures/manifest", import.meta.url));
 const REQUESTS = fileURLToPath(new URL("../requests.mjs", import.meta.url));
@@ -92,7 +92,8 @@ test("request reaches done, the session is stored, the next run resumes it", asy
   assert.ok(!first.includes("--resume"));
   for (const t of MCP_TOOLS) assert.ok(first.includes(t), t);
   assert.ok(!first.includes("Bash(node:*)"));
-  assert.deepEqual(first.slice(first.indexOf("--disallowedTools") + 1, first.indexOf("--disallowedTools") + 3), ["WebFetch", "WebSearch"]);
+  assert.deepEqual(first.slice(first.indexOf("--disallowedTools") + 1, first.indexOf("--disallowedTools") + 1 + DENIED_TOOLS.length), DENIED_TOOLS);
+  assert.ok(!first.includes("--add-dir"), "the director gets no write access to the plugin");
   assert.equal(first[first.indexOf("--permission-mode") + 1], "acceptEdits");
   assert.match(first[first.indexOf("-p") + 1], /"id": "r-\d{14}-[0-9a-f]{4}"[\s\S]*studio_request_done/);
 
@@ -145,4 +146,26 @@ test("runner mcp leaves the request queued; Studio can cancel it; POST needs the
     assert.equal((await post("/api/director", { name: "demo", scope: "nope", text: "x" })).status, 400);
   } finally { rmSync(process.env.OPUS_STUDIO_STATE, { force: true }); }
   assert.ok(ALLOWED_TOOLS.some((t) => t.startsWith("Bash(node /") && t.endsWith("/scripts/*)")));
+});
+
+test("deny rules: the plugin is not editable and no `..` follows scripts/", () => {
+  const ov = fileURLToPath(new URL("../..", import.meta.url)).replace(/\/$/, "");
+  assert.deepEqual(DENIED_TOOLS.slice(0, 2), ["WebFetch", "WebSearch"]);
+  assert.ok(DENIED_TOOLS.includes(`Edit(/${ov}/**)`) && DENIED_TOOLS.includes(`Write(/${ov}/**)`), "absolute path rules start with //");
+  assert.ok(DENIED_TOOLS.includes(`Bash(node ${ov}/scripts/*../*)`));
+});
+
+test("a request queued before Studio starts is pumped when it listens", async () => {
+  const other = mkdtempSync(join(tmpdir(), "director-boot-"));
+  const s2 = createServer({ root: other, token: TOKEN, runtime: null });
+  try {
+    cpSync(FIXTURE, join(other, "boot"), { recursive: true });
+    const r = enqueue(join(other, "boot"), { scope: "project", base: 1, text: "Chữ to hơn" });
+    await new Promise((ok) => s2.listen(0, "127.0.0.1", ok));
+    for (let i = 0; i < 100 && list(join(other, "boot")).find((x) => x.id === r.id)?.status !== "done"; i++) await new Promise((x) => setTimeout(x, 50));
+    assert.equal(list(join(other, "boot")).find((x) => x.id === r.id).status, "done");
+  } finally {
+    s2.closeAllConnections?.(); s2.close();
+    rmSync(other, { recursive: true, force: true });
+  }
 });

@@ -347,6 +347,14 @@ export function createServer({ root, token, runtime = undefined }) {
       else res.end();
     }
   });
+  // Requests queued while Studio was down (or before a restart) start once it listens.
+  server.on("listening", () => {
+    for (const p of projectsOf(root)) {
+      if (!p.has_manifest) continue;
+      const dir = join(root, p.name);
+      try { if (listRequests(dir).some((r) => r.status === "queued")) pump(p.name, dir); } catch { /* unreadable requests: left for the next request */ }
+    }
+  });
   server.on("close", () => { for (const w of watchers.values()) w.close(); watchers.clear(); stopAll(); });
   // Look up the HyperFrames runtime once now, not inside the first player request.
   if (runtime === undefined) setImmediate(() => findRuntime(null));

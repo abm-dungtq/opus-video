@@ -6,7 +6,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, stat
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { importProject, main } from "../manifest-import.mjs";
+import { importProject, main, shotName } from "../manifest-import.mjs";
 import { load, validate } from "../manifest.mjs";
 import { readHistory } from "../gateway.mjs";
 
@@ -59,6 +59,24 @@ test("an existing project.json is refused (exit 6); --force imports it as the ne
     assert.equal(main(["--project", dir, "--write", "--force"], io().io), 0);
     assert.equal(load(dir).version, 2);
     assert.equal(readHistory(dir).length, 2);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("shot names come from the Hình / hiệu ứng cell: first quoted text, else its start, at most 40 characters", () => {
+  assert.equal(shotName('Ba thẻ hiện lần lượt, chữ "thuê lập trình viên?"'), "thuê lập trình viên?");
+  assert.equal(shotName("“MOTION” trượt vào, \"STUDIO\" đập xuống"), "MOTION");
+  assert.equal(shotName("Thẻ kết quả"), "Thẻ kết quả");
+  assert.equal(shotName("—"), "");
+  const long = shotName("Ô chat gõ tiếng Việt, mascot nhận tờ yêu cầu rồi chạy đi");
+  assert.equal(long, "Ô chat gõ tiếng Việt, mascot nhận tờ…");
+  assert.ok([...long].length <= 40);
+  const dir = tmp();
+  try {
+    cpSync(FIXTURE, dir, { recursive: true });
+    const plan = readFileSync(join(dir, "PLAN.md"), "utf8");
+    const { manifest: m } = importProject(dir);
+    assert.ok(m.shots.every((s) => s.name !== ""), JSON.stringify(m.shots.map((s) => s.name)));
+    assert.ok(m.shots.every((s) => plan.includes(s.name)));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

@@ -1,7 +1,7 @@
 // studio/jobs.mjs — child-process jobs of Motion Studio (director runs and exports).
 // startJob spawns without a shell in its own process group, keeps the last 500 log lines and
 // emits "job" events { type: "start" | "log" | "exit", job, line? } on `events`. One running job
-// per (project, kind): a second start throws (code "BUSY"). cancel(id) sends SIGTERM to the group,
+// per (project, kind): a second start throws (code "BUSY"), also while the first is still cancelling. cancel(id) sends SIGTERM to the group,
 // then SIGKILL after 5 s. stopAll() ends every running job when the server stops, so no child
 // (render, headless Chrome, claude) outlives it.
 import { spawn } from "node:child_process";
@@ -23,7 +23,7 @@ function signal(j, sig) {
 // onLine(line, stream) → the text to keep (null drops it); onExit(job) runs before the exit event.
 export function startJob({ name, kind, cmd, args = [], cwd, env = process.env, onLine = null, onExit = null, meta = {} }) {
   for (const j of all.values()) {
-    if (j.name === name && j.kind === kind && j.status === "running") throw Object.assign(new Error(`${name} đang có việc ${kind} chạy (${j.id})`), { code: "BUSY", job: view(j) });
+    if (j.name === name && j.kind === kind && (j.status === "running" || j.status === "cancelling")) throw Object.assign(new Error(`${name} đang có việc ${kind} chạy (${j.id})`), { code: "BUSY", job: view(j) });
   }
   const id = `j-${Date.now().toString(36)}-${randomBytes(2).toString("hex")}`;
   const j = { id, name, kind, cmd, args, cwd, meta, status: "running", code: null, signal: null, started: new Date().toISOString(), ended: null, log: [], onLine, onExit };

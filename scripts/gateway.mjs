@@ -311,6 +311,14 @@ export function deriveHtml(html, m) {
     out = r.text;
     if (!r.hit) missing.push(l.id);
   }
+  // Each music bed's data-start / data-duration (end − start; a bed with no end runs to the root
+  // duration). Its id joins missing when no live tag carries it.
+  for (const b of m.music ?? []) {
+    const r = replaceLive(out, new RegExp(`<(?:audio|video)\\b[^>]*\\sid\\s*=\\s*["']${esc(b.id)}["'][^>]*>`, "i"), (tag) =>
+      setAttr(setAttr(tag, "data-start", r3(b.start)), "data-duration", r3((b.end ?? m.duration) - b.start)));
+    out = r.text;
+    if (!r.hit) missing.push(b.id);
+  }
   const missingEvents = [];
   const shotOf = new Map((m.shots ?? []).map((s) => [s.id, s]));
   for (const e of m.events ?? []) {

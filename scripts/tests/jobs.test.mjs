@@ -32,6 +32,16 @@ test("one running job per project and kind; cancel ends the child", async () => 
   assert.equal((await exited(again.id)).code, 0);
 });
 
+test("a job still cancelling keeps its slot BUSY until it exits", async () => {
+  const j = startJob({ name: "p", kind: "slowstop", cmd: node, args: ["-e", "process.on('SIGTERM', () => setTimeout(() => process.exit(0), 300)); console.log('up'); setInterval(() => {}, 1000)"] });
+  await new Promise((r) => { const on = (e) => { if (e.type === "log" && e.job.id === j.id) { events.off("job", on); r(); } }; events.on("job", on); });
+  assert.equal(cancel(j.id).status, "cancelling");
+  assert.throws(() => startJob({ name: "p", kind: "slowstop", cmd: node, args: ["-e", "0"] }), (e) => e.code === "BUSY");
+  assert.equal((await exited(j.id)).status, "cancelled");
+  const again = startJob({ name: "p", kind: "slowstop", cmd: node, args: ["-e", "0"] });
+  assert.equal((await exited(again.id)).code, 0);
+});
+
 test("cancel kills a child that ignores SIGTERM, and grandchildren go with the group", async () => {
   const script = "process.on('SIGTERM', () => {}); const c = require('child_process').spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' }); console.log(c.pid); setInterval(() => {}, 1000)";
   const j = startJob({ name: "p", kind: "stubborn", cmd: node, args: ["-e", script] });

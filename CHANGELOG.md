@@ -6,6 +6,13 @@
 - SFX events in `project.json`: an optional `events` array of `{id, shot, offset, sound?, label}`, validated with Vietnamese errors (projects without it stay valid). `gateway.mjs` derive writes each event's `<audio id>` `data-start` as shot start + offset, so `resize_shot`, `add_shot` and undo move sound effects with their shot and `sfx-sync` stays PASS with no hand edit (in the v2.0.0 E2E the director copied two values from `sfx-sync --fix`). `remove_shot` drops the shot's events with a receipt warning; undo restores them and the `## Sự kiện` rows the change dropped (kept in the history line as `dropped_rows`). `move_line` leaves events alone and moves the `chữ:` rows inside the moved line. A remapped Thời điểm keeps its decimals (`3.0` stays `3.0`).
 - `manifest-import.mjs` imports events from the PLAN.md `## Sự kiện` rows that name a sound file, matching `<audio>` tags by src (nearest `data-start`, each tag once); a row with no tag or a tag with no id is a WARN. The IMPORT line prints `events=N`.
 
+### Fixed
+- `manifest-import.mjs` names each PLAN.md shot from its `## Cảnh` Hình / hiệu ứng cell: the first quoted on-screen text, else the start of the cell, at most 40 characters. Imported shots had empty names, so the Studio timeline showed "1 -".
+- `gateway.mjs` derive writes each music bed's `<audio id>` `data-start` and `data-duration` (end − start; a bed with no end runs to the root duration) from `project.json` `music`. In the v2.0.0 E2E the bgm kept `data-duration="10"` while `music.end` was 10.55. A bed with no live tag is a derive WARN.
+- Studio director: `claude -p` no longer gets `--add-dir` for the plugin (Read and Skill reach the plugin files without it). Edit and Write under the plugin are denied by path, because the plain Edit/Write allow rules also reach files outside the project. `Bash(node <plugin>/scripts/*)` no longer runs a `..` path: `node <plugin>/scripts/../../…/x.mjs` ran any script before. All checked with `claude -p --model haiku`.
+- Studio starts the director on every project with queued requests when it starts listening, so requests queued while it was down no longer wait for the next click.
+- Studio jobs: a job still `cancelling` keeps its project and kind BUSY until it exits, so a new director run or export cannot start beside a child that is still stopping.
+
 ## v2.0.0 (2026-10-16): plugin with eleven skills, four operating modes, project.json manifest
 
 Why: the 45 KB root `SKILL.md` loaded every rule of every step into each session, could not be routed by intent (a quick template video and a timeline edit read the same 253 lines), and the timeline had no single source of truth: seconds lived in PLAN.md, the TIMING block and the voice tags at once, with nothing to undo a change.

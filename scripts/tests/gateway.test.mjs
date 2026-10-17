@@ -149,6 +149,14 @@ test("deriveHtml adds a missing data-duration and leaves unknown tracks alone", 
   assert.match(out, /<audio id="bgm" src="b\.mp3" data-start="0">/);
 });
 
+test("deriveHtml sets each music bed's data-start and data-duration from m.music", () => {
+  const html = '<div data-composition-id="main" data-duration="10"><audio id="bgm" src="assets/bgm/bgm.mp3" data-start="0" data-duration="10" data-volume="0.3"></audio><audio id="bed2" src="b.mp3"></audio></div>';
+  const { html: out, missing } = deriveHtml(html, { duration: 10.55, shots: [], lines: [], music: [{ id: "bgm", start: 0, end: 10.55, gain: 0.3 }, { id: "bed2", start: 2, end: null, gain: 1 }, { id: "gone", start: 0, end: 4, gain: 1 }] });
+  assert.match(out, /<audio id="bgm" src="assets\/bgm\/bgm\.mp3" data-start="0" data-duration="10\.55" data-volume="0\.3">/);
+  assert.match(out, /<audio id="bed2" src="b\.mp3" data-start="2" data-duration="8\.55">/, "a bed with no end runs to the root duration");
+  assert.deepEqual(missing, ["gone"]);
+});
+
 test("timing.mjs on a manifest project goes through derive", () => withProject((dir) => {
   const buf = { out: "", err: "" };
   assert.equal(timingMain(["--project", dir], { out: (s) => { buf.out += s; }, err: (s) => { buf.err += s; } }), 0, buf.err);
