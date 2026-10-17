@@ -3,7 +3,7 @@
 // ctx.patch; anything for the director (a task, "Dùng cho dự án", a changed line) through
 // ctx.direct. The open panel is kept in localStorage ("studio.tab") and in the URL (?tab=).
 // Keys: Alt+1…Alt+6 pick a panel; arrow keys, Home and End move along the rail (ARIA tabs).
-import { h, thumb, fmtS } from "/dom.js";
+import { h, thumb, fmtS, isMedia } from "/dom.js";
 import { icon } from "/icons.js";
 
 const TABS = [
@@ -17,12 +17,15 @@ const TABS = [
 const IDS = TABS.map((t) => t.id);
 const STORE = "studio.tab";
 
-const STATUS = { queued: "đang chờ", running: "đang làm", done: "xong", failed: "không xong", waiting_user: "chờ bạn trả lời" };
 const KIND = { director: "Đạo diễn", export: "Xuất video" };
 const safeUrl = (u) => (/^https?:\/\//i.test(String(u ?? "")) ? u : null);
 // Shortens text at a word boundary so a card never ends mid-word.
 const clip = (t, n) => { const s = String(t ?? "").trim(); if (s.length <= n) return s; const cut = s.slice(0, n); return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), n * 0.6)).trimEnd()}…`; };
 const mb = (n) => `${(n / 1048576).toFixed(1)} MB`;
+const KIND_VI = { video: "Video", audio: "Âm thanh", image: "Ảnh" };
+// 75.4 → "1:15".
+const mss = (s) => { const t = Math.round(Number(s) || 0); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`; };
+const when = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }); };
 const fileUrl = (name, path) => `/p/${encodeURIComponent(name)}/${path.split("/").map(encodeURIComponent).join("/")}`;
 
 // The three library sources share one search box. run(q) returns rows; use(row) is the request
@@ -65,8 +68,10 @@ function readTab() {
 
 export function mountPanels(ctx, railEl, panelEl) {
   let tab = readTab();
-  const memo = { brief: "", libMode: "cases", libQuery: "" };
+  // Panel state that survives a redraw: drafts, the browse folder, reopened and rejecting cards.
+  const memo = { brief: "", libMode: "cases", libQuery: "", browse: null, drafts: {}, reopen: new Set(), rejecting: new Set() };
   const logEls = new Map(); // job id → <pre> of the open Xuất bản panel
+  let liveLog = null; // { id, pre } of the running director job in the open Giao việc panel
 
   // Rail buttons with icon, label and a count badge; roving tabindex as in the ARIA tabs pattern.
   const buttons = new Map(TABS.map((t, i) => {
@@ -92,34 +97,81 @@ export function mountPanels(ctx, railEl, panelEl) {
     ai() {
       const { name } = ctx.state;
       if (!name || !ctx.state.m) return [needManifest()];
-      const brief = h("textarea", { value: memo.brief, "aria-label": "Việc giao cho AI", placeholder: "Ví dụ: shot 2 chậm lại, chữ to hơn, thêm logo cuối video…" });
-      brief.addEventListener("input", () => (memo.brief = brief.value));
-      const ask = async () => { if (await ctx.direct({ scope: "project", text: brief.value.trim() })) { memo.brief = ""; render(); } };
+      // Threads: a follow-up request (follows: id) joins the thread of the request it answers.
+      const threads = [], threadOf = new Map();
+      for (const r of ctx.state.requests) {
+        const t = r.follows ? threadOf.get(r.follows) : null;
+        if (t) t.push(r); else threads.push([r]);
+        threadOf.set(r.id, t ?? threads[threads.length - 1]);
+      }
+      const chat = h("div", { class: "chat", "aria-live": "polite" },
+        ...(threads.length ? threads.slice(-12).flatMap((t) => t.flatMap((r, i) => turn(name, r, i > 0)))
+          : [h("p", { class: "empty" }, "Chưa giao việc nào. Viết việc đầu tiên ở ô dưới rồi bấm Giao việc.")]));
       const story = h("pre", { class: "text" }, "…");
       fetch(fileUrl(name, "STORYBOARD.md")).then((r) => (r.ok ? r.text() : "Chưa có STORYBOARD.md")).then((t) => (story.textContent = t)).catch(() => (story.textContent = "Chưa có STORYBOARD.md"));
-      const reqs = [...ctx.state.requests].reverse().slice(0, 8).map((r) => h("div", { class: "card" },
-        h("div", { class: "row" }, h("span", { class: `badge ${r.status === "done" ? "pass" : r.status === "failed" || r.status === "waiting_user" ? "stale" : "unknown"}` }, STATUS[r.status] ?? r.status), h("span", { class: "muted" }, `${r.scope}${r.target ? ` ${r.target}` : ""} · v${r.base}`)),
-        h("span", {}, r.text),
-        r.status === "waiting_user" && r.ask?.question ? h("strong", {}, r.ask.question) : null,
-        r.receipt ? h("pre", { class: "text" }, r.receipt) : null,
-        r.error ? h("pre", { class: "text" }, r.error) : null,
-        r.status === "queued" || r.status === "running" ? h("div", { class: "row" }, h("button", { class: "btn", onclick: () => ctx.cancelRequest(r.id) }, "Huỷ yêu cầu")) : null));
-      return [
-        h("section", { class: "group" }, brief, h("div", { class: "row" }, h("button", { class: "btn primary", onclick: ask }, "Giao việc"))),
-        h("section", { class: "group" }, h("h3", {}, "Việc đã giao"), ...(reqs.length ? reqs : [h("p", { class: "empty" }, "Chưa giao việc nào. Viết việc đầu tiên ở ô trên rồi bấm Giao việc.")])),
-        h("details", {}, h("summary", {}, "Storyboard"), story),
-      ];
+      return [h("details", {}, h("summary", {}, "Storyboard"), story), chat, working(), composer()];
     },
     media() {
       const { name } = ctx.state;
       if (!name || !ctx.state.m) return [needManifest()];
-      const out = h("div", { class: "thumbs" }, loading());
+      const reg = h("div", { class: "stack" }, loading());
+      const loadReg = () => ctx.api(`/api/media?name=${encodeURIComponent(name)}`).then((list) => {
+        if (name !== ctx.state.name) return;
+        reg.replaceChildren(...(list.length ? list.map(mediaRow) : [h("p", { class: "empty" }, "Chưa có footage. Chọn file bên dưới.")]));
+      }).catch((e) => reg.replaceChildren(fail(e)));
+      loadReg();
+
+      const pathIn = h("input", { type: "text", value: memo.browse ?? "", "aria-label": "Thư mục đang xem", spellcheck: "false", placeholder: "/Users/…/Movies" });
+      const up = h("button", { class: "btn", type: "button", disabled: true }, "Lên");
+      const list = h("div", { class: "browser", "aria-label": "Thư mục và file media" }, loading());
+      let parent = null;
+      const add = async (e, btn) => {
+        btn.disabled = true;
+        btn.textContent = "Đang thêm…";
+        const r = await ctx.send("/api/media/register", { name, src: e.path }).catch((x) => ({ status: 0, error: x.message }));
+        if (r.status !== 200) { btn.disabled = false; btn.textContent = "Thêm"; return ctx.toast(r.error ?? `Lỗi ${r.status}`, true); }
+        btn.textContent = "Đã thêm";
+        ctx.toast(r.existing ? `${e.name} đã có trong danh sách` : `Đã thêm ${e.name}${r.copied ? ", đã chép vào footage/raw" : ""}`);
+        loadReg();
+      };
+      const entry = (e) => {
+        if (e.type === "dir") return h("button", { type: "button", class: "entry dir", title: e.path, onclick: () => go(e.path) }, h("span", { class: "entry-name" }, e.name), h("span", { class: "muted", "aria-hidden": "true" }, "›"));
+        const btn = h("button", { type: "button", class: "btn", "aria-label": `Thêm ${e.name}` }, "Thêm");
+        btn.addEventListener("click", () => add(e, btn));
+        return h("div", { class: "entry file" }, h("span", { class: "entry-name", title: e.path }, e.name), h("small", { class: "muted num" }, `${KIND_VI[e.kind] ?? e.kind} · ${mb(e.size)}`), btn);
+      };
+      const go = async (path, first = false) => {
+        list.replaceChildren(loading());
+        try {
+          let d = await ctx.api(`/api/media/browse${path ? `?path=${encodeURIComponent(path)}` : ""}`);
+          // First visit: ~/Movies when it exists, else the home folder the server reports.
+          const movies = first ? d.entries.find((x) => x.type === "dir" && x.name === "Movies") : null;
+          if (movies) d = await ctx.api(`/api/media/browse?path=${encodeURIComponent(movies.path)}`);
+          memo.browse = d.path;
+          pathIn.value = d.path;
+          requestAnimationFrame(() => (pathIn.scrollLeft = pathIn.scrollWidth)); // show the deepest folder
+          parent = d.parent;
+          up.disabled = !parent;
+          list.replaceChildren(...(d.entries.length ? d.entries.map(entry) : [h("p", { class: "empty" }, "Thư mục này không có thư mục con hay file media. Bấm Lên hoặc gõ đường dẫn khác.")]));
+        } catch (e) {
+          list.replaceChildren(h("p", { class: "empty" }, `Không mở được: ${e.message}. Gõ đường dẫn khác hoặc bấm Lên.`));
+        }
+      };
+      up.addEventListener("click", () => parent && go(parent));
+      pathIn.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); go(pathIn.value.trim()); } });
+      go(memo.browse, !memo.browse);
+
+      const assets = h("div", { class: "thumbs" }, loading());
       ctx.api(`/api/files?name=${encodeURIComponent(name)}&dir=assets`).then((fs) => {
         const shown = fs.filter((f) => !/\.json$/i.test(f.path));
-        if (shown.length) out.replaceChildren(...shown.map((f) => thumb(name, f.path)));
-        else out.replaceWith(empty("Chưa có file nào trong assets/. Giao việc cho AI tìm footage hoặc tạo hình cho dự án.", "Giao việc cho AI", "ai"));
-      }).catch((e) => out.replaceWith(fail(e)));
-      return [h("section", { class: "group" }, h("h3", {}, "File trong assets/"), out)];
+        if (shown.length) assets.replaceChildren(...shown.map((f) => thumb(name, f.path)));
+        else assets.replaceWith(empty("Chưa có file nào trong assets/. Giao việc cho AI tìm footage hoặc tạo hình cho dự án.", "Giao việc cho AI", "ai"));
+      }).catch((e) => assets.replaceWith(fail(e)));
+      return [
+        h("section", { class: "group" }, h("h3", {}, "Footage đã thêm"), reg),
+        h("section", { class: "group" }, h("h3", {}, "Chọn file trên máy"), h("div", { class: "search" }, pathIn, up), list),
+        h("section", { class: "group" }, h("h3", {}, "File trong assets/"), assets),
+      ];
     },
     voice() {
       const m = ctx.state.m;
@@ -211,6 +263,116 @@ export function mountPanels(ctx, railEl, panelEl) {
     },
   };
 
+  // One request as chat turns: the user's words on the right, the director's answer on the left.
+  // A follow-up (joined) request shows no user words; its trigger is the answer above it.
+  function turn(name, r, joined) {
+    const out = [];
+    if (!joined) out.push(h("div", { class: "bubble me" }, h("span", {}, r.text), h("small", { class: "muted" }, `${r.scope === "project" ? "cả dự án" : `${r.scope} ${r.target ?? ""}`} · v${r.base} · ${when(r.at)}`)));
+    const bot = (cls, ...kids) => h("div", { class: `bubble bot ${cls}` }, ...kids);
+    const cancel = () => h("div", { class: "row" }, h("button", { class: "btn", onclick: () => ctx.cancelRequest(r.id) }, "Huỷ yêu cầu"));
+    if (r.status === "queued") out.push(bot("pending", h("span", { class: "muted" }, "Đang chờ tới lượt."), cancel()));
+    else if (r.status === "running") out.push(bot("pending", h("span", { class: "muted" }, "Đang làm…"), cancel()));
+    else if (r.status === "waiting_user" && r.ask) out.push(gateCard(name, r, false));
+    else if (r.status === "done" && r.ask && r.decision) {
+      out.push(bot("", h("small", { class: "muted" }, "Đạo diễn hỏi"), h("span", {}, r.ask.question)));
+      out.push(h("div", { class: "bubble me" }, h("span", {}, r.decision.value)));
+    } else if (r.status === "done") out.push(bot("", h("span", { class: "receipt" }, r.receipt ?? "Xong.")));
+    else if (r.status === "failed" && r.ask && /^Hết hạn chờ/.test(r.error ?? "")) {
+      out.push(memo.reopen.has(r.id) ? gateCard(name, r, true) : h("div", { class: "card gate expired" },
+        h("strong", {}, r.ask.question),
+        h("span", { class: "muted" }, "Hết hạn chờ trả lời. Trả lời lại để đạo diễn làm tiếp."),
+        h("div", { class: "row" }, h("button", { class: "btn", onclick: () => { memo.reopen.add(r.id); render(); } }, "Trả lời lại"))));
+    } else if (r.status === "failed") out.push(bot("err", h("span", { class: "receipt" }, r.error ?? "Không xong.")));
+    return out;
+  }
+
+  // A director question waiting for the user (studio_ask). again: the question had expired, so the
+  // answer goes out as a new request with the old question and the answer in its text.
+  function gateCard(name, r, again) {
+    const a = r.ask;
+    const card = h("div", { class: `card gate${again ? " again" : ""}`, role: "group", "aria-label": "Câu hỏi của đạo diễn" }, h("small", { class: "muted" }, again ? "Trả lời lại câu hỏi đã hết hạn" : "Đạo diễn cần bạn trả lời"), h("strong", {}, a.question));
+    const lock = (on) => { for (const el of card.querySelectorAll("button, textarea")) el.disabled = on; };
+    const submit = async (value, text) => {
+      lock(true);
+      const ok = again
+        ? await ctx.direct({ scope: r.scope, ...(r.target ? { target: r.target } : {}), text: `Trả lời lại câu hỏi "${a.question}": ${text}` })
+        : await ctx.answer(r.id, value);
+      if (!ok) return lock(false);
+      memo.reopen.delete(r.id);
+      memo.rejecting.delete(r.id);
+      delete memo.drafts[r.id];
+      render();
+    };
+    const art = (a.artifacts ?? []).filter(Boolean);
+    const draft = (key, label, placeholder) => {
+      const t = h("textarea", { value: memo.drafts[key] ?? "", "aria-label": label, placeholder, maxlength: "2000", rows: "3" });
+      t.addEventListener("input", () => (memo.drafts[key] = t.value));
+      return t;
+    };
+    if (a.kind === "choice") {
+      const imgs = art.filter((p) => isMedia(p) === "img");
+      const paired = imgs.length && imgs.length === art.length && imgs.length === a.options.length;
+      if (imgs.length && !paired) card.append(h("div", { class: "thumbs" }, ...imgs.map((p) => thumb(name, p))));
+      card.append(h("div", { class: `options${paired ? " pics" : ""}` }, ...a.options.map((o, i) =>
+        h("button", { type: "button", class: "btn opt", onclick: () => submit(o.id, `${o.label} (${o.id})`) },
+          paired ? h("img", { src: fileUrl(name, imgs[i]), alt: "", loading: "lazy" }) : null, h("span", {}, o.label)))));
+    } else if (a.kind === "approve") {
+      const first = art[0];
+      if (first) {
+        const kind = isMedia(first);
+        if (kind === "video") card.append(h("video", { class: "preview", src: fileUrl(name, first), controls: true, preload: "metadata" }));
+        else if (kind === "img") card.append(h("img", { class: "preview", src: fileUrl(name, first), alt: first }));
+        card.append(h("div", { class: "row" }, ...art.map((p) => h("a", { class: "ext", href: fileUrl(name, p), target: "_blank", rel: "noopener", title: p }, p.split("/").pop()))));
+      }
+      const note = memo.rejecting.has(r.id) ? draft(`${r.id}:reject`, "Ghi chú: chưa được ở đâu", "Chỗ nào chưa được? Đạo diễn sẽ sửa theo ghi chú này.") : null;
+      if (note) card.append(note);
+      card.append(h("div", { class: "row" },
+          note ? h("button", { type: "button", class: "btn", onclick: () => submit({ reject: note.value.trim() }, note.value.trim() ? `Không duyệt: ${note.value.trim()}` : "Không duyệt") }, "Gửi ghi chú")
+            : h("button", { type: "button", class: "btn", onclick: () => { memo.rejecting.add(r.id); render(); } }, "Chưa được"),
+          h("button", { type: "button", class: "btn primary", onclick: () => submit("approve", "Duyệt") }, "Duyệt")));
+    } else {
+      const t = draft(r.id, "Câu trả lời", "Viết câu trả lời…");
+      card.append(t, h("div", { class: "row" }, h("button", { type: "button", class: "btn primary", onclick: () => {
+        const v = t.value.trim();
+        if (!v) return ctx.toast("Viết câu trả lời trước", true);
+        submit(v, v);
+      } }, "Gửi")));
+    }
+    return card;
+  }
+
+  // "Đạo diễn đang làm…" with the last 3 log lines of the running director job.
+  function working() {
+    liveLog = null;
+    const job = ctx.state.jobs.find((j) => j.kind === "director" && (j.status === "running" || j.status === "cancelling"));
+    const busy = job || ctx.state.requests.some((r) => r.status === "running");
+    if (!busy) return null;
+    if (job) liveLog = { id: job.id, pre: h("pre", { class: "text tail" }, tail3(job.id)) };
+    return h("div", { class: "working", role: "status" }, h("strong", {}, "Đạo diễn đang làm…"), liveLog?.pre);
+  }
+  const tail3 = (id) => (ctx.state.logs.get(id) ?? []).slice(-3).join("\n") || "Đang khởi động…";
+
+  function composer() {
+    const brief = h("textarea", { value: memo.brief, rows: "3", "aria-label": "Việc giao cho AI", placeholder: "Ví dụ: shot 2 chậm lại, chữ to hơn, thêm logo cuối video…" });
+    brief.addEventListener("input", () => (memo.brief = brief.value));
+    const send = h("button", { type: "button", class: "btn primary" }, "Giao việc");
+    const ask = async () => {
+      send.disabled = true;
+      const ok = await ctx.direct({ scope: "project", text: brief.value.trim() });
+      send.disabled = false;
+      if (ok) { memo.brief = ""; brief.value = ""; render(); }
+    };
+    send.addEventListener("click", ask);
+    brief.addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); ask(); } });
+    return h("div", { class: "composer" }, brief, h("div", { class: "row" }, h("small", { class: "muted" }, "⌘/Ctrl+Enter để gửi"), h("span", { class: "spacer" }), send));
+  }
+
+  function mediaRow(m) {
+    const file = String(m.rel ?? m.path ?? "").split("/").pop();
+    const meta = [KIND_VI[m.kind] ?? m.kind, Number.isFinite(m.duration) ? mss(m.duration) : null, m.width && m.height ? `${m.width}×${m.height}` : null].filter(Boolean).join(" · ");
+    return h("div", { class: "card media-row" }, h("span", { class: "entry-name", title: m.rel ?? m.path }, file), h("small", { class: "muted num" }, meta));
+  }
+
   function badges() {
     const counts = {
       ai: ctx.state.requests.filter((r) => r.status === "waiting_user").length,
@@ -224,8 +386,10 @@ export function mountPanels(ctx, railEl, panelEl) {
     }
   }
 
+  let drawnFor = null; // project name whose manifest the open panel was drawn with
   function render() {
     const t = TABS.find((x) => x.id === tab);
+    drawnFor = ctx.state.m ? ctx.state.name : null;
     for (const [id, { b }] of buttons) {
       const on = id === tab;
       b.setAttribute("aria-selected", String(on));
@@ -235,6 +399,7 @@ export function mountPanels(ctx, railEl, panelEl) {
     const head = h("header", { class: "panel-head" }, h("h2", {}, t.label), h("p", {}, t.lead));
     panelEl.replaceChildren(head, ...views[tab]().filter(Boolean));
     badges();
+    if (tab === "ai") requestAnimationFrame(() => { if (tab === "ai") panelEl.scrollTop = panelEl.scrollHeight; });
   }
 
   function select(id, focus = false) {
@@ -259,9 +424,11 @@ export function mountPanels(ctx, railEl, panelEl) {
     e.preventDefault();
     select(IDS[(next + IDS.length) % IDS.length], true);
   });
-  // e.code, not e.key: on macOS Alt+digit types a symbol (Alt+1 → "¡").
+  // e.code, not e.key: on macOS Alt+digit types a symbol (Alt+1 → "¡"). Inside an editable field
+  // that symbol is what the user wants, so the shortcut stays out of the way there and in a dialog.
   document.addEventListener("keydown", (e) => {
     if (!e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    if (e.target.closest?.("input, textarea, select, [contenteditable]") || document.querySelector("dialog[open]")) return;
     const m = /^Digit([1-6])$/.exec(e.code);
     if (!m) return;
     e.preventDefault();
@@ -271,10 +438,21 @@ export function mountPanels(ctx, railEl, panelEl) {
   ctx.on("project", render);
   // Manifest-driven panels follow new versions, unless the user is typing in the panel.
   const typing = () => panelEl.contains(document.activeElement) && document.activeElement.matches("textarea, input[type=text], input[type=search]");
-  ctx.on("manifest", () => { if ((tab === "voice" || tab === "music") && !typing()) render(); else badges(); });
+  // The first manifest of a project always redraws: the panel was drawn on "project", before the
+  // manifest arrived, and would otherwise keep saying the project has no project.json.
+  ctx.on("manifest", (m) => {
+    if (m && drawnFor !== ctx.state.name) render();
+    else if ((tab === "voice" || tab === "music") && !typing()) render();
+    else badges();
+  });
   ctx.on("requests", () => { if (tab === "ai" && !typing()) render(); else badges(); });
   // A log line only extends its <pre>; start and exit redraw the panel (export list included).
   ctx.on("jobs", (e) => {
+    if (tab === "ai") {
+      if (e?.type === "log" && liveLog?.id === e.job.id) liveLog.pre.textContent = tail3(e.job.id);
+      else if (e?.type !== "log" && !typing()) render();
+      return;
+    }
     if (tab !== "output") return;
     const pre = e?.type === "log" ? logEls.get(e.job.id) : null;
     if (pre) { pre.textContent += (pre.textContent ? "\n" : "") + e.line; pre.scrollTop = pre.scrollHeight; }

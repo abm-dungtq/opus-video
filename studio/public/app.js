@@ -6,6 +6,8 @@ import { mountPlayer } from "/player.js";
 import { mountTimeline } from "/timeline.js";
 import { mountInspector } from "/inspector.js";
 import { mountPanels } from "/panels.js";
+import { mountNewProject } from "/new-project.js";
+import { mountAgent } from "/agent.js";
 
 const $ = (id) => document.getElementById(id);
 const TOKEN = document.querySelector('meta[name="studio-token"]').content;
@@ -59,6 +61,19 @@ const ctx = {
     await refreshQueue();
     return true;
   },
+  // The user's answer to a director card (choice id, "approve", { reject } or text).
+  async answer(id, value) {
+    const r = await ctx.send("/api/director/answer", { name: ctx.state.name, id, value });
+    if (r.status !== 200) {
+      const why = String(r.stderr ?? "").trim().split("\n").pop();
+      toast(`${r.error ?? `Lỗi ${r.status}`}${why ? `: ${why}` : ""}`, true);
+      await refreshQueue();
+      return false;
+    }
+    toast("Đã gửi câu trả lời, đạo diễn làm tiếp");
+    await refreshQueue();
+    return true;
+  },
   async cancelRequest(id) {
     const r = await ctx.send("/api/director/cancel", { name: ctx.state.name, id });
     if (r.status !== 200) toast(r.error ?? `Lỗi ${r.status}`, true);
@@ -84,7 +99,16 @@ const ctx = {
 const player = mountPlayer(ctx, $("player"), { playBtn: $("play-btn"), timeEl: $("time") });
 mountTimeline(ctx, $("timeline"), { zoomIn: $("zoom-in"), zoomOut: $("zoom-out") });
 mountInspector(ctx, $("inspector"));
-mountPanels(ctx, document.querySelector(".rail"), $("panel"));
+const panels = mountPanels(ctx, document.querySelector(".rail"), $("panel"));
+mountAgent(ctx, $("agent-chip"));
+mountNewProject(ctx, $("new-btn"), {
+  async onCreated(name, mode) {
+    await loadProjects();
+    await open(name);
+    toast(`Đã tạo dự án ${name}`);
+    if (mode === "video-co-san") panels.select("media");
+  },
+});
 
 function setManifest(m) {
   ctx.state.m = m;
