@@ -81,6 +81,7 @@ test("buildArgs: data-fade-in / data-fade-out become afade after the volume; no 
   assert.doesNotMatch(fc(parseTracks(HTML, BASE)), /afade/);
   assert.doesNotMatch(fc([{ ...t[0], duration: null, fadeIn: 0 }]), /afade/, "a fade-out needs the clip's duration");
   assert.deepEqual(dynamicAudio(`<audio id="bgm" src="a.mp3" data-fade-in="1" data-fade-out="2"></audio>`), [], "a fade is not dynamic audio");
+  assert.match(fc([{ ...t[0], duration: 1.5, fadeIn: 0 }]), /afade=t=out:st=0:d=2,/, "a fade-out longer than the clip starts at 0, never before it");
 });
 
 test("CLI: bad usage and missing src exit 2", () => {

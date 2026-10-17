@@ -8,7 +8,7 @@ import * as api from "../studio-api.mjs";
 const ROOT = fileURLToPath(new URL("../..", import.meta.url)).replace(/\/$/, "");
 
 test("studio-api exposes the plugin surface Studio needs", () => {
-  for (const k of ["load", "validate", "patch", "undo", "redo", "readHistory", "derive", "enqueue", "list", "next", "finish", "cancelRequest", "ask", "answer", "expireWaiting"]) assert.equal(typeof api[k], "function", k);
+  for (const k of ["load", "validate", "patch", "undo", "redo", "redoTarget", "readHistory", "derive", "enqueue", "list", "next", "finish", "cancelRequest", "ask", "answer", "expireWaiting"]) assert.equal(typeof api[k], "function", k);
   for (const k of ["SCHEMA", "FILE", "EXIT", "ACTORS", "STATUSES", "ASK_KINDS", "ASK_GATES", "ID"]) assert.ok(api[k] !== undefined, k);
   assert.equal(api.OV, ROOT);
   assert.ok(!api.OV.endsWith("/"));

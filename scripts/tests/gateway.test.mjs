@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
-import { applyOps, patch, undo, redo, derive, readHistory, deriveHtml, derivePlan, remapEvents, EXIT } from "../gateway.mjs";
+import { applyOps, patch, undo, redo, redoTarget, derive, readHistory, deriveHtml, derivePlan, remapEvents, EXIT } from "../gateway.mjs";
 import { load, save } from "../manifest.mjs";
 import { main as timingMain } from "../timing.mjs";
 
@@ -344,10 +344,11 @@ test("move_event, add_event and remove_event edit SFX events by absolute time", 
   assert.deepEqual(added.next.events[1], { id: "sfx-1", shot: "s3", offset: 0.2, sound: "assets/sfx/a.mp3", label: "a", volume: 0.8, studio: true });
   assert.deepEqual(added.receipt, ["thêm sfx-1 lúc 6.0s"]);
   assert.equal(applyOps(added.next, [{ op: "add_event", start: 8, sound: "x/b.wav" }]).next.events[2].id, "sfx-2", "the end of the video belongs to the last shot");
-  const removed = applyOps(added.next, [{ op: "remove_event", id: "sfx-a" }, { op: "remove_event", id: "sfx-1" }]);
-  assert.deepEqual(removed.next.events, []);
-  assert.deepEqual(removed.receipt, ["xoá sfx-a", "xoá sfx-1"]);
-  assert.throws(() => applyOps(m, [{ op: "move_event", id: "sfx-a", start: 99 }]), /nằm ngoài video/);
+  const removed = applyOps(added.next, [{ op: "remove_event", id: "sfx-1" }]);
+  assert.deepEqual(removed.next.events.map((e) => e.id), ["sfx-a"]);
+  assert.deepEqual(removed.receipt, ["xoá sfx-1"]);
+  assert.throws(() => applyOps(m, [{ op: "move_event", id: "sfx-a", start: 99 }]), /^Error: 99s nằm ngoài video \(8s\)$/);
+  assert.throws(() => applyOps(m, [{ op: "add_event", start: 8.5, sound: "a.mp3" }]), /8\.5s nằm ngoài video \(8s\)/);
   assert.throws(() => applyOps(m, [{ op: "move_event", id: "sfx-z", start: 1 }]), /không có sự kiện sfx-z/);
   assert.throws(() => applyOps(load(FIXTURE), [{ op: "add_event", start: 1 }]), /add_event: cần sound/);
   assert.equal(applyOps(load(FIXTURE), [{ op: "add_event", start: 1, sound: "assets/sfx/a.mp3" }]).next.events.length, 1, "events is created when absent");
@@ -362,7 +363,7 @@ test("deriveHtml inserts a studio event's tag once, removes it when the event go
   assert.deepEqual(a.missingEvents, []);
   assert.ok(a.html.indexOf('id="sfx-1"') > a.html.indexOf('id="bgm"'), "after the bgm tag");
   assert.ok(a.html.indexOf('id="sfx-1"') > a.html.indexOf('id="sfx-old"'), "after the last live <audio>");
-  assert.match(a.html, /<audio id="sfx-1" src="assets\/sfx\/a\.mp3" data-start="6" data-track-index="21" data-volume="0\.8" data-audio-group="sfx" data-studio-sfx><\/audio>/);
+  assert.match(a.html, /<audio id="sfx-1" src="assets\/sfx\/a\.mp3" data-start="6" data-track-index="30" data-volume="0\.8" data-audio-group="sfx" data-studio-sfx><\/audio>/);
   const b = deriveHtml(a.html, { ...base, events: [ev] });
   assert.equal(b.html.match(/id="sfx-1"/g).length, 1, "derive again does not insert twice");
   assert.equal(b.html, a.html);
@@ -372,7 +373,11 @@ test("deriveHtml inserts a studio event's tag once, removes it when the event go
   assert.match(c.html, /<audio id="sfx-old" src="o\.mp3" data-start="1"><\/audio>/, "a tag without data-studio-sfx stays");
   const quiet = deriveHtml(src, { ...base, events: [{ id: "sfx-old", shot: "s1", offset: 1.5, label: "o", volume: 0.4 }] }).html;
   assert.match(quiet, /<audio id="sfx-old" src="o\.mp3" data-start="1\.5" data-volume="0\.4">/);
-  assert.deepEqual(deriveHtml('<div data-composition-id="main"></div>', { ...base, events: [ev] }).missingEvents, ["sfx-1"], "no live <audio>: nothing inserted");
+  const bare = deriveHtml('<!-- <audio id="c"></audio> -->\n<div data-composition-id="main" data-duration="8">\n  <div class="scene"></div>\n</div>', { ...base, events: [ev] });
+  assert.deepEqual(bare.missingEvents, [], "no live <audio>: the tag still goes in");
+  assert.match(bare.html, /<div data-composition-id="main" data-duration="8">\n      <audio id="sfx-1" src="assets\/sfx\/a\.mp3" data-start="6" data-track-index="30" [^>]*data-studio-sfx><\/audio>\n  <div class="scene">/, "right after the root's opening tag");
+  const high = deriveHtml(src.replace('data-track-index="20"', 'data-track-index="41"'), { ...base, events: [ev] }).html;
+  assert.match(high, /id="sfx-1"[^>]*data-track-index="42"/, "one past the highest lane above 29");
 });
 
 const runCli = (args) => new Promise((ok) => {
@@ -449,3 +454,53 @@ test("a new change after an undo clears redo; redo with no undo is exit 9", asyn
     assert.equal((await runCli(["redo", "--project", dir])).code, 2, "redo needs --base");
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("remove_event refuses an event the director placed", () => {
+  const m = { ...load(FIXTURE), events: [{ id: "sfx-a", shot: "s1", offset: 1, sound: "a.mp3", label: "a" }, { id: "sfx-b", shot: "s1", offset: 1, sound: "a.mp3", label: "b", studio: false }] };
+  for (const id of ["sfx-a", "sfx-b"]) {
+    assert.throws(() => applyOps(m, [{ op: "remove_event", id }]), new RegExp(`^Error: chỉ xoá được SFX thêm từ Studio; ${id} do đạo diễn đặt, hãy nhờ đạo diễn$`));
+  }
+  withProject((dir) => {
+    save(dir, { ...load(dir), events: m.events });
+    const before = snapshot(dir);
+    const r = patch(dir, { actor: "human", base: 1, ops: [{ op: "remove_event", id: "sfx-a" }] });
+    assert.equal(r.code, EXIT.invalid);
+    assert.deepEqual(snapshot(dir), before);
+  });
+});
+
+test("a studio event whose id is a hand-written <audio> is INVALID and nothing is written", () => withProject((dir) => {
+  const f = join(dir, "index.html");
+  writeFileSync(f, readFileSync(f, "utf8").replace(/(<audio id="vo-01"[^>]*><\/audio>)/, '$1\n      <audio id="sfx-1" src="old.mp3" data-start="1"></audio>'));
+  const before = snapshot(dir);
+  const r = patch(dir, { actor: "human", base: 1, ops: [{ op: "add_event", id: "sfx-1", start: 6, sound: "assets/sfx/a.mp3" }] });
+  assert.equal(r.code, EXIT.invalid);
+  assert.equal(r.error, "sự kiện sfx-1: trùng id với thẻ <audio> có sẵn trong index.html, chọn id khác");
+  assert.deepEqual(snapshot(dir), before);
+  assert.match(html(dir), /<audio id="sfx-1" src="old\.mp3" data-start="1"><\/audio>/);
+  const d = deriveHtml(before["index.html"], { ...load(dir), events: [{ id: "sfx-1", shot: "s3", offset: 0.2, sound: "a.mp3", label: "a", studio: true }] });
+  assert.deepEqual(d.conflicts, ["sfx-1"]);
+  assert.equal(d.html, before["index.html"], "the hand-written tag is not touched");
+  // Without an id, add_event picks the next sfx-<n> that is free in index.html too.
+  const ok = patch(dir, { actor: "human", base: 1, ops: [{ op: "add_event", start: 6, sound: "assets/sfx/a.mp3" }] });
+  assert.equal(ok.code, EXIT.ok, ok.error);
+  assert.deepEqual(load(dir).events.map((e) => e.id), ["sfx-2"]);
+  assert.match(html(dir), /<audio id="sfx-2"[^>]*data-studio-sfx><\/audio>/);
+  assert.equal(applyOps(load(FIXTURE), [{ op: "add_event", start: 6, sound: "a.mp3" }], { html: '<audio id="sfx-1"></audio><!-- <audio id="sfx-2"></audio> -->' }).next.events[0].id, "sfx-2");
+}));
+
+test("redoTarget stays non-null while undos are left to redo", () => withProject((dir) => {
+  let v = 1;
+  for (const d of [3.5, 2]) assert.equal(patch(dir, { actor: "human", base: v++, ops: [{ op: "resize_shot", id: "s1", duration: d }] }).code, EXIT.ok);
+  assert.equal(redoTarget(readHistory(dir)), null, "no undo, nothing to redo");
+  assert.equal(undo(dir, { base: v++ }).code, EXIT.ok);
+  assert.equal(undo(dir, { base: v++ }).code, EXIT.ok);
+  assert.equal(redo(dir, { base: v++ }).code, EXIT.ok);
+  const t = redoTarget(readHistory(dir));
+  assert.ok(t, "one undo is still on the stack");
+  assert.equal(t.actor, "undo");
+  assert.equal(t.undoes, 3, "the first undo, of v3");
+  assert.equal(redo(dir, { base: v++ }).code, EXIT.ok);
+  assert.equal(redoTarget(readHistory(dir)), null);
+  assert.equal(redoTarget([{ v: 1, actor: "undo", undoes: 2 }, { v: 2, actor: "import" }]), null, "an import ends the stack");
+}));

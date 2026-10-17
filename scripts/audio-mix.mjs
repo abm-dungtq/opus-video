@@ -202,7 +202,7 @@ function trackFilters(t) {
   if (t.rate !== 1) f.push(...atempoChain(t.rate));
   f.push(`volume=${t.volume}`);
   if (t.fadeIn > 0) f.push(`afade=t=in:st=0:d=${t.fadeIn}`);
-  if (t.fadeOut > 0 && t.duration != null) f.push(`afade=t=out:st=${+(t.duration - t.fadeOut).toFixed(6)}:d=${t.fadeOut}`);
+  if (t.fadeOut > 0 && t.duration != null) f.push(`afade=t=out:st=${+Math.max(0, t.duration - t.fadeOut).toFixed(6)}:d=${t.fadeOut}`);
   return f;
 }
 

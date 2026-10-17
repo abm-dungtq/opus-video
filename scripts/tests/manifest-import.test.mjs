@@ -132,3 +132,21 @@ test("the title comes from the first heading after the frontmatter, never a YAML
     assert.equal(importProject(dir).manifest.title, "Slogan theo beat");
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("--force keeps the SFX added in Studio, which PLAN.md does not list", () => {
+  const dir = tmp();
+  try {
+    cpSync(FIXTURE, dir, { recursive: true });
+    assert.equal(main(["--project", dir, "--write"], io().io), 0);
+    const m = load(dir);
+    const studio = { id: "sfx-1", shot: "s3", offset: 0.2, sound: "assets/sfx/a.mp3", label: "a", volume: 0.8, studio: true };
+    m.events = [studio, { id: "sfx-gone", shot: "s9", offset: 0, sound: "b.mp3", label: "b", studio: true }, { id: "sfx-hand", shot: "s1", offset: 0, sound: "c.mp3", label: "c" }, { ...studio, id: "vo-01" }];
+    writeFileSync(join(dir, "project.json"), JSON.stringify(m, null, 2) + "\n");
+    const { buf, io: o } = io();
+    assert.equal(main(["--project", dir, "--write", "--force"], o), 0, buf.err);
+    const after = load(dir);
+    assert.deepEqual(after.events, [studio], "studio events carry over; director events, taken ids and lost shots do not");
+    assert.match(buf.out, /WARN sự kiện sfx-gone \(Studio\): shot s9 không còn, bỏ qua/);
+    assert.deepEqual(validate(after), []);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

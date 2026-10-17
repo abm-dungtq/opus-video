@@ -3,13 +3,13 @@
 // owns the director's tool permissions (they name plugin paths). STUDIO_API is bumped whenever an
 // export Studio relies on changes shape; Studio checks it together with PLUGIN_VERSION.
 // API 3 adds redo (EXIT.nothingToRedo 9) and the gateway ops move_event, add_event, remove_event
-// and update_music.
+// and update_music; redoTarget(history) tells whether a redo is possible without a write.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export { load, validate, SCHEMA, FILE } from "./manifest.mjs";
-export { patch, undo, redo, readHistory, derive, EXIT, ACTORS } from "./gateway.mjs";
+export { patch, undo, redo, redoTarget, readHistory, derive, EXIT, ACTORS } from "./gateway.mjs";
 export { enqueue, list, next, finish, cancelRequest, ask, answer, expireWaiting, STATUSES, ASK_KINDS, ASK_GATES, ID } from "./requests.mjs";
 
 export const OV = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");

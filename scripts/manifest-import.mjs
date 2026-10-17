@@ -224,9 +224,20 @@ function run(dir, o, out, err) {
   if (existing && !o.force) { err(`manifest-import: ${dir}/project.json đã có (thêm --force để nhập lại thành phiên bản mới)\n`); return 6; }
   let r;
   try { r = importProject(dir); } catch (e) { err(`manifest-import: ${e.message}\n`); return 1; }
+  const m = r.manifest;
+  // PLAN.md does not know the SFX added in Studio: keep them across a re-import.
+  if (existing) {
+    const taken = new Set([...(m.events ?? []), ...m.lines, ...m.music].map((x) => x.id));
+    const shots = new Set(m.shots.map((s) => s.id));
+    for (const e of existing.events ?? []) {
+      if (e.studio !== true || taken.has(e.id)) continue;
+      if (!shots.has(e.shot)) { r.warnings.push(`sự kiện ${e.id} (Studio): shot ${e.shot} không còn, bỏ qua`); continue; }
+      (m.events ??= []).push(e);
+      taken.add(e.id);
+    }
+  }
   const errors = validate(r.manifest);
   if (errors.length) { err(`manifest-import: kết quả không hợp lệ: ${errors.join("; ")}\n`); return 1; }
-  const m = r.manifest;
   out(`IMPORT ${dir} shots=${m.shots.length} lines=${m.lines.length} music=${m.music.length} events=${m.events?.length ?? 0} editable=${m.capabilities.editable} (shot từ ${r.source})\n`);
   for (const w of r.warnings) out(`WARN ${w}\n`);
   if (!o.write) { out(JSON.stringify(m, null, 2) + "\n"); return 0; }

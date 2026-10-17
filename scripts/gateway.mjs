@@ -26,8 +26,9 @@
 //     "gain"?: 0.6, "fade_in"?: 1, "fade_out"?: 2 }          several fields of a bed at once; end null = to the end
 //   { "op": "move_event", "id": "sfx-1", "start": 3.5 }     the event joins the shot holding its new start
 //   { "op": "add_event", "start": 6, "sound": "assets/sfx/a.mp3", "label"?: "…", "volume"?: 0.8, "id"?: "sfx-1" }
-//                                                            a studio event: derive inserts its <audio data-studio-sfx>
-//   { "op": "remove_event", "id": "sfx-1" }                  derive removes its tag only when it is data-studio-sfx
+//                                                            a studio event: derive inserts its <audio data-studio-sfx>;
+//                                                            an id already on another <audio> is INVALID
+//   { "op": "remove_event", "id": "sfx-1" }                  studio events only; derive removes its data-studio-sfx tag
 //   { "op": "add_shot", "after": "s2" | null, "name": "…", "duration": 3 }   later shots ripple
 //   { "op": "remove_shot", "id": "s4" }                      refused while a line belongs to it; its events are dropped
 // --base is the version the caller last saw; another version is a CONFLICT and nothing is written.
@@ -40,7 +41,7 @@
 // redo re-applies the change the newest undo reverted, as a new version (actor "redo"); it works
 // only while the last changes are undos and redos: any other change clears what can be redone.
 // A project whose index.html has no TIMING:BEGIN/END (capabilities.editable false, every project
-// imported from before the skeleton) is view only: patch, undo and derive exit 4.
+// imported from before the skeleton) is view only: patch, undo, redo and derive exit 4.
 // Exit: 0 ok · 1 cannot read or write · 2 bad usage · 3 CONFLICT · 4 view-only project ·
 // 5 INVALID (unknown op or id, or the result breaks project.json rules) · 7 nothing to undo ·
 // 8 BUSY (another writer holds the lock) · 9 nothing to redo.
@@ -71,7 +72,8 @@ const snapPath = (dir, v) => join(opusDir(dir), "versions", `v${v}.json`);
 const historyPath = (dir) => join(opusDir(dir), "history.jsonl");
 
 // Pure: manifest + ops → { next, receipt: [text] }. Throws OpError on an unknown op, id or field.
-export function applyOps(m, ops) {
+// html (optional): the index.html text, so add_event's default id skips <audio> ids already there.
+export function applyOps(m, ops, { html = null } = {}) {
   if (!Array.isArray(ops) || !ops.length) throw new OpError("ops phải là mảng không rỗng");
   const next = structuredClone(m);
   const receipt = [];
@@ -84,7 +86,7 @@ export function applyOps(m, ops) {
   const eventOf = (id) => (next.events ?? []).find((e) => e.id === id) ?? (() => { throw new OpError(`không có sự kiện ${id}`); })();
   // The shot holding second t (half-open windows; the very end of the video belongs to the last shot).
   const holderAt = (t) => next.shots.find((s, i) => t >= s.start && (t < s.end || (i === next.shots.length - 1 && t <= s.end + EPS)))
-    ?? (() => { throw new OpError(`${fmt(t)} nằm ngoài video`); })();
+    ?? (() => { throw new OpError(`${r3(t)}s nằm ngoài video (${r3(next.duration)}s)`); })();
   const timeOf = (what, v) => {
     const t = Number(v);
     if (v == null || v === "" || !Number.isFinite(t) || t < 0) throw new OpError(`${what}: start phải ≥ 0`);
@@ -188,6 +190,7 @@ export function applyOps(m, ops) {
         if (op.label != null && typeof op.label !== "string") throw new OpError("add_event: label phải là chuỗi");
         const holder = holderAt(t);
         const used = new Set([...(next.events ?? []), ...next.lines].map((x) => x.id));
+        if (html != null) for (const x of liveMatches(html, /<audio\b[^>]*\sid\s*=\s*["']([^"']*)["']/gi)) used.add(x[1]);
         let id = op.id;
         if (id == null) { let n = 1; while (used.has(`sfx-${n}`)) n++; id = `sfx-${n}`; }
         const label = op.label ?? op.sound.split(/[\\/]/).pop().replace(/\.[^.]*$/, "");
@@ -198,6 +201,7 @@ export function applyOps(m, ops) {
       }
       case "remove_event": {
         const e = eventOf(op.id);
+        if (e.studio !== true) throw new OpError(`chỉ xoá được SFX thêm từ Studio; ${e.id} do đạo diễn đặt, hãy nhờ đạo diễn`);
         next.events = next.events.filter((x) => x !== e);
         receipt.push(`xoá ${e.id}`);
         break;
@@ -317,7 +321,12 @@ function commit(dir, { base, actor, build, lockWaitMs }) {
 // note: optional free text kept in the history line (the director's reason, a Studio request id).
 export function patch(dir, { actor, base, ops, note, lockWaitMs }) {
   if (!ACTORS.includes(actor) || actor === "undo" || actor === "redo" || actor === "import") return { code: EXIT.usage, error: `actor phải là human | director | timing` };
-  return commit(dir, { base, actor, lockWaitMs, build: (m) => ({ ...applyOps(m, ops), ops, ...(note ? { extra: { note: String(note) } } : {}) }) });
+  return commit(dir, { base, actor, lockWaitMs, build: (m) => ({ ...applyOps(m, ops, { html: readHtml(dir, m) }), ops, ...(note ? { extra: { note: String(note) } } : {}) }) });
+}
+
+// The composition text for applyOps, or null when it cannot be read (derive reports that later).
+function readHtml(dir, m) {
+  try { return readFileSync(join(resolve(dir), m.html), "utf8"); } catch { return null; }
 }
 
 export function undo(dir, { base, lockWaitMs }) {
@@ -337,21 +346,27 @@ export function undo(dir, { base, lockWaitMs }) {
   });
 }
 
+// Pure: history lines → the undo entry a redo would re-apply, or null. Only lines after the latest
+// import count. The undos and redos since the last other change form a stack: an undo pushes, a
+// redo pops; any other change empties it.
+export function redoTarget(history) {
+  const hist = history.slice(history.findLastIndex((h) => h.actor === "import") + 1);
+  let stack = [];
+  for (const h of hist) {
+    if (h.actor === "undo") stack.push(h);
+    else if (h.actor === "redo") stack.pop();
+    else stack = [];
+  }
+  return stack.at(-1) ?? null;
+}
+
 // Re-applies the change the newest undo reverted, as a new version. The undos and redos since the
 // last other change form a stack: an undo pushes, a redo pops; any other change empties it.
 export function redo(dir, { base, lockWaitMs }) {
   return commit(dir, {
     base, actor: "redo", lockWaitMs,
     build: (m) => {
-      const all = readHistory(dir);
-      const hist = all.slice(all.findLastIndex((h) => h.actor === "import") + 1);
-      let stack = [];
-      for (const h of hist) {
-        if (h.actor === "undo") stack.push(h);
-        else if (h.actor === "redo") stack.pop();
-        else stack = [];
-      }
-      const target = stack.at(-1);
+      const target = redoTarget(readHistory(dir));
       if (!target) throw Object.assign(new Error("không còn gì để làm lại"), { code: "NOTHING_REDO" });
       const prev = JSON.parse(readFileSync(snapPath(dir, target.undoes), "utf8"));
       const next = { ...prev, version: m.version, updated: m.updated };
@@ -391,15 +406,16 @@ function liveMatches(html, re) {
 // Root-timeline data-start of a manifest event.
 const eventStart = (e, shotOf) => r3(shotOf.get(e.shot).start + e.offset);
 
-// HTML text + manifest → { html, missing, missingEvents }: the root data-duration, each voice
+// HTML text + manifest → { html, missing, missingEvents, conflicts }: the root data-duration, each voice
 // line's data-start / data-duration, each music bed's data-start / data-duration / data-volume
 // (gain) / data-media-start / data-fade-in / data-fade-out (the last three only when > 0, removed
 // otherwise) and each event's <audio> data-start (shot.start + offset) and data-volume set.
 // Otherwise only attribute values change, with one exception: the <audio data-studio-sfx> tags
 // the gateway owns. A studio event (studio: true, with a sound) with no live tag gets one,
-// inserted after the last live <audio>; a data-studio-sfx tag whose id is no longer an event is
-// removed. A tag without data-studio-sfx is never inserted or removed. missing / missingEvents
-// list the ids with no live tag.
+// inserted after the last live <audio> (after the root's opening tag when there is none); a
+// data-studio-sfx tag whose id is no longer an event is removed. A tag without data-studio-sfx is
+// never inserted or removed, and never edited for a studio event: conflicts lists the studio event
+// ids that hit such a tag. missing / missingEvents list the ids with no live tag.
 export function deriveHtml(html, m) {
   let out = replaceLive(html, /<[a-z][^>]*\sdata-composition-id\s*=[^>]*>/i, (tag) => setAttr(tag, "data-duration", m.duration)).text;
   const missing = [];
@@ -425,19 +441,24 @@ export function deriveHtml(html, m) {
     if (!r.hit) missing.push(b.id);
   }
   const missingEvents = [];
+  const conflicts = [];
   const shotOf = new Map((m.shots ?? []).map((s) => [s.id, s]));
   for (const e of m.events ?? []) {
     const r = replaceLive(out, new RegExp(`<audio\\b[^>]*\\sid\\s*=\\s*["']${esc(e.id)}["'][^>]*>`, "i"), (tag) => {
+      // A studio event never takes over a tag the director or the author wrote.
+      if (e.studio === true && !/\sdata-studio-sfx\b/i.test(tag)) { conflicts.push(e.id); return tag; }
       const t = setAttr(tag, "data-start", eventStart(e, shotOf));
       return e.volume != null ? setAttr(t, "data-volume", e.volume) : t;
     });
     out = r.text;
     if (r.hit) continue;
-    const last = e.studio === true && e.sound ? liveMatches(out, /<audio\b[^>]*>\s*<\/audio>/gi).at(-1) : null;
+    const last = e.studio === true && e.sound
+      ? liveMatches(out, /<audio\b[^>]*>\s*<\/audio>/gi).at(-1) ?? liveMatches(out, /<[a-z][^>]*\sdata-composition-id\s*=[^>]*>/gi)[0]
+      : null;
     if (!last) { missingEvents.push(e.id); continue; }
-    // A lane of its own: one past the highest data-track-index in use (29 when none is).
+    // A lane of its own: one past the highest data-track-index in use, and at least 30.
     const lanes = liveMatches(out, /<[a-z][^>]*\sdata-track-index\s*=\s*["'](\d+)["'][^>]*>/gi).map((x) => Number(x[1]));
-    const idx = (lanes.length ? Math.max(...lanes) : 29) + 1;
+    const idx = Math.max(29, ...lanes) + 1;
     const at = last.index + last[0].length;
     out = `${out.slice(0, at)}\n      <audio id="${e.id}" src="${e.sound}" data-start="${eventStart(e, shotOf)}" data-track-index="${idx}" data-volume="${e.volume ?? EVENT_VOLUME}" data-audio-group="sfx" data-studio-sfx></audio>${out.slice(at)}`;
   }
@@ -446,7 +467,7 @@ export function deriveHtml(html, m) {
   const stale = liveMatches(out, /(\n[ \t]*)?<audio\b[^>]*\sdata-studio-sfx\b[^>]*>\s*<\/audio>/gi)
     .filter((x) => !evIds.has(x[0].match(/\sid\s*=\s*["']([^"']*)["']/i)?.[1]));
   for (const x of stale.reverse()) out = out.slice(0, x.index) + out.slice(x.index + x[0].length);
-  return { html: out, missing, missingEvents };
+  return { html: out, missing, missingEvents, conflicts };
 }
 
 // PLAN.md text + manifest → PLAN.md with the "## Cảnh" rows in shot order and each Thời điểm cell
@@ -561,6 +582,7 @@ export function derive(dir, { manifest = null, prev = null, dry = false, restore
     html = dh.html;
     missing = dh.missing;
     missingEvents = dh.missingEvents;
+    if (dh.conflicts.length) return { code: EXIT.invalid, error: dh.conflicts.map((id) => `sự kiện ${id}: trùng id với thẻ <audio> có sẵn trong index.html, chọn id khác`).join("; ") };
     if (existsSync(planPath)) {
       const ev = remapEvents(readFileSync(planPath, "utf8"), prev, m, restoreRows);
       plan = derivePlan(ev.text, m);
