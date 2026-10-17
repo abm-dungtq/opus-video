@@ -1,6 +1,6 @@
 ---
 name: ov-studio
-description: "Hướng timeline của opus-video: manifest project.json (shot, câu thoại, nhạc, phiên bản), nhập dự án cũ thành project.json mà không đổi file gốc (manifest-import.mjs), sửa timeline qua cổng lệnh gateway.mjs (patch, undo, log, show, derive) và Motion Studio chạy trên máy. Dùng khi người dùng nói sửa video, mở studio, đổi shot, kéo dài cảnh hoặc dời câu thoại của một dự án đã có. Không dùng để làm video mới từ đầu (opus-video chọn hướng dao-dien hoặc nhanh), tạo lại giọng (ov-audio) hay render bản giao (ov-deliver)."
+description: "Hướng timeline của opus-video: manifest project.json (shot, câu thoại, nhạc, phiên bản), nhập dự án cũ thành project.json mà không đổi file gốc (manifest-import.mjs), sửa timeline qua cổng lệnh gateway.mjs (patch, undo, log, show, derive) và Motion Studio chạy trên máy. Dùng khi người dùng nói sửa video, mở studio, tạo dự án hay giao việc cho đạo diễn trong Studio, đổi shot, kéo dài cảnh hoặc dời câu thoại của một dự án đã có. Không dùng để làm video mới từ đầu trong terminal (opus-video chọn hướng dao-dien hoặc nhanh), tạo lại giọng (ov-audio) hay render bản giao (ov-deliver)."
 ---
 
 # ov-studio: project.json, gateway, Motion Studio
@@ -9,7 +9,7 @@ description: "Hướng timeline của opus-video: manifest project.json (shot, c
 
 ## Phạm vi
 
-Skill này sở hữu manifest `project.json`, cổng lệnh ghi duy nhất `gateway.mjs`, việc nhập dự án cũ, Motion Studio và yêu cầu gửi cho đạo diễn AI. Dùng được: hai CLI dưới đây, Motion Studio (giao diện web trên máy) và MCP server `opus-video` cho đạo diễn AI.
+Skill này sở hữu manifest `project.json`, cổng lệnh ghi duy nhất `gateway.mjs`, việc nhập dự án cũ, Motion Studio và yêu cầu gửi cho đạo diễn AI. Studio import plugin chỉ qua `scripts/studio-api.mjs` (`STUDIO_API = 2`, `PLUGIN_VERSION`, quyền của đạo diễn). Dùng được: hai CLI dưới đây, Motion Studio (giao diện web trên máy) và MCP server `opus-video` cho đạo diễn AI.
 
 ## Đã dùng được
 
@@ -32,7 +32,7 @@ Skill này sở hữu manifest `project.json`, cổng lệnh ghi duy nhất `gat
 
 ## Motion Studio
 
-Giao diện web trên máy để xem và sửa timeline: player, timeline (Shot, Lồng tiếng, Nhạc), inspector của shot và bảy tab (Đạo diễn AI, Nhanh, Mẫu cảnh, Media, Lồng tiếng, Nhạc, Phong cách).
+Giao diện web trên máy để làm video từ đầu tới bản giao: tạo dự án, nạp footage, giao việc cho đạo diễn AI, bấm duyệt, xem và sửa timeline, xuất MP4. Gồm player, timeline (Shot, Lồng tiếng, Nhạc), inspector của shot và thanh bên sáu mục: Giao việc cho AI, Footage & chất liệu, Lời & giọng, Nhạc & âm thanh, Thư viện mẫu, Xuất bản (Alt+1…6; tab đang mở giữ trong `?tab=`).
 
 ```bash
 node $OV/scripts/studio.mjs start --background   # http://127.0.0.1:4317, gốc /Volumes/2/Edit-Video
@@ -42,6 +42,9 @@ node $OV/scripts/studio.mjs stop                 # dừng khi xong việc
 ```
 
 - Mỗi máy chỉ một server. `start` khi server đang chạy cho cùng thư mục gốc thì in URL; cho thư mục gốc khác thì từ chối (exit 3), dừng nó trước. Cổng 4317 bị tiến trình khác giữ: exit 3, không đổi cổng. Log nền: `~/.config/opus-video/studio.log`.
+- **Dự án mới** (nút trên thanh trên cùng): tên (chữ thường, số, gạch nối), tỷ lệ 16:9 / 9:16 / cả hai, chế độ (`tu-dau` làm từ đầu, `video-co-san` dựng từ video có sẵn + B-roll, `theo-nhac`, `mau-nhanh`), thời lượng, chủ đề, đối tượng và việc đầu tiên cho đạo diễn. Server chạy `new-project.sh` (chép font Be Vietnam Pro từ `shared-assets/fonts/`), ghi `mode/topic/audience/duration_s` vào BRIEF.md (không bao giờ ghi `direction:`), tạo `project.json` sửa được, mở dự án và xếp việc đầu tiên. API: `POST /api/projects/new`.
+- **Footage & chất liệu:** duyệt thư mục trên máy (trong home và `/Volumes`) rồi đăng ký file video, âm thanh, ảnh. File đã nằm trong `footage/`, `shared-assets/` hoặc `assets/` của dự án được dùng tại chỗ; file khác được chép vào `footage/raw/` (tên trùng thành `-2`, `-3`, không ghi đè). Mọi đường dẫn kiểm bằng realpath. Metadata lấy bằng ffprobe, lưu ở `.opus/media.json` cho đạo diễn đọc. API: `GET /api/media/browse`, `POST /api/media/register`, `GET /api/media`.
+- **Chip agent** (góc phải thanh trên): `claude` có không, phiên bản, đã đăng nhập chưa (chỉ đọc cờ `loggedIn` của `claude auth status`), runner, job gần nhất, ffprobe và ffmpeg. API: `GET /api/agent`.
 - Dự án là thư mục con trực tiếp của thư mục gốc có `project.json`. Thư mục có `index.html` và `BRIEF.md` mà chưa có manifest hiện nút **Nhập dự án** (chạy `manifest-import --write`).
 - Mọi thao tác sửa đi qua gateway với actor `human`: kéo mép phải shot (`resize_shot`, bước 0,1 s, tối thiểu 0,5 s), kéo câu thoại (`move_line`), Áp dụng trong inspector (`set_shot`, `resize_shot`), sửa lời (`set_line_text`, gate thành `stale`), thanh âm lượng nhạc (`set_music`), Hoàn tác hoặc Ctrl/Cmd+Z (`undo`). Phiên bản đã đổi (409) thì Studio tải lại và báo "Đã có thay đổi mới, đã tải lại".
 - Dự án chỉ xem hiện banner "Dự án nhập từ bản cũ: chỉ xem, sửa qua đạo diễn" và khoá mọi thao tác sửa.
@@ -50,9 +53,10 @@ node $OV/scripts/studio.mjs stop                 # dừng khi xong việc
 ### Đạo diễn AI và xuất video từ Studio
 
 - Yêu cầu cho đạo diễn: ô "Nhờ đạo diễn sửa" (phạm vi `project`), nút "Nhờ đạo diễn" trong inspector (phạm vi `shot`, kèm thời điểm playhead và ghi chú chuyển động), câu đã sửa lời trong tab Lồng tiếng (phạm vi `line`: duyệt viet-pro rồi lồng tiếng lại), "Dùng mẫu này" trong tab Nhanh. Dự án chỉ xem vẫn nhận yêu cầu, vì đạo diễn sửa HTML trực tiếp.
-- Vòng đời một yêu cầu: `queued` → `running` → `done` (kèm biên nhận) hoặc `failed` (kèm lý do). Tab Đạo diễn AI liệt kê yêu cầu, biên nhận, log trực tiếp và nút Huỷ. Huỷ được cả yêu cầu đang chờ và yêu cầu bị kẹt ở `running`.
+- Vòng đời một yêu cầu: `queued` → `running` → `done` (kèm biên nhận), `failed` (kèm lý do) hoặc `waiting_user` (đạo diễn hỏi bằng `studio_ask`). Tab Giao việc cho AI là khung hội thoại: yêu cầu, biên nhận, log trực tiếp, nút Huỷ và thẻ hỏi. Huỷ được cả yêu cầu đang chờ và yêu cầu bị kẹt ở `running`.
+- **Thẻ hỏi và cổng duyệt.** Đạo diễn gọi `studio_ask` (kiểu `choice`, `approve` hoặc `text`, kèm file để xem) rồi kết thúc lượt; yêu cầu thành `waiting_user` và tab hiện huy hiệu. Người dùng trả lời trên thẻ (`POST /api/director/answer`); server tạo một yêu cầu nối tiếp (`follows`, cùng phiên, `--resume`). Hai cổng chỉ server ghi, theo cú bấm của người dùng: thẻ `gate: direction` chạy `make-pitch.mjs choose --pick N` (BRIEF `direction:`), thẻ `gate: animatic` được duyệt thì ghi `approval: user@studio <thời điểm> duyệt animatic <file>` vào DEMO.md. Đạo diễn bị chặn ghi `DEMO.md`, `BRIEF.md`, chạy `make-pitch.mjs choose`, `replace-in-file.mjs`, `cp`, `mv` hay lệnh Bash nhắc tới hai file đó. `waiting_user` quá 24 giờ thành `failed`; giao lại việc là tiếp tục được.
 - Runner đặt trong `~/.config/opus-video/studio.json`, giữ qua các lần start/stop: `{"director": {"runner": "cli"}}` (mặc định) hoặc `"mcp"`.
-  - `cli`: Studio tự chạy `claude -p` trong thư mục dự án, với `--permission-mode acceptEdits`, chỉ cho Read/Edit/Write/Glob/Grep, `node $OV/scripts/…`, `npx hyperframes …` và sáu tool MCP `opus-video`, cấm WebFetch/WebSearch. Mỗi dự án chạy một yêu cầu một lúc, yêu cầu sau chờ tới lượt. Phiên được nhớ trong `.opus/director.json` và lần sau `--resume`; resume hỏng thì chạy lại một lần với phiên mới. Đạo diễn đóng yêu cầu bằng `studio_request_done`; nếu nó thoát mà chưa đóng thì câu trả lời cuối thành biên nhận (exit 0) hoặc yêu cầu thành `failed` kèm 20 dòng log cuối. Đổi thời gian hoặc chuyển động thì đạo diễn chạy lại `recipe-pack` và `make-demo --animatic`; DEMO.md về `approval: pending`, nên "Xuất video" bị chặn tới khi người dùng duyệt lại animatic.
+  - `cli`: Studio tự chạy `claude -p` trong thư mục dự án, với `--permission-mode acceptEdits`, chỉ cho Read/Edit/Write/Glob/Grep, `node $OV/scripts/…`, `npx hyperframes …` và bảy tool MCP `opus-video`, cấm WebFetch/WebSearch. Mỗi dự án chạy một yêu cầu một lúc, yêu cầu sau chờ tới lượt. Phiên được nhớ trong `.opus/director.json` và lần sau `--resume`; resume hỏng thì chạy lại một lần với phiên mới. Đạo diễn đóng yêu cầu bằng `studio_request_done`; nếu nó thoát mà chưa đóng thì câu trả lời cuối thành biên nhận (exit 0) hoặc yêu cầu thành `failed` kèm 20 dòng log cuối. Đổi thời gian hoặc chuyển động thì đạo diễn chạy lại `recipe-pack` và `make-demo --animatic`; DEMO.md về `approval: pending`, nên "Xuất video" bị chặn tới khi người dùng duyệt lại animatic.
   - `mcp`: yêu cầu nằm chờ cho một phiên Claude Code đang mở lấy bằng `studio_request_next`.
 - **Xuất video:** chạy `render-final.mjs` (giữ mọi cổng) ra `renders/<dự án>-<thời điểm>.mp4`, rồi `compress-final.sh` ra `…-final.mp4`. Exit 5 thì Studio báo "Thiếu cổng: …" với các dòng FAIL và không nén. Mỗi dự án chạy một job xuất một lúc. `stop` dừng mọi job (SIGTERM, 5 s sau SIGKILL), nên không còn tiến trình mồ côi.
 
@@ -68,10 +72,12 @@ Claude Code nạp server `opus-video` (`$OV/mcp/server.mjs`, khai báo trong `.c
 | `project_undo` | `project`, `base` | hoàn tác thay đổi mới nhất |
 | `studio_request_next` | `project` | nhận yêu cầu Studio cũ nhất đang chờ (runner `mcp`); `null` khi trống |
 | `studio_request_done` | `project`, `id`, `ok`, `receipt` hoặc `error` | đóng yêu cầu: `done` hoặc `failed` |
+| `studio_ask` | `project`, `id`, `kind`, `question`, `options?`, `artifacts?`, `gate?` | hỏi người dùng trong Studio: yêu cầu thành `waiting_user`; kết thúc lượt ngay, câu trả lời đến ở lượt sau |
 
 Luật của đạo diễn:
 
 - Luôn gọi `project_get` trước, rồi patch với đúng `base` vừa đọc. `CONFLICT` thì đọc lại và làm lại, không đoán phiên bản.
 - Sửa chuyển động bên trong một shot bằng cách sửa HTML của cảnh đó. Mọi thay đổi về thời gian (độ dài shot, vị trí câu thoại, nhạc) chỉ đi qua `project_patch`, không sửa tay số giây.
 - Đổi lời một câu (`set_line_text`) để `gate: "stale"` cho tới khi câu đó qua cổng `ov-script`; chỉ khi đó mới tạo lại giọng của riêng câu đó qua `ov-audio`.
+- Cần người dùng chọn hướng hay duyệt animatic thì hỏi bằng `studio_ask` với `gate` tương ứng, không tự ghi `direction:` hay dòng `approval:`.
 - Xong yêu cầu thì gọi `studio_request_done` với biên nhận tiếng Việt liệt kê mọi file và op đã đổi; không làm được thì `ok: false` kèm lý do.

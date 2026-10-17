@@ -1,8 +1,17 @@
 # Changelog
 
-## Unreleased
+## v2.1.0 (2026-10-17): Motion Studio làm cửa chính
+
+Why: Studio only opened projects that already existed, had no place to give the AI a task, and the director could not ask the user anything, so a new video still started in the terminal and both human gates (direction, animatic) were written by hand.
 
 ### New
+- Studio "Dự án mới": name, aspect (16:9, 9:16, both), mode (`tu-dau`, `video-co-san`, `theo-nhac`, `mau-nhanh`), duration, topic, audience and a first task. `POST /api/projects/new` runs `new-project.sh`, writes `mode/topic/audience/duration_s` into BRIEF.md (never `direction:`), creates an editable `project.json`, opens the project and queues the first task.
+- Studio media: browse folders under home and `/Volumes` and register video, audio and image files (`GET /api/media/browse`, `POST /api/media/register`, `GET /api/media`). A file already under `footage/`, `shared-assets/` or the project's `assets/` is used in place; any other is copied to `footage/raw/` (a taken name gets `-2`, never overwritten). Paths are checked by realpath; ffprobe metadata goes to `.opus/media.json` for the director.
+- Multi-turn director: request status `waiting_user` and the seventh MCP tool `studio_ask` (`choice`, `approve`, `text`, with artifacts and an optional `gate`). The answer (`POST /api/director/answer`) queues a follow-up request (`follows`, same session, `--resume`). A request waiting more than 24 hours becomes `failed`.
+- Human gates written by the Studio server only: a `direction` card answer runs `make-pitch.mjs choose --pick N`; an approved `animatic` card writes `approval: user@studio <ISO> duyệt animatic <file>` into DEMO.md. The director's `claude -p` denies `Edit(DEMO.md)`, `Edit(BRIEF.md)`, `make-pitch.mjs choose`, `replace-in-file.mjs`, `cp`, `mv` and Bash commands naming either file.
+- Agent status: `GET /api/agent` (`claude` found, version, logged in, runner, last job, ffprobe, ffmpeg) and an agent chip in the Studio top bar.
+- `scripts/studio-api.mjs`: the one file Studio imports from the plugin (manifest, gateway, requests, `OV`, `PLUGIN_VERSION`, `STUDIO_API = 2`, director tool lists).
+- Studio UI: light high-contrast theme; the left panel is a six-item rail (Giao việc cho AI, Footage & chất liệu, Lời & giọng, Nhạc & âm thanh, Thư viện mẫu, Xuất bản) with a heading and one-line description per panel, badges for waiting cards and stale lines, `?tab=` and Alt+1…6; the AI tab is a chat with gate cards.
 - SFX events in `project.json`: an optional `events` array of `{id, shot, offset, sound?, label}`, validated with Vietnamese errors (projects without it stay valid). `gateway.mjs` derive writes each event's `<audio id>` `data-start` as shot start + offset, so `resize_shot`, `add_shot` and undo move sound effects with their shot and `sfx-sync` stays PASS with no hand edit (in the v2.0.0 E2E the director copied two values from `sfx-sync --fix`). `remove_shot` drops the shot's events with a receipt warning; undo restores them and the `## Sự kiện` rows the change dropped (kept in the history line as `dropped_rows`). `move_line` leaves events alone and moves the `chữ:` rows inside the moved line. A remapped Thời điểm keeps its decimals (`3.0` stays `3.0`).
 - `manifest-import.mjs` imports events from the PLAN.md `## Sự kiện` rows that name a sound file, matching `<audio>` tags by src (nearest `data-start`, each tag once); a row with no tag or a tag with no id is a WARN. The IMPORT line prints `events=N`.
 

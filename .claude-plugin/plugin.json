@@ -1,6 +1,6 @@
 {
   "name": "opus-video",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Làm video tiếng Việt với Claude Opus 5.5: brief, hướng đạo diễn, kịch bản qua viet-pro, giọng ElevenLabs, dựng HyperFrames, QA và render bản giao, chia thành 11 skill theo bốn hướng vận hành.",
   "author": { "name": "abm-dungtq", "url": "https://github.com/abm-dungtq" },
   "homepage": "https://github.com/abm-dungtq/opus-video",

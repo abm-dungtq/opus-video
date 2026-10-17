@@ -14,7 +14,7 @@ const ASPECTS = [["16:9", "16:9 ngang"], ["9:16", "9:16 dọc"], ["both", "Cả 
 export function mountNewProject(ctx, btn, { onCreated }) {
   const err = h("p", { class: "form-error", role: "alert", hidden: true });
   const field = (label, control, note) => h("label", { class: "field" }, h("span", {}, label), control, note ? h("small", { class: "muted" }, note) : null);
-  const name = h("input", { type: "text", name: "name", required: true, pattern: "[a-z0-9][a-z0-9-]{1,48}", autocomplete: "off", spellcheck: "false", placeholder: "vi-du-video-moi" });
+  const name = h("input", { type: "text", name: "name", required: true, pattern: "[a-z0-9][a-z0-9\\-]{1,48}", autocomplete: "off", spellcheck: "false", placeholder: "vi-du-video-moi" });
   const topic = h("textarea", { name: "topic", required: true, maxlength: "500", rows: "2", placeholder: "Video nói về điều gì?" });
   const duration = h("input", { type: "number", name: "duration", required: true, min: "5", max: "600", step: "1", value: "30" });
   const audience = h("input", { type: "text", name: "audience", maxlength: "500", placeholder: "Ví dụ: chủ shop online mới bắt đầu" });

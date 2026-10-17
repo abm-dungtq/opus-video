@@ -50,6 +50,14 @@ Các video dưới đây do opus-video dựng. Bấm vào ảnh để mở file 
 
 ## Có gì mới
 
+### v2.1.0 (2026-10-17): Motion Studio làm cửa chính
+
+- **Làm video mới ngay trong Studio.** Nút "Dự án mới" hỏi tên, tỷ lệ (16:9, 9:16 hoặc cả hai), chế độ (làm từ đầu, dựng từ video có sẵn kèm B-roll, theo nhạc, mẫu nhanh), thời lượng, chủ đề và việc đầu tiên cho đạo diễn. Studio tạo dự án, mở nó và giao việc luôn.
+- **Footage & chất liệu.** Duyệt thư mục trên máy và đăng ký video, âm thanh, ảnh. File ngoài thư mục studio được chép vào `footage/raw/`, không ghi đè file trùng tên. Đạo diễn đọc danh sách kèm thông số ffprobe.
+- **Giao việc cho AI nhiều lượt.** Khung hội thoại với đạo diễn. Khi cần bạn chọn hướng hay duyệt animatic, đạo diễn hỏi bằng thẻ (tool MCP mới `studio_ask`). Bạn bấm trên thẻ, Studio ghi quyết định rồi đạo diễn làm tiếp. Đạo diễn không tự ghi được `BRIEF.md` hay `DEMO.md`: hai cổng duyệt chỉ do bạn bấm.
+- **Chip agent.** Góc phải thanh trên cho biết `claude` có sẵn không, phiên bản, đã đăng nhập chưa, runner, job gần nhất, ffprobe và ffmpeg.
+- **Giao diện sáng, sáu mục rõ nghĩa:** Giao việc cho AI, Footage & chất liệu, Lời & giọng, Nhạc & âm thanh, Thư viện mẫu, Xuất bản.
+
 ### v2.0.0 (2026-10-16): plugin 11 skill, bốn hướng vận hành, project.json
 
 - **Plugin thay cho một file `SKILL.md` 45 KB.** Repo là plugin Claude Code `opus-video` (`.claude-plugin/plugin.json`). Quy trình tách thành 11 skill nhỏ trong `skills/`: `opus-video` (điểm vào, chọn hướng), `ov-setup`, `ov-brief`, `ov-direction`, `ov-cases`, `ov-script`, `ov-audio`, `ov-build`, `ov-footage`, `ov-deliver`, `ov-studio`. Không bỏ luật nào: mỗi luật của bản cũ nằm trong đúng một skill.
