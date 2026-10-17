@@ -105,3 +105,12 @@ test("bad usage and a missing index.html exit 2", () => {
     assert.equal(main(["--project", dir], io().io), 2);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("the title comes from the first heading after the frontmatter, never a YAML comment in it", () => {
+  const dir = tmp();
+  try {
+    cpSync(FIXTURE, dir, { recursive: true });
+    writeFileSync(join(dir, "BRIEF.md"), "---\nbrief_version: 2\n# ↓ ghi chú trong frontmatter\nstyle: x\n---\n\n# Slogan theo beat\n");
+    assert.equal(importProject(dir).manifest.title, "Slogan theo beat");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

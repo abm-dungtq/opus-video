@@ -36,7 +36,8 @@ import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { load, save, validate, r3 } from "./manifest.mjs";
 import { buildTiming, injectTiming, manifestScenes } from "./timing.mjs";
-import { SECTIONS, fold, parseTable, sceneId } from "./check-preflight.mjs";
+import { EVENTS_SECTION, SECTIONS, fold, parseTable, sceneId } from "./check-preflight.mjs";
+import { eventTime } from "./sfx-sync.mjs";
 
 export const EXIT = { ok: 0, io: 1, usage: 2, conflict: 3, viewOnly: 4, invalid: 5, nothingToUndo: 7, busy: 8 };
 export const ACTORS = ["human", "director", "timing", "import", "undo"];
@@ -230,11 +231,11 @@ function commit(dir, { base, actor, build, lockWaitMs }) {
     r.next.updated = new Date().toISOString();
     // Derive first, so a composition that cannot take the change leaves every file as it was,
     // then write it, and project.json last: a reader that sees v+1 also sees its derived files.
-    const d = derive(dir, { manifest: r.next, dry: true });
+    const d = derive(dir, { manifest: r.next, prev: m, dry: true });
     if (d.code) return d;
-    const w = derive(dir, { manifest: r.next });
+    const w = derive(dir, { manifest: r.next, prev: m });
     if (w.code) return w;
-    record(dir, r.next, { actor, base: m.version, ops: r.ops, receipt: r.receipt, ...(r.extra ?? {}) });
+    record(dir, r.next, { actor, base: m.version, ops: r.ops, receipt: [...r.receipt, ...w.events], ...(r.extra ?? {}) });
     return { code: EXIT.ok, version: r.next.version, receipt: r.receipt, lines: w.lines, warnings: w.warnings };
   } finally { release(); }
 }
@@ -338,21 +339,60 @@ export function derivePlan(text, m) {
   return [...lines.slice(0, a + head), ...rows, ...lines.slice(b)].join("\n");
 }
 
+// PLAN.md text + the manifest before and after a change → { text, receipt }: each "## Sự kiện"
+// row keeps its offset inside the shot that held it (half-open windows, the last shot takes the
+// end), so word and SFX rows follow a resized, added or removed shot. Rows of a removed shot are
+// dropped; a row left past its shot's new end stays, with a warning. Only the number changes.
+export function remapEvents(text, prev, m) {
+  const receipt = [];
+  const lines = text.split("\n");
+  const h = lines.findIndex((l) => /^##\s+/.test(l) && fold(l.replace(/^##\s+/, "")) === EVENTS_SECTION);
+  if (h < 0 || !prev?.shots?.length) return { text, receipt };
+  let a = h + 1;
+  while (a < lines.length && !/^\s*\|/.test(lines[a]) && !/^##\s+/.test(lines[a])) a++;
+  if (a >= lines.length || !/^\s*\|/.test(lines[a])) return { text, receipt };
+  let b = a;
+  while (b < lines.length && /^\s*\|/.test(lines[b])) b++;
+  const ti = parseTable(lines.slice(a, b).join("\n")).headers.findIndex((x) => /thoi diem/.test(x));
+  if (ti < 0) return { text, receipt };
+  const head = /^\s*\|[\s|:-]+\|\s*$/.test(lines[a + 1] ?? "") ? 2 : 1;
+  const holder = (t) => prev.shots.find((s, i) => t >= s.start && (t < s.end || i === prev.shots.length - 1)) ?? prev.shots.at(-1);
+  const rows = [];
+  for (const row of lines.slice(a + head, b)) {
+    const cells = row.split("|");
+    const { t } = eventTime(cells[ti + 1]?.trim());
+    const old = Number.isFinite(t) ? holder(t) : null;
+    const now = old && m.shots.find((s) => s.id === old.id);
+    if (!old) { rows.push(row); continue; }
+    if (!now) { receipt.push(`bỏ hàng sự kiện ${t}s: ${old.id} đã xoá`); continue; }
+    const t2 = r3(now.start + (t - old.start));
+    if (t2 !== t) cells[ti + 1] = cells[ti + 1].replace(/\d+(?:[.,]\d+)?/, String(t2));
+    if (t2 > now.end) receipt.push(`CẢNH BÁO sự kiện ${t2}s nằm ngoài ${now.id} (hết ở ${r3(now.end)}s)`);
+    rows.push(cells.join("|"));
+  }
+  return { text: [...lines.slice(0, a + head), ...rows, ...lines.slice(b)].join("\n"), receipt };
+}
+
 // Re-derives the renderer's inputs from project.json (or opts.manifest). dry: compute only.
-// Returns { code, lines, warnings, error }.
-export function derive(dir, { manifest = null, dry = false } = {}) {
+// prev: the manifest before the change, so "## Sự kiện" rows follow their shots.
+// Returns { code, lines, warnings, events, error }.
+export function derive(dir, { manifest = null, prev = null, dry = false } = {}) {
   const root = resolve(dir);
   const m = manifest ?? load(root);
   if (!m) return { code: EXIT.usage, error: `không có project.json trong ${root}` };
   if (!m.capabilities?.editable) return { code: EXIT.viewOnly, error: VIEW_ONLY };
   const htmlPath = join(root, m.html);
   const planPath = join(root, "PLAN.md");
-  let html, plan = null, r, next, missing = [];
+  let html, plan = null, r, next, missing = [], events = [];
   try {
     const dh = deriveHtml(readFileSync(htmlPath, "utf8"), m);
     html = dh.html;
     missing = dh.missing;
-    if (existsSync(planPath)) plan = derivePlan(readFileSync(planPath, "utf8"), m);
+    if (existsSync(planPath)) {
+      const ev = remapEvents(readFileSync(planPath, "utf8"), prev, m);
+      plan = derivePlan(ev.text, m);
+      events = ev.receipt;
+    }
     const bed = m.music.find((b) => existsSync(join(root, `${b.file}.beats.json`)));
     r = buildTiming({ dir: root, html: m.html, music: bed?.file ?? null, scenes: manifestScenes(m), htmlText: html });
     next = injectTiming(html, r.timing);
@@ -365,7 +405,7 @@ export function derive(dir, { manifest = null, dry = false } = {}) {
     } catch (e) { return { code: EXIT.io, error: `không ghi được: ${e.message}` }; }
   }
   const warnings = [...missing.map((id) => `${id}: không có thẻ <audio>/<video id="${id}"> trong ${m.html}, thời điểm không được ghi`), ...r.warnings];
-  return { code: EXIT.ok, lines: r.lines, warnings };
+  return { code: EXIT.ok, lines: r.lines, warnings, events };
 }
 
 function writeAtomic(f, text) {

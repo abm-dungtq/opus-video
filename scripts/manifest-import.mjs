@@ -54,7 +54,8 @@ function title(root) {
     const t = readFileSync(brief, "utf8");
     const fm = t.match(/^---\n([\s\S]*?)\n---/)?.[1]?.match(/^(?:title|topic|chu_de):\s*(.+)$/m)?.[1];
     if (fm) return fm.replace(/^["']|["']$/g, "").trim();
-    const h = t.match(/^#\s+(.+)$/m)?.[1];
+    // Headings only after the frontmatter: a YAML comment there also starts with "# ".
+    const h = t.replace(/^---\n[\s\S]*?\n---/, "").match(/^#\s+(.+)$/m)?.[1];
     if (h) return h.trim();
   }
   return basename(root);

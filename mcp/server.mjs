@@ -14,6 +14,11 @@ import { load } from "../scripts/manifest.mjs";
 import { patch, undo, readHistory } from "../scripts/gateway.mjs";
 import { next, finish } from "../scripts/requests.mjs";
 
+// A director started by Studio (`claude -p`, studio/director.mjs) runs this server with
+// OPUS_STUDIO_RUNNER=cli: it closes the request Studio claimed for it as runner "cli". Any other
+// session pulls the queue as runner "mcp".
+const RUNNER = process.env.OPUS_STUDIO_RUNNER === "cli" ? "cli" : "mcp";
+
 // stdout carries JSON-RPC only: anything a library logs goes to stderr.
 console.log = (...a) => console.error(...a);
 
@@ -97,11 +102,11 @@ export function callTool(name, args) {
         if (!Number.isInteger(args.base)) return fail("base phải là số phiên bản");
         return gatewayResult(undo(dir, { base: args.base }));
       case "studio_request_next": {
-        const r = next(dir, "mcp");
+        const r = next(dir, RUNNER);
         return text(r ?? "null");
       }
       case "studio_request_done":
-        return text(finish(dir, args.id, { ok: Boolean(args.ok), receipt: args.receipt, error: args.error, runner: "mcp" }));
+        return text(finish(dir, args.id, { ok: Boolean(args.ok), receipt: args.receipt, error: args.error, runner: RUNNER }));
     }
   } catch (e) { return fail(e.message); }
 }

@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
-import { applyOps, patch, undo, derive, readHistory, deriveHtml, derivePlan, EXIT } from "../gateway.mjs";
+import { applyOps, patch, undo, derive, readHistory, deriveHtml, derivePlan, remapEvents, EXIT } from "../gateway.mjs";
 import { load, save } from "../manifest.mjs";
 import { main as timingMain } from "../timing.mjs";
 
@@ -255,4 +255,36 @@ test("a held lock is BUSY (exit 8), not a CONFLICT", () => withProject((dir) => 
   const r = patch(dir, { actor: "human", base: 1, ops: [{ op: "resize_shot", id: "s1", duration: 3 }] });
   assert.equal(r.code, EXIT.busy);
   assert.equal(readFileSync(join(dir, ".opus", "lock"), "utf8"), "other", "another writer's lock is left alone");
+}));
+
+const EVENTS = "\n## Sự kiện\n| Thời điểm | Sự kiện | Âm thanh |\n|---|---|---|\n| 1.0s | tiêu đề | — |\n| 3.0 | chữ: \"bạn đưa\" | — |\n| 6.2s (đo) | thẻ bật lên | assets/sfx/hit.mp3 |\n| ? | ghi chú | — |\n";
+
+test("remapEvents keeps each Sự kiện row at its offset inside its shot", () => {
+  const m = load(FIXTURE);
+  const { next } = applyOps(m, [{ op: "resize_shot", id: "s1", duration: 3 }]);
+  const r = remapEvents(EVENTS, m, next);
+  assert.match(r.text, /\| 1\.0s \| tiêu đề/);
+  assert.match(r.text, /\| 3\.5 \| chữ: "bạn đưa"/);
+  assert.match(r.text, /\| 6\.7s \(đo\) \| thẻ bật lên \| assets\/sfx\/hit\.mp3 \|/);
+  assert.match(r.text, /\| \? \| ghi chú/);
+  assert.deepEqual(r.receipt, []);
+  const s3 = applyOps(m, [{ op: "resize_shot", id: "s3", duration: 0.3 }]).next;
+  assert.match(remapEvents(EVENTS, m, s3).receipt[0], /CẢNH BÁO sự kiện 6\.2s nằm ngoài s3/);
+  const gone = { ...m, shots: m.shots.filter((s) => s.id !== "s3") };
+  const g = remapEvents(EVENTS, m, gone);
+  assert.doesNotMatch(g.text, /thẻ bật lên/);
+  assert.match(g.receipt[0], /bỏ hàng sự kiện 6\.2s: s3 đã xoá/);
+});
+
+test("patch moves Sự kiện rows with their shot and undo puts the table back", () => withProject((dir) => {
+  writeFileSync(join(dir, "PLAN.md"), readFileSync(join(dir, "PLAN.md"), "utf8") + EVENTS);
+  const events = () => readFileSync(join(dir, "PLAN.md"), "utf8").split("## Sự kiện")[1];
+  const before = events();
+  assert.equal(patch(dir, { actor: "human", base: 1, ops: [{ op: "resize_shot", id: "s2", duration: 3.8 }] }).code, 0);
+  const plan = readFileSync(join(dir, "PLAN.md"), "utf8");
+  assert.match(plan, /\| 1\.0s \|/);
+  assert.match(plan, /\| 3\.0 \|/);
+  assert.match(plan, /\| 6\.7s \(đo\) \|/);
+  assert.equal(undo(dir, { base: 2 }).code, 0);
+  assert.equal(events(), before);
 }));

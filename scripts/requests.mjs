@@ -107,3 +107,12 @@ export function finish(dir, id, { ok, receipt = null, error = null, runner = nul
   if (!res.r) throw new Error(`không đọc được yêu cầu ${id}`);
   return res.r;
 }
+
+// Cancels a queued or running request from Studio (a stuck runner included): status failed.
+// Returns the updated request, or null when it had already ended.
+export function cancelRequest(dir, id, reason = "Đã huỷ trong Studio") {
+  if (!ID.test(String(id))) throw new Error(`id không hợp lệ: ${id}`);
+  const res = withClaim(dir, id, (r) => (r.status === "queued" || r.status === "running" ? { ...r, status: "failed", error: reason, finished: new Date().toISOString() } : null), { tries: 50 });
+  if (res.busy) throw new Error(`yêu cầu ${id} đang bị tiến trình khác giữ, thử lại sau`);
+  return res.r ?? null;
+}

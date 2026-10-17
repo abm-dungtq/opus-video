@@ -12,6 +12,9 @@
 // names the running root. Port 4317 held by another process: "cổng 4317 đang bị <pid> giữ",
 // exit 3; the port never changes. Binds 127.0.0.1 only. Background log: studio.log beside the
 // state file.
+// Settings in the same file survive stop and start: {"director": {"runner": "cli" | "mcp"}}
+// (default cli: Studio runs `claude -p` itself; mcp: an open Claude Code session takes the queue).
+// stop waits up to 10 s: running jobs (director, export) get SIGTERM, then SIGKILL after 5 s.
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync, chmodSync, renameSync } from "node:fs";
 import { spawn, execFileSync } from "node:child_process";
 import { homedir } from "node:os";
@@ -28,6 +31,12 @@ const url = () => `http://${HOST}:${PORT}/`;
 
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === "EPERM"; } };
 export function readState() { try { return JSON.parse(readFileSync(STATE, "utf8")); } catch { return null; } }
+// Settings kept across runs (director.runner); the rest of the file describes the running server.
+const settingsOf = (s) => (s?.director ? { director: s.director } : null);
+function clearState() {
+  const keep = settingsOf(readState());
+  if (keep) writeState(keep); else rmSync(STATE, { force: true });
+}
 function writeState(s) {
   mkdirSync(dirname(STATE), { recursive: true });
   const tmp = `${STATE}.${process.pid}.tmp`;
@@ -59,8 +68,14 @@ async function serve(root) {
     });
     server.listen(PORT, HOST, res);
   });
-  writeState({ pid: process.pid, port: PORT, root, url: url(), token, started: new Date().toISOString() });
-  const bye = () => { const s = readState(); if (s?.pid === process.pid) rmSync(STATE, { force: true }); server.close(); process.exit(0); };
+  writeState({ ...settingsOf(readState()), pid: process.pid, port: PORT, root, url: url(), token, started: new Date().toISOString() });
+  const bye = async () => {
+    const { stopAll } = await import("../studio/jobs.mjs");
+    await stopAll();
+    if (readState()?.pid === process.pid) clearState();
+    server.close();
+    process.exit(0);
+  };
   process.on("SIGTERM", bye);
   process.on("SIGINT", bye);
   console.log(`Motion Studio: ${url()} (root ${root})`);
@@ -74,7 +89,7 @@ async function start(o) {
     console.error(`studio: đang chạy cho ${s.root} (pid ${s.pid}); dừng nó trước (node studio.mjs stop)`);
     return 3;
   }
-  if (readState()) rmSync(STATE, { force: true });
+  if (readState()) clearState();
   const owner = portOwner();
   if (owner) { console.error(`studio: cổng ${PORT} đang bị ${owner} giữ`); return 3; }
   if (!o.background) { await serve(root); return null; }
@@ -95,18 +110,18 @@ async function start(o) {
 
 async function status() {
   const s = await live();
-  if (!s) { if (readState()) rmSync(STATE, { force: true }); console.log("stopped"); return 0; }
+  if (!s) { if (readState()) clearState(); console.log("stopped"); return 0; }
   console.log(`running ${s.url} (pid ${s.pid}, root ${s.root}, từ ${s.started})`);
   return 0;
 }
 
 async function stop() {
   const s = await live();
-  if (!s) { rmSync(STATE, { force: true }); console.log("stopped"); return 0; }
+  if (!s) { clearState(); console.log("stopped"); return 0; }
   process.kill(s.pid, "SIGTERM");
-  for (let i = 0; i < 50 && alive(s.pid); i++) await new Promise((r) => setTimeout(r, 100));
-  if (alive(s.pid)) { console.error(`studio: pid ${s.pid} chưa dừng sau 5 s`); return 1; }
-  rmSync(STATE, { force: true });
+  for (let i = 0; i < 100 && alive(s.pid); i++) await new Promise((r) => setTimeout(r, 100));
+  if (alive(s.pid)) { console.error(`studio: pid ${s.pid} chưa dừng sau 10 s`); return 1; }
+  clearState();
   console.log("stopped");
   return 0;
 }

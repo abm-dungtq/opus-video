@@ -10,6 +10,9 @@
 // - project names match ^[A-Za-z0-9._-]+$ (else 400); /p/<name>/<path> serves only files whose
 //   realpath is inside the project, never .env, .git, .opus/lock or other dotfiles outside .opus/;
 // - the server never reads ~/.config/opus-video/.env.
+// Jobs (studio/jobs.mjs): POST /api/director queues a request and, with runner cli, starts the
+// director (studio/director.mjs); POST /api/export runs render-final.mjs, then compress-final.sh.
+// Their start/log/exit events reach the page as SSE "job"; every job stops with the server.
 // Writes wait at most LOCK_WAIT_MS for the project lock and answer 503 "đang bận" when busy, so
 // one contended write never stalls SSE or the player.
 import { createServer as httpServer } from "node:http";
@@ -19,12 +22,16 @@ import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { load } from "../scripts/manifest.mjs";
 import { patch, undo, readHistory, EXIT } from "../scripts/gateway.mjs";
-import { list as listRequests } from "../scripts/requests.mjs";
+import { enqueue, cancelRequest, list as listRequests } from "../scripts/requests.mjs";
+import { events as jobEvents, startJob, cancel as cancelJob, listJobs, running, stopAll } from "./jobs.mjs";
+import { KIND as DIRECTOR, pump, runnerSetting } from "./director.mjs";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const PUBLIC = join(HERE, "public");
 const SCRIPTS = fileURLToPath(new URL("../scripts/", import.meta.url));
 const DIRECTIONS = fileURLToPath(new URL("../data/directions.json", import.meta.url));
+const COMPRESS = process.env.OPUS_COMPRESS_FINAL || "/Volumes/2/Edit-Video/scripts/compress-final.sh";
+const RATIO = /^\d+x\d+$/;
 export const NAME = /^[A-Za-z0-9._-]+$/;
 const LOCK_WAIT_MS = 300;
 const BODY_MAX = 1 << 20;
@@ -162,7 +169,9 @@ export function createServer({ root, token, runtime = undefined }) {
         fsw.push({ close: () => clearInterval(t) });
       }
       const ping = setInterval(() => { for (const c of clients) c.write(": ping\n\n"); }, 25000);
-      w = { clients, close: () => { clearInterval(ping); for (const t of Object.values(timers)) clearTimeout(t); fsw.forEach((x) => x.close()); } };
+      const onJob = (e) => { if (e.job.name === name) emit("job", e); };
+      jobEvents.on("job", onJob);
+      w = { clients, close: () => { clearInterval(ping); jobEvents.off("job", onJob); for (const t of Object.values(timers)) clearTimeout(t); fsw.forEach((x) => x.close()); } };
       watchers.set(name, w);
     }
     res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store", connection: "keep-alive", "x-content-type-options": "nosniff" });
@@ -202,6 +211,8 @@ export function createServer({ root, token, runtime = undefined }) {
       if (p === "/api/project") { const pd = withManifest(q("name")); return pd.error ? send(res, pd.status, { error: pd.error }) : send(res, 200, load(pd.dir)); }
       if (p === "/api/log") { const pd = withManifest(q("name")); return pd.error ? send(res, pd.status, { error: pd.error }) : send(res, 200, readHistory(pd.dir)); }
       if (p === "/api/requests") { const pd = withManifest(q("name")); return pd.error ? send(res, pd.status, { error: pd.error }) : send(res, 200, listRequests(pd.dir)); }
+      if (p === "/api/jobs") { const pd = projectDir(q("name")); return pd.error ? send(res, pd.status, { error: pd.error }) : send(res, 200, listJobs(q("name"))); }
+      if (p === "/api/settings") return send(res, 200, { director: { runner: runnerSetting() } });
       if (p === "/api/files") {
         const pd = projectDir(q("name"));
         if (pd.error) return send(res, pd.status, { error: pd.error });
@@ -267,6 +278,56 @@ export function createServer({ root, token, runtime = undefined }) {
         if (!Number.isInteger(b.base)) return send(res, 400, { error: "cần base (số)" });
         return gatewayReply(res, undo(pd.dir, { base: b.base, lockWaitMs: LOCK_WAIT_MS }));
       }
+      if (p === "/api/director") {
+        const pd = withManifest(b.name);
+        if (pd.error) return send(res, pd.status, { error: pd.error });
+        let r;
+        try { r = enqueue(pd.dir, { scope: b.scope, target: b.target ?? null, t: Number.isFinite(b.t) ? b.t : null, base: load(pd.dir).version, text: b.text }); } catch (e) { return send(res, 400, { error: e.message }); }
+        const runner = runnerSetting();
+        if (runner === "mcp") return send(res, 200, { request: r, runner, message: "Đang chờ phiên Claude Code mở nhận việc (studio_request_next)" });
+        const busy = running(b.name, DIRECTOR);
+        const job = busy ? null : pump(b.name, pd.dir);
+        const now = listRequests(pd.dir).find((x) => x.id === r.id) ?? r;
+        return send(res, 200, { request: now, runner, job, message: busy ? "Đạo diễn đang làm yêu cầu trước; yêu cầu này chờ tới lượt" : null });
+      }
+      if (p === "/api/director/cancel") {
+        const pd = withManifest(b.name);
+        if (pd.error) return send(res, pd.status, { error: pd.error });
+        const job = listJobs(b.name).find((j) => j.kind === DIRECTOR && j.meta?.request === b.id && j.status === "running");
+        if (job) return send(res, 200, { job: cancelJob(job.id) });
+        try { return send(res, 200, { request: cancelRequest(pd.dir, b.id) }); } catch (e) { return send(res, 400, { error: e.message }); }
+      }
+      if (p === "/api/jobs/cancel") {
+        const job = listJobs(b.name).find((j) => j.id === b.id);
+        return job ? send(res, 200, { job: cancelJob(job.id) }) : send(res, 404, { error: "không có job" });
+      }
+      if (p === "/api/export") {
+        const pd = projectDir(b.name);
+        if (pd.error) return send(res, pd.status, { error: pd.error });
+        const forward = [];
+        if (b.ratio != null && b.ratio !== "16x9") {
+          if (!RATIO.test(String(b.ratio))) return send(res, 400, { error: "ratio dạng 9x16" });
+          const comp = `compositions/main-${b.ratio}.html`;
+          if (!existsSync(join(pd.dir, comp))) return send(res, 400, { error: `không có ${comp} (chạy reframe.mjs trước)` });
+          forward.push("-c", comp);
+        }
+        const d = new Date(), z = (n) => String(n).padStart(2, "0");
+        const base = `renders/${b.name}-${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}${b.ratio && b.ratio !== "16x9" ? `-${b.ratio}` : ""}`;
+        try {
+          const job = startJob({
+            name: b.name, kind: "export", cmd: process.execPath, args: [join(SCRIPTS, "render-final.mjs"), "--project", pd.dir, "--", ...forward, "--output", `${base}.mp4`], cwd: pd.dir, meta: { step: "render", output: `${base}-final.mp4` },
+            onExit: (j) => {
+              if (j.code === 5) { j.meta.message = `Thiếu cổng: ${(j.tail ?? []).filter((l) => /^FAIL\b/.test(l)).map((l) => l.replace(/^FAIL\s+/, "")).join("; ") || "xem log"}`; return; }
+              if (j.code !== 0 || j.status === "cancelled") return;
+              // The render is done; compress runs as the next export job (the render job has ended).
+              setImmediate(() => {
+                try { startJob({ name: b.name, kind: "export", cmd: COMPRESS, args: [`${base}.mp4`, `${base}-final.mp4`], cwd: pd.dir, meta: { step: "compress", output: `${base}-final.mp4` } }); } catch { /* another export started */ }
+              });
+            },
+          });
+          return send(res, 200, { job });
+        } catch (e) { return send(res, e.code === "BUSY" ? 409 : 500, { error: e.message }); }
+      }
       return send(res, 404, { error: "không có" });
     }
     return send(res, 405, { error: "method không hỗ trợ" });
@@ -286,6 +347,8 @@ export function createServer({ root, token, runtime = undefined }) {
       else res.end();
     }
   });
-  server.on("close", () => { for (const w of watchers.values()) w.close(); watchers.clear(); });
+  server.on("close", () => { for (const w of watchers.values()) w.close(); watchers.clear(); stopAll(); });
+  // Look up the HyperFrames runtime once now, not inside the first player request.
+  if (runtime === undefined) setImmediate(() => findRuntime(null));
   return server;
 }

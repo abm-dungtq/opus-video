@@ -13,7 +13,7 @@ const listeners = {};
 let events = null;
 
 const ctx = {
-  state: { projects: [], name: null, entry: null, m: null, sel: null, log: [] },
+  state: { projects: [], name: null, entry: null, m: null, sel: null, log: [], t: 0, jobs: [], logs: new Map(), requests: [] },
   on(ev, fn) { (listeners[ev] ??= []).push(fn); },
   emit(ev, ...a) { for (const fn of listeners[ev] ?? []) fn(...a); },
   get editable() { return Boolean(ctx.state.m?.capabilities?.editable); },
@@ -47,6 +47,34 @@ const ctx = {
     else if (r.status === 409) toast("Đã có thay đổi mới, đã tải lại");
     else if (r.status === 422) toast("Không còn gì để hoàn tác");
     else toast(r.error ?? `Lỗi ${r.status}`, true);
+  },
+  // A request to the director (scope project | shot | line). Read-only projects take them too.
+  async direct(req) {
+    const { name } = ctx.state;
+    if (!name || !ctx.state.m) return false;
+    if (!String(req.text ?? "").trim()) { toast("Viết yêu cầu cho đạo diễn trước", true); return false; }
+    const r = await ctx.send("/api/director", { name, ...req });
+    if (r.status !== 200) { toast(r.error ?? `Lỗi ${r.status}`, true); return false; }
+    toast(r.message ?? "Đã gửi cho đạo diễn");
+    await refreshQueue();
+    return true;
+  },
+  async cancelRequest(id) {
+    const r = await ctx.send("/api/director/cancel", { name: ctx.state.name, id });
+    if (r.status !== 200) toast(r.error ?? `Lỗi ${r.status}`, true);
+    await refreshQueue();
+  },
+  async cancelJob(id) {
+    const r = await ctx.send("/api/jobs/cancel", { name: ctx.state.name, id });
+    if (r.status !== 200) toast(r.error ?? `Lỗi ${r.status}`, true);
+  },
+  async exportVideo() {
+    const { name } = ctx.state;
+    if (!name || !ctx.state.m) return;
+    const r = await ctx.send("/api/export", { name });
+    if (r.status !== 200) return toast(r.error ?? `Lỗi ${r.status}`, true);
+    toast("Đang xuất video: render bản giao rồi nén");
+    await refreshQueue();
   },
   select(id) { ctx.state.sel = id; ctx.emit("select", id); },
   seek(t) { player.seek(t); },
@@ -94,6 +122,44 @@ $("version-select").addEventListener("change", (e) => {
   e.target.value = String(ctx.state.m?.version ?? "");
 });
 
+// Jobs and requests of the open project; SSE keeps them current afterwards.
+async function refreshQueue() {
+  const { name } = ctx.state;
+  if (!name || !ctx.state.entry?.has_manifest) return;
+  try {
+    const [jobs, requests] = await Promise.all([ctx.api(`/api/jobs?name=${encodeURIComponent(name)}`), ctx.api(`/api/requests?name=${encodeURIComponent(name)}`)]);
+    if (name !== ctx.state.name) return;
+    for (const j of jobs) if (!ctx.state.logs.has(j.id)) ctx.state.logs.set(j.id, [...(j.tail ?? [])]);
+    ctx.state.jobs = jobs;
+    setRequests(requests);
+    ctx.emit("jobs", null);
+  } catch { /* the panel shows what it has */ }
+}
+
+function setRequests(list) {
+  const before = new Map(ctx.state.requests.map((r) => [r.id, r.status]));
+  ctx.state.requests = list;
+  for (const r of list) {
+    const was = before.get(r.id);
+    if (was && was !== r.status && r.status === "done") toast(`Đạo diễn xong: ${String(r.receipt ?? "").slice(0, 160)}`);
+    if (was && was !== r.status && r.status === "failed") toast(`Yêu cầu không xong: ${String(r.error ?? "").split("\n")[0].slice(0, 160)}`, true);
+  }
+  ctx.emit("requests", list);
+}
+
+function onJob(e) {
+  const jobs = ctx.state.jobs.filter((j) => j.id !== e.job.id);
+  ctx.state.jobs = [...jobs, e.job].sort((a, b) => a.started.localeCompare(b.started));
+  if (!ctx.state.logs.has(e.job.id)) ctx.state.logs.set(e.job.id, []);
+  if (e.type === "log") ctx.state.logs.get(e.job.id).push(e.line);
+  if (e.type === "exit" && e.job.kind === "export") {
+    if (e.job.code === 5) toast(e.job.meta?.message ?? "Thiếu cổng", true);
+    else if (e.job.code === 0 && e.job.meta?.step === "compress") toast(`Đã xuất ${e.job.meta.output}`);
+    else if (e.job.code !== 0 && e.job.status !== "cancelled") toast(`Xuất video lỗi (exit ${e.job.code})`, true);
+  }
+  ctx.emit("jobs", e);
+}
+
 function subscribe(name) {
   events?.close();
   events = new EventSource(`/api/events?name=${encodeURIComponent(name)}`);
@@ -101,7 +167,8 @@ function subscribe(name) {
     const m = JSON.parse(e.data);
     if (name === ctx.state.name && m.version !== ctx.state.m?.version) reload();
   });
-  events.addEventListener("request", (e) => ctx.emit("requests", JSON.parse(e.data)));
+  events.addEventListener("request", (e) => { if (name === ctx.state.name) setRequests(JSON.parse(e.data)); });
+  events.addEventListener("job", (e) => { if (name === ctx.state.name) onJob(JSON.parse(e.data)); });
 }
 
 async function importProject(name) {
@@ -115,7 +182,7 @@ async function importProject(name) {
 async function open(name) {
   events?.close(); events = null;
   const entry = ctx.state.projects.find((p) => p.name === name) ?? null;
-  Object.assign(ctx.state, { name: entry ? name : null, entry, m: null, sel: null, log: [] });
+  Object.assign(ctx.state, { name: entry ? name : null, entry, m: null, sel: null, log: [], jobs: [], logs: new Map(), requests: [] });
   const url = new URL(location.href);
   if (entry) url.searchParams.set("name", name); else url.searchParams.delete("name");
   history.replaceState(null, "", url);
@@ -129,7 +196,7 @@ async function open(name) {
     player.clear("Nhập dự án để xem");
   }
   ctx.emit("project", entry);
-  if (entry?.has_manifest) { await reload(); subscribe(name); }
+  if (entry?.has_manifest) { await reload(); subscribe(name); await refreshQueue(); }
 }
 
 async function loadProjects() {
@@ -140,7 +207,8 @@ async function loadProjects() {
 
 $("project-select").addEventListener("change", (e) => open(e.target.value));
 $("undo-btn").addEventListener("click", () => ctx.undo());
-$("export-btn").addEventListener("click", () => toast("Xuất video: chưa nối đạo diễn"));
+$("export-btn").addEventListener("click", () => ctx.exportVideo());
+ctx.on("time", (t) => (ctx.state.t = t));
 document.addEventListener("keydown", (e) => {
   if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "z") return;
   if (e.target.closest?.("input, textarea, select, [contenteditable]")) return;

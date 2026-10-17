@@ -45,7 +45,15 @@ node $OV/scripts/studio.mjs stop                 # dừng khi xong việc
 - Mọi thao tác sửa đi qua gateway với actor `human`: kéo mép phải shot (`resize_shot`, bước 0,1 s, tối thiểu 0,5 s), kéo câu thoại (`move_line`), Áp dụng trong inspector (`set_shot`, `resize_shot`), sửa lời (`set_line_text`, gate thành `stale`), thanh âm lượng nhạc (`set_music`), Hoàn tác hoặc Ctrl/Cmd+Z (`undo`). Phiên bản đã đổi (409) thì Studio tải lại và báo "Đã có thay đổi mới, đã tải lại".
 - Dự án chỉ xem hiện banner "Dự án nhập từ bản cũ: chỉ xem, sửa qua đạo diễn" và khoá mọi thao tác sửa.
 - Bảo mật: chỉ nghe 127.0.0.1, kiểm tra Host và Origin, POST cần token của lần chạy (lưu trong `~/.config/opus-video/studio.json`, chmod 600). Không phục vụ `.env`, `.git` hay dotfile ngoài `.opus/`. Tiến trình cùng user trên máy nằm trong vùng tin cậy.
-- Chưa nối đạo diễn: "Nhờ đạo diễn sửa", "Dùng mẫu này" và Xuất video mới chỉ báo "Chưa nối đạo diễn". Chưa có nút đưa lại hay huỷ một yêu cầu đang chạy bị kẹt.
+
+### Đạo diễn AI và xuất video từ Studio
+
+- Yêu cầu cho đạo diễn: ô "Nhờ đạo diễn sửa" (phạm vi `project`), nút "Nhờ đạo diễn" trong inspector (phạm vi `shot`, kèm thời điểm playhead và ghi chú chuyển động), câu đã sửa lời trong tab Lồng tiếng (phạm vi `line`: duyệt viet-pro rồi lồng tiếng lại), "Dùng mẫu này" trong tab Nhanh. Dự án chỉ xem vẫn nhận yêu cầu, vì đạo diễn sửa HTML trực tiếp.
+- Vòng đời một yêu cầu: `queued` → `running` → `done` (kèm biên nhận) hoặc `failed` (kèm lý do). Tab Đạo diễn AI liệt kê yêu cầu, biên nhận, log trực tiếp và nút Huỷ. Huỷ được cả yêu cầu đang chờ và yêu cầu bị kẹt ở `running`.
+- Runner đặt trong `~/.config/opus-video/studio.json`, giữ qua các lần start/stop: `{"director": {"runner": "cli"}}` (mặc định) hoặc `"mcp"`.
+  - `cli`: Studio tự chạy `claude -p` trong thư mục dự án, với `--permission-mode acceptEdits`, chỉ cho Read/Edit/Write/Glob/Grep, `node $OV/scripts/…`, `npx hyperframes …` và sáu tool MCP `opus-video`, cấm WebFetch/WebSearch. Mỗi dự án chạy một yêu cầu một lúc, yêu cầu sau chờ tới lượt. Phiên được nhớ trong `.opus/director.json` và lần sau `--resume`; resume hỏng thì chạy lại một lần với phiên mới. Đạo diễn đóng yêu cầu bằng `studio_request_done`; nếu nó thoát mà chưa đóng thì câu trả lời cuối thành biên nhận (exit 0) hoặc yêu cầu thành `failed` kèm 20 dòng log cuối. Đổi thời gian hoặc chuyển động thì đạo diễn chạy lại `recipe-pack` và `make-demo --animatic`; DEMO.md về `approval: pending`, nên "Xuất video" bị chặn tới khi người dùng duyệt lại animatic.
+  - `mcp`: yêu cầu nằm chờ cho một phiên Claude Code đang mở lấy bằng `studio_request_next`.
+- **Xuất video:** chạy `render-final.mjs` (giữ mọi cổng) ra `renders/<dự án>-<thời điểm>.mp4`, rồi `compress-final.sh` ra `…-final.mp4`. Exit 5 thì Studio báo "Thiếu cổng: …" với các dòng FAIL và không nén. Mỗi dự án chạy một job xuất một lúc. `stop` dừng mọi job (SIGTERM, 5 s sau SIGKILL), nên không còn tiến trình mồ côi.
 
 ## MCP server cho đạo diễn AI
 

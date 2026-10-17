@@ -29,3 +29,7 @@ at the seek point because the runtime keeps its own clock. In a hidden Browser p
 `requestAnimationFrame` is throttled: `getTime()` advanced 0.035 s while the audio advanced
 1.5 s. That comes from the hidden pane, not from the player, so playback sync has to be judged
 in a visible window.
+
+## Contract the player relies on (checked 2026-10-17, runtime 0.8.161)
+
+`studio/public/player.js` needs two globals that the HyperFrames runtime sets in the project page: `window.__playerReady` (truthy once the timeline and its sub-compositions are loaded) and `window.__player` with `play`, `pause`, `seek`, `getTime`, `getDuration` and `isPlaying`. Both were present with the global `hyperframes` 0.8.161 install (runtime `dist/hyperframe.runtime.iife.js`) on the fixture copy and on `claude-code-ceo-sme`. Projects pin `hyperframes@0.8.144` in their `package.json`, and `findRuntime` prefers the project's own install. After a HyperFrames upgrade, open one project in Studio. If the player reports "Không nạp được player" after 15 s, one of these globals changed name, so update `player.js` first.

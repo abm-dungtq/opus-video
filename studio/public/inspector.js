@@ -1,5 +1,6 @@
 // inspector.js — the selected shot: Tên, Số giây, Chuyển cảnh vào and motion_note, applied
 // together with "Áp dụng" as one patch (set_shot + resize_shot); assets as thumbnails.
+// "Nhờ đạo diễn" sends the motion note as a shot request at the playhead time.
 import { fmtS, h, round1, thumb } from "/dom.js";
 
 export function mountInspector(ctx, el) {
@@ -18,7 +19,8 @@ export function mountInspector(ctx, el) {
     const cur = s.transition_in ?? "";
     const opts = ["", ...new Set([...seams, cur].filter(Boolean))];
     const trans = h("select", { disabled: ro }, opts.map((o) => h("option", { value: o, selected: o === cur }, o || "(không)")));
-    const note = h("textarea", { value: s.motion_note ?? "", disabled: ro, placeholder: "Muốn shot này chuyển động thế nào…" });
+    // Also the text of "Nhờ đạo diễn", so it stays editable on read-only projects.
+    const note = h("textarea", { value: s.motion_note ?? "", placeholder: "Muốn shot này chuyển động thế nào…" });
 
     async function apply() {
       const ops = [];
@@ -43,7 +45,7 @@ export function mountInspector(ctx, el) {
       h("h3", {}, "Chuyển động"),
       h("div", { class: "muted" }, "Nội dung chuyển động trong shot này là code — nhờ đạo diễn"),
       note,
-      h("button", { class: "btn", onclick: () => ctx.toast("Chưa nối đạo diễn") }, "Nhờ đạo diễn"),
+      h("button", { class: "btn", onclick: () => ctx.direct({ scope: "shot", target: s.id, t: round1(ctx.state.t), text: note.value.trim() }) }, "Nhờ đạo diễn"),
       h("h3", {}, `Chất liệu (${assets.length})`),
       assets.length ? h("div", { class: "thumbs" }, assets.map((a) => thumb(ctx.state.name, a))) : h("div", { class: "muted" }, "Chưa có chất liệu"),
     );

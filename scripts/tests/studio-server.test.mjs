@@ -115,3 +115,42 @@ test("SSE sends manifest after a patch", async () => {
   assert.equal(got.version, v + 1);
   assert.equal(got.shots[1].name, "SSE");
 });
+
+test("undo, busy lock, import mapping, files and a missing runtime", async () => {
+  const v = (await http("GET", "/api/project?name=demo")).json.version;
+  const ok = await post("/api/patch", { name: "demo", base: v, ops: [{ op: "set_shot", id: "s3", field: "name", value: "U" }] });
+  assert.equal(ok.status, 200);
+  const u = await post("/api/undo", { name: "demo", base: v + 1 });
+  assert.equal(u.status, 200, u.text);
+  assert.equal((await http("GET", "/api/project?name=demo")).json.shots[2].name, "Kết quả");
+  assert.equal((await post("/api/undo", { name: "demo", base: v })).status, 409);
+  // Another process holds the project lock: a write gives up after 300 ms with 503.
+  writeFileSync(join(root, "demo", ".opus", "lock"), "other");
+  const t0 = Date.now();
+  const busy = await post("/api/patch", { name: "demo", base: v + 2, ops: [{ op: "set_shot", id: "s3", field: "name", value: "B" }] });
+  assert.equal(busy.status, 503);
+  assert.ok(Date.now() - t0 < 2000);
+  rmSync(join(root, "demo", ".opus", "lock"));
+  assert.equal((await post("/api/import", { name: "demo" })).status, 409);
+  const files = (await http("GET", "/api/files?name=demo&dir=assets")).json;
+  assert.ok(files.some((f) => f.path === "assets/voice/01.mp3.words.json"));
+  assert.equal((await http("GET", "/api/files?name=demo&dir=..")).status, 400);
+  assert.equal((await http("GET", "/hf/runtime.js?name=demo")).status, 404);
+});
+
+test("export: a project without demo approval stops at the gate (exit 5) and is not compressed", async () => {
+  const r = await post("/api/export", { name: "old" });
+  assert.equal(r.status, 200, r.text);
+  let job;
+  for (let i = 0; i < 200; i++) {
+    job = (await http("GET", "/api/jobs?name=old")).json.find((j) => j.id === r.json.job.id);
+    if (job.ended) break;
+    await new Promise((x) => setTimeout(x, 100));
+  }
+  assert.equal(job.code, 5);
+  assert.match(job.meta.message, /^Thiếu cổng: .*DEMO\.md/);
+  await new Promise((x) => setTimeout(x, 200));
+  assert.equal((await http("GET", "/api/jobs?name=old")).json.length, 1);
+  assert.equal((await http("GET", "/api/files?name=old&dir=renders")).json.some((f) => /-final\.mp4$/.test(f.path)), false);
+  assert.equal((await post("/api/export", { name: "old", ratio: "9x16" })).status, 400);
+});
