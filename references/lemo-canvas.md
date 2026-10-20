@@ -64,9 +64,9 @@ Số đo trên hai spike (MacBook, 10 giây, 300 khung, HyperFrames 0.8.144, 202
 | Skeleton GSAP thuần | khoảng 6,1 giây | giống nhau từng byte |
 | `watercolor` (2D) | 7,5–7,8 giây, khoảng 1,3 lần | giống nhau từng byte |
 | `glass-product` (3D, GPU) | 28,7–36,7 giây, khoảng 5 lần | PSNR trung bình 56,7 dB, thấp nhất 53,4 dB, mắt thường không thấy khác |
-| `glass-product` (3D, `--no-browser-gpu`) | khoảng 30 phút | chưa đo |
+| `glass-product` (3D, `--no-browser-gpu`) | khoảng 30 phút | giống nhau từng byte; so với bản GPU PSNR khoảng 46 dB |
 
-Vì vậy với 3D, tiêu chí là PSNR từ 50 dB trở lên giữa hai lần render, không phải framemd5. Render bằng SwiftShader (`--no-browser-gpu`) quá chậm để dùng hằng ngày.
+Vì vậy với 3D trên GPU, tiêu chí là PSNR từ 50 dB trở lên giữa hai lần render, không phải framemd5. SwiftShader (`--no-browser-gpu`) cho hai bản giống nhau từng byte nhưng quá chậm để dùng hằng ngày, và hình của nó lệch nhẹ so với bản GPU, nên đừng trộn khung của hai cách render trong một video.
 
 ## Khổ dọc
 
