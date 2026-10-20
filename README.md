@@ -370,7 +370,8 @@ Mọi script đều có `--help` / `-h` (in phần mô tả đầu file, thoát 
 | `scripts/audio-mix.mjs` | Dựng lại tiếng của composition bằng ffmpeg; giảm nhạc theo giọng từ `data-fx-carve`; `--loudnorm`, `--stems` |
 | `scripts/mix-balance.mjs` | Đo nhạc thấp hơn giọng bao nhiêu dB lúc có lời (PASS 4–7 dB) |
 | `scripts/reframe.mjs` | Sinh bản 9:16 hoặc 1:1 từ một `index.html` có khối `html[data-ratio=…]`; asset clone APFS |
-| `scripts/styles.mjs` | 61 style: `find`, `show`, `css`, `suggest --direction`, `resolve --project` (style theo cảnh), `validate` |
+| `scripts/styles.mjs` | 63 style: `find`, `show`, `css`, `suggest --direction`, `resolve --project` (style theo cảnh), `validate` |
+| `scripts/lemo.mjs` | Lớp lemo-canvas: `fetch` (cache commit lemo-opuscar đã ghim), `list`, `add --project . --style <slug>` (watercolor hoặc glass-product), `remove`. Xem `references/lemo-canvas.md` |
 | `scripts/source-ingest.mjs` | Lưu văn bản gốc của URL, PDF, trang abstract arXiv (toàn văn thì truyền `https://arxiv.org/pdf/<id>`) vào `sources/` và ghi mục nguồn vào `SOURCES.md`; PDF cần `pdftotext` (poppler) |
 
 ## 8. Cập nhật và gỡ
@@ -401,4 +402,4 @@ Test cần project thật sẽ tự bỏ qua khi không tìm thấy project đó
 
 ## Giấy phép
 
-Mã nguồn và tài liệu dùng giấy phép MIT (xem `LICENSE`). Corpus trong `data/` lấy từ hai repo có giấy phép MIT. Prompt trong corpus thuộc về tác giả gốc, và mỗi dòng đều ghi tác giả cùng link. Repo không phân phối lại video gốc. `scripts/cut.mjs` phỏng theo ý tưởng của [open-edit](https://github.com/veedstudio/open-edit) (Apache-2.0, © VEED LIMITED); xem `NOTICE`. 61 style trong `data/styles/`, ba tài liệu chi tiết style, skeleton composition, nguyên tắc chuyển động và các thuật toán beat-grid, reframe, resolve style phỏng theo skill motion-video của AgentKit (MIT, © 2026 BestAgentKits); xem `NOTICE` và `third_party/agentkit-motion-video/LICENSE`.
+Mã nguồn và tài liệu dùng giấy phép MIT (xem `LICENSE`). Corpus trong `data/` lấy từ hai repo có giấy phép MIT. Prompt trong corpus thuộc về tác giả gốc, và mỗi dòng đều ghi tác giả cùng link. Repo không phân phối lại video gốc. `scripts/cut.mjs` phỏng theo ý tưởng của [open-edit](https://github.com/veedstudio/open-edit) (Apache-2.0, © VEED LIMITED); xem `NOTICE`. 61 trong 63 style của `data/styles/`, ba tài liệu chi tiết style, skeleton composition, nguyên tắc chuyển động và các thuật toán beat-grid, reframe, resolve style phỏng theo skill motion-video của AgentKit (MIT, © 2026 BestAgentKits); xem `NOTICE` và `third_party/agentkit-motion-video/LICENSE`.
