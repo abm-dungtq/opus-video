@@ -45,9 +45,9 @@ const focusAt = new THREE.Vector3(0, 15, 0);
 window.lemoRender = (t, win) => {
   const shots = Object.values(win), [a0, a1] = shots[0], at = (f) => a0 + (a1 - a0) * f;
   const end = shots[shots.length - 1][1];
-  const k = ss(seg(t, 0, end)), az = lerp(-.5, .3, k), r = lerp(260, 210, k);
-  camera.position.set(Math.sin(az) * r, lerp(38, 24, k), Math.cos(az) * r);
-  camera.lookAt(focusAt);
+  const k = ss(seg(t, 0, end)), az = lerp(-.5, .3, k), r = lerp(360, 310, k);
+  camera.position.set(Math.sin(az) * r, lerp(30, 20, k), Math.cos(az) * r);
+  camera.lookAt(0, 30, 0); // above the vase centre, so the object sits low and the title band stays clear
   // one light sweep across the glass in the first shot
   const s = seg(t, at(.3), at(.8));
   const sweep = s > 0 && s < 1 ? { x: lerp(-1, 1, s), I: 8 * Math.sin(s * Math.PI), tilt: -.3, az: az + Math.PI } : { I: 0 };
