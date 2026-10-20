@@ -1,0 +1,21 @@
+{
+  "repo": "https://github.com/lemomo-ai/lemo-opuscar.git",
+  "sha": "b5e8ef93930b6d828f352055a689320f138237b1",
+  "three": "0.170.0",
+  "styles": {
+    "watercolor": {
+      "kind": "2d",
+      "files": ["styles/watercolor/demo/engine.js", "styles/watercolor/demo/plants.js"],
+      "paper": "styles/watercolor/demo/paper.py",
+      "guide": "styles/watercolor/STYLE.md",
+      "status": "verified"
+    },
+    "glass-product": {
+      "kind": "3d",
+      "files": ["core/three/post.js", "styles/glass-product/demo/studio.js"],
+      "three_addons": ["postprocessing", "shaders", "objects", "math", "lights"],
+      "guide": "styles/glass-product/STYLE.md",
+      "status": "verified"
+    }
+  }
+}
