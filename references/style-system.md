@@ -34,6 +34,8 @@ node $OV/scripts/styles.mjs css glass-keynote            # :root { --bg: …; --
 node $OV/scripts/styles.mjs suggest --direction A6 --energy em
 ```
 
+`signature_moves` nhận hai dạng. Chuỗi là tên nước đi (61 profile cũ). Object `{ "name", "technique", "numbers", "check" }` ghi kỹ thuật, con số đo được (số hoặc `[lo, hi]`) và cách kiểm trên contact sheet hay frame; `styles.mjs validate` kiểm dạng này, `judge.mjs score --style <id>` đưa phần `check` cho giám khảo. Profile mới nên viết bằng object, ví dụ `variety-captions` (hoa chữ 9:16).
+
 `find` khớp id trước, rồi alias, rồi từ trong `summary`, `mo_ta_vi`, `best_for`. Không phân biệt hoa thường, dấu, gạch nối; bỏ qua các chữ "style", "kiểu", "phong cách". Một tên khớp hai style ngang nhau, hoặc không khớp gì, thì báo các ứng viên cho người dùng chọn, không đoán.
 
 ## Năng lượng

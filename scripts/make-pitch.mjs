@@ -45,7 +45,7 @@ import { createHash } from "node:crypto";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
 import { loadDirections, pickDirections, compatWarnings, resolveSelection, wordBudget, upstream, DIMENSIONS, DIM_VI, TIER_VI } from "./directions.mjs";
-import { StyleError, defaultStyle, loadProfiles, lookup, paletteCss } from "./styles.mjs";
+import { StyleError, defaultStyle, loadProfiles, lookup, moveText, paletteCss } from "./styles.mjs";
 import { OV_DIR } from "./skill-paths.mjs";
 import { buildRecipes } from "./recipe-pack.mjs";
 import { findBrand, validateBrand, brandAbs } from "./brand.mjs";
@@ -117,7 +117,7 @@ ${paletteCss(style)}
 - Chữ: ${list(dims.typography)} (font thiếu dấu tiếng Việt thì thay bằng Be Vietnam Pro)
 - Chất liệu: ${list(dims.material)}
 - Chuyển cảnh: ${list(dims.transitions)}
-- Nước đi đặc trưng: ${list((style.signature_moves || []).slice(0, 3))}
+- Nước đi đặc trưng: ${list((style.signature_moves || []).slice(0, 3).map(moveText))}
 - Ràng buộc: ${list(style.constraints)}
 ${style.detail ? `- Chi tiết: \`${join(OV_DIR, style.detail)}\`\n` : ""}
 `;

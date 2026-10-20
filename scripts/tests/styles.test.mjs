@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  STYLES_DIR, STYLE_DIMENSIONS, StyleError, buildIndex, defaultStyle, findStyles, loadProfiles, lookup, main,
+  STYLES_DIR, STYLE_DIMENSIONS, StyleError, buildIndex, defaultStyle, findStyles, loadProfiles, lookup, main, moveError, moveText,
   norm, paletteCss, parseLayers, planSceneList, renderMarkdown, resolveProject, resolveSpec, suggestStyles, validateProfiles,
 } from "../styles.mjs";
 import { checkData, compatWarnings, loadDirections, main as directionsMain } from "../directions.mjs";
@@ -22,8 +22,9 @@ const fx = (name) => fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url
 const capture = () => { const out = []; return { out, log: (s) => out.push(String(s)), text: () => out.join("\n") }; };
 const SCENES = [{ id: "s1", type: "cover" }, { id: "s2", type: "ui-demo" }, { id: "s3", type: "diagram" }, { id: "s4", type: "outro" }];
 
-test("61 profiles with Vietnamese name and description; validate passes; index.json is generated", () => {
-  assert.equal(Object.keys(profiles).length, 61);
+test("every profile has a Vietnamese name and description; validate passes; index.json is generated", () => {
+  assert.ok(Object.keys(profiles).length >= 62);
+  assert.ok(profiles["variety-captions"]);
   for (const p of Object.values(profiles)) {
     assert.ok(p.ten_vi && p.ten_vi.split(/\s+/).length <= 5, `${p.id} ten_vi`);
     assert.ok(p.mo_ta_vi && p.mo_ta_vi.split(/\s+/).length <= 25, `${p.id} mo_ta_vi`);
@@ -33,10 +34,10 @@ test("61 profiles with Vietnamese name and description; validate passes; index.j
   const text = readFileSync(join(STYLES_DIR, "index.json"), "utf8");
   assert.equal(text, buildIndex(profiles));
   const rows = JSON.parse(text);
-  assert.equal(rows.length, 61);
+  assert.equal(rows.length, Object.keys(profiles).length);
   assert.deepEqual(Object.keys(rows[0]), ["id", "ten_vi", "name", "family", "aliases", "energy", "best_for", "summary", "mo_ta_vi", "depth"]);
   assert.deepEqual(rows.map((r) => r.id), [...rows.map((r) => r.id)].sort());
-  assert.equal(text.trim().split("\n").length, 63, "one line per style plus the brackets");
+  assert.equal(text.trim().split("\n").length, Object.keys(profiles).length + 2, "one line per style plus the brackets");
   assert.deepEqual(rows.filter((r) => r.depth === "reference").map((r) => r.id), ["cinematic-product-launch", "comic-multiverse", "glass-keynote"]);
 });
 
@@ -283,4 +284,29 @@ test("preflight plan: creative-good with style_profile glass-keynote still passe
     assert.equal(checkStyle({ dir: d, brief: "---\ntitle: cũ\n---\n", ...quiet }), null);
     assert.deepEqual(quiet, { errors: [], warnings: [] }, "a legacy brief without style_profile stays silent");
   } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("signature moves: a string or { name, technique, numbers, check } with numeric values", () => {
+  const ok = { name: "a", technique: "b", check: "c", numbers: { f: 4, r: [1, 2] } };
+  assert.equal(moveError("x"), null);
+  assert.notEqual(moveError(""), null);
+  assert.equal(moveError(ok), null);
+  const noCheck = { ...ok };
+  delete noCheck.check;
+  assert.match(moveError(noCheck), /check/);
+  assert.notEqual(moveError({ ...ok, numbers: {} }), null);
+  assert.notEqual(moveError({ ...ok, numbers: { r: [3, 1] } }), null);
+  assert.match(moveError({ ...ok, foo: 1 }), /foo/);
+  assert.equal(moveText("plain"), "plain");
+  assert.match(moveText(ok), /kiểm:/);
+});
+
+test("validate reports a malformed signature move; variety-captions moves are all numeric objects", () => {
+  const broken = structuredClone(profiles["variety-captions"]);
+  broken.signature_moves = [{ name: "x" }];
+  assert.ok(validateProfiles({ ...profiles, "variety-captions": broken }).some((e) => e.includes("signature_moves[0]")));
+  for (const m of profiles["variety-captions"].signature_moves) {
+    assert.equal(typeof m, "object");
+    assert.equal(moveError(m), null);
+  }
 });

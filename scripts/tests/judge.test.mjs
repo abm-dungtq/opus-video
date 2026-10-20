@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   consensusOf, mapWinner, parseEnvelope, countTextMatches, htmlToText, normalizeText, buildCorpus,
+  aggregateScores, median, scoreShapeError, scorePrompt, SCORE_DIMENSIONS,
 } from "../judge.mjs";
 
 const script = fileURLToPath(new URL("../judge.mjs", import.meta.url));
@@ -136,4 +137,95 @@ test("parseEnvelope: model text mentioning login is not an auth error", () => {
   assert.equal(parseEnvelope(env, "").kind, "invalid");
   assert.equal(parseEnvelope("", "Error: not logged in").kind, "auth");
   assert.equal(parseEnvelope(JSON.stringify({ status: "ERROR", error: { message: "please sign in" } }), "").kind, "auth");
+});
+
+// ---------- score ----------
+
+const scored = (over = {}) => ({
+  duration_s: 10, onscreen_text: [], critical: [], strengths: [], ai_template: false,
+  scores: Object.fromEntries(SCORE_DIMENSIONS.map((d) => [d, 6])),
+  fixes: [{ t_s: 1, dimension: "technical", observed: "x", change: "y", impact: "low", wow: false }],
+  ...over,
+});
+const scoreArgs = (out, ...extra) => ["score", "--video", VIDEO, "--hyperframes", PROJECT, "--out", out, ...extra];
+
+test("median: odd count → middle value, even count → mean of the two middle values", () => {
+  assert.equal(median([3, 1, 2]), 2);
+  assert.equal(median([1, 2, 3, 4]), 2.5);
+});
+
+test("aggregateScores: per-dimension median and spread, unstable above 1, ai_template by majority", () => {
+  const hi = scored({ scores: { ...scored().scores, technical: 9 }, ai_template: true });
+  const a = aggregateScores([scored({ ai_template: true }), scored(), hi]);
+  assert.equal(a.median.technical, 6);
+  assert.equal(a.spread.technical, 3);
+  assert.ok(a.unstable.includes("technical"));
+  assert.equal(a.spread.concept_wow, 0);
+  assert.equal(a.ai_template, true);
+  assert.equal(a.fixes.length, 3);
+  assert.deepEqual(a.fixes.map((f) => f.run), [1, 2, 3]);
+});
+
+test("scoreShapeError: missing or out-of-range scores are rejected", () => {
+  assert.equal(scoreShapeError(scored()), null);
+  const missing = scored();
+  delete missing.scores.technical;
+  assert.match(scoreShapeError(missing), /technical/);
+  assert.ok(scoreShapeError(scored({ scores: { ...scored().scores, motion_craft: 11 } })));
+  assert.ok(scoreShapeError(scored({ fixes: [] })));
+});
+
+test("scorePrompt: signature moves (string or object) are appended only when given", () => {
+  assert.equal(scorePrompt([]), scorePrompt());
+  assert.ok(!scorePrompt([]).includes("judge style_fidelity against these"));
+  const p = scorePrompt([{ name: "Pop", technique: "scale in", check: "4 frames" }, "Plain move"]);
+  assert.ok(p.includes("Pop — scale in (check: 4 frames)") && p.includes("- Plain move"));
+  assert.ok(p.includes("judge style_fidelity against these"));
+});
+
+test("score + score: exit 0, median of 3 valid runs", { skip: !haveFixture }, () => {
+  const out = join(tmp, "score.json");
+  const r = run("score", scoreArgs(out, "--runs", "3"));
+  assert.equal(r.code, 0, r.stderr);
+  const j = readOut(out);
+  assert.equal(j.mode, "score");
+  assert.equal(j.status, "valid");
+  assert.equal(j.runs_valid, 3);
+  assert.equal(j.median.technical, 7);
+  assert.equal(j.spread.technical, 0);
+  assert.equal(j.fixes.length, 3);
+});
+
+test("score --runs 1: one valid run is enough", { skip: !haveFixture }, () => {
+  const out = join(tmp, "score1.json");
+  const r = run("score", scoreArgs(out, "--runs", "1"));
+  assert.equal(r.code, 0, r.stderr);
+  assert.equal(readOut(out).runs_valid, 1);
+});
+
+test("score + score-nofp: exit 2, invalid", { skip: !haveFixture }, () => {
+  const out = join(tmp, "score-nofp.json");
+  const r = run("score-nofp", scoreArgs(out, "--runs", "2"));
+  assert.equal(r.code, 2, r.stderr);
+  assert.equal(readOut(out).status, "invalid");
+  assert.equal((r.stderr.match(/invalid —/g) || []).length, 4);
+});
+
+test("score --style: a known style is recorded, an unknown one is a usage error", { skip: !haveFixture }, () => {
+  const out = join(tmp, "score-style.json");
+  const r = run("score", scoreArgs(out, "--runs", "1", "--style", "kinetic-typography"));
+  assert.equal(r.code, 0, r.stderr);
+  assert.equal(readOut(out).style, "kinetic-typography");
+  const alias = join(tmp, "score-alias.json");
+  assert.equal(run("score", scoreArgs(alias, "--runs", "1", "--style", "hoa chữ")).code, 0);
+  assert.equal(readOut(alias).style, "variety-captions");
+  assert.equal(run("score", scoreArgs(join(tmp, "x.json"), "--style", "khong-co-style-nay")).code, 2);
+});
+
+test("score --runs 9: usage error", () => {
+  assert.equal(run("score", scoreArgs(join(tmp, "x.json"), "--runs", "9")).code, 2);
+});
+
+test("score + auth: exit 3", { skip: !haveFixture }, () => {
+  assert.equal(run("auth", scoreArgs(join(tmp, "sa.json"), "--runs", "3")).code, 3);
 });

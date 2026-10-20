@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+- `judge.mjs score`: Gemini chấm 7 tiêu chí 1–10 (style_fidelity, concept_wow, motion_craft, design_typography, finish_texture, sound_sync, technical) theo mốc cố định, chạy 3 lượt độc lập, ghi trung vị, độ dao động và 5–10 fix có mốc giây. Chỉ quan sát, không chặn render. `--style <id>` đưa signature moves của profile cho giám khảo.
+- `signature_moves` nhận object `{ name, technique, numbers, check }` bên cạnh chuỗi; `styles.mjs validate` kiểm dạng mới.
+- Profile `variety-captions` (Hoa chữ show giải trí): phụ đề 9:16 viền dày nảy theo lời, từ nhấn kèm sticker, trong vùng an toàn TikTok.
+- `check-preflight.mjs`: mục `## Nhịp` trong PLAN.md (Hook ≤ 0,5 s, cao trào bắt đầu trong 55–78 % thời lượng, giữ cuối 0,8–1,2 s), chỉ cảnh báo.
+
 ### Fixed
 - Đạo diễn của Motion Studio không còn sửa được file ngoài dự án. `ALLOWED_TOOLS` trong `scripts/studio-api.mjs` bỏ hai luật `Edit` và `Write` không kèm đường dẫn: với chúng, `claude -p` sửa được mọi file không nhạy cảm trên đĩa (ví dụ `/tmp/…`). Chế độ `acceptEdits` vẫn cho sửa trong thư mục dự án (cwd). Kiểm bằng `claude -p` 2.1.304 với haiku: sửa trong dự án được, sửa `/tmp/<probe>` bị chặn.
 

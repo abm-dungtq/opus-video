@@ -1,0 +1,122 @@
+{
+  "id": "variety-captions",
+  "name": "Variety Show Captions",
+  "ten_vi": "Hoa chữ show giải trí",
+  "mo_ta_vi": "Phụ đề kiểu show giải trí: chữ to viền dày nảy theo lời, từ nhấn phóng lên kèm sticker, gọn trong vùng an toàn TikTok.",
+  "family": "aesthetic",
+  "aliases": ["hoa chữ", "variety captions", "huazi", "phụ đề show"],
+  "summary": "Variety-show caption art for 9:16: fat outlined words pop on their spoken onsets, stressed words punch with stickers.",
+  "energy": 4,
+  "best_for": ["social-cut", "talking-head", "announcement"],
+  "character": "Sound-off social viewing: the caption is the performance. Chunky outlined words bounce in on their spoken onsets, one stressed word per line punches up with a sticker, and everything stays inside the TikTok safe area.",
+  "dimensions": {
+    "palette": {
+      "mode": "mixed",
+      "colors": {
+        "bg": "#111111",
+        "ink": "#ffffff",
+        "accent": "#ffd400",
+        "stroke": "#111111",
+        "hot": "#ff3b6b",
+        "cool": "#22c3ff"
+      },
+      "rule": "Caption fill ink or accent, always with a stroke-coloured outline; hot and cool only for the stressed word and its sticker, never both on one line."
+    },
+    "typography": [
+      "Be Vietnam Pro 900 for caption words, 88-120 px on 1080x1920, line-height 1.05, tracking 0",
+      "Be Vietnam Pro 700 for the small label line, 44-56 px",
+      "Max 2 caption lines, max 14 words on screen at once"
+    ],
+    "layout": [
+      "Captions centred on x, inside x 72-900 and y 231-1536 (TikTok/Reels UI safe area on 1080x1920)",
+      "Default caption block centred at y 1180-1380; moves up to y 300-500 when the subject's face is low",
+      "Sticker sits at the end of the stressed word, offset 12-24 px up and right"
+    ],
+    "material": [
+      "Flat fill with 2-3 stacked outlines: inner stroke 6-10 px, outer stroke or hard drop shadow offset 4-8 px"
+    ],
+    "texture": [
+      "None on captions; footage keeps its own texture"
+    ],
+    "camera": [
+      "Optional punch-in on the footage 1.0 -> 1.06 over 4 frames on a stressed word",
+      "No camera move on the caption layer itself"
+    ],
+    "transitions": [
+      "caption pop (scale 0 -> 1.15 -> 1.0 in 4 frames at 30 fps, back.out(2.2))",
+      "caption swap (old line scales 1.0 -> 0.9 and leaves in 3 frames while the next pops)",
+      "sticker spin-in (rotate -12 -> 0 deg with scale 0 -> 1.1 -> 1.0, 6 frames)"
+    ],
+    "pacing": {
+      "bpm": [100, 140],
+      "rhythm": "Word-locked: a caption line changes on phrase boundaries from words.json, never mid-word; stressed-word punches land on the stressed syllable onset."
+    },
+    "beat_response": [
+      "Stressed word punch 1.0 -> 1.25 -> 1.0 in 6 frames on its onset",
+      "Sticker wiggles +-4 deg on kicks while on screen"
+    ],
+    "ui_choreography": [
+      "No product UI; captions and stickers are the only overlay layer",
+      "Small label pill (top area, y 260-340) may name the speaker or topic"
+    ],
+    "diagrams": [
+      "Not used; numbers appear as an oversized caption word in accent"
+    ],
+    "character_motion": [
+      "No mascot; emoji or sticker shapes only, max one per line"
+    ],
+    "captions": [
+      "The captions are the style: word-by-word from words.json, current word in accent, past words ink, future words hidden"
+    ],
+    "sound": [
+      "Upbeat pop or hip-hop bed 100-140 BPM under the voice",
+      "SFX: pop on each caption line, boing or ding on stressed-word punches; high density but 11-16 dB under the voice"
+    ]
+  },
+  "scene_types": {
+    "prefer": ["hook", "quote", "testimonial", "cta"],
+    "avoid": ["ui-demo", "diagram", "code", "terminal"]
+  },
+  "signature_moves": [
+    {
+      "name": "Caption pop",
+      "technique": "Each caption line scales 0 -> 1.15 -> 1.0 with back.out(2.2), anchored at its spoken onset W(word)",
+      "numbers": { "frames_in": 4, "overshoot": 1.15, "fps": 30 },
+      "check": "Step frames around a line's onset: frame 1-2 above 1.1x, frame 4 at 1.0x, first frame within 1 frame of the word onset in words.json"
+    },
+    {
+      "name": "Stacked outline",
+      "technique": "Fill plus inner stroke plus outer stroke or hard drop shadow, so captions read on any footage",
+      "numbers": { "stroke_layers": [2, 3], "inner_stroke_px": [6, 10], "shadow_offset_px": [4, 8] },
+      "check": "At 100% zoom on a demo frame over the brightest and darkest footage, 2-3 outline layers are visible and every diacritic is legible"
+    },
+    {
+      "name": "Stressed-word punch",
+      "technique": "One stressed word per line punches up in hot or cool with a sticker spinning in at its end",
+      "numbers": { "punch_scale": 1.25, "punch_frames": 6, "sticker_rot_deg": 12, "max_punch_per_line": 1 },
+      "check": "Contact sheet: at most one punched word per line; its scale peak falls within 1 frame of the stressed word onset"
+    },
+    {
+      "name": "TikTok safe area",
+      "technique": "Caption block and stickers stay inside the 9:16 UI-free zone",
+      "numbers": { "x_min": 72, "x_max": 900, "y_min": 231, "y_max": 1536, "max_lines": 2 },
+      "check": "hyperframes check --frame-check and video-lint report nothing in the UI zone; no caption over 2 lines on any demo frame"
+    }
+  ],
+  "strengths": [
+    "Works with sound off",
+    "Lifts plain talking-head footage",
+    "Fast to produce from words.json"
+  ],
+  "constraints": [
+    "Every caption line anchored with W(); no fixed offsets",
+    "Be Vietnam Pro only (full Vietnamese diacritics)",
+    "One stressed word per line, max 2 lines"
+  ],
+  "avoid": [
+    "Captions covering the speaker's mouth or eyes",
+    "Thin outlines that vanish on bright footage",
+    "More than one sticker per line"
+  ],
+  "pairs_well_with": ["kinetic-typography", "joyful-pop", "character-comedy"]
+}

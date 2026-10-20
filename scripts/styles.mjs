@@ -58,6 +58,27 @@ export const REQUIRED = ["id", "name", "ten_vi", "mo_ta_vi", "family", "aliases"
 export const ENERGY_RANGE = { em: [1, 2], vua: [3, 3], "don-dap": [4, 5] };
 export const MAX_LAYERS = 4;
 const LAYER_KEYS = ["style", "dimensions", "scenes", "palette_mode"];
+
+// A signature move is a plain string, or { name, technique, numbers, check } with testable numbers.
+export function moveText(m) {
+  if (typeof m === "string") return m;
+  return `${m.name} — ${m.technique}; kiểm: ${m.check}`;
+}
+
+// Error text for one signature move, or null when it is valid.
+export function moveError(m) {
+  if (typeof m === "string") return m.trim() ? null : "is an empty string";
+  if (!m || typeof m !== "object" || Array.isArray(m)) return "must be a string or an object";
+  for (const k of ["name", "technique", "check"]) if (typeof m[k] !== "string" || !m[k].trim()) return `needs a non-empty ${k}`;
+  const nums = m.numbers;
+  if (!nums || typeof nums !== "object" || Array.isArray(nums) || !Object.keys(nums).length) return "needs a non-empty numbers object";
+  for (const [k, v] of Object.entries(nums)) {
+    const ok = typeof v === "number" || (Array.isArray(v) && v.length === 2 && v.every((x) => typeof x === "number") && v[0] <= v[1]);
+    if (!ok) return `numbers.${k} must be a number or [lo, hi]`;
+  }
+  const extra = Object.keys(m).filter((k) => !["name", "technique", "numbers", "check"].includes(k));
+  return extra.length ? `has unknown keys ${extra.join(", ")}` : null;
+}
 const PALETTE_MODES = ["accent", "full"];
 const HEX = /^#[0-9a-f]{6}$/i;
 const CSS_RGB = /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)$/i;
@@ -180,6 +201,8 @@ export function validateProfiles(profiles, { dir = STYLES_DIR, root = OV_DIR } =
       if (unknown.length) err(`scene_types.${bucket} has unknown types ${unknown.join(", ")}`);
     }
     for (const other of p.pairs_well_with || []) if (!profiles[other]) err(`pairs_well_with names unknown style "${other}"`);
+    if (!Array.isArray(p.signature_moves) || !p.signature_moves.length) err("signature_moves needs at least one move");
+    else p.signature_moves.forEach((m, i) => { const e = moveError(m); if (e) err(`signature_moves[${i}] ${e}`); });
     if (p.detail && !existsSync(join(root, p.detail))) err(`detail file ${p.detail} not found`);
     for (const name of [id, ...(p.aliases || [])]) {
       const key = norm(name);
@@ -347,7 +370,7 @@ const showText = (p) => [
   `${p.id} — ${p.ten_vi} (${p.name}, ${p.family}, năng lượng ${p.energy}/5 = ${energyBucket(p.energy)})`,
   p.mo_ta_vi, p.summary,
   `Hợp: ${(p.best_for || []).join(", ")} · cảnh nên dùng: ${(p.scene_types?.prefer || []).join(", ")} · tránh: ${(p.scene_types?.avoid || []).join(", ") || "—"}`,
-  `Nước đi đặc trưng: ${(p.signature_moves || []).join("; ")}`,
+  `Nước đi đặc trưng: ${(p.signature_moves || []).map(moveText).join("; ")}`,
   `Ràng buộc: ${(p.constraints || []).join("; ")}`,
   `Tránh: ${(p.avoid || []).join("; ")}`,
   `Đi cùng: ${(p.pairs_well_with || []).join(", ")}${p.detail ? `\nChi tiết: ${join(OV_DIR, p.detail)}` : ""}`,

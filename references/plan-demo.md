@@ -36,8 +36,13 @@ Người xem là ai, xem xong làm gì. Thời lượng, khổ hình (16:9 / 9:1
 | # | Thời điểm | Loại | Lời đọc | Hình / hiệu ứng | Blueprint/Rule | Nối sang beat sau | Âm thanh |
 |---|---|---|---|---|---|---|---|
 | 1 | 0–2s | hook | — | Khung lệnh gõ yêu cầu (styleframe đã duyệt) | prompt-type-submit-generate | card-morph-anchor | keycap click |
-| 2 | 2–6s | ui-demo | "…" | Khung giãn thành bảng tiến trình | agent-progress-theater | zoom-through vào bước cuối | soft pop |
-| 3 | 6–15s | outro | "…" | Logo khoá giữa khung | cta-morph-press | — | glass pop |
+| 2 | 2–9s | ui-demo | "…" | Khung giãn thành bảng tiến trình | agent-progress-theater | zoom-through vào bước cuối | soft pop |
+| 3 | 9–15s | outro | "…" | Logo khoá giữa khung | cta-morph-press | — | glass pop |
+
+## Nhịp
+- Hook: 0.3s
+- Cao trào: cảnh 3
+- Giữ cuối: 1.0s
 
 ## Âm thanh
 Giọng (voice id/model), nhạc nền (prompt, âm lượng), SFX theo beat, ngôn ngữ.
@@ -68,6 +73,8 @@ Lệnh sẽ chạy ở bước 8 (lint, check, video-lint, qc-mp4 MOTION, judge)
 ```
 
 Cột `Loại` là tuỳ chọn: một loại cảnh trong `references/style-system.md` (`cover`, `hook`, `ui-demo`, `diagram`, `outro`…) hoặc `—`. Lớp trong `## style_layers` của BRIEF chọn cảnh theo cột này hoặc theo id `s<#>`. Các dòng từ `- Style nền:` trở xuống trong `## Ý đồ sáng tạo` là khối in bởi `node $OV/scripts/styles.mjs resolve --markdown` (chạy trong thư mục dự án); dán nguyên khối, có lớp mượn thì khối có thêm bảng cảnh × chiều.
+
+Mục `## Nhịp` là quy ước nhịp, preflight chỉ cảnh báo: **Hook** là giây có chuyển động hoặc chữ đầu tiên (nên ≤ 0,5 s, không mở bằng khung trống); **Cao trào** là số `#` của cảnh đắt nhất, nên bắt đầu trong khoảng 55–78 % thời lượng; **Giữ cuối** là số giây khung kết đứng lại với chuyển động nhỏ (nên 0,8–1,2 s). Ngưỡng lấy từ phim motion 10 giây, chưa hiệu chỉnh cho video 30–90 giây.
 
 Cổng plan kiểm: đủ 6 mục, bảng Cảnh có ít nhất một dòng, số mốc demo ≥ số cảnh, và có mục 9:16 khi `aspect: both`. Chữ trên hình là chuỗi trong ngoặc kép ở cột Hình; cổng WARN khi beat ngắn hơn `số từ / 2,5 + 0,5 s` (tối thiểu 1 s). Chữ còn ở lại qua beat sau thì ghi `(giữ đến 15s)` hoặc `(giữ đến hết)` trong ô Hình, tính bằng giây trên timeline gốc. Sửa plan sau khi đã chụp demo thì phải chụp lại (frame cũ hơn `PLAN.md` bị chặn).
 

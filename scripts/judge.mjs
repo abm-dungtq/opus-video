@@ -3,18 +3,22 @@
 //
 //   node judge.mjs check --video <mp4> --hyperframes <dir> --out <file.json> [--model id] [--timeout 300]
 //   node judge.mjs pair  --a <mp4> --b <mp4> --out <file.json> [--model id] [--timeout 540]
+//   node judge.mjs score --video <mp4> --hyperframes <dir> --out <file.json> [--runs 3] [--style <id>] [--model id] [--timeout 300]
 //
 // check: hard-defect review with an anti-fabrication fingerprint (on-screen text must match the
 //        project HTML, reported duration must match ffprobe). Frames of hard issues are extracted
 //        from the original video into <out-basename>_frames/.
 // pair:  A/B comparison run twice with the order swapped; consensus ∈ {A, B, tie, invalid}.
+// score: observe-only jury, 7 dimensions 1–10, median of N sequential runs (each in a fresh temp dir),
+//        spread and timecoded fixes; never FAIL, exit 0 when ≥ min(2, N) runs are valid.
 //
 // Every agy call runs in a fresh temp dir holding only 540p copies + schema.json, with --new-project.
 // agy binary: $AGY_BIN, else `which agy`, else ~/.local/bin/agy.
-// Exit codes: 0 ok (check PASS / pair consensus), 1 check FAIL, 2 invalid or usage, 3 agy auth, 4 agy missing.
+// Exit codes: 0 ok (check PASS / pair consensus / score valid), 1 check FAIL, 2 invalid or usage, 3 agy auth, 4 agy missing.
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, copyFileSync, readdirSync, statSync, realpathSync } from "node:fs";
 import { wantsHelp, helpText } from "./cli-help.mjs";
+import { loadProfiles, lookup } from "./styles.mjs";
 import { homedir, tmpdir } from "node:os";
 import { join, dirname, resolve, extname } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -51,6 +55,33 @@ layout (composition, spacing, nothing covered or cramped), pacing (rhythm fits t
 For each dimension set better = first | second | tie and give evidence naming the file and the second, e.g. "second @4s: caption covers the logo".
 winner: the video a viewer would prefer overall, or tie if they are genuinely equal. top_fix_for_loser: the single change that would most improve the weaker one.
 Judge only from watching the videos. Do not open other files and do not run any other tool.`;
+
+export const SCORE_DIMENSIONS = ["style_fidelity", "concept_wow", "motion_craft", "design_typography", "finish_texture", "sound_sync", "technical"];
+const IMPACT_ORDER = { high: 0, medium: 1, low: 2 };
+
+const SCORE_PROMPT = `You are a senior motion-design jury member for Vietnamese social video (TikTok, Reels, YouTube). You did NOT make @clip.mp4.
+Watch it from the first frame to the last, including audio. Judge harshly and precisely; kindness is useless, specificity is everything.
+1. duration_s: the total length in seconds. onscreen_text: up to 12 distinct on-screen phrases, verbatim, keeping Vietnamese diacritics and case.
+2. scores: 1-10 on each dimension. Anchors: 5 = competent student work, 6 = decent template, 7 = solid professional, 8 = high-end agency,
+   9 = award shortlist, 10 = best in the world. Most first renders deserve 5-7. Do not inflate.
+   style_fidelity (the intended style is instantly recognisable; its signature moves are present and correct),
+   concept_wow (a clear idea, a hook in the first 0.5 s, one unmistakable hero moment, a satisfying end frame),
+   motion_craft (easing, spacing, overlap, anticipation and follow-through, arcs, transitions; no dead or jittery motion),
+   design_typography (composition, hierarchy, grid, Vietnamese type setting, palette, negative space),
+   finish_texture (lighting, texture, grain, glow; no banding, aliasing or artifacts),
+   sound_sync (music fits, sound design, visual hits on audio onsets, voice clear over music),
+   technical (no glitches, clipping, popping, fallback fonts or broken diacritics).
+3. fixes: 5-10 fixes ordered by impact. Each: t_s (second), dimension, observed (what is wrong), change (concrete how-to with numbers:
+   easing curve, frame counts, px, colours, seconds), impact, wow. At least one fix must have wow = true.
+4. critical: anything that reads as generic or AI-template, unnatural Vietnamese, fallback fonts, or a spec failure. strengths: what to keep.
+   ai_template: true if the whole video reads as a generic AI template.
+Judge only from watching the video. Do not open other files and do not run any other tool.`;
+
+// Adds the style's signature moves so style_fidelity is judged against them; moves may be strings or objects.
+export function scorePrompt(moves = []) {
+  const lines = moves.map((m) => (typeof m === "string" ? m : `${m.name} — ${m.technique}${m.check ? ` (check: ${m.check})` : ""}`));
+  return lines.length ? `${SCORE_PROMPT}\nThe intended style's signature moves (judge style_fidelity against these):\n- ${lines.join("\n- ")}` : SCORE_PROMPT;
+}
 
 // ---------- pure helpers (exported for tests) ----------
 
@@ -116,6 +147,43 @@ export function pairShapeError(r) {
   if (!["first", "second", "tie"].includes(r.winner)) return "winner not first/second/tie";
   if (!Array.isArray(r.dimensions)) return "dimensions is not an array";
   return null;
+}
+
+export function scoreShapeError(r) {
+  if (typeof r.duration_s !== "number") return "duration_s is not a number";
+  if (!Array.isArray(r.onscreen_text)) return "onscreen_text is not an array";
+  const s = r.scores;
+  if (!s || typeof s !== "object") return "scores missing";
+  for (const d of SCORE_DIMENSIONS) if (!Number.isInteger(s[d]) || s[d] < 1 || s[d] > 10) return `scores.${d} not an integer 1-10`;
+  if (!Array.isArray(r.fixes) || !r.fixes.length) return "fixes empty";
+  if (r.fixes.some((f) => !f || typeof f.t_s !== "number" || !SCORE_DIMENSIONS.includes(f.dimension))) return "malformed fix";
+  return null;
+}
+
+// Median of numbers; the mean of the two middle values when the count is even.
+export function median(xs) {
+  const a = [...xs].sort((x, y) => x - y);
+  const m = Math.floor(a.length / 2);
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+
+// Valid score results → per-dimension median and spread (max − min), overall = mean of medians (2 decimals),
+// unstable = dimensions whose spread is above 1.
+export function aggregateScores(results) {
+  const med = {}, spread = {};
+  for (const d of SCORE_DIMENSIONS) {
+    const v = results.map((r) => r.scores[d]);
+    med[d] = median(v);
+    spread[d] = Math.max(...v) - Math.min(...v);
+  }
+  const overall = Math.round((SCORE_DIMENSIONS.reduce((a, d) => a + med[d], 0) / SCORE_DIMENSIONS.length) * 100) / 100;
+  const unstable = SCORE_DIMENSIONS.filter((d) => spread[d] > 1);
+  const aiVotes = results.filter((r) => r.ai_template === true).length;
+  const fixes = results
+    .flatMap((r, run) => r.fixes.map((f) => ({ ...f, run: run + 1 })))
+    .sort((a, b) => (IMPACT_ORDER[a.impact] ?? 3) - (IMPACT_ORDER[b.impact] ?? 3) || a.t_s - b.t_s);
+  const critical = [...new Set(results.flatMap((r) => r.critical || []))];
+  return { median: med, spread, overall, unstable, ai_template: aiVotes * 2 > results.length, critical, fixes };
 }
 
 // order "AB": first = A; order "BA": first = B.
@@ -409,6 +477,87 @@ async function cmdPair(args, agy) {
   return consensus === "invalid" ? EXIT.INVALID : EXIT.PASS;
 }
 
+// One independent jury run in a fresh temp dir; `clip` is the 540p copy made once by cmdScore.
+async function scoreOnce(agy, clip, prompt, opts, corpus, realDuration) {
+  const work = makeWorkDir("score");
+  try {
+    copyFileSync(clip, join(work, "clip.mp4"));
+    let run;
+    for (let i = 0; i < 2; i++) {
+      run = { status: "invalid", fingerprint: null, result: null, reason: "" };
+      const r = await runAgyAsync(agy, work, { ...opts, prompt });
+      if (r.kind === "auth") return { auth: true };
+      if (r.kind === "invalid") run.reason = r.reason;
+      else {
+        run.result = r.data;
+        const shape = scoreShapeError(r.data);
+        if (shape) run.reason = shape;
+        else {
+          const m = countTextMatches(r.data.onscreen_text, corpus);
+          const diff = Math.round(Math.abs(r.data.duration_s - realDuration) * 1000) / 1000;
+          run.fingerprint = { matched: m.matched, total: m.total, duration_diff_s: diff };
+          if (m.matched < MIN_TEXT_MATCHES) run.reason = `only ${m.matched} on-screen phrases match the HTML`;
+          else if (diff > DURATION_TOLERANCE_S) run.reason = `duration off by ${diff}s`;
+          else { run.status = "valid"; delete run.reason; break; }
+        }
+      }
+      console.error(`judge score: attempt ${i + 1} invalid — ${run.reason}`);
+    }
+    return run;
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+async function cmdScore(args, agy) {
+  const video = needFile(args, "video");
+  const hf = resolve(need(args, "hyperframes"));
+  const out = resolve(need(args, "out"));
+  const model = args.model || DEFAULT_MODEL;
+  const timeout = positiveNumber(args.timeout, 300, "timeout");
+  const runsN = positiveNumber(args.runs, 3, "runs");
+  if (!Number.isInteger(runsN) || runsN > 5) throw new UsageError("--runs must be an integer 1-5");
+  let moves = [];
+  let id = null;
+  if (args.style) {
+    const profiles = loadProfiles();
+    try { id = lookup(args.style, profiles); } catch (e) { throw new UsageError(`--style: ${e.message}`); }
+    moves = profiles[id].signature_moves || [];
+  }
+  const corpus = buildCorpus(hf);
+  const realDuration = probeDuration(video);
+  const prompt = scorePrompt(moves);
+  // Runs are sequential: parallel uploads on one account risk per-minute quota errors, and an auth failure stops at run 1.
+  const stage = mkdtempSync(join(tmpdir(), "ov-judge-"));
+  const runs = [];
+  try {
+    const clip = join(stage, "clip.mp4");
+    transcode540(video, clip);
+    for (let i = 0; i < runsN; i++) {
+      const r = await scoreOnce(agy, clip, prompt, { model, timeout }, corpus, realDuration);
+      if (r.auth) return authExit();
+      runs.push(r);
+    }
+  } finally {
+    rmSync(stage, { recursive: true, force: true });
+  }
+  const valid = runs.filter((r) => r.status === "valid").map((r) => r.result);
+  const need2 = Math.min(2, runsN);
+  const status = valid.length >= need2 ? "valid" : "invalid";
+  const report = {
+    mode: "score", status, model, video, style: id, runs_requested: runsN, runs_valid: valid.length,
+    ...(status === "valid" ? aggregateScores(valid) : { reason: `only ${valid.length} of ${runsN} runs valid` }),
+    runs,
+  };
+  writeJson(out, report);
+  if (status === "valid") {
+    console.log(`judge score: overall ${report.overall} (median of ${valid.length}) → ${out}`);
+    for (const d of SCORE_DIMENSIONS) console.log(`  ${d}: ${report.median[d]} (spread ${report.spread[d]})`);
+    if (report.unstable.length) console.log(`  unstable (spread > 1): ${report.unstable.join(", ")}`);
+  } else console.log(`judge score: invalid — ${report.reason} → ${out}`);
+  return status === "valid" ? EXIT.PASS : EXIT.INVALID;
+}
+
 function authExit() {
   console.error("AGY_AUTH: agy is not signed in or not eligible — run `agy` interactively to sign in, or fall back to still-frame QA");
   return EXIT.AUTH;
@@ -417,9 +566,9 @@ function authExit() {
 export async function main(argv = process.argv.slice(2)) {
   if (wantsHelp(argv)) { process.stdout.write(helpText(import.meta.url)); return 0; }
   const [cmd, ...rest] = argv;
-  const commands = { check: cmdCheck, pair: cmdPair };
+  const commands = { check: cmdCheck, pair: cmdPair, score: cmdScore };
   if (!commands[cmd]) {
-    console.error("usage: judge.mjs <check|pair> [--flags]  (see header of judge.mjs)");
+    console.error("usage: judge.mjs <check|pair|score> [--flags]  (see header of judge.mjs)");
     return EXIT.INVALID;
   }
   const args = parseArgs(rest);
