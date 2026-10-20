@@ -5,7 +5,7 @@
 //   node make-pitch.mjs init   --project . --topic "<chủ đề>" --aspect <16:9|9:16|both>
 //                              [--category <motion|explainer|3d|interactive|product|story-music|bat-dong-san>]
 //                              [--energy em|vua|don-dap] [--duration <s, default BRIEF duration_s, else 15>]
-//                              [--brand <brand.json>]
+//                              [--brand <brand.json>] [--lemo <watercolor|glass-product|lemo-… profile>]
 //   node make-pitch.mjs render --project .
 //   node make-pitch.mjs choose --project . (--pick <1|2|3> | --auto) [--style id] [--visual id]
 //                              [--effect id] [--transition id] [--sfx id] [--energy e]
@@ -24,6 +24,9 @@
 //   energy and is not used by an earlier pick; STYLEFRAME.md lists its palette (CSS), type,
 //   material, transitions, three signature moves, constraints and detail document. Brand colours
 //   win over the style palette. The id is kept in pitch/PICK.json.
+//   --lemo puts a lemo-canvas style profile (styles.mjs, engine lemo-canvas) on the bold-tier pick:
+//   its project starts from the opus-video skeleton (composition.mjs) instead of the blank example,
+//   so lemo.mjs add finds its markers, and STYLEFRAME.md says to run lemo.mjs add before building.
 // render: renders every pitch/<n>-*/index.html at --quality draft to pitch/<n>.mp4, cuts a poster
 //   pitch/<n>.png at 60% of the clip, tiles pitch/sheet.jpg, measures motion (qc-mp4 MOTION) and
 //   writes PITCH.md: the 3 options with paths, the two knobs, 3–4 swappable keywords per group
@@ -46,6 +49,7 @@ import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
 import { loadDirections, pickDirections, compatWarnings, resolveSelection, wordBudget, upstream, DIMENSIONS, DIM_VI, TIER_VI } from "./directions.mjs";
 import { StyleError, defaultStyle, loadProfiles, lookup, paletteCss } from "./styles.mjs";
+import { SKELETON, sizeSkeleton } from "./composition.mjs";
 import { OV_DIR } from "./skill-paths.mjs";
 import { buildRecipes } from "./recipe-pack.mjs";
 import { findBrand, validateBrand, brandAbs } from "./brand.mjs";
@@ -119,7 +123,7 @@ ${paletteCss(style)}
 - Chuyển cảnh: ${list(dims.transitions)}
 - Nước đi đặc trưng: ${list((style.signature_moves || []).slice(0, 3))}
 - Ràng buộc: ${list(style.constraints)}
-${style.detail ? `- Chi tiết: \`${join(OV_DIR, style.detail)}\`\n` : ""}
+${style.engine === "lemo-canvas" ? `- **Engine lemo-canvas (${style.lemo.kind}):** trong thư mục này chạy \`node ${join(OV_DIR, "scripts", "lemo.mjs")} add --project . --style ${style.lemo.style}\` (lần đầu chạy \`lemo.mjs fetch\`), đọc hướng dẫn phong cách mà lệnh in ra, rồi viết \`assets/lemo/${style.lemo.kind === "2d" ? "scene.js" : "scene3d.js"}\` theo chủ đề. Chữ tiếng Việt ở lớp DOM, không vẽ lên canvas. Cách dùng: \`${join(OV_DIR, "references", "lemo-canvas.md")}\`.\n` : ""}${style.detail ? `- Chi tiết: \`${join(OV_DIR, style.detail)}\`\n` : ""}
 `;
 }
 
@@ -158,9 +162,21 @@ function hfInit(cwd, name, aspect) {
     { cwd, stdio: "inherit", shell: WIN, env: { ...process.env, HYPERFRAMES_SKIP_SKILLS: "1" } });
 }
 
+// --lemo value → the lemo-canvas profile id: a profile id or alias, or the lemo catalog slug it draws.
+export function lemoProfile(value, profiles) {
+  const hit = Object.values(profiles).find((p) => p.engine === "lemo-canvas" && p.lemo?.style === value);
+  if (hit) return hit.id;
+  const id = lookup(value, profiles);
+  if (profiles[id].engine !== "lemo-canvas") throw new StyleError(`${id} is not a lemo-canvas style; use one of ${Object.values(profiles).filter((p) => p.engine === "lemo-canvas").map((p) => p.lemo.style).join(", ")}`, 2);
+  return id;
+}
+
 export function init(o, data, up = upstream()) {
   if (!o.topic || !o.aspect) return { code: 2, msg: "init needs --topic and --aspect" };
   if (!SIZE[o.aspect]) return { code: 2, msg: "--aspect must be 16:9, 9:16 or both" };
+  const profiles = loadProfiles();
+  let lemoId = null;
+  if (o.lemo) { try { lemoId = lemoProfile(o.lemo, profiles); } catch (e) { if (e instanceof StyleError) return { code: 2, msg: `--lemo: ${e.message}` }; throw e; } }
   const project = resolve(o.project);
   const energy = o.energy || "vua";
   if (!data.energy[energy]) return { code: 2, msg: `--energy must be ${Object.keys(data.energy).join(", ")}` };
@@ -180,11 +196,11 @@ export function init(o, data, up = upstream()) {
   // Keep the scaffold hash of styleframes that already exist, so render can still spot an unwritten one.
   let old = [];
   try { old = JSON.parse(readFileSync(join(pitch, "PICK.json"), "utf8")).picks || []; } catch { /* first init */ }
-  const profiles = loadProfiles();
-  const used = new Set();
+  const used = new Set(lemoId ? [lemoId] : []);
   const rows = [];
+  const lemoPick = lemoId ? (picks.find((p) => p.tier === "bold") || picks[picks.length - 1]) : null;
   for (const p of picks) {
-    const styleId = defaultStyle(p.direction, energy, profiles, used);
+    const styleId = p === lemoPick ? lemoId : defaultStyle(p.direction, energy, profiles, used);
     if (styleId) used.add(styleId);
     const name = `${p.n}-${p.direction.slug}`;
     const dir = join(pitch, name);
@@ -193,6 +209,8 @@ export function init(o, data, up = upstream()) {
     if (!existsSync(join(dir, "index.html"))) {
       const r = hfInit(pitch, name, o.aspect);
       if (r.status !== 0 || !existsSync(join(dir, "index.html"))) return { code: 1, msg: `hyperframes init failed for ${name}` };
+      // lemo.mjs add needs the skeleton's markers; the pitch frame is portrait unless 16:9
+      if (p === lemoPick) writeFileSync(join(dir, "index.html"), sizeSkeleton(readFileSync(SKELETON, "utf8"), o.aspect === "16:9" ? "16:9" : "9:16"));
       scaffold = sha(join(dir, "index.html"));
     }
     writeFileSync(join(dir, "STYLEFRAME.md"), styleframeMd({ n: p.n, pick: p, topic: o.topic, aspect: o.aspect, energy, data, brand, style: styleId ? profiles[styleId] : null }));

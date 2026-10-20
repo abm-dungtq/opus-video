@@ -1,0 +1,143 @@
+{
+  "id": "lemo-glass-product",
+  "name": "Glass Product Render",
+  "ten_vi": "Sản phẩm thuỷ tinh 3D",
+  "mo_ta_vi": "Vật thể thuỷ tinh trong studio đen, vệt sáng quét tạo viền cầu vồng, camera trôi chậm, nhịp sáng khớp phách.",
+  "family": "lemo-opuscar",
+  "engine": "lemo-canvas",
+  "lemo": { "style": "glass-product", "kind": "3d" },
+  "aliases": [
+    "glass product",
+    "glass render",
+    "thuy tinh 3d",
+    "dark field glass"
+  ],
+  "summary": "Launch-film glass render: dark studio, strip-light sweeps, dispersion, caustics, slow orbits on the beat.",
+  "energy": 3,
+  "best_for": [
+    "product-reveal",
+    "hardware-launch",
+    "premium-launch",
+    "exploded-view"
+  ],
+  "character": "One fictional hero object of glass, metal and light floating in an infinite black studio. Strips behind it turn clear glass into a thin white outline with rainbow edges; internals show through like a display case. Slow, precise, every sweep and pulse on the beat.",
+  "dimensions": {
+    "palette": {
+      "mode": "dark",
+      "colors": {
+        "bg": "#000000",
+        "ink": "#f2f5f7",
+        "accent": "#8fd6ff",
+        "muted": "#b9c3cc",
+        "steel": "#5f6b75",
+        "accent-2": "#b9a2ff"
+      },
+      "rule": "Neutral world of black, greys and strip-light white; one accent family reserved for light only; dispersion rainbows only at thick glass edges and in caustics."
+    },
+    "typography": [
+      "Be Vietnam Pro 300 for titles, very large with wide tracking, upper third",
+      "Small tracked caps 18-20 px for kickers",
+      "Product name and claim as title cards, not caption lines"
+    ],
+    "layout": [
+      "One hero object, centred or on a strong diagonal, never cropped in a wide",
+      "Negative space left for type on pull-backs",
+      "Each shot is its own presentation stage; no spatial continuity needed"
+    ],
+    "material": [
+      "Clear glass: MeshPhysical transmission 1, roughness 0.015, IOR 1.5, dispersion on",
+      "Frosted glass only with something bright behind or inside",
+      "Satin and brushed metals; anything inside glass is opaque"
+    ],
+    "texture": [
+      "Black gloss floor with blurred mirror and radial fade, no horizon line",
+      "Procedural caustic rings on the floor",
+      "Grain 0"
+    ],
+    "camera": [
+      "Always drifting: slow orbits and push-ins, never locked off",
+      "Macro rack focus from shell to the part inside",
+      "Exploded view on a 40 degree axis with a slow orbit"
+    ],
+    "transitions": [
+      "cut on the beat",
+      "sweep passing through black"
+    ],
+    "pacing": {
+      "bpm": [
+        84,
+        110
+      ],
+      "rhythm": "Slow eased moves; long ease-out apart, short drifting hover, very short ease-in snap on a downbeat."
+    },
+    "beat_response": [
+      "Light sweeps and pulses are events on the beat grid",
+      "Exploded parts snap shut on a downbeat",
+      "Two frames of micro-shake on an impact, never more"
+    ],
+    "ui_choreography": [
+      "No flat UI screens; data shown as light travelling inside glass",
+      "Accent line on frosted-glass caption slab"
+    ],
+    "diagrams": [
+      "Exploded view as the diagram",
+      "Light paths inside channels show flow of charge, data or heat"
+    ],
+    "character_motion": [
+      "No characters; objects lift, hinge and settle with eased motion"
+    ],
+    "captions": [
+      "Frosted-glass slab: centred rounded bar of the blurred live frame, Be Vietnam Pro 300 about 40 px near-white, accent line on top"
+    ],
+    "sound": [
+      "Minimal electronic: glass bells, granular crystal, filtered tick grid, sub drone, soft kicks",
+      "Foley follows the material: glass shimmer per sweep, magnetic clicks, air puffs",
+      "Short total silence before a release"
+    ]
+  },
+  "scene_types": {
+    "prefer": [
+      "cover",
+      "product-hero",
+      "feature",
+      "spec",
+      "cta",
+      "outro"
+    ],
+    "avoid": [
+      "terminal",
+      "code",
+      "ui-demo",
+      "chart",
+      "testimonial"
+    ]
+  },
+  "signature_moves": [
+    "Strip-light sweep drawing a glass contour in the dark",
+    "Rack focus through glass to the part inside",
+    "Exploded view that snaps shut on a downbeat",
+    "Light travelling inside channels"
+  ],
+  "strengths": [
+    "Premium, physical product presence from code alone",
+    "Makes an invisible function visible as light",
+    "Reads instantly as a launch film"
+  ],
+  "constraints": [
+    "Engine is three.js with the lemo-opuscar studio rig and post stack (lemo.mjs add --style glass-product)",
+    "lemoRender(t, win) is a pure function of t; motion timed as fractions of a shot",
+    "Render is about 5 times slower than a GSAP-only composition; two renders match to PSNR 50 dB or better, not byte for byte",
+    "The object is fictional: no real product silhouette, brand, logo or UI",
+    "All Vietnamese text in the DOM layer, never in the WebGL canvas"
+  ],
+  "avoid": [
+    "White cyclorama catalogue shots",
+    "HDRI photo studios that print clutter on glass",
+    "Dissolves, wipes and rainbow gradients on surfaces or type"
+  ],
+  "pairs_well_with": [
+    "precision-dark-product",
+    "cinematic-product-launch",
+    "glass-keynote"
+  ]
+}

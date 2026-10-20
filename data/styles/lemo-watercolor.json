@@ -1,0 +1,150 @@
+{
+  "id": "lemo-watercolor",
+  "name": "Watercolor Brush",
+  "ten_vi": "Thuỷ màu tự vẽ",
+  "mo_ta_vi": "Trang sổ tay thuỷ màu tự vẽ từng nét cọ trên giấy ấm, ghi chú viết tay bên cạnh, không một đường vector nào.",
+  "family": "lemo-opuscar",
+  "engine": "lemo-canvas",
+  "lemo": { "style": "watercolor", "kind": "2d" },
+  "aliases": [
+    "watercolor",
+    "watercolour",
+    "thuy mau",
+    "brush painting",
+    "field journal"
+  ],
+  "summary": "Self-painting watercolour journal: translucent brush strokes with flying white on warm paper, hand notes.",
+  "energy": 2,
+  "best_for": [
+    "thoughtful-explainer",
+    "sustainability-story",
+    "education",
+    "brand-story"
+  ],
+  "character": "A hand-painted journal page that paints itself: translucent strokes with dry-brush flying white on warm cotton paper, structure before detail, a quiet annotation layer beside each subject. Calm, curious and precise; the paper is the white and the eraser.",
+  "dimensions": {
+    "palette": {
+      "mode": "light",
+      "colors": {
+        "bg": "#f1e9da",
+        "ink": "#2b2520",
+        "accent": "#c8442a",
+        "ink-soft": "#3d3129",
+        "sage": "#8ea860",
+        "shade": "#4e6e3c",
+        "sky": "#9fb4c4",
+        "ochre": "#c9a26b"
+      },
+      "rule": "Paper is the white, never paint pure white; 3-5 hues per scene plus ink; darker means more passes; one vermilion accent reserved for one recurring element."
+    },
+    "typography": [
+      "Be Vietnam Pro 600 for titles in ink on the paper, never in a box",
+      "Be Vietnam Pro 400 italic for notes beside a subject, revealed left to right like writing",
+      "Small tracked caps for measured labels; numbers as digits on screen"
+    ],
+    "layout": [
+      "Generous paper margins; one hero subject per view with its note",
+      "Parallax layers: farther is smaller, lighter and less saturated",
+      "Labels never cover the subject; a pen leader line joins note and specimen"
+    ],
+    "material": [
+      "One sheet of fibrous paper under everything (paper.jpg as a DOM image)",
+      "Variable-width stroke ribbons at partial opacity with 3-9 bristle tracks",
+      "Washes in 3 jittered passes so edges pool darker"
+    ],
+    "texture": [
+      "Paper fibres, smooth noise and light vignette baked into paper.jpg",
+      "Flying-white dashes inside every stroke",
+      "Paper-coloured mist bands between depth layers"
+    ],
+    "camera": [
+      "Locked page or a slow continuous pan across one painted world",
+      "Gentle parallax between layers during holds",
+      "No hard cuts between unrelated pictures"
+    ],
+    "transitions": [
+      "brush-edge wipe (wavy vertical clip reveals the next scene)",
+      "mist erase (paper-coloured wash returns the world to paper)",
+      "page turn",
+      "continuous pan to the next painted area"
+    ],
+    "pacing": {
+      "bpm": [
+        70,
+        96
+      ],
+      "rhythm": "Unhurried: each object paints in over most of its shot, holds with a small sway, then the next thing paints in."
+    },
+    "beat_response": [
+      "Painting-in progress may step on beats, never pulse",
+      "A burst of strokes (under 1 s) for the one peak",
+      "No flashes, shakes or scale pulses"
+    ],
+    "ui_choreography": [
+      "UI only as a painted sketch of a screen with hand notes",
+      "Callouts are pen leader lines growing to the part"
+    ],
+    "diagrams": [
+      "Transect: a gradient read across space, palette carries the value",
+      "Specimen plate: one object dissected into labelled painted parts",
+      "Map whose fills change through time"
+    ],
+    "character_motion": [
+      "Figures painted in as silhouettes stroke by stroke, then a small sway",
+      "No limb animation rigs; change by repainting"
+    ],
+    "captions": [
+      "On the paper, no box: centred bottom, Be Vietnam Pro italic about 36 px, ink at 78% over a paper-coloured halo, 2 lines max"
+    ],
+    "sound": [
+      "Acoustic and gentle: felt piano, fingerpicked guitar, woodwinds, kalimba",
+      "Foley from the scene's matter: paper brush rustle per painting-in, pencil scratch for notes, soft stamp thump",
+      "Silence when the brush lifts"
+    ]
+  },
+  "scene_types": {
+    "prefer": [
+      "cover",
+      "hook",
+      "feature",
+      "diagram",
+      "timeline",
+      "quote",
+      "outro"
+    ],
+    "avoid": [
+      "terminal",
+      "code",
+      "ui-demo",
+      "spec"
+    ]
+  },
+  "signature_moves": [
+    "Painting-in as reveal: structure first, then detail",
+    "Specimen with a hand-written note and leader line",
+    "Palette as data across a transect",
+    "Mist erase back to paper"
+  ],
+  "strengths": [
+    "Warm, human and unmistakably hand-made",
+    "Turns a gradient or a process into one readable painting",
+    "Very far from tech-slick styles"
+  ],
+  "constraints": [
+    "Engine is the lemo-opuscar watercolor stroke engine on a canvas under the DOM (lemo.mjs add --style watercolor)",
+    "Every stroke built once under withSeed; lemoRender(t, win) is a pure function of t",
+    "Cache finished objects as sprites; time strokes as fractions of a shot",
+    "All Vietnamese text in the DOM layer, never on the canvas",
+    "Do not copy the lemo demo film's story, scenes or end card"
+  ],
+  "avoid": [
+    "Vector outlines or a watercolour texture laid over flat vector art",
+    "Pure white paint, neon or glass",
+    "Hard video cuts and dissolves between unrelated pictures"
+  ],
+  "pairs_well_with": [
+    "paper-cut-collage",
+    "organic-biomorphic",
+    "human-storytelling"
+  ]
+}

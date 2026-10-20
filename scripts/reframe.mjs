@@ -20,6 +20,8 @@
 // WARN layout  one line per left/top/width/height ≥ 1080 px in a <style> block or a style=""
 //   attribute (index.html and compositions/) outside any html[data-ratio=…] block: a 1920x1080
 //   value that will not fit the new frame.
+// WARN lemo    the master has a lemo-canvas layer (lemo.mjs add): its scene is drawn for the
+//   master's frame (a 2D canvas keeps 1920x1080 and is stretched), so the edition needs its own scene.
 // A frame-worker project (compositions/frames/) is refused: its 9:16 edition is a separate project,
 //   see references/engine-selection.md.
 // Next: cd <edition> && npx --yes hyperframes@0.8.144 lint && npx --yes hyperframes@0.8.144 check
@@ -182,6 +184,9 @@ export function main(argv = process.argv.slice(2), { out = (s) => process.stdout
       lines.push(`WARN  layout ${rel}:${w.line} ${w.prop}: ${w.px}px nằm ngoài khối html[data-ratio=…]; khung ${o.ratio} chỉ rộng ${RATIOS[o.ratio].width}px`);
     }
   }
+
+  const lemo = readFileSync(index, "utf8").match(/<!-- lemo-style: (\S+) -->/)?.[1];
+  if (lemo) lines.push(`WARN  lemo index.html: lớp lemo-canvas ${lemo} vẽ theo khung gốc; khung ${o.ratio} cần cảnh riêng, xem lại từng shot trước khi giao`);
 
   let assets = { files: 0, skipped: [] };
   try {

@@ -197,3 +197,16 @@ test("frame-worker project, missing root composition and bad usage", () => {
     assert.equal(main([project, "--ratio", "9x16"], capture().io), 2);
   } finally { rmSync(parent, { recursive: true, force: true }); }
 });
+
+test("a master with a lemo-canvas layer gets one WARN lemo line", () => {
+  const { parent, project } = master();
+  try {
+    const f = join(project, "index.html");
+    writeFileSync(f, readFileSync(f, "utf8").replace('<div class="abs"', '<!-- lemo-style: watercolor --><div class="abs"'));
+    const c = capture();
+    assert.equal(main([project, "--ratio", "9x16"], c.io), 0, c.buf.err);
+    const warns = c.buf.out.split("\n").filter((l) => l.startsWith("WARN  lemo"));
+    assert.equal(warns.length, 1);
+    assert.match(warns[0], /lemo-canvas watercolor vẽ theo khung gốc/);
+  } finally { rmSync(parent, { recursive: true, force: true }); }
+});
