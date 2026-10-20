@@ -24,9 +24,12 @@ export const MCP_TOOLS = ["project_get", "project_log", "project_patch", "projec
 // No Bash(node:*): under acceptEdits it would allow `node -e` with any code. The scripts rule is a
 // wildcard: the `:*` prefix form needs a word boundary after the prefix, so ".../scripts/:*" never
 // matches ".../scripts/timing.mjs" (checked against claude -p 2.1).
-export const ALLOWED_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep", `Bash(node ${OV}/scripts/*)`, "Bash(npx hyperframes:*)", ...MCP_TOOLS];
-// The plain Edit/Write rules also reach files outside the project, so the plugin is denied by
-// path (`//` marks an absolute path), and a `..` after scripts/ is denied: the `/*` glob alone ran
+// No Edit or Write rule: acceptEdits already lets the director write inside its cwd (the project),
+// and a plain Edit/Write allow rule reached files anywhere else on disk (checked against
+// claude -p 2.1.304 with haiku: without the rules an edit in the cwd works, one in /tmp is denied).
+export const ALLOWED_TOOLS = ["Read", "Glob", "Grep", `Bash(node ${OV}/scripts/*)`, "Bash(npx hyperframes:*)", ...MCP_TOOLS];
+// The plugin is still denied by path (`//` marks an absolute path) in case it ever sits under a
+// project, and a `..` after scripts/ is denied: the `/*` glob alone ran
 // `node $OV/scripts/../../…/x.mjs` (checked against claude -p 2.1 with haiku).
 // The approval gates are the user's: Studio writes DEMO.md and BRIEF.md. Claude Code reads only
 // Edit(path) rules for file writes (they cover Write too) and a bare name matches at any depth;

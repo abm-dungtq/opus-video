@@ -18,3 +18,8 @@ test("studio-api exposes the plugin surface Studio needs", () => {
   assert.ok(existsSync(api.DIRECTIONS_FILE));
   for (const k of ["MCP_TOOLS", "ALLOWED_TOOLS", "DENIED_TOOLS"]) assert.ok(Array.isArray(api[k]) && api[k].length, k);
 });
+
+test("the director writes only through acceptEdits in its cwd: no Edit or Write allow rule", () => {
+  assert.ok(!api.ALLOWED_TOOLS.some((t) => /^(Edit|Write|MultiEdit|NotebookEdit)\b/.test(t)), "an Edit/Write allow rule reaches files outside the project");
+  assert.ok(api.DENIED_TOOLS.includes(`Edit(/${api.OV}/**)`) && api.DENIED_TOOLS.includes(`Write(/${api.OV}/**)`));
+});

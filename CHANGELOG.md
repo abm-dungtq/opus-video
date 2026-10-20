@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Đạo diễn của Motion Studio không còn sửa được file ngoài dự án. `ALLOWED_TOOLS` trong `scripts/studio-api.mjs` bỏ hai luật `Edit` và `Write` không kèm đường dẫn: với chúng, `claude -p` sửa được mọi file không nhạy cảm trên đĩa (ví dụ `/tmp/…`). Chế độ `acceptEdits` vẫn cho sửa trong thư mục dự án (cwd). Kiểm bằng `claude -p` 2.1.304 với haiku: sửa trong dự án được, sửa `/tmp/<probe>` bị chặn.
+
 ## v2.3.0 (2026-10-17): timeline sửa nhanh
 
 Why: Motion Studio's timeline could only resize shots and move lines; sound effects, music trims and fades, and redo still needed the director or a hand edit. The gateway now has the ops a CapCut-style timeline sends, one version per drop, and the render hears what the timeline shows.
