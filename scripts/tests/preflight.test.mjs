@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { check, checkCreative, checkRevisions, verticalHint, parsePlan, isPng, readableHold, holdWarnings, parseTable, spanBounds, spanSeconds } from "../check-preflight.mjs";
+import { check, checkCreative, checkRevisions, verticalHint, parsePlan, isPng, readableHold, holdWarnings, parseTable, spanBounds, spanSeconds, beatWarnings, parseBeat } from "../check-preflight.mjs";
 import { main as renderFinal, PREFLIGHT_EXIT } from "../render-final.mjs";
 import { writeDemoMd } from "../make-demo.mjs";
 
@@ -419,4 +419,39 @@ test("aspect both: a missing or landscape animatic_9x16 points at the reframe ed
     const landscape = run("animatic: demo/animatic.mp4\nanimatic_9x16: demo/9x16/animatic.mp4\n").find((e) => e.includes("not portrait"));
     assert.ok(landscape && landscape.includes(edition), landscape);
   } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+// ---------- beat contract ("## Nhịp") ----------
+
+const beatPlan = (beat) => parsePlan(`# P\n\n## Cảnh\n| # | Thời điểm |\n|---|---|\n| 1 | 0–5s |\n| 2 | 5–9s |\n| 3 | 9–14s |\n| 4 | 14–20s |\n${beat === null ? "" : `\n## Nhịp\n${beat}\n`}`);
+const beat = (hook, hero, hold) => `- Hook: ${hook}\n- Cao trào: cảnh ${hero}\n- Giữ cuối: ${hold}`;
+
+test("beat contract: a missing section is one WARN", () => {
+  const w = beatWarnings(beatPlan(null));
+  assert.equal(w.length, 1);
+  assert.ok(w[0].includes("## Nhịp"));
+});
+
+test("beat contract: hook, hero band and end hold within thresholds give no WARN", () => {
+  assert.deepEqual(beatWarnings(beatPlan(beat("0.3s", 4, "1s"))), []);
+});
+
+test("beat contract: each threshold miss is one WARN", () => {
+  const late = beatWarnings(beatPlan(beat("0.8s", 4, "1s")));
+  assert.equal(late.length, 1);
+  assert.ok(late[0].includes("hook 0.8s"));
+  const early = beatWarnings(beatPlan(beat("0.3s", 2, "1s")));
+  assert.equal(early.length, 1);
+  assert.ok(early[0].includes("25%") && early[0].includes("55–78%"), early[0]);
+  const long = beatWarnings(beatPlan(beat("0.3s", 4, "2,5s")));
+  assert.equal(long.length, 1);
+  assert.ok(long[0].includes("giữ cuối 2.5s"));
+  const unknown = beatWarnings(beatPlan(beat("0.3s", 9, "1s")));
+  assert.equal(unknown.length, 1);
+  assert.ok(unknown[0].includes("không có trong"));
+});
+
+test("parseBeat reads lines without diacritics and with decimal commas", () => {
+  assert.deepEqual(parseBeat("- hook: 0,4 s\n- Cao trao: s3\n- Giu cuoi: 0.9"), { hook: 0.4, hero: "3", hold: 0.9 });
+  assert.equal(parseBeat("- Cao trào: cảnh #3").hero, "3");
 });

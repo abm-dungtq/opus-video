@@ -50,7 +50,7 @@ import { createHash } from "node:crypto";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
 import { loadDirections, pickDirections, compatWarnings, resolveSelection, wordBudget, upstream, DIMENSIONS, DIM_VI, TIER_VI } from "./directions.mjs";
-import { StyleError, defaultStyle, loadProfiles, lookup, paletteCss } from "./styles.mjs";
+import { StyleError, defaultStyle, loadProfiles, lookup, moveText, paletteCss } from "./styles.mjs";
 import { SKELETON, sizeSkeleton } from "./composition.mjs";
 import { OV_DIR } from "./skill-paths.mjs";
 import { buildRecipes } from "./recipe-pack.mjs";
@@ -123,7 +123,7 @@ ${paletteCss(style)}
 - Chữ: ${list(dims.typography)} (font thiếu dấu tiếng Việt thì thay bằng Be Vietnam Pro)
 - Chất liệu: ${list(dims.material)}
 - Chuyển cảnh: ${list(dims.transitions)}
-- Nước đi đặc trưng: ${list((style.signature_moves || []).slice(0, 3))}
+- Nước đi đặc trưng: ${list((style.signature_moves || []).slice(0, 3).map(moveText))}
 - Ràng buộc: ${list(style.constraints)}
 ${style.engine === "lemo-canvas" ? `- **Engine lemo-canvas (${style.lemo.kind}):** trong thư mục này chạy \`node ${join(OV_DIR, "scripts", "lemo.mjs")} add --project . --style ${style.lemo.style}\` (lần đầu chạy \`lemo.mjs fetch\`), đọc hướng dẫn phong cách mà lệnh in ra, rồi viết \`assets/lemo/${style.lemo.kind === "2d" ? "scene.js" : "scene3d.js"}\` theo chủ đề. Chữ tiếng Việt ở lớp DOM, không vẽ lên canvas. Cách dùng: \`${join(OV_DIR, "references", "lemo-canvas.md")}\`.\n` : ""}${style.detail ? `- Chi tiết: \`${join(OV_DIR, style.detail)}\`\n` : ""}
 `;

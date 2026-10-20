@@ -7,7 +7,7 @@
 ![Node ≥ 22](https://img.shields.io/badge/node-%E2%89%A5%2022-339933.svg)
 ![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Antigravity-6f42c1.svg)
 ![OS](https://img.shields.io/badge/OS-macOS%20%C2%B7%20Linux%20%C2%B7%20WSL%20%C2%B7%20Windows-555.svg)
-![Tests](https://img.shields.io/badge/tests-501%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-518%20passing-brightgreen.svg)
 
 Chạy trên **Claude Code** (dạng plugin `opus-video` gồm 11 skill), **OpenAI Codex, Google Antigravity (app và CLI)** và mọi agent đọc được thư mục skill có `SKILL.md`.
 
@@ -55,7 +55,7 @@ Các video dưới đây do opus-video dựng. Bấm vào ảnh để mở file 
 - **Hai phong cách vẽ bằng code từ [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar).** `lemo-watercolor` là thuỷ màu tự vẽ trên giấy (canvas 2D). `lemo-glass-product` là sản phẩm thuỷ tinh 3D có khúc xạ và tán sắc (three.js). Engine của lemo vẽ vào canvas nằm dưới lớp DOM, còn timeline GSAP, Motion Studio, cổng viet-pro và chữ tiếng Việt vẫn như cũ.
 - **Một lệnh gắn lớp vào dự án.** Chạy `lemo.mjs fetch` một lần mỗi máy, sau đó `lemo.mjs add --project . --style watercolor`. Lệnh chép engine, giấy phép và `CREDITS`, rồi tạo `scene.js` mẫu để agent thay bằng chủ đề của bạn. Dự án tạo bằng `composition.mjs init` từ bản này đã có sẵn chỗ gắn.
 - **Kéo dài shot thì tranh co giãn theo.** Scene tính mốc theo tỉ lệ shot, nên `resize_shot` trong Motion Studio vẫn giữ nhịp vẽ.
-- **Chọn được từ thư viện style và pitch.** Thư viện có 63 profile, thêm cột `engine`. `make-pitch init --lemo watercolor` đặt phong cách lemo vào styleframe táo bạo.
+- **Chọn được từ thư viện style và pitch.** Thư viện có 64 profile, thêm cột `engine`. `make-pitch init --lemo watercolor` đặt phong cách lemo vào styleframe táo bạo.
 - **Giá phải trả là thời gian render.** Với video 10 giây, bản thuỷ màu render lâu gấp khoảng 1,3 lần bản thường, bản 3D lâu gấp khoảng 5 lần và cần GPU. Chi tiết ở `references/lemo-canvas.md`.
 
 ### v2.3.0 (2026-10-17): timeline sửa nhanh
@@ -367,7 +367,7 @@ Mọi script đều có `--help` / `-h` (in phần mô tả đầu file, thoát 
 | `scripts/jev-audit.mjs`, `scripts/jev-audit-eval.mjs` | (Tuỳ chọn) Jev rà lời đọc; đo precision theo pattern |
 | `scripts/video-lint.mjs` | Bắt chữ bị ép thường, chữ quá nhỏ, nội dung lấn vùng UI ở khổ 9:16, nhãn rào đón trên hình (`HEDGE_LABEL`: ERROR khi `voice_source: clip`, còn lại WARN) |
 | `scripts/captions-from-transcript.mjs` | Phụ đề từ `transcript.json` (Whisper) + `captions.fixes.json` (`fix`, `unclear`, `ranges`): ghi `assets/fx/captions.js`, `script/captions.txt` và `captions.review.md` để người dùng duyệt |
-| `scripts/judge.mjs` | Gemini chấm một video (`check`) hoặc so hai phiên bản (`pair`) |
+| `scripts/judge.mjs` | Gemini chấm một video (`check`), so hai phiên bản (`pair`) hoặc chấm điểm 7 tiêu chí chỉ để quan sát (`score`) |
 | `scripts/cut.mjs` | `probe` tìm khoảng lặng an toàn; `apply-edl` ghép footage theo danh sách cắt JSON |
 | `scripts/brand.mjs` | `check` brand kit dùng chung (`shared-assets/brand.json`, mẫu ở `references/brand.example.json`); `make-pitch` tự đọc |
 | `scripts/poi-fetch.mjs` | Tiện ích thật quanh một địa chỉ hoặc toạ độ từ OpenStreetMap, khoảng cách và phút đi bộ, ghi vào `SOURCES.md` |
@@ -378,7 +378,7 @@ Mọi script đều có `--help` / `-h` (in phần mô tả đầu file, thoát 
 | `scripts/audio-mix.mjs` | Dựng lại tiếng của composition bằng ffmpeg; giảm nhạc theo giọng từ `data-fx-carve`; `--loudnorm`, `--stems` |
 | `scripts/mix-balance.mjs` | Đo nhạc thấp hơn giọng bao nhiêu dB lúc có lời (PASS 4–7 dB) |
 | `scripts/reframe.mjs` | Sinh bản 9:16 hoặc 1:1 từ một `index.html` có khối `html[data-ratio=…]`; asset clone APFS |
-| `scripts/styles.mjs` | 63 style: `find`, `show`, `css`, `suggest --direction`, `resolve --project` (style theo cảnh), `validate` |
+| `scripts/styles.mjs` | 64 style: `find`, `show`, `css`, `suggest --direction`, `resolve --project` (style theo cảnh), `validate` |
 | `scripts/lemo.mjs` | Lớp lemo-canvas: `fetch` (cache commit lemo-opuscar đã ghim), `list`, `add --project . --style <slug>` (watercolor hoặc glass-product), `remove`. Xem `references/lemo-canvas.md` |
 | `scripts/source-ingest.mjs` | Lưu văn bản gốc của URL, PDF, trang abstract arXiv (toàn văn thì truyền `https://arxiv.org/pdf/<id>`) vào `sources/` và ghi mục nguồn vào `SOURCES.md`; PDF cần `pdftotext` (poppler) |
 

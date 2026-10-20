@@ -9,10 +9,17 @@ Why: some briefs need a look GSAP and the DOM cannot draw: brushwork that paints
 - Catalogue `data/lemo/styles.json` with two verified styles: `watercolor` (2D canvas) and `glass-product` (three.js).
 - Scene contract: `window.lemoRender(t, win)` is a pure function of `t`, with `win = { <scene id>: [start, end] }` from `WINDOWS` and `TIMING`. Scenes time their beats as fractions of a shot, so `resize_shot` stretches the painting. The 3D module loads after the timeline script and paints from `__lemoT` and `__lemoWin`.
 - `composition.mjs init` skeleton carries four empty markers: `<!-- LEMO-LAYER:BEGIN/END -->` in `#bg` and `/* LEMO:BEGIN/END */` after the `WINDOWS.forEach` block.
-- Style profiles `lemo-watercolor` and `lemo-glass-product` (63 profiles). Profiles take an optional `engine` (`hyperframes` by default, or `lemo-canvas`) and `lemo: { style, kind }`; `styles.mjs validate` checks both, `index` has an `engine` column, `show` prints the `lemo.mjs add` command, and `resolve` warns when the BRIEF's lemo profile has no layer in `index.html`.
-- `make-pitch.mjs init --lemo <slug>` gives the bold styleframe a lemo profile and the opus-video skeleton.
+- Style profiles `lemo-watercolor` and `lemo-glass-product` (64 profiles with `variety-captions`). Profiles take an optional `engine` (`hyperframes` by default, or `lemo-canvas`) and `lemo: { style, kind }`; `styles.mjs validate` checks both, `index` has an `engine` column, `show` prints the `lemo.mjs add` command, and `resolve` warns when the BRIEF's lemo profile has no layer in `index.html`.
+- `make-pitch.mjs init --lemo <slug>` (or `lemo_style:` in BRIEF.md) gives the bold styleframe a lemo profile and the opus-video skeleton; with `lemo_style:` set, `choose` keeps that lemo profile whichever direction wins.
 - `reframe.mjs` prints `WARN lemo` for a project with the layer: the scene is drawn for the landscape layout and needs its own vertical scene.
 - `references/lemo-canvas.md`, section 1b of `engine-selection.md`, `lemo_style:` in the brief template, the `engine` field in `style-system.md`, and pointers in `ov-build` and `ov-direction`. `NOTICE` and `third_party/` carry the lemo-opuscar and three.js MIT licences.
+- `judge.mjs score`: Gemini chấm 7 tiêu chí 1–10 (style_fidelity, concept_wow, motion_craft, design_typography, finish_texture, sound_sync, technical) theo mốc cố định, chạy 3 lượt độc lập, ghi trung vị, độ dao động và 5–10 fix có mốc giây. Chỉ quan sát, không chặn render. `--style <id>` đưa signature moves của profile cho giám khảo.
+- `signature_moves` nhận object `{ name, technique, numbers, check }` bên cạnh chuỗi; `styles.mjs validate` kiểm dạng mới.
+- Profile `variety-captions` (Hoa chữ show giải trí): phụ đề 9:16 viền dày nảy theo lời, từ nhấn kèm sticker, trong vùng an toàn TikTok.
+- `check-preflight.mjs`: mục `## Nhịp` trong PLAN.md (Hook ≤ 0,5 s, cao trào bắt đầu trong 55–78 % thời lượng, giữ cuối 0,8–1,2 s), chỉ cảnh báo.
+
+### Fixed
+- Đạo diễn của Motion Studio không còn sửa được file ngoài dự án. `ALLOWED_TOOLS` trong `scripts/studio-api.mjs` bỏ hai luật `Edit` và `Write` không kèm đường dẫn: với chúng, `claude -p` sửa được mọi file không nhạy cảm trên đĩa (ví dụ `/tmp/…`). Chế độ `acceptEdits` vẫn cho sửa trong thư mục dự án (cwd). Kiểm bằng `claude -p` 2.1.304 với haiku: sửa trong dự án được, sửa `/tmp/<probe>` bị chặn.
 
 ### Measured
 - 10 s, 300 frames, HyperFrames 0.8.144, MacBook GPU: watercolor renders in about 1.3 times the plain skeleton and two renders are byte-identical; glass-product takes about 5 times and two renders reach PSNR 56–59 dB (not byte-identical). With `--no-browser-gpu` a 3D render takes about 30 minutes.

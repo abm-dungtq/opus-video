@@ -60,7 +60,11 @@ mkdir -p qa && for T in 1 4 7 10 13; do ffmpeg -v error -y -ss $T -i renders/f.m
    - tie: giữ bản cũ, trừ khi bản mới sửa được lỗi hard.
    - invalid: **chưa so**, không tính là thua. Một lượt riêng lẻ không đáng tin vì Gemini thiên vị video đưa vào trước.
    - Muốn xem tận mắt hai phiên bản cạnh nhau (không cần Gemini, cần giữ bản sao thư mục project cũ): `hyperframes compare <dir-cũ> <dir-mới> --at <T> --labels cu,moi --out qc/compare-vN.png`.
-7. Dừng khi các cổng đều qua và: bản mới không thắng, hoặc đã tới v3, hoặc chỉ còn sửa nhỏ. Mỗi phiên bản phải sửa ít nhất một lỗi lớn.
-8. Exit code của judge:
+7. Tuỳ chọn, chỉ quan sát: `node $OV/scripts/judge.mjs score --video renders/<name>-vN.mp4 --hyperframes . --runs 3 [--style <style_profile>] --out qc/vN-score.json`.
+   - 7 tiêu chí 1–10 (5 bài sinh viên, 7 chuyên nghiệp, 8 agency, 9 vào vòng giải), trung vị 3 lượt, `spread` là độ dao động.
+   - Không chặn render. Chưa dùng điểm để so phiên bản: Gemini dao động, xem `spread` và `unstable` trước khi tin một tiêu chí.
+   - `fixes` có mốc giây và số cụ thể; chọn tối đa 5 fix đưa vào REVISIONS.md theo mẫu `references/revisions.md`.
+8. Dừng khi các cổng đều qua và: bản mới không thắng, hoặc đã tới v3, hoặc chỉ còn sửa nhỏ. Mỗi phiên bản phải sửa ít nhất một lỗi lớn.
+9. Exit code của judge:
    - 3 (auth) hoặc 4 (thiếu agy): QA bằng ảnh tĩnh như các mục trên, ghi "không có giám khảo video".
    - 2: chạy lại 1 lần.

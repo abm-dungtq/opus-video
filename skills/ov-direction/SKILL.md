@@ -29,6 +29,6 @@ Sau bước này: viết kịch bản theo hướng đã chọn (`ov-script`), v
 | `$OV/scripts/directions.mjs` | Bước 0/1b: `check` (token có thật trong HyperFrames, cũng chạy trong setup-check), `pick` (3 hướng tương phản), `compat` (cảnh báo phối sai), `doc --write` |
 | `$OV/scripts/make-pitch.mjs` | Bước 1b: `init` (3 project styleframe + STYLEFRAME.md + RECIPES.md; `--lemo` đặt một style lemo-canvas cho hướng táo bạo), `render` (3 clip, sheet.jpg, PITCH.md menu số; exit 4 khi styleframe FAIL MOTION), `choose` (ghi BRIEF, exit 3 khi phối sai) |
 | `$OV/scripts/recipe-pack.mjs` | Bước 1b (và 6): gom blueprint/rule/seam theo hướng thành `RECIPES.md` |
-| `$OV/references/style-system.md` | Bước 1b và 4b: 63 style, `style_profile`, `## style_layers`, luật resolve theo cảnh (`styles.mjs`) |
+| `$OV/references/style-system.md` | Bước 1b và 4b: 64 style, `style_profile`, `## style_layers`, luật resolve theo cảnh (`styles.mjs`) |
 | `$OV/scripts/styles.mjs` | `find`, `show`, `suggest --direction`, `resolve --project` (cú pháp ở `--help`) |
 | `$OV/scripts/brand.mjs` | `make-pitch` tự đọc brand kit (màu, font, logo, hướng bị cấm) |

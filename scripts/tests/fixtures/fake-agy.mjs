@@ -5,6 +5,8 @@
 //   fail       check → FAIL with one hard issue at 2s
 //   auth       prints a not-signed-in error, exit 1
 //   pair-first pair → always picks "first"
+//   score      score → valid scores (all 6, technical 7), real phrases, real duration
+//   score-nofp score → valid shape but on-screen text matches nothing
 // Durations come from ffprobe on the files in cwd, so the fingerprint check sees real values.
 // It also asserts the minimal agy invocation judge.mjs must use.
 import { existsSync, readFileSync } from "node:fs";
@@ -41,6 +43,18 @@ if (existsSync("clip.mp4")) {
     fail: {
       duration_s: d, onscreen_text: real, verdict: "FAIL",
       issues: [{ code: "OVERLAP", t_s: 2, severity: "hard", note: "title overlaps subtitle" }],
+    },
+    score: {
+      duration_s: d, onscreen_text: real,
+      scores: { style_fidelity: 6, concept_wow: 6, motion_craft: 6, design_typography: 6, finish_texture: 6, sound_sync: 6, technical: 7 },
+      fixes: [{ t_s: 1, dimension: "concept_wow", observed: "no hook", change: "start motion at 0.2s", impact: "high", wow: true }],
+      critical: [], strengths: ["clear text"], ai_template: false,
+    },
+    "score-nofp": {
+      duration_s: d, onscreen_text: ["Lorem ipsum dolor", "Nothing like this"],
+      scores: { style_fidelity: 6, concept_wow: 6, motion_craft: 6, design_typography: 6, finish_texture: 6, sound_sync: 6, technical: 6 },
+      fixes: [{ t_s: 1, dimension: "technical", observed: "x", change: "y", impact: "low", wow: false }],
+      critical: [], strengths: [], ai_template: false,
     },
   }[mode];
 } else if (existsSync("first.mp4") && existsSync("second.mp4") && mode === "pair-first") {

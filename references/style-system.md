@@ -1,11 +1,11 @@
-# Hệ style với 63 profile, chọn theo từng cảnh
+# Hệ style với 64 profile, chọn theo từng cảnh
 
 Một video của opus-video có hai trục chọn độc lập:
 
 | Trục | Quyết định | Nguồn | Ghi vào BRIEF |
 |---|---|---|---|
 | **Hướng** (A1–A8) | Cách kể bằng hình: khối biến hình, khung lệnh, máy quay lướt, bản đồ… Blueprint, rule, seam, luật chống slideshow | `data/directions.json`, `references/creative-directions.md` | `direction:` |
-| **Style** (63 profile) | Giao diện: màu, chữ, bố cục, chất liệu, texture, camera, chuyển cảnh, nhịp, phản ứng theo beat, UI, sơ đồ, nhân vật, caption, âm thanh | `data/styles/<id>.json`, `data/styles/index.json` | `style_profile:` và `## style_layers` |
+| **Style** (64 profile) | Giao diện: màu, chữ, bố cục, chất liệu, texture, camera, chuyển cảnh, nhịp, phản ứng theo beat, UI, sơ đồ, nhân vật, caption, âm thanh | `data/styles/<id>.json`, `data/styles/index.json` | `style_profile:` và `## style_layers` |
 
 Cùng hướng A2 (gõ lệnh, máy bung kết quả) có thể mặc `precision-dark-product` (nền gần đen, viền mảnh) hoặc `terminal-ops` (cả khung là terminal). Đổi style không đổi cách kể; đổi hướng không đổi bảng màu.
 
@@ -34,6 +34,8 @@ node $OV/scripts/styles.mjs show glass-keynote           # tóm tắt một prof
 node $OV/scripts/styles.mjs css glass-keynote            # :root { --bg: …; --ink: …; … }
 node $OV/scripts/styles.mjs suggest --direction A6 --energy em
 ```
+
+`signature_moves` nhận hai dạng. Chuỗi là tên nước đi (61 profile cũ). Object `{ "name", "technique", "numbers", "check" }` ghi kỹ thuật, con số đo được (số hoặc `[lo, hi]`) và cách kiểm trên contact sheet hay frame; `styles.mjs validate` kiểm dạng này, `judge.mjs score --style <id>` đưa phần `check` cho giám khảo. Profile mới nên viết bằng object, ví dụ `variety-captions` (hoa chữ 9:16).
 
 `find` khớp id trước, rồi alias, rồi từ trong `summary`, `mo_ta_vi`, `best_for`. Không phân biệt hoa thường, dấu, gạch nối; bỏ qua các chữ "style", "kiểu", "phong cách". Một tên khớp hai style ngang nhau, hoặc không khớp gì, thì báo các ứng viên cho người dùng chọn, không đoán.
 

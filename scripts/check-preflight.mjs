@@ -58,6 +58,9 @@
 //   max(1s, words / 2.5 + 0.5s) — 2.5 words/s from viet-pro's speech rate, 0.5s eye-landing is
 //   an assumption. Quotes in the Lời đọc column do not count. A cell may state `(giữ đến <t>s)` /
 //   `(giữ đến hết)`; the hold is then measured to that mark.
+// Beat contract, both stages, every project, WARN only (thresholds from 10 s motion films, not yet
+//   calibrated): PLAN.md "## Nhịp" with "- Hook: <s>" (≤ 0.5 s), "- Cao trào: cảnh <#>" (that "## Cảnh"
+//   row starts within 55–78 % of the runtime) and "- Giữ cuối: <s>" (0.8–1.2 s). A missing section is one WARN.
 // REVISIONS.md (references/revisions.md), final stage, every project, WARN only, when the file
 //   exists: a round ("## … Vòng …", diacritics optional) with more than 5 "### R<n>" fixes, or a
 //   fix missing one of the lines Vị trí: · Lỗi thấy: · Đổi: · Giữ nguyên:. In a creative project whose
@@ -99,6 +102,7 @@ export const PLACEHOLDER = /^(?:…|\.{3}|todo|tbd|-|n\/a|chưa|pending|<[^>]*>)
 export const SECTIONS = { goal: "muc tieu", scenes: "canh", audio: "am thanh", engine: "engine", demo: "khung hinh demo", qa: "qa" };
 export const CREATIVE_SECTION = "y do sang tao";
 export const EVENTS_SECTION = "su kien";
+export const BEAT_SECTION = "nhip";
 const EVENTS_MISSING = 'PLAN.md has no "## Sự kiện" table (Thời điểm | Sự kiện | Âm thanh); write "không có SFX gắn sự kiện" when no sound is tied to a picture event';
 // Heading/label folding shared with sfx-sync: strip diacritics, đ → d, lower case, single spaces.
 export const fold = (s) => s.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/gi, "d").toLowerCase().replace(/\s+/g, " ").trim();
@@ -194,6 +198,48 @@ export function holdWarnings(table) {
     const tail = marked ? `giữ tới ${Number(until.toFixed(2))}s, được ${hold.toFixed(1)}s` : `beat dài ${Number(len.toFixed(2))}s`;
     out.push(`PLAN.md "## Cảnh" row ${i + 1}: chữ trên hình "${longest.slice(0, 40)}" (${words} từ) cần giữ ≥ ${need.toFixed(1)}s, ${tail}`);
   });
+  return out;
+}
+
+// Beat contract (WARN only, thresholds from 10-second motion films, not yet calibrated on 30–90 s videos):
+// hook ≤ 0.5 s, hero scene starting within 55–78 % of the runtime, end hold 0.8–1.2 s.
+export const HOOK_MAX_S = 0.5;
+export const HERO_BAND = [0.55, 0.78];
+export const END_HOLD_S = [0.8, 1.2];
+const BEAT_MISSING = 'PLAN.md has no "## Nhịp" section (- Hook: <s> · - Cao trào: cảnh <#> · - Giữ cuối: <s>; mẫu ở references/plan-demo.md)';
+
+// "## Nhịp" body → { hook, hero, hold } (null when a line is missing or unreadable).
+export function parseBeat(body) {
+  const f = fold(String(body || "").replace(/,/g, "."));
+  const num = (re) => { const m = f.match(re); return m ? Number(m[1]) : null; };
+  return {
+    hook: num(/hook\s*:\s*(\d+(?:\.\d+)?)/),
+    hero: (() => { const m = f.match(/cao trao\s*:\s*(?:canh\s*)?#?\s*s?(\d+)/); return m ? m[1] : null; })(),
+    hold: num(/giu cuoi\s*:\s*(\d+(?:\.\d+)?)/),
+  };
+}
+
+// plan = parsePlan output → WARN lines for the beat contract.
+export function beatWarnings(plan) {
+  const body = plan.sections[BEAT_SECTION];
+  if (body === undefined) return [BEAT_MISSING];
+  const out = [];
+  const { hook, hero, hold } = parseBeat(body);
+  if (hook === null) out.push('PLAN.md "## Nhịp": thiếu hoặc không đọc được dòng "- Hook: <giây>"');
+  else if (hook > HOOK_MAX_S) out.push(`PLAN.md "## Nhịp": hook ${hook}s, nên ≤ ${HOOK_MAX_S}s (chuyển động hoặc chữ đầu tiên)`);
+  if (hold === null) out.push('PLAN.md "## Nhịp": thiếu hoặc không đọc được dòng "- Giữ cuối: <giây>"');
+  else if (hold < END_HOLD_S[0] || hold > END_HOLD_S[1]) out.push(`PLAN.md "## Nhịp": giữ cuối ${hold}s, nên trong ${END_HOLD_S[0]}–${END_HOLD_S[1]}s`);
+  if (hero === null) { out.push('PLAN.md "## Nhịp": thiếu hoặc không đọc được dòng "- Cao trào: cảnh <#>"'); return out; }
+  const table = parseTable(plan.sections[SECTIONS.scenes]);
+  const tm = col(table.headers, /thoi diem|thoi gian|^t$|time/);
+  if (tm < 0) return out;
+  const bounds = table.rows.map((r) => spanBounds(r[tm]));
+  const ends = bounds.filter(Boolean).map((b) => b.end);
+  const total = ends.length ? Math.max(...ends) : 0;
+  const idx = table.rows.findIndex((r, i) => sceneId(r[0], i) === `s${hero}`);
+  if (idx < 0 || !bounds[idx] || !total) { out.push(`PLAN.md "## Nhịp": cao trào cảnh ${hero} không có trong "## Cảnh" hoặc thiếu Thời điểm`); return out; }
+  const at = bounds[idx].start / total;
+  if (at < HERO_BAND[0] || at > HERO_BAND[1]) out.push(`PLAN.md "## Nhịp": cao trào cảnh ${hero} bắt đầu ở ${bounds[idx].start}s = ${Math.round(at * 100)}% thời lượng ${total}s, nên trong ${Math.round(HERO_BAND[0] * 100)}–${Math.round(HERO_BAND[1] * 100)}%`);
   return out;
 }
 
@@ -454,6 +500,7 @@ export function check({ project = ".", stage = "plan", sync = checkSync, words =
   out.creative = checkCreative({ dir, plan, brief, stage, errors, warnings, sync, words });
   out.style = checkStyle({ dir, brief, errors, warnings });
   warnings.push(...holdWarnings(parseTable(plan.sections[SECTIONS.scenes])));
+  warnings.push(...beatWarnings(plan));
 
   if (stage === "final") {
     const planTime = statSync(planPath).mtimeMs;
