@@ -33,6 +33,22 @@ test("skeleton: TIMING markers once each, default TIMING, timeline registered", 
   assert.match(html, /<html[^>]*data-ratio="16x9"/);
 });
 
+test("skeleton: no audio tag inside comments, so lint finds no missing audio src", () => {
+  const html = readFileSync(SKELETON, "utf8");
+  for (const c of html.match(/<!--[\s\S]*?-->/g)) assert.doesNotMatch(c, /<audio/);
+});
+
+test("skeleton: empty LEMO markers once each, layer markers inside #bg", () => {
+  const html = readFileSync(SKELETON, "utf8");
+  for (const m of ["/* LEMO:BEGIN */", "/* LEMO:END */", "<!-- LEMO-LAYER:BEGIN -->", "<!-- LEMO-LAYER:END -->"]) {
+    assert.equal(html.split(m).length - 1, 1, m);
+  }
+  assert.match(html, /\/\* LEMO:BEGIN \*\/\s*\/\* LEMO:END \*\//);
+  assert.match(html, /<div id="bg" class="layer">\s*<!-- LEMO-LAYER:BEGIN -->\s*<!-- LEMO-LAYER:END -->\s*<\/div>/);
+  assert.ok(html.indexOf("/* LEMO:BEGIN */") > html.indexOf("const winStart"), "bridge block needs WINDOWS and winStart");
+  assert.ok(html.indexOf("/* LEMO:END */") < html.indexOf('tl.set({}, {}, T.duration)'), "bridge block sits inside the timeline script");
+});
+
 test("sizeSkeleton: 9:16 sets root, ratio, resolution, viewport and CSS frame", () => {
   const html = sizeSkeleton(readFileSync(SKELETON, "utf8"), "9:16");
   assert.deepEqual(rootSize(html), [1080, 1920]);

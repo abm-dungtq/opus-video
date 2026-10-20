@@ -53,7 +53,10 @@
   </head>
   <body>
     <div id="root" data-composition-id="main" data-start="0" data-duration="10" data-width="1920" data-height="1080">
-      <div id="bg" class="layer"></div>
+      <div id="bg" class="layer">
+        <!-- LEMO-LAYER:BEGIN -->
+        <!-- LEMO-LAYER:END -->
+      </div>
       <div id="pulse" class="layer">
         <div id="stage" class="layer">
           <!-- one .scene per row of PLAN.md "## Cảnh"; the WINDOWS table in the script maps selector -> scene id -> transition -->
@@ -67,7 +70,7 @@
       </div>
       <div id="flash" class="layer"></div>
       <div id="fade" class="layer"></div>
-      <!-- sound: <audio id="vo-01" src="assets/voice/01.mp3" data-start="…" data-duration="…" data-track-index="10" data-volume="1" data-audio-group="voiceover"></audio> -->
+      <!-- sound: one audio element per voice line here, id vo-01, file assets/voice/01.mp3, attributes data-start, data-duration, data-track-index 10, data-volume 1, data-audio-group voiceover (references/audio-pipeline.md) -->
     </div>
 
     <script>
@@ -248,6 +251,10 @@
           intro(sc, t0);
         });
         if (T.beatLen > 0) (T.drops || []).forEach((n) => flash(B(n), 0.8));
+
+        // ---------- lemo-canvas layer: lemo.mjs add fills this block, lemo.mjs remove empties it ----------
+        /* LEMO:BEGIN */
+        /* LEMO:END */
 
         // ---------- per-scene choreography: key every reveal to a spoken phrase ----------
         // e.g. { const sid = "s2"; pop("#sc2 .hl", W(sid, "mã nguồn") - 0.1); }
