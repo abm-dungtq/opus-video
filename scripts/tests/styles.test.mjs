@@ -338,3 +338,21 @@ test("make-pitch --lemo: catalog slug, profile id or alias resolve to the profil
   assert.equal(pitchMain(["init", "--project", ".", "--topic", "t", "--aspect", "16:9", "--lemo", "saas-bento"], c.log, c.log), 2);
   assert.match(c.text(), /--lemo: saas-bento is not a lemo-canvas style/);
 });
+
+test("make-pitch choose: BRIEF lemo_style keeps its lemo profile whichever pick wins; --style-profile still overrides", () => {
+  const d = tmp();
+  try {
+    mkdirSync(join(d, "pitch"));
+    writeFileSync(join(d, "pitch", "PICK.json"), JSON.stringify({ topic: "t", aspect: "16:9", energy: "vua", duration_s: 20, picks: [{ n: 1, id: "A2", tier: "fit", dir: "pitch/1-x", style_profile: "terminal-ops" }] }));
+    writeFileSync(join(d, "BRIEF.md"), "---\naspect: 16:9\nstyle_profile: lemo-watercolor\nlemo_style: watercolor\n---\n\n# Brief\n");
+    const quiet = () => {};
+    assert.equal(pitchMain(["choose", "--project", d, "--pick", "1", "--accept-warnings"], quiet, quiet), 0);
+    assert.match(readFileSync(join(d, "BRIEF.md"), "utf8"), /^style_profile: lemo-watercolor$/m);
+    assert.equal(pitchMain(["choose", "--project", d, "--pick", "1", "--style-profile", "terminal-ops", "--accept-warnings"], quiet, quiet), 0);
+    assert.match(readFileSync(join(d, "BRIEF.md"), "utf8"), /^style_profile: terminal-ops$/m);
+    writeFileSync(join(d, "BRIEF.md"), "---\naspect: 16:9\nlemo_style: saas-bento\n---\n");
+    const c = capture();
+    assert.equal(pitchMain(["choose", "--project", d, "--pick", "1"], c.log, c.log), 2);
+    assert.match(c.text(), /BRIEF lemo_style: saas-bento is not a lemo-canvas style/);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});

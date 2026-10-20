@@ -27,6 +27,7 @@
 //   --lemo puts a lemo-canvas style profile (styles.mjs, engine lemo-canvas) on the bold-tier pick:
 //   its project starts from the opus-video skeleton (composition.mjs) instead of the blank example,
 //   so lemo.mjs add finds its markers, and STYLEFRAME.md says to run lemo.mjs add before building.
+//   Without --lemo, a `lemo_style:` in BRIEF.md does the same.
 // render: renders every pitch/<n>-*/index.html at --quality draft to pitch/<n>.mp4, cuts a poster
 //   pitch/<n>.png at 60% of the clip, tiles pitch/sheet.jpg, measures motion (qc-mp4 MOTION) and
 //   writes PITCH.md: the 3 options with paths, the two knobs, 3–4 swappable keywords per group
@@ -34,7 +35,8 @@
 // choose: compat check (directions.mjs); warnings → exit 3 so the agent asks the user once, then
 //   re-run with --accept-warnings if they keep it. Writes BRIEF.md frontmatter: direction,
 //   direction_swaps, energy, palette, word_budget, music_only_s, creative_selection (user|auto),
-//   styleframe, style_profile (the pick's style, or --style-profile; with it, compat also warns on
+//   styleframe, style_profile (BRIEF's lemo_style profile, else the pick's style; --style-profile
+//   overrides both, and with it compat also warns on
 //   an energy mismatch and on a swapped style keyword); and a "## creative_direction" body
 //   section. --auto = option 1, recorded as auto (only when the user asked to run without stopping).
 // Exit: 0 ok · 1 render/init failed or ffmpeg/ffprobe missing · 2 bad usage · 3 compat warnings to confirm · 4 a styleframe
@@ -171,13 +173,20 @@ export function lemoProfile(value, profiles) {
   return id;
 }
 
+// BRIEF.md `lemo_style:` locks the look the user chose; its lemo-canvas profile id, or null.
+function briefLemo(project, profiles) {
+  const p = join(project, "BRIEF.md");
+  const v = existsSync(p) ? setv(frontmatter(readFileSync(p, "utf8")).lemo_style) : "";
+  return v ? lemoProfile(v, profiles) : null;
+}
+
 export function init(o, data, up = upstream()) {
   if (!o.topic || !o.aspect) return { code: 2, msg: "init needs --topic and --aspect" };
   if (!SIZE[o.aspect]) return { code: 2, msg: "--aspect must be 16:9, 9:16 or both" };
   const profiles = loadProfiles();
-  let lemoId = null;
-  if (o.lemo) { try { lemoId = lemoProfile(o.lemo, profiles); } catch (e) { if (e instanceof StyleError) return { code: 2, msg: `--lemo: ${e.message}` }; throw e; } }
   const project = resolve(o.project);
+  let lemoId = null;
+  try { lemoId = o.lemo ? lemoProfile(o.lemo, profiles) : briefLemo(project, profiles); } catch (e) { if (e instanceof StyleError) return { code: 2, msg: `${o.lemo ? "--lemo" : "BRIEF lemo_style"}: ${e.message}` }; throw e; }
   const energy = o.energy || "vua";
   if (!data.energy[energy]) return { code: 2, msg: `--energy must be ${Object.keys(data.energy).join(", ")}` };
   let brand = null, brandWarn = "";
@@ -314,6 +323,8 @@ function choose(o, data) {
   const swaps = Object.fromEntries(DIMENSIONS.filter((d) => o[d]).map((d) => [d, o[d]]));
   const profiles = loadProfiles();
   let styleId = row.style_profile && profiles[row.style_profile] ? row.style_profile : defaultStyle(direction, energy, profiles);
+  // A lemo_style in BRIEF.md outranks the pick's own style: the chosen direction is drawn in that look.
+  try { styleId = briefLemo(project, profiles) || styleId; } catch (e) { if (e instanceof StyleError) return { code: 2, msg: `BRIEF lemo_style: ${e.message}` }; throw e; }
   if (o["style-profile"]) {
     try { styleId = lookup(o["style-profile"], profiles); } catch (e) { if (e instanceof StyleError) return { code: 2, msg: `--style-profile: ${e.message}` }; throw e; }
   }
