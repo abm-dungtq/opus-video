@@ -22,7 +22,7 @@ const RUNNER = process.env.OPUS_STUDIO_RUNNER === "cli" ? "cli" : "mcp";
 // stdout carries JSON-RPC only: anything a library logs goes to stderr.
 console.log = (...a) => console.error(...a);
 
-export const SERVER = { name: "opus-video", version: "2.3.0" };
+export const SERVER = { name: "opus-video", version: "2.4.0" };
 const PROJECT = { type: "string", description: "Đường dẫn tuyệt đối tới thư mục dự án có project.json" };
 const BASE = { type: "integer", description: "Phiên bản project.json bạn vừa đọc (project_get → version)" };
 
