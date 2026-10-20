@@ -7,7 +7,7 @@
 ![Node ≥ 22](https://img.shields.io/badge/node-%E2%89%A5%2022-339933.svg)
 ![Agents](https://img.shields.io/badge/agents-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Antigravity-6f42c1.svg)
 ![OS](https://img.shields.io/badge/OS-macOS%20%C2%B7%20Linux%20%C2%B7%20WSL%20%C2%B7%20Windows-555.svg)
-![Tests](https://img.shields.io/badge/tests-489%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-518%20passing-brightgreen.svg)
 
 Chạy trên **Claude Code** (dạng plugin `opus-video` gồm 11 skill), **OpenAI Codex, Google Antigravity (app và CLI)** và mọi agent đọc được thư mục skill có `SKILL.md`.
 
@@ -49,6 +49,14 @@ Các video dưới đây do opus-video dựng. Bấm vào ảnh để mở file 
 </table>
 
 ## Có gì mới
+
+### v2.4.0 (2026-10-20): lớp lemo-canvas
+
+- **Hai phong cách vẽ bằng code từ [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar).** `lemo-watercolor` là thuỷ màu tự vẽ trên giấy (canvas 2D). `lemo-glass-product` là sản phẩm thuỷ tinh 3D có khúc xạ và tán sắc (three.js). Engine của lemo vẽ vào canvas nằm dưới lớp DOM, còn timeline GSAP, Motion Studio, cổng viet-pro và chữ tiếng Việt vẫn như cũ.
+- **Một lệnh gắn lớp vào dự án.** Chạy `lemo.mjs fetch` một lần mỗi máy, sau đó `lemo.mjs add --project . --style watercolor`. Lệnh chép engine, giấy phép và `CREDITS`, rồi tạo `scene.js` mẫu để agent thay bằng chủ đề của bạn. Dự án tạo bằng `composition.mjs init` từ bản này đã có sẵn chỗ gắn.
+- **Kéo dài shot thì tranh co giãn theo.** Scene tính mốc theo tỉ lệ shot, nên `resize_shot` trong Motion Studio vẫn giữ nhịp vẽ.
+- **Chọn được từ thư viện style và pitch.** Thư viện có 64 profile, thêm cột `engine`. `make-pitch init --lemo watercolor` đặt phong cách lemo vào styleframe táo bạo.
+- **Giá phải trả là thời gian render.** Với video 10 giây, bản thuỷ màu render lâu gấp khoảng 1,3 lần bản thường, bản 3D lâu gấp khoảng 5 lần và cần GPU. Chi tiết ở `references/lemo-canvas.md`.
 
 ### v2.3.0 (2026-10-17): timeline sửa nhanh
 
@@ -370,7 +378,8 @@ Mọi script đều có `--help` / `-h` (in phần mô tả đầu file, thoát 
 | `scripts/audio-mix.mjs` | Dựng lại tiếng của composition bằng ffmpeg; giảm nhạc theo giọng từ `data-fx-carve`; `--loudnorm`, `--stems` |
 | `scripts/mix-balance.mjs` | Đo nhạc thấp hơn giọng bao nhiêu dB lúc có lời (PASS 4–7 dB) |
 | `scripts/reframe.mjs` | Sinh bản 9:16 hoặc 1:1 từ một `index.html` có khối `html[data-ratio=…]`; asset clone APFS |
-| `scripts/styles.mjs` | 61 style: `find`, `show`, `css`, `suggest --direction`, `resolve --project` (style theo cảnh), `validate` |
+| `scripts/styles.mjs` | 64 style: `find`, `show`, `css`, `suggest --direction`, `resolve --project` (style theo cảnh), `validate` |
+| `scripts/lemo.mjs` | Lớp lemo-canvas: `fetch` (cache commit lemo-opuscar đã ghim), `list`, `add --project . --style <slug>` (watercolor hoặc glass-product), `remove`. Xem `references/lemo-canvas.md` |
 | `scripts/source-ingest.mjs` | Lưu văn bản gốc của URL, PDF, trang abstract arXiv (toàn văn thì truyền `https://arxiv.org/pdf/<id>`) vào `sources/` và ghi mục nguồn vào `SOURCES.md`; PDF cần `pdftotext` (poppler) |
 
 ## 8. Cập nhật và gỡ
@@ -401,4 +410,4 @@ Test cần project thật sẽ tự bỏ qua khi không tìm thấy project đó
 
 ## Giấy phép
 
-Mã nguồn và tài liệu dùng giấy phép MIT (xem `LICENSE`). Corpus trong `data/` lấy từ hai repo có giấy phép MIT. Prompt trong corpus thuộc về tác giả gốc, và mỗi dòng đều ghi tác giả cùng link. Repo không phân phối lại video gốc. `scripts/cut.mjs` phỏng theo ý tưởng của [open-edit](https://github.com/veedstudio/open-edit) (Apache-2.0, © VEED LIMITED); xem `NOTICE`. 61 style trong `data/styles/`, ba tài liệu chi tiết style, skeleton composition, nguyên tắc chuyển động và các thuật toán beat-grid, reframe, resolve style phỏng theo skill motion-video của AgentKit (MIT, © 2026 BestAgentKits); xem `NOTICE` và `third_party/agentkit-motion-video/LICENSE`.
+Mã nguồn và tài liệu dùng giấy phép MIT (xem `LICENSE`). Corpus trong `data/` lấy từ hai repo có giấy phép MIT. Prompt trong corpus thuộc về tác giả gốc, và mỗi dòng đều ghi tác giả cùng link. Repo không phân phối lại video gốc. `scripts/cut.mjs` phỏng theo ý tưởng của [open-edit](https://github.com/veedstudio/open-edit) (Apache-2.0, © VEED LIMITED); xem `NOTICE`. 61 trong 63 style của `data/styles/`, ba tài liệu chi tiết style, skeleton composition, nguyên tắc chuyển động và các thuật toán beat-grid, reframe, resolve style phỏng theo skill motion-video của AgentKit (MIT, © 2026 BestAgentKits); xem `NOTICE` và `third_party/agentkit-motion-video/LICENSE`.

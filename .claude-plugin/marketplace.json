@@ -8,7 +8,7 @@
     {
       "name": "opus-video",
       "source": "./",
-      "version": "2.3.0",
+      "version": "2.4.0",
       "description": "Làm video tiếng Việt với Claude Opus 5.5: brief, hướng đạo diễn, kịch bản qua viet-pro, giọng ElevenLabs, dựng HyperFrames, QA và render bản giao, chia thành 11 skill theo bốn hướng vận hành."
     }
   ]

@@ -12,11 +12,13 @@
 //   node styles.mjs suggest --direction <A1..A8> [--energy em|vua|don-dap] [--json]
 //   node styles.mjs --help | -h
 // index: one JSON object per line (id, ten_vi, name, family, aliases, energy, best_for, summary,
-//   mo_ta_vi, depth), sorted by id. depth is "reference" when the profile has a detail document.
+//   mo_ta_vi, depth, engine), sorted by id. depth is "reference" when the profile has a detail
+//   document; engine is "hyperframes" unless the profile says "lemo-canvas".
 // validate: required keys and all 14 dimensions; energy 1–5; bg/ink/accent are #rrggbb (other
 //   tokens #rrggbb or rgb()/rgba()); pacing.bpm [lo, hi]; known scene types; pairs_well_with and
 //   detail point at real files; ten_vi ≤ 5 words, mo_ta_vi one sentence ≤ 25 words; no alias shared
-//   by two styles; index.json equal to `index`.
+//   by two styles; engine is hyperframes or lemo-canvas, and a lemo-canvas profile names a style
+//   of data/lemo/styles.json in lemo.style with the same kind; index.json equal to `index`.
 // find: names fold case, diacritics, separators and filler words ("style", "kiểu", "phong cách").
 //   Exact id or alias scores 1; else the best of 0.7 × name similarity (1 when the query holds a
 //   whole name or a name holds it, else the bigram Dice score when ≥ 0.5) and 0.6 × the share of
@@ -31,6 +33,8 @@
 //   bind everywhere, layer constraints only in its scenes. Warns on more than 2 transition
 //   languages, a layer that selects no scene, and a borrowed value that names something the base
 //   avoids. --markdown prints the block to paste into PLAN.md "## Ý đồ sáng tạo".
+//   A lemo-canvas style whose index.html has no lemo layer yet warns with the lemo.mjs add command.
+// show: a lemo-canvas profile adds its engine line and the lemo.mjs add command.
 // suggest: the direction's styles_goi_y (data/directions.json); --energy keeps profiles whose
 //   energy fits it (em 1–2, vua 3, don-dap 4–5).
 // Exit: 0 ok · 1 validation or resolution errors, nothing found · 2 bad usage, unknown style or
@@ -51,7 +55,11 @@ export const STYLE_DIMENSIONS = ["palette", "typography", "layout", "material", 
   "pacing", "beat_response", "ui_choreography", "diagrams", "character_motion", "captions", "sound"];
 export const SCENE_TYPES = ["cover", "hook", "title", "stats", "feature", "ui-demo", "product-hero", "spec", "diagram", "chart",
   "terminal", "code", "comparison", "timeline", "montage", "quote", "testimonial", "cta", "outro"];
-export const FAMILIES = ["aesthetic", "brand-inspired", "house"];
+export const FAMILIES = ["aesthetic", "brand-inspired", "house", "lemo-opuscar"];
+// hyperframes: GSAP and DOM only. lemo-canvas: a lemo-opuscar engine draws a canvas under the DOM
+// (scripts/lemo.mjs, references/lemo-canvas.md).
+export const ENGINES = ["hyperframes", "lemo-canvas"];
+export const LEMO_CATALOG = join(OV_DIR, "data", "lemo", "styles.json");
 export const REQUIRED = ["id", "name", "ten_vi", "mo_ta_vi", "family", "aliases", "summary", "energy", "best_for", "character",
   "dimensions", "scene_types", "signature_moves", "strengths", "constraints", "avoid", "pairs_well_with"];
 // Profile energy 1–5 per opus-video energy (same mapping as references/motion-craft.md).
@@ -162,13 +170,18 @@ export function buildIndex(profiles) {
   const rows = Object.keys(profiles).sort().map((id) => {
     const p = profiles[id];
     return JSON.stringify({ id, ten_vi: p.ten_vi, name: p.name, family: p.family, aliases: p.aliases || [], energy: p.energy,
-      best_for: p.best_for || [], summary: p.summary, mo_ta_vi: p.mo_ta_vi, depth: p.detail ? "reference" : "profile" });
+      best_for: p.best_for || [], summary: p.summary, mo_ta_vi: p.mo_ta_vi, depth: p.detail ? "reference" : "profile", engine: p.engine || "hyperframes" });
   });
   return `[\n${rows.join(",\n")}\n]\n`;
 }
 
-export function validateProfiles(profiles, { dir = STYLES_DIR, root = OV_DIR } = {}) {
+export function validateProfiles(profiles, { dir = STYLES_DIR, root = OV_DIR, lemoCatalog = LEMO_CATALOG } = {}) {
   const errors = [];
+  let lemoStyles = null;
+  const lemoStyle = (slug) => {
+    if (!lemoStyles) { try { lemoStyles = JSON.parse(readFileSync(lemoCatalog, "utf8")).styles || {}; } catch { lemoStyles = {}; } }
+    return lemoStyles[slug];
+  };
   const owners = new Map();
   for (const [id, p] of Object.entries(profiles)) {
     const err = (m) => errors.push(`${id}: ${m}`);
@@ -204,6 +217,13 @@ export function validateProfiles(profiles, { dir = STYLES_DIR, root = OV_DIR } =
     if (!Array.isArray(p.signature_moves) || !p.signature_moves.length) err("signature_moves needs at least one move");
     else p.signature_moves.forEach((m, i) => { const e = moveError(m); if (e) err(`signature_moves[${i}] ${e}`); });
     if (p.detail && !existsSync(join(root, p.detail))) err(`detail file ${p.detail} not found`);
+    const engine = p.engine ?? "hyperframes";
+    if (!ENGINES.includes(engine)) err(`engine must be one of ${ENGINES.join(", ")}`);
+    if (engine === "lemo-canvas") {
+      const ls = lemoStyle(p.lemo?.style);
+      if (!ls) err(`lemo.style "${p.lemo?.style}" is not in data/lemo/styles.json`);
+      else if (p.lemo.kind !== ls.kind) err(`lemo.kind "${p.lemo.kind}" differs from the catalog's "${ls.kind}"`);
+    } else if (p.lemo !== undefined) err('lemo is only for engine "lemo-canvas"');
     for (const name of [id, ...(p.aliases || [])]) {
       const key = norm(name);
       if (!key) { err(`name "${name}" is empty once filler words are removed`); continue; }
@@ -324,7 +344,16 @@ export function resolveProject(dir, profiles = loadProfiles()) {
   if (!base || PLACEHOLDER.test(base)) throw new StyleError("BRIEF.md has no style_profile: (make-pitch.mjs choose writes it; ids in data/styles/index.json)");
   const planPath = join(resolve(dir), "PLAN.md");
   const scenes = existsSync(planPath) ? planSceneList(readFileSync(planPath, "utf8")) : [];
-  return resolveSpec({ base, layers: parseLayers(brief), scenes }, profiles);
+  const r = resolveSpec({ base, layers: parseLayers(brief), scenes }, profiles);
+  const indexPath = join(resolve(dir), "index.html");
+  const html = existsSync(indexPath) ? readFileSync(indexPath, "utf8") : "";
+  for (const id of [r.base, ...r.layers.filter((l) => l.scenes.length).map((l) => l.style)]) {
+    const p = profiles[id];
+    if (p.engine === "lemo-canvas" && !html.includes(`lemo-style: ${p.lemo.style} -->`)) {
+      r.warnings.push(`${id} vẽ bằng lớp lemo-canvas nhưng index.html chưa có lớp ${p.lemo.style}; chạy node ${join(OV_DIR, "scripts", "lemo.mjs")} add --project ${dir} --style ${p.lemo.style}`);
+    }
+  }
+  return r;
 }
 
 const cell = (v, base) => (v === base ? "base" : v.replace(`${base} + `, "base + ").replace(/ accents$/, " (màu nhấn)"));
@@ -374,6 +403,7 @@ const showText = (p) => [
   `Ràng buộc: ${(p.constraints || []).join("; ")}`,
   `Tránh: ${(p.avoid || []).join("; ")}`,
   `Đi cùng: ${(p.pairs_well_with || []).join(", ")}${p.detail ? `\nChi tiết: ${join(OV_DIR, p.detail)}` : ""}`,
+  ...(p.engine === "lemo-canvas" ? [`engine: lemo-canvas (${p.lemo.kind}) · node ${join(OV_DIR, "scripts", "lemo.mjs")} add --project . --style ${p.lemo.style}`] : []),
 ].join("\n");
 
 function parseArgs(argv) {

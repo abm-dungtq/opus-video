@@ -19,13 +19,24 @@ Dùng cho phần lớn trường hợp. Gọi skill `hyperframes` (cửa vào b�
 
 CLI (binary đã cài, `hyperframes` ≥ 0.8.144): `lint` → `check` → `render`. Trước khi tự viết motion, tìm primitive có sẵn bằng `hyperframes catalog --query "<hiệu ứng>"`.
 
+## 1b. HyperFrames cùng lớp lemo-canvas
+
+Dùng khi brief cần chất liệu vẽ bằng code mà GSAP và DOM không làm được: thuỷ màu tự vẽ từng nét trên giấy, hoặc sản phẩm thuỷ tinh 3D có khúc xạ và tán sắc. Engine của một phong cách [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) (MIT) vẽ vào canvas nằm dưới lớp DOM, và timeline GSAP điều khiển nó qua `window.lemoRender(t, win)`. Lint, check, Motion Studio, render và chữ tiếng Việt ở lớp DOM giữ nguyên. `BRIEF.md` vẫn ghi `engine: hyperframes`, thêm `lemo_style: <slug>`.
+
+```bash
+node $OV/scripts/lemo.mjs fetch
+node $OV/scripts/lemo.mjs add --project . --style <watercolor|glass-product>
+```
+
+Cái giá phải trả là thời gian render: phong cách 2D chậm hơn khoảng 1,3 lần, phong cách three.js khoảng 5 lần, và hai lần render 3D chỉ gần giống nhau (PSNR từ 50 dB). Hợp đồng của scene, luật ghi công và cách thêm phong cách ở `references/lemo-canvas.md`.
+
 ## 2. Remotion (`ak-remotion`)
 
 Dùng khi người dùng yêu cầu React hoặc đã có codebase Remotion. Nhiều biến thể của cùng một mẫu (headline, giá, CTA, tên cửa hàng) **không** còn là lý do chọn Remotion: dùng HyperFrames `render --variables` / `--batch rows.json --output "renders/{name}.mp4"` với `data-composition-variables` (xem `hyperframes-cli/references/compare-and-batch.md`). Trong corpus có 89 prompt nhắc tới Remotion, chủ yếu là video sản phẩm và data. Chỉ chọn khi có lý do rõ, và ghi lý do vào `engine_reason`.
 
 ## 3. Raw HTML/Canvas/Three.js + Playwright + ffmpeg
 
-Dùng khi cần shader hoặc generative nặng mà HyperFrames không seek được (simulation có trạng thái, WebGL tự viết). Công thức:
+Dùng khi cần shader hoặc generative nặng mà HyperFrames không seek được (simulation có trạng thái, WebGL tự viết). Canvas hoặc three.js vẽ được thành hàm thuần của `t` thì thử lớp lemo-canvas ở mục 1b trước, vì đường đó vẫn giữ lint, check và Studio. Công thức:
 
 1. Trang HTML chạy bằng một **clock giả định**: `window.__t` do script điều khiển, không dùng `requestAnimationFrame` theo thời gian thật. Mọi chuyển động phải là hàm thuần của `t`.
 2. Script Playwright: với `i = 0..N-1`, đặt `__t = i / fps`, gọi hàm render, rồi `page.screenshot({ path: frames/frame_%05d.png })`.

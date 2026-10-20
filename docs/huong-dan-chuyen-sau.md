@@ -1071,7 +1071,7 @@ cd ../<project>-9x16 && npx --yes hyperframes@0.8.144 lint
 
 ### 14.7 Style: trục thứ hai
 
-Hướng đạo diễn (A1–A8) quyết định cách kể bằng hình. Style quyết định giao diện: màu, chữ, chất liệu, chuyển cảnh, nhịp. Có 61 style trong `data/styles/`, mỗi style một file JSON với tên và mô tả tiếng Việt (`ten_vi`, `mo_ta_vi`). Agent chỉ đọc `data/styles/index.json` (một dòng mỗi style) và đúng một profile đã chọn.
+Hướng đạo diễn (A1–A8) quyết định cách kể bằng hình. Style quyết định giao diện: màu, chữ, chất liệu, chuyển cảnh, nhịp. Có 61 style trong `data/styles/` (từ v2.4.0 thêm hai style vẽ bằng lớp lemo-canvas, xem `references/lemo-canvas.md`), mỗi style một file JSON với tên và mô tả tiếng Việt (`ten_vi`, `mo_ta_vi`). Agent chỉ đọc `data/styles/index.json` (một dòng mỗi style) và đúng một profile đã chọn.
 
 ```bash
 node $OV/scripts/styles.mjs find "keynote kính"

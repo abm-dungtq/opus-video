@@ -11,7 +11,7 @@ import {
   norm, paletteCss, parseLayers, planSceneList, renderMarkdown, resolveProject, resolveSpec, suggestStyles, validateProfiles,
 } from "../styles.mjs";
 import { checkData, compatWarnings, loadDirections, main as directionsMain } from "../directions.mjs";
-import { main as pitchMain, styleframeMd } from "../make-pitch.mjs";
+import { main as pitchMain, lemoProfile, styleMd, styleframeMd } from "../make-pitch.mjs";
 import { check as preflight, checkStyle } from "../check-preflight.mjs";
 
 const profiles = loadProfiles();
@@ -35,7 +35,7 @@ test("every profile has a Vietnamese name and description; validate passes; inde
   assert.equal(text, buildIndex(profiles));
   const rows = JSON.parse(text);
   assert.equal(rows.length, Object.keys(profiles).length);
-  assert.deepEqual(Object.keys(rows[0]), ["id", "ten_vi", "name", "family", "aliases", "energy", "best_for", "summary", "mo_ta_vi", "depth"]);
+  assert.deepEqual(Object.keys(rows[0]), ["id", "ten_vi", "name", "family", "aliases", "energy", "best_for", "summary", "mo_ta_vi", "depth", "engine"]);
   assert.deepEqual(rows.map((r) => r.id), [...rows.map((r) => r.id)].sort());
   assert.equal(text.trim().split("\n").length, Object.keys(profiles).length + 2, "one line per style plus the brackets");
   assert.deepEqual(rows.filter((r) => r.depth === "reference").map((r) => r.id), ["cinematic-product-launch", "comic-multiverse", "glass-keynote"]);
@@ -283,6 +283,78 @@ test("preflight plan: creative-good with style_profile glass-keynote still passe
     const quiet = { errors: [], warnings: [] };
     assert.equal(checkStyle({ dir: d, brief: "---\ntitle: cũ\n---\n", ...quiet }), null);
     assert.deepEqual(quiet, { errors: [], warnings: [] }, "a legacy brief without style_profile stays silent");
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("lemo-canvas profiles: engine and catalog style checked; find, show and index know them", () => {
+  const lemo = Object.values(profiles).filter((p) => p.engine === "lemo-canvas").map((p) => p.id).sort();
+  assert.deepEqual(lemo, ["lemo-glass-product", "lemo-watercolor"]);
+  assert.equal(findStyles("thuỷ màu", profiles)[0].id, "lemo-watercolor");
+  assert.equal(lookup("glass product", profiles), "lemo-glass-product");
+  const rows = JSON.parse(readFileSync(join(STYLES_DIR, "index.json"), "utf8"));
+  assert.equal(rows.find((r) => r.id === "lemo-watercolor").engine, "lemo-canvas");
+  assert.equal(rows.find((r) => r.id === "saas-bento").engine, "hyperframes");
+  const c = capture();
+  assert.equal(main(["show", "lemo-watercolor"], c.log, c.log), 0);
+  assert.match(c.text(), /engine: lemo-canvas \(2d\) · node .*lemo\.mjs add --project \. --style watercolor/);
+
+  const d = tmp();
+  try {
+    cpSync(STYLES_DIR, d, { recursive: true });
+    const edit = (id, fn) => { const f = join(d, `${id}.json`); const p = JSON.parse(readFileSync(f, "utf8")); fn(p); writeFileSync(f, JSON.stringify(p)); };
+    edit("lemo-watercolor", (p) => { p.lemo.style = "oil-paint"; });
+    edit("lemo-glass-product", (p) => { p.lemo.kind = "2d"; });
+    edit("saas-bento", (p) => { p.engine = "webgl"; });
+    edit("glass-keynote", (p) => { p.lemo = { style: "watercolor", kind: "2d" }; });
+    const ps = loadProfiles(d);
+    writeFileSync(join(d, "index.json"), buildIndex(ps));
+    const errors = validateProfiles(ps, { dir: d });
+    for (const re of [/lemo-watercolor: lemo\.style "oil-paint" is not in/, /lemo-glass-product: lemo\.kind "2d" differs/, /saas-bento: engine must be one of/, /glass-keynote: lemo is only for engine/]) {
+      assert.ok(errors.some((e) => re.test(e)), `${re}: ${errors.join(" | ")}`);
+    }
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("resolve --project: a lemo-canvas base without its layer in index.html warns with the add command", () => {
+  const d = tmp();
+  try {
+    writeFileSync(join(d, "BRIEF.md"), "---\nstyle_profile: lemo-watercolor\n---\n# Brief\n");
+    writeFileSync(join(d, "index.html"), "<div id=\"bg\"><!-- LEMO-LAYER:BEGIN --><!-- LEMO-LAYER:END --></div>");
+    assert.ok(resolveProject(d, profiles).warnings.some((w) => /lemo\.mjs add --project .* --style watercolor/.test(w)));
+    writeFileSync(join(d, "index.html"), "<div id=\"bg\"><!-- LEMO-LAYER:BEGIN --><!-- lemo-style: watercolor --><!-- LEMO-LAYER:END --></div>");
+    assert.ok(!resolveProject(d, profiles).warnings.some((w) => /lemo/.test(w)));
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("make-pitch --lemo: catalog slug, profile id or alias resolve to the profile; others refuse; STYLEFRAME says how to add it", () => {
+  assert.equal(lemoProfile("watercolor", profiles), "lemo-watercolor");
+  assert.equal(lemoProfile("lemo-glass-product", profiles), "lemo-glass-product");
+  assert.equal(lemoProfile("thuy mau", profiles), "lemo-watercolor");
+  assert.throws(() => lemoProfile("saas-bento", profiles), /not a lemo-canvas style/);
+  const md = styleMd(profiles["lemo-glass-product"], dir("A1"));
+  assert.match(md, /lemo\.mjs add --project \. --style glass-product/);
+  assert.match(md, /scene3d\.js/);
+  assert.doesNotMatch(styleMd(profiles["saas-bento"], dir("A1")), /lemo/);
+  const c = capture();
+  assert.equal(pitchMain(["init", "--project", ".", "--topic", "t", "--aspect", "16:9", "--lemo", "saas-bento"], c.log, c.log), 2);
+  assert.match(c.text(), /--lemo: saas-bento is not a lemo-canvas style/);
+});
+
+test("make-pitch choose: BRIEF lemo_style keeps its lemo profile whichever pick wins; --style-profile still overrides", () => {
+  const d = tmp();
+  try {
+    mkdirSync(join(d, "pitch"));
+    writeFileSync(join(d, "pitch", "PICK.json"), JSON.stringify({ topic: "t", aspect: "16:9", energy: "vua", duration_s: 20, picks: [{ n: 1, id: "A2", tier: "fit", dir: "pitch/1-x", style_profile: "terminal-ops" }] }));
+    writeFileSync(join(d, "BRIEF.md"), "---\naspect: 16:9\nstyle_profile: lemo-watercolor\nlemo_style: watercolor\n---\n\n# Brief\n");
+    const quiet = () => {};
+    assert.equal(pitchMain(["choose", "--project", d, "--pick", "1", "--accept-warnings"], quiet, quiet), 0);
+    assert.match(readFileSync(join(d, "BRIEF.md"), "utf8"), /^style_profile: lemo-watercolor$/m);
+    assert.equal(pitchMain(["choose", "--project", d, "--pick", "1", "--style-profile", "terminal-ops", "--accept-warnings"], quiet, quiet), 0);
+    assert.match(readFileSync(join(d, "BRIEF.md"), "utf8"), /^style_profile: terminal-ops$/m);
+    writeFileSync(join(d, "BRIEF.md"), "---\naspect: 16:9\nlemo_style: saas-bento\n---\n");
+    const c = capture();
+    assert.equal(pitchMain(["choose", "--project", d, "--pick", "1"], c.log, c.log), 2);
+    assert.match(c.text(), /BRIEF lemo_style: saas-bento is not a lemo-canvas style/);
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 

@@ -16,6 +16,7 @@ Viết `STORYBOARD.md` từ bảng của viet-pro và hướng đã chọn, cộ
 Chọn theo `references/engine-selection.md` (`$OV/references/engine-selection.md`). Mặc định là HyperFrames. Ghi `engine`, `workflow`, `engine_reason` vào `BRIEF.md`. Nhiều biến thể của cùng một mẫu thì dùng `render --batch` của HyperFrames, không chuyển sang Remotion.
 
 - **Dựng tay** (general-video): khung là `node $OV/scripts/composition.mjs init --project .` (`new-project.sh` đã gọi sẵn): `index.html` có bộ hàm hoạt hình, `W(cảnh, "cụm từ")` mốc theo lời, `B(n)` mốc theo phách. Không gõ tay số giây.
+- **Lớp lemo-canvas** (`lemo_style:` trong BRIEF, hoặc `style_profile` có `engine: lemo-canvas`): `node $OV/scripts/lemo.mjs add --project . --style <slug>` rồi viết `assets/lemo/scene.js` hoặc `scene3d.js`. Đọc `$OV/references/lemo-canvas.md` trước khi viết scene.
 
 ## 4b. Plan
 
@@ -35,6 +36,7 @@ Chép mục "Sàn chất lượng", "Chống slideshow" và "Kỷ luật GSAP" c
 - **Bắt buộc** chạy `hyperframes catalog --query "<hiệu ứng>"` trước khi tự viết hiệu ứng, và ưu tiên block hoặc blueprint đã chọn ở bước 3.
 - Workflow có frame preset (`build-frame.mjs`): kiểm tra font preset có đủ dấu tiếng Việt (`engine-selection.md`). Thiếu thì đổi sang Be Vietnam Pro và copy file font vào `assets/fonts/`.
 - Remotion: dùng skill `ak-remotion`.
+- Lớp lemo-canvas: scene là hàm thuần của `t`, mốc theo tỉ lệ shot, chữ tiếng Việt ở lớp DOM (`references/lemo-canvas.md`). Bản 3D render chậm khoảng 5 lần, nên xem nháp bằng `ssaa: 1`.
 - Raw canvas: làm theo công thức trong `engine-selection.md`.
 - Với `aspect: both`, bản dọc phải dàn lại bố cục, không crop:
   - **Dự án mới** (một `index.html`): viết phần khác của khổ dọc trong `html[data-ratio="9x16"]`, rồi `node $OV/scripts/reframe.mjs ./ --ratio 9x16` (hoặc `1x1`) sinh `../<project>-9x16`. Chi tiết và giới hạn ở `engine-selection.md`.
@@ -74,5 +76,7 @@ Chép mục "Sàn chất lượng", "Chống slideshow" và "Kỷ luật GSAP" c
 | `$OV/scripts/make-demo.mjs` | Bước 6b: chụp khung hình demo theo `PLAN.md`, ghi `DEMO.md`; `--animatic` render clip nháp toàn bộ + contact sheet (bắt buộc với dự án có `direction:`); `--from-video` cắt từ bản nháp người dùng đã xem |
 | `$OV/scripts/sfx-sync.mjs` | Bước 6b và 8: đo lúc SFX thật sự vang so với `## Sự kiện` trong `PLAN.md`, ngưỡng theo ITU-R BT.1359-1; `--fix` in đề xuất `data-start` (không sửa HTML); `--write-qa` ghi vào `QA.md` |
 | `$OV/scripts/composition.mjs` | Bước 4: khung composition từ skeleton (`init`) |
+| `$OV/scripts/lemo.mjs` | Bước 4 và 6: lớp lemo-canvas (`fetch`, `list`, `add --style`, `remove`) |
+| `$OV/references/lemo-canvas.md` | Bước 4 và 6: hợp đồng scene `lemoRender(t, win)`, ghi công, tốc độ render, thêm phong cách |
 | `$OV/scripts/reframe.mjs` | Bước 6: bản 9:16/1:1 của dự án một `index.html` |
 | `$OV/scripts/styles.mjs` | Bước 4b: `resolve --project` in khối style theo cảnh cho `## Ý đồ sáng tạo` |

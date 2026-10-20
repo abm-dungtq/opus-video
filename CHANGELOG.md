@@ -1,8 +1,18 @@
 # Changelog
 
-## Unreleased
+## v2.4.0 (2026-10-20): lớp lemo-canvas
 
-### Added
+Why: some briefs need a look GSAP and the DOM cannot draw: brushwork that paints itself on paper, or a glass product with refraction and dispersion. [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) (MIT) already has engines for these styles. They now paint into a canvas under the composition's DOM layer, while the GSAP timeline, the player, Motion Studio, `render-final.mjs`, the viet-pro gate and Vietnamese text stay as they are.
+
+### New
+- `scripts/lemo.mjs` (`fetch`, `list [--json]`, `add --project --style [--force]`, `remove`). `fetch` takes only the catalogued files from the pinned lemo-opuscar commit (`b5e8ef9`, about 0.5 MB) plus three.js 0.170.0 into `~/.cache/opus-video/lemo-opuscar` (`LEMO_OPUSCAR_HOME`). `add` copies the engine to `assets/lemo/` (three.js to `assets/three/`), writes the licences and `CREDITS`, makes `paper.jpg` for watercolor, fills the layer and the bridge, and creates `scene.js` or `scene3d.js` from a template only when the project has none. `remove` takes the layer out and keeps the scene. Exit 2 bad usage or unknown style, 3 `index.html` without the markers, 4 cache missing or `paper.py` failed, 5 layer already there (pass `--force`).
+- Catalogue `data/lemo/styles.json` with two verified styles: `watercolor` (2D canvas) and `glass-product` (three.js).
+- Scene contract: `window.lemoRender(t, win)` is a pure function of `t`, with `win = { <scene id>: [start, end] }` from `WINDOWS` and `TIMING`. Scenes time their beats as fractions of a shot, so `resize_shot` stretches the painting. The 3D module loads after the timeline script and paints from `__lemoT` and `__lemoWin`.
+- `composition.mjs init` skeleton carries four empty markers: `<!-- LEMO-LAYER:BEGIN/END -->` in `#bg` and `/* LEMO:BEGIN/END */` after the `WINDOWS.forEach` block.
+- Style profiles `lemo-watercolor` and `lemo-glass-product` (64 profiles with `variety-captions`). Profiles take an optional `engine` (`hyperframes` by default, or `lemo-canvas`) and `lemo: { style, kind }`; `styles.mjs validate` checks both, `index` has an `engine` column, `show` prints the `lemo.mjs add` command, and `resolve` warns when the BRIEF's lemo profile has no layer in `index.html`.
+- `make-pitch.mjs init --lemo <slug>` (or `lemo_style:` in BRIEF.md) gives the bold styleframe a lemo profile and the opus-video skeleton; with `lemo_style:` set, `choose` keeps that lemo profile whichever direction wins.
+- `reframe.mjs` prints `WARN lemo` for a project with the layer: the scene is drawn for the landscape layout and needs its own vertical scene.
+- `references/lemo-canvas.md`, section 1b of `engine-selection.md`, `lemo_style:` in the brief template, the `engine` field in `style-system.md`, and pointers in `ov-build` and `ov-direction`. `NOTICE` and `third_party/` carry the lemo-opuscar and three.js MIT licences.
 - `judge.mjs score`: Gemini chấm 7 tiêu chí 1–10 (style_fidelity, concept_wow, motion_craft, design_typography, finish_texture, sound_sync, technical) theo mốc cố định, chạy 3 lượt độc lập, ghi trung vị, độ dao động và 5–10 fix có mốc giây. Chỉ quan sát, không chặn render. `--style <id>` đưa signature moves của profile cho giám khảo.
 - `signature_moves` nhận object `{ name, technique, numbers, check }` bên cạnh chuỗi; `styles.mjs validate` kiểm dạng mới.
 - Profile `variety-captions` (Hoa chữ show giải trí): phụ đề 9:16 viền dày nảy theo lời, từ nhấn kèm sticker, trong vùng an toàn TikTok.
@@ -10,6 +20,9 @@
 
 ### Fixed
 - Đạo diễn của Motion Studio không còn sửa được file ngoài dự án. `ALLOWED_TOOLS` trong `scripts/studio-api.mjs` bỏ hai luật `Edit` và `Write` không kèm đường dẫn: với chúng, `claude -p` sửa được mọi file không nhạy cảm trên đĩa (ví dụ `/tmp/…`). Chế độ `acceptEdits` vẫn cho sửa trong thư mục dự án (cwd). Kiểm bằng `claude -p` 2.1.304 với haiku: sửa trong dự án được, sửa `/tmp/<probe>` bị chặn.
+
+### Measured
+- 10 s, 300 frames, HyperFrames 0.8.144, MacBook GPU: watercolor renders in about 1.3 times the plain skeleton and two renders are byte-identical; glass-product takes about 5 times and two renders reach PSNR 56–59 dB (not byte-identical). With `--no-browser-gpu` a 3D render takes about 30 minutes.
 
 ## v2.3.0 (2026-10-17): timeline sửa nhanh
 

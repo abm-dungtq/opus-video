@@ -11,6 +11,7 @@
 workflow: <faceless-explainer | product-launch-video | music-to-video | motion-graphics | general-video>
 engine: <hyperframes | remotion | raw-canvas>
 engine_reason: <1 câu: vì sao chọn engine này>
+lemo_style: <watercolor | glass-product>   # tuỳ chọn: lớp lemo-canvas dưới composition (references/lemo-canvas.md); bỏ dòng này khi không dùng
 aspect: <16:9 | 9:16 | both>
 duration_s: <số giây>
 fps: <30 | 60>

@@ -1,11 +1,11 @@
-# Hệ style với 61 profile, chọn theo từng cảnh
+# Hệ style với 64 profile, chọn theo từng cảnh
 
 Một video của opus-video có hai trục chọn độc lập:
 
 | Trục | Quyết định | Nguồn | Ghi vào BRIEF |
 |---|---|---|---|
 | **Hướng** (A1–A8) | Cách kể bằng hình: khối biến hình, khung lệnh, máy quay lướt, bản đồ… Blueprint, rule, seam, luật chống slideshow | `data/directions.json`, `references/creative-directions.md` | `direction:` |
-| **Style** (61 profile) | Giao diện: màu, chữ, bố cục, chất liệu, texture, camera, chuyển cảnh, nhịp, phản ứng theo beat, UI, sơ đồ, nhân vật, caption, âm thanh | `data/styles/<id>.json`, `data/styles/index.json` | `style_profile:` và `## style_layers` |
+| **Style** (64 profile) | Giao diện: màu, chữ, bố cục, chất liệu, texture, camera, chuyển cảnh, nhịp, phản ứng theo beat, UI, sơ đồ, nhân vật, caption, âm thanh | `data/styles/<id>.json`, `data/styles/index.json` | `style_profile:` và `## style_layers` |
 
 Cùng hướng A2 (gõ lệnh, máy bung kết quả) có thể mặc `precision-dark-product` (nền gần đen, viền mảnh) hoặc `terminal-ops` (cả khung là terminal). Đổi style không đổi cách kể; đổi hướng không đổi bảng màu.
 
@@ -15,15 +15,16 @@ Hai trục gặp nhau ở ba chỗ.
 - Seam giữa các beat vẫn do hướng quyết định. Cổng sáng tạo chặn `fade`, `cut`, `crossfade` dù style có liệt kê chúng; chuyển cảnh của style chỉ là chất liệu để dựng seam đó.
 - Từ khoá `style` cũ của hướng (token HyperFrames như `Data Drift`, `Swiss Pulse`) cũng mang bảng màu. Khi đã có `style_profile`, profile thắng ở phần màu, chữ, chất liệu. Đổi cả hai cùng lúc thì `directions.mjs compat` cảnh báo hai nguồn bảng màu.
 
-Profile lấy từ ak-motion-video (AgentKit, MIT), đổi từ YAML sang JSON. Nội dung kỹ thuật giữ tiếng Anh; mỗi profile có thêm `ten_vi` (tối đa 5 từ) và `mo_ta_vi` (một câu, tối đa 25 từ) để đưa cho người dùng. Tên thương hiệu chỉ nằm trong `aliases`. Video không mượn logo, font có bản quyền, linh vật, khẩu hiệu hay mã màu chính xác của thương hiệu. Video cũng không ngụ ý được thương hiệu bảo trợ.
+61 profile lấy từ ak-motion-video (AgentKit, MIT), đổi từ YAML sang JSON. Hai profile họ `lemo-opuscar` (`lemo-watercolor`, `lemo-glass-product`) chuyển từ hướng dẫn phong cách của lemo-opuscar (MIT). Nội dung kỹ thuật giữ tiếng Anh; mỗi profile có thêm `ten_vi` (tối đa 5 từ) và `mo_ta_vi` (một câu, tối đa 25 từ) để đưa cho người dùng. Tên thương hiệu chỉ nằm trong `aliases`. Video không mượn logo, font có bản quyền, linh vật, khẩu hiệu hay mã màu chính xác của thương hiệu. Video cũng không ngụ ý được thương hiệu bảo trợ.
 
 ## Agent đọc gì
 
 Không đọc cả thư mục `data/styles/`. Đọc theo thứ tự:
 
-1. `data/styles/index.json`: mỗi dòng một style (`id, ten_vi, name, family, aliases, energy, best_for, summary, mo_ta_vi, depth`). Đủ để chọn.
+1. `data/styles/index.json`: mỗi dòng một style (`id, ten_vi, name, family, aliases, energy, best_for, summary, mo_ta_vi, depth, engine`). Đủ để chọn. `engine` là `hyperframes` với hầu hết style; `lemo-canvas` nghĩa là hình vẽ bằng engine lemo trên một canvas dưới DOM.
 2. Đúng một profile `data/styles/<id>.json` cho style nền, thêm một profile cho mỗi lớp mượn thật sự dùng.
 3. `references/styles/detail/<id>.md` khi `depth` là `reference` (hiện có `glass-keynote`, `comic-multiverse`, `cinematic-product-launch`): token, lớp, thành phần và trường hợp biên từ một bản đã làm xong.
+4. Style có `engine: lemo-canvas`: đọc thêm `references/lemo-canvas.md`. Profile có trường `lemo: { style, kind }` trỏ tới danh mục `data/lemo/styles.json`; `styles.mjs show` in lệnh `lemo.mjs add` cần chạy, và `resolve --project` cảnh báo khi `index.html` chưa có lớp đó.
 
 Lệnh tra cứu:
 
@@ -147,5 +148,5 @@ Lệnh `check-preflight.mjs` chạy cùng phép resolve ở cả hai stage. Dự
 1. Chép một profile có sẵn thành `data/styles/<id>.json`. Id viết kebab-case, tả giao diện, không mang tên thương hiệu.
 2. Điền đủ 14 chiều bằng giá trị dựng được: mã màu `#rrggbb` (`bg`, `ink`, `accent` bắt buộc là hex; token khác được dùng `rgba()`), font Google Fonts hoặc OFL, ease GSAP, thời lượng, cỡ pixel.
 3. Viết `ten_vi` và `mo_ta_vi` cho người dùng; tên thương hiệu chỉ đặt trong `aliases`.
-4. Chạy `node $OV/scripts/styles.mjs index --write` rồi `node $OV/scripts/styles.mjs validate`.
+4. Chạy `node $OV/scripts/styles.mjs index --write` rồi `node $OV/scripts/styles.mjs validate`. Style vẽ bằng lớp lemo-canvas thêm `engine: "lemo-canvas"`, `lemo: { "style": <slug trong data/lemo/styles.json>, "kind": "2d" | "3d" }` và `family: "lemo-opuscar"`; validate kiểm slug và kind khớp danh mục. Xem `references/lemo-canvas.md` mục "Thêm một phong cách lemo khác".
 5. Muốn hướng nào gợi ý style mới thì thêm id vào `styles_goi_y` của hướng đó, chạy `directions.mjs check` rồi `directions.mjs doc --write`.
