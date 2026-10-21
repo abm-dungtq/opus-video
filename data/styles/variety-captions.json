@@ -28,7 +28,7 @@
       "Max 2 caption lines, max 14 words on screen at once"
     ],
     "layout": [
-      "Captions centred on x, inside x 72-900 and y 231-1536 (TikTok/Reels UI safe area on 1080x1920)",
+      "Captions centred on x, inside x 72-900 and y 231-1440 (TikTok/Reels UI safe area on 1080x1920)",
       "Default caption block centred at y 1180-1380; moves up to y 300-500 when the subject's face is low",
       "Sticker sits at the end of the stressed word, offset 12-24 px up and right"
     ],
@@ -99,7 +99,7 @@
     {
       "name": "TikTok safe area",
       "technique": "Caption block and stickers stay inside the 9:16 UI-free zone",
-      "numbers": { "x_min": 72, "x_max": 900, "y_min": 231, "y_max": 1536, "max_lines": 2 },
+      "numbers": { "x_min": 72, "x_max": 900, "y_min": 231, "y_max": 1440, "max_lines": 2 },
       "check": "hyperframes check --frame-check and video-lint report nothing in the UI zone; no caption over 2 lines on any demo frame"
     }
   ],
