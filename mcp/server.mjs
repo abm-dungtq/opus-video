@@ -15,14 +15,16 @@ import { patch, undo, readHistory } from "../scripts/gateway.mjs";
 import { next, finish, ask, ASK_KINDS } from "../scripts/requests.mjs";
 
 // A director started by Studio (`claude -p`, director.mjs in the motion-studio repo) runs this server with
-// OPUS_STUDIO_RUNNER=cli: it closes the request Studio claimed for it as runner "cli". Any other
-// session pulls the queue as runner "mcp".
-const RUNNER = process.env.OPUS_STUDIO_RUNNER === "cli" ? "cli" : "mcp";
+// MOTION_STUDIO_RUNNER=cli (older Studio: OPUS_STUDIO_RUNNER=cli): it closes the request Studio
+// claimed for it as runner "cli". A non-empty MOTION_STUDIO_RUNNER wins over the old name. Any
+// other session pulls the queue as runner "mcp". The request id Studio also sets
+// (MOTION_STUDIO_REQUEST / OPUS_STUDIO_REQUEST) is not read here: every tool call names its id.
+const RUNNER = (process.env.MOTION_STUDIO_RUNNER || process.env.OPUS_STUDIO_RUNNER) === "cli" ? "cli" : "mcp";
 
 // stdout carries JSON-RPC only: anything a library logs goes to stderr.
 console.log = (...a) => console.error(...a);
 
-export const SERVER = { name: "opus-video", version: "2.4.0" };
+export const SERVER = { name: "opus-video", version: "2.5.0" };
 const PROJECT = { type: "string", description: "Đường dẫn tuyệt đối tới thư mục dự án có project.json" };
 const BASE = { type: "integer", description: "Phiên bản project.json bạn vừa đọc (project_get → version)" };
 
