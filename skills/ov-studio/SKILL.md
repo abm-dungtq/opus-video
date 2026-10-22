@@ -9,7 +9,7 @@ description: "Hướng timeline của opus-video: manifest project.json (shot, c
 
 ## Phạm vi
 
-Skill này sở hữu manifest `project.json`, cổng lệnh ghi duy nhất `gateway.mjs`, việc nhập dự án cũ, Motion Studio và yêu cầu gửi cho đạo diễn AI. Studio import plugin chỉ qua `scripts/studio-api.mjs` (`STUDIO_API = 3`, `PLUGIN_VERSION`, quyền của đạo diễn, `redo` và hàm thuần `redoTarget(history)` cho biết còn gì để làm lại). Dùng được: hai CLI dưới đây, Motion Studio (giao diện web trên máy) và MCP server `opus-video` cho đạo diễn AI.
+Skill này sở hữu manifest `project.json`, cổng lệnh ghi duy nhất `gateway.mjs`, việc nhập dự án cũ, Motion Studio và yêu cầu gửi cho đạo diễn AI. Studio import plugin chỉ qua `scripts/studio-api.mjs` (`STUDIO_API = 4`, `PLUGIN_VERSION`, quyền của đạo diễn, `redo` và hàm thuần `redoTarget(history)` cho biết còn gì để làm lại; `SKILLS` là các skill đạo diễn dùng, `COMMANDS` là đường tuyệt đối tới các script Studio chạy, kèm `COMMANDS.choose` là lệnh chọn hướng). Dùng được: hai CLI dưới đây, Motion Studio (giao diện web trên máy) và MCP server `opus-video` cho đạo diễn AI.
 
 ## Đã dùng được
 
@@ -40,7 +40,9 @@ Skill này sở hữu manifest `project.json`, cổng lệnh ghi duy nhất `gat
 
 Giao diện web trên máy để làm video từ đầu tới bản giao: tạo dự án, nạp footage, giao việc cho đạo diễn AI, bấm duyệt, xem và sửa timeline, xuất MP4. Gồm player, timeline (Shot, Lồng tiếng, Nhạc, SFX), inspector theo khối đang chọn (shot, câu, nhạc, SFX) và thanh bên sáu mục: Giao việc cho AI, Footage & chất liệu, Lời & giọng, Nhạc & âm thanh, Thư viện mẫu, Xuất bản (Alt+1…6; tab đang mở giữ trong `?tab=`).
 
-Studio là repo riêng [abm-dungtq/motion-studio](https://github.com/abm-dungtq/motion-studio), thường clone ở `~/Projects/motion-studio`. `$OV/scripts/studio.mjs` là shim: tìm Studio ở `MOTION_STUDIO_HOME`, rồi `~/Projects/motion-studio`, và chạy `bin/motion-studio.mjs` với cùng tham số. Chưa có Studio thì shim in lệnh `git clone` và exit 2.
+Studio là repo riêng [abm-dungtq/motion-studio](https://github.com/abm-dungtq/motion-studio). Clone về thư mục nào cũng được rồi đặt `MOTION_STUDIO_HOME` là thư mục đó. `$OV/scripts/studio.mjs` là shim: tìm Studio ở `MOTION_STUDIO_HOME`, không đặt thì ở `~/Projects/motion-studio`, và chạy `bin/motion-studio.mjs` với cùng tham số. Chưa có Studio thì shim in lệnh `git clone`, dòng `export MOTION_STUDIO_HOME=…` và exit 2.
+
+Đạo diễn do Studio chạy có `MOTION_STUDIO_RUNNER=cli` (Studio cũ đặt `OPUS_STUDIO_RUNNER=cli`). MCP server đọc tên mới trước, không có thì đọc tên cũ.
 
 ```bash
 node $OV/scripts/studio.mjs start --background   # http://127.0.0.1:4317, gốc /Volumes/2/Edit-Video

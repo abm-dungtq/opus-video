@@ -4,6 +4,8 @@
 // export Studio relies on changes shape; Studio checks it together with PLUGIN_VERSION.
 // API 3 adds redo (EXIT.nothingToRedo 9) and the gateway ops move_event, add_event, remove_event
 // and update_music; redoTarget(history) tells whether a redo is possible without a write.
+// API 4 adds SKILLS and COMMANDS, so Studio names no plugin skill, script file or argv of its own;
+// every API 3 export stays as it was.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,9 +16,28 @@ export { enqueue, list, next, finish, cancelRequest, ask, answer, expireWaiting,
 
 export const OV = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
 export const PLUGIN_VERSION = JSON.parse(readFileSync(join(OV, ".claude-plugin", "plugin.json"), "utf8")).version;
-export const STUDIO_API = 3;
+export const STUDIO_API = 4;
 export const SCRIPTS = join(OV, "scripts");
 export const DIRECTIONS_FILE = join(OV, "data/directions.json");
+
+// The skills the director uses, in the order Studio lists them in its prompt.
+export const SKILLS = Object.freeze(["ov-studio", "ov-build", "ov-script", "ov-audio", "ov-deliver"]);
+// Scripts Studio runs as `node <path> …`: each value is an absolute path to a .mjs file. `choose`
+// is the direction gate (it writes direction: into BRIEF.md): Studio replaces {project} and {pick}
+// in args and runs `node <file> ...args`.
+const script = (f) => join(SCRIPTS, f);
+export const COMMANDS = Object.freeze({
+  render: script("render-final.mjs"),
+  mix: script("audio-mix.mjs"),
+  pitch: script("make-pitch.mjs"),
+  import: script("manifest-import.mjs"),
+  demo: script("make-demo.mjs"),
+  recipe: script("recipe-pack.mjs"),
+  preflight: script("check-preflight.mjs"),
+  cases: script("find-cases.mjs"),
+  styles: script("styles.mjs"),
+  choose: Object.freeze({ file: script("make-pitch.mjs"), args: Object.freeze(["choose", "--project", "{project}", "--pick", "{pick}", "--accept-warnings"]) }),
+});
 
 // The director (`claude -p` started by Studio) reaches the plugin's MCP server under this prefix.
 export const PREFIX = "mcp__plugin_opus-video_opus-video__";

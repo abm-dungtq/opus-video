@@ -11,8 +11,11 @@ const server = fileURLToPath(new URL("../../mcp/server.mjs", import.meta.url));
 const FIXTURE = fileURLToPath(new URL("./fixtures/manifest", import.meta.url));
 
 // Sends every message as one line, returns the replies by id once the server exits on EOF.
-function session(messages) {
-  const r = spawnSync("node", [server], { input: messages.map((m) => JSON.stringify(m)).join("\n") + "\n", encoding: "utf8", timeout: 20000 });
+// env adds to the parent's environment, without the runner names so only env picks the runner.
+function session(messages, env = {}) {
+  const base = { ...process.env };
+  for (const k of ["MOTION_STUDIO_RUNNER", "OPUS_STUDIO_RUNNER"]) delete base[k];
+  const r = spawnSync("node", [server], { input: messages.map((m) => JSON.stringify(m)).join("\n") + "\n", encoding: "utf8", timeout: 20000, env: { ...base, ...env } });
   assert.equal(r.status, 0, r.stderr);
   const replies = r.stdout.trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
   return Object.fromEntries(replies.map((x) => [x.id, x]));
@@ -86,6 +89,25 @@ test("studio_request_next claims the queued request for mcp; studio_request_done
     assert.equal(r[4].result.content[0].text, "null");
     assert.equal(r[5].result.isError, true);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("the runner is cli from MOTION_STUDIO_RUNNER, else from OPUS_STUDIO_RUNNER; the new name wins", () => {
+  const cases = [
+    [{ MOTION_STUDIO_RUNNER: "cli" }, "cli"],
+    [{ OPUS_STUDIO_RUNNER: "cli" }, "cli"],
+    [{ MOTION_STUDIO_RUNNER: "mcp", OPUS_STUDIO_RUNNER: "cli" }, "mcp"],
+    [{ MOTION_STUDIO_RUNNER: "", OPUS_STUDIO_RUNNER: "cli" }, "cli"],
+    [{}, "mcp"],
+  ];
+  for (const [env, runner] of cases) {
+    const dir = mkdtempSync(join(tmpdir(), "mcp-"));
+    try {
+      cpSync(FIXTURE, dir, { recursive: true });
+      enqueue(dir, { scope: "project", base: 1, text: "kiểm runner" });
+      const r = session([init, call(2, "studio_request_next", { project: dir })], env);
+      assert.equal(JSON.parse(r[2].result.content[0].text).runner, runner, JSON.stringify(env));
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }
 });
 
 test("studio_ask moves a running request to waiting_user; a queued one or a bad choice is an error", () => {

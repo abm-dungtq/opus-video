@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.5.0 (2026-10-22): STUDIO_API 4
+
+Why: Motion Studio now reaches the plugin through a provider adapter, and the adapter still named the plugin's script files and the `make-pitch choose` argv itself. The plugin now names them, and Studio's environment names lose the plugin prefix.
+
+### New
+- `scripts/studio-api.mjs`: `STUDIO_API = 4`. `SKILLS` is the frozen list of skills the director uses (`ov-studio`, `ov-build`, `ov-script`, `ov-audio`, `ov-deliver`). `COMMANDS` is a frozen object: `render`, `mix`, `pitch`, `import`, `demo`, `recipe`, `preflight`, `cases`, `styles` are absolute paths to the `.mjs` Studio runs as `node <path> …`, and `choose` is `{ file, args }` with `file` the path of `make-pitch.mjs` and `args` `["choose", "--project", "{project}", "--pick", "{pick}", "--accept-warnings"]` (Studio fills `{project}` and `{pick}`).
+- `mcp/server.mjs` reads `MOTION_STUDIO_RUNNER` first and falls back to `OPUS_STUDIO_RUNNER`; a non-empty new name wins.
+
+### Changed
+- `scripts/studio.mjs` without Studio prints the clone command with a folder of your choice and the `export MOTION_STUDIO_HOME=…` line, and names a `MOTION_STUDIO_HOME` that has no `bin/motion-studio.mjs`. The search order is unchanged: `MOTION_STUDIO_HOME`, then `~/Projects/motion-studio`.
+
+### Kept
+- Every API 3 export keeps its name and shape. Motion Studio v1.1.0 checks `STUDIO_API >= 3`, so it runs on this release unchanged; Studio with the provider adapter accepts 3 and 4 and uses `COMMANDS` when present. `OPUS_STUDIO_RUNNER` still works; `OPUS_STUDIO_REQUEST` was never read by the MCP server.
+
 ## v2.4.0 (2026-10-20): lớp lemo-canvas
 
 Why: some briefs need a look GSAP and the DOM cannot draw: brushwork that paints itself on paper, or a glass product with refraction and dispersion. [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) (MIT) already has engines for these styles. They now paint into a canvas under the composition's DOM layer, while the GSAP timeline, the player, Motion Studio, `render-final.mjs`, the viet-pro gate and Vietnamese text stay as they are.
