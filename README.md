@@ -50,6 +50,12 @@ Các video dưới đây do opus-video dựng. Bấm vào ảnh để mở file 
 
 ## Có gì mới
 
+### v2.5.0 (2026-10-22): STUDIO_API 4 cho Motion Studio
+
+- **Studio không còn ghi cứng tên script của plugin.** `scripts/studio-api.mjs` có `STUDIO_API = 4`, thêm `SKILLS` (các skill đạo diễn dùng) và `COMMANDS` (đường tuyệt đối tới script render, mix, pitch, import, demo, recipe, preflight, cases, styles, cùng lệnh chọn hướng `COMMANDS.choose`). Mọi export của API 3 giữ nguyên, Studio cũ vẫn chạy.
+- **Tên biến môi trường mới.** MCP server đọc `MOTION_STUDIO_RUNNER` trước, không có thì đọc `OPUS_STUDIO_RUNNER`.
+- **Clone Studio ở đâu cũng được.** Đặt `MOTION_STUDIO_HOME` là thư mục clone; shim `scripts/studio.mjs` tìm ở đó trước, rồi mới tới `~/Projects/motion-studio`.
+
 ### v2.4.0 (2026-10-20): lớp lemo-canvas
 
 - **Hai phong cách vẽ bằng code từ [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar).** `lemo-watercolor` là thuỷ màu tự vẽ trên giấy (canvas 2D). `lemo-glass-product` là sản phẩm thuỷ tinh 3D có khúc xạ và tán sắc (three.js). Engine của lemo vẽ vào canvas nằm dưới lớp DOM, còn timeline GSAP, Motion Studio, cổng viet-pro và chữ tiếng Việt vẫn như cũ.
