@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### New
+- `data/directions.json`: four `native` seams, `impact-frame`, `smear-cut`, `ink-wipe` and `speed-lines`. The plan gate accepts them in the "Nối sang beat sau" column, the recipe pack prints their `mo_ta` (which names the Motion Studio recipe), and `whip-pan + smear-cut` no longer trips the banned word `cut`.
+
 ## v2.5.0 (2026-10-22): STUDIO_API 4
 
 Why: Motion Studio now reaches the plugin through a provider adapter, and the adapter still named the plugin's script files and the `make-pitch choose` argv itself. The plugin now names them, and Studio's environment names lose the plugin prefix.
