@@ -49,13 +49,17 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, rena
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
-import { load, save, validate, r3 } from "./manifest.mjs";
+import { load, save, validate, r3, WORKFLOW_MODES } from "./manifest.mjs";
 import { buildTiming, injectTiming, manifestScenes } from "./timing.mjs";
 import { EVENTS_SECTION, SECTIONS, fold, parseTable, sceneId } from "./check-preflight.mjs";
 import { eventTime } from "./sfx-sync.mjs";
 
 export const EXIT = { ok: 0, io: 1, usage: 2, conflict: 3, viewOnly: 4, invalid: 5, nothingToUndo: 7, busy: 8, nothingToRedo: 9 };
 export const ACTORS = ["human", "director", "timing", "import", "undo", "redo"];
+export { WORKFLOW_MODES };
+// OPS names every op applyOps accepts; Studio checks it before sending one.
+export const OPS = Object.freeze(["resize_shot", "move_line", "set_shot", "set_line_text", "set_music", "update_music",
+  "move_event", "add_event", "remove_event", "add_shot", "remove_shot", "set_workflow_mode"]);
 const VIEW_ONLY = "dự án chỉ xem: index.html không có TIMING:BEGIN/END";
 const LOCK_STALE_MS = 30_000;
 const LOCK_WAIT_MS = 5_000;
@@ -232,6 +236,12 @@ export function applyOps(m, ops, { html = null } = {}) {
         }
         ripple(i, -(s.end - s.start));
         retime(before);
+        break;
+      }
+      case "set_workflow_mode": {
+        if (!WORKFLOW_MODES.includes(op.mode)) throw new OpError(`workflow_mode phải là một trong ${WORKFLOW_MODES.join(", ")}`);
+        receipt.push(`chế độ vận hành: ${next.workflow_mode ?? "chưa đặt"} → ${op.mode}`);
+        next.workflow_mode = op.mode;
         break;
       }
       default:

@@ -6,12 +6,14 @@
 // and update_music; redoTarget(history) tells whether a redo is possible without a write.
 // API 4 adds SKILLS and COMMANDS, so Studio names no plugin skill, script file or argv of its own;
 // every API 3 export stays as it was.
+// OPS lists the gateway ops (set_workflow_mode writes project.json workflow_mode); added without a
+// STUDIO_API bump because nothing existing changes shape.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export { load, validate, SCHEMA, FILE } from "./manifest.mjs";
-export { patch, undo, redo, redoTarget, readHistory, derive, EXIT, ACTORS } from "./gateway.mjs";
+export { patch, undo, redo, redoTarget, readHistory, derive, EXIT, ACTORS, OPS } from "./gateway.mjs";
 export { enqueue, list, next, finish, cancelRequest, ask, answer, expireWaiting, STATUSES, ASK_KINDS, ASK_GATES, ID } from "./requests.mjs";
 
 export const OV = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
