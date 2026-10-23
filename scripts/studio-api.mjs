@@ -24,7 +24,8 @@ export const DIRECTIONS_FILE = join(OV, "data/directions.json");
 export const SKILLS = Object.freeze(["ov-studio", "ov-build", "ov-script", "ov-audio", "ov-deliver"]);
 // Scripts Studio runs as `node <path> …`: each value is an absolute path to a .mjs file. `choose`
 // is the direction gate (it writes direction: into BRIEF.md): Studio replaces {project} and {pick}
-// in args and runs `node <file> ...args`.
+// in args and runs `node <file> ...args`. suggest prints three directions (one per tier) and their
+// styles as JSON.
 const script = (f) => join(SCRIPTS, f);
 export const COMMANDS = Object.freeze({
   render: script("render-final.mjs"),
@@ -36,6 +37,7 @@ export const COMMANDS = Object.freeze({
   preflight: script("check-preflight.mjs"),
   cases: script("find-cases.mjs"),
   styles: script("styles.mjs"),
+  suggest: Object.freeze({ file: script("suggest.mjs"), args: Object.freeze(["--project", "{project}", "--json"]) }),
   choose: Object.freeze({ file: script("make-pitch.mjs"), args: Object.freeze(["choose", "--project", "{project}", "--pick", "{pick}", "--accept-warnings"]) }),
 });
 
