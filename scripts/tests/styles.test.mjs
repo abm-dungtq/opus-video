@@ -185,7 +185,7 @@ test("every direction suggests 3-5 real styles covering each of its energies; su
     assert.ok(d.styles_goi_y.length >= 3 && d.styles_goi_y.length <= 5, d.id);
     for (const e of d.energy) assert.ok(suggestStyles(d, e, profiles).length >= 1, `${d.id} has no style for ${e}`);
   }
-  assert.deepEqual(suggestStyles(dir("A7"), "em", profiles), ["editorial-intelligence", "calm-workspace"]);
+  assert.deepEqual(suggestStyles(dir("A7"), "em", profiles), ["editorial-intelligence", "calm-workspace", "lemo-watercolor"]);
   assert.throws(() => suggestStyles(dir("A7"), "nhanh", profiles), StyleError);
   assert.equal(defaultStyle(dir("A1"), "don-dap", profiles), "neo-brutalist-web");
   assert.equal(defaultStyle(dir("A1"), "vua", profiles, new Set(["expressive-material"])), "precision-dark-product");

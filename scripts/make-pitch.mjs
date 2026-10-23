@@ -6,6 +6,7 @@
 //                              [--category <motion|explainer|3d|interactive|product|story-music|bat-dong-san>]
 //                              [--energy em|vua|don-dap] [--duration <s, default BRIEF duration_s, else 15>]
 //                              [--brand <brand.json>] [--lemo <watercolor|glass-product|lemo-… profile>]
+//                              [--directions <A?,A?,…>]
 //   node make-pitch.mjs render --project .
 //   node make-pitch.mjs choose --project . (--pick <1|2|3> | --auto) [--style id] [--visual id]
 //                              [--effect id] [--transition id] [--sfx id] [--energy e]
@@ -28,6 +29,9 @@
 //   its project starts from the opus-video skeleton (composition.mjs) instead of the blank example,
 //   so lemo.mjs add finds its markers, and STYLEFRAME.md says to run lemo.mjs add before building.
 //   Without --lemo, a `lemo_style:` in BRIEF.md does the same.
+//   --directions replaces the pick: 1 to 3 direction ids in the given order become picks 1..n, each
+//   keeps its own tier; ids must exist, be unique, fit --aspect and not be banned by the brand
+//   (exit 2 otherwise).
 // render: renders every pitch/<n>-*/index.html at --quality draft to pitch/<n>.mp4, cuts a poster
 //   pitch/<n>.png at 60% of the clip, tiles pitch/sheet.jpg, measures motion (qc-mp4 MOTION) and
 //   writes PITCH.md: the 3 options with paths, the two knobs, 3–4 swappable keywords per group
@@ -49,7 +53,7 @@ import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
-import { loadDirections, pickDirections, compatWarnings, resolveSelection, wordBudget, upstream, DIMENSIONS, DIM_VI, TIER_VI } from "./directions.mjs";
+import { loadDirections, pickDirections, scoreDirection, compatWarnings, resolveSelection, wordBudget, upstream, DIMENSIONS, DIM_VI, TIER_VI } from "./directions.mjs";
 import { StyleError, defaultStyle, loadProfiles, lookup, moveText, paletteCss } from "./styles.mjs";
 import { SKELETON, sizeSkeleton } from "./composition.mjs";
 import { OV_DIR } from "./skill-paths.mjs";
@@ -180,6 +184,24 @@ function briefLemo(project, profiles) {
   return v ? lemoProfile(v, profiles) : null;
 }
 
+// --directions "A8,A6" → picks in that order with pickDirections' shape, or { msg } naming the bad id.
+// Same filters as pickDirections: the direction must fit the aspect and not be banned.
+export function chosenDirections(list, { category, aspect, energy, topic, exclude = [] }, data) {
+  const ids = String(list).split(",").map((x) => x.trim()).filter(Boolean);
+  if (ids.length < 1 || ids.length > 3) return { msg: `--directions needs 1 to 3 direction ids (got ${ids.length})` };
+  const picks = [];
+  for (const [i, id] of ids.entries()) {
+    if (ids.indexOf(id) !== i) return { msg: `--directions: ${id} is repeated` };
+    const d = data.directions.find((x) => x.id === id);
+    if (!d) return { msg: `--directions: unknown direction ${id} (known: ${data.directions.map((x) => x.id).join(", ")})` };
+    if (aspect && !d.aspects.includes(aspect)) return { msg: `--directions: ${id} does not fit aspect ${aspect} (${d.aspects.join(", ")})` };
+    if (exclude.includes(id)) return { msg: `--directions: ${id} is banned by the brand (banned_directions)` };
+    const { score, why } = scoreDirection(d, { category, aspect, energy, topic });
+    picks.push({ n: i + 1, id, tier: d.tier, score, why, direction: d });
+  }
+  return { picks };
+}
+
 export function init(o, data, up = upstream()) {
   if (!o.topic || !o.aspect) return { code: 2, msg: "init needs --topic and --aspect" };
   if (!SIZE[o.aspect]) return { code: 2, msg: "--aspect must be 16:9, 9:16 or both" };
@@ -196,7 +218,10 @@ export function init(o, data, up = upstream()) {
     if (errors.length) return { code: 2, msg: `${brand.path}:\n${errors.map((e) => `ERROR ${e}`).join("\n")}` };
     brandWarn = warnings.map((w) => `\nWARN brand ${w}`).join("");
   }
-  const picks = pickDirections({ category: o.category || "", aspect: o.aspect, energy, topic: o.topic, exclude: (brand && brand.brand.banned_directions) || [] }, data);
+  const scoring = { category: o.category || "", aspect: o.aspect, energy, topic: o.topic, exclude: (brand && brand.brand.banned_directions) || [] };
+  const chosen = o.directions === undefined ? null : chosenDirections(o.directions, scoring, data);
+  if (chosen?.msg) return { code: 2, msg: chosen.msg };
+  const picks = chosen ? chosen.picks : pickDirections(scoring, data);
   if (!up.anim || !up.faceless || !up.creative) return { code: 1, msg: "make-pitch: HyperFrames skills (hyperframes-animation, hyperframes-creative, faceless-explainer) not found; run setup-check.mjs" };
   const briefPath = join(project, "BRIEF.md");
   const briefFm = existsSync(briefPath) ? frontmatter(readFileSync(briefPath, "utf8")) : {};

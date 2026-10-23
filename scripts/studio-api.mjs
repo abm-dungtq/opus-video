@@ -6,12 +6,14 @@
 // and update_music; redoTarget(history) tells whether a redo is possible without a write.
 // API 4 adds SKILLS and COMMANDS, so Studio names no plugin skill, script file or argv of its own;
 // every API 3 export stays as it was.
+// OPS lists the gateway ops (set_workflow_mode writes project.json workflow_mode); added without a
+// STUDIO_API bump because nothing existing changes shape.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export { load, validate, SCHEMA, FILE } from "./manifest.mjs";
-export { patch, undo, redo, redoTarget, readHistory, derive, EXIT, ACTORS } from "./gateway.mjs";
+export { patch, undo, redo, redoTarget, readHistory, derive, EXIT, ACTORS, OPS } from "./gateway.mjs";
 export { enqueue, list, next, finish, cancelRequest, ask, answer, expireWaiting, STATUSES, ASK_KINDS, ASK_GATES, ID } from "./requests.mjs";
 
 export const OV = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
@@ -24,7 +26,10 @@ export const DIRECTIONS_FILE = join(OV, "data/directions.json");
 export const SKILLS = Object.freeze(["ov-studio", "ov-build", "ov-script", "ov-audio", "ov-deliver"]);
 // Scripts Studio runs as `node <path> …`: each value is an absolute path to a .mjs file. `choose`
 // is the direction gate (it writes direction: into BRIEF.md): Studio replaces {project} and {pick}
-// in args and runs `node <file> ...args`.
+// in args and runs `node <file> ...args`. suggest prints three directions (one per tier) and their
+// styles as JSON. pitchInit builds the pitch from directions the user already chose ({directions}:
+// comma-separated ids, first is pick 1); Studio fills {topic}, {aspect}, {category}, {energy} from
+// BRIEF.md, empty when missing.
 const script = (f) => join(SCRIPTS, f);
 export const COMMANDS = Object.freeze({
   render: script("render-final.mjs"),
@@ -36,7 +41,10 @@ export const COMMANDS = Object.freeze({
   preflight: script("check-preflight.mjs"),
   cases: script("find-cases.mjs"),
   styles: script("styles.mjs"),
+  suggest: Object.freeze({ file: script("suggest.mjs"), args: Object.freeze(["--project", "{project}", "--json"]) }),
   choose: Object.freeze({ file: script("make-pitch.mjs"), args: Object.freeze(["choose", "--project", "{project}", "--pick", "{pick}", "--accept-warnings"]) }),
+  pitchInit: Object.freeze({ file: script("make-pitch.mjs"), args: Object.freeze(["init", "--project", "{project}", "--topic", "{topic}",
+    "--aspect", "{aspect}", "--category", "{category}", "--energy", "{energy}", "--directions", "{directions}"]) }),
 });
 
 // The director (`claude -p` started by Studio) reaches the plugin's MCP server under this prefix.

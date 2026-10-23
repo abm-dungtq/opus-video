@@ -4,6 +4,9 @@
 
 ### New
 - `data/directions.json`: four `native` seams, `impact-frame`, `smear-cut`, `ink-wipe` and `speed-lines`. The plan gate accepts them in the "Nối sang beat sau" column, the recipe pack prints their `mo_ta` (which names the Motion Studio recipe), and `whip-pan + smear-cut` no longer trips the banned word `cut`.
+- `scripts/suggest.mjs --project <dir> [--json]`: deterministic suggestion from BRIEF.md, the three directions `make-pitch init` would pick (one per tier) with their reasons and the `styles_goi_y` that fit the brief's energy; no network, no file written. `COMMANDS.suggest` declares it for Studio (`{ file, args: ["--project", "{project}", "--json"] }`).
+- `make-pitch.mjs init --directions <A?,A?,…>`: builds the pitch from one to three directions the user chose, in that order (picks 1..n, each keeps its tier) instead of the three `directions.mjs pick` would choose; an unknown, repeated, banned or aspect-mismatched id exits 2. `COMMANDS.pitchInit` declares it for Studio with `{project}`, `{topic}`, `{aspect}`, `{category}`, `{energy}` and `{directions}`; empty `--category` and `--energy` keep the old defaults.
+- Gateway op `set_workflow_mode` (`{ op, mode }`, mode `dao-dien`, `nhanh`, `tu-nhac` or `timeline`) writes the optional `project.json` field `workflow_mode`; `manifest.mjs` validates it when present. `gateway.mjs` exports `OPS`, the frozen list of every op `applyOps` accepts, and `studio-api.mjs` re-exports it so Studio checks an op before sending it. `STUDIO_API` stays 4: no existing export changes shape.
 
 ## v2.5.0 (2026-10-22): STUDIO_API 4
 

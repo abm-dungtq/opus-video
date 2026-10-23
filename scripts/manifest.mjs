@@ -9,12 +9,15 @@
 //     music:  [{ id, file, start, end, gain }],
 //     assets: [{ path, kind }],
 //     events: [{ id, shot, offset, sound?, label, volume?, studio? }],   optional
+//     workflow_mode: "dao-dien"|"nhanh"|"tu-nhac"|"timeline",             optional
 //     version, updated }
 // An event is a sound effect tied to a shot: id names its <audio id> in the HTML, whose data-start
 // the gateway writes as shot.start + offset, so the sound moves with its shot. sound is the src,
 // volume (0–1) its data-volume; studio: true marks an event the gateway added (add_event), whose
 // <audio data-studio-sfx> tag derive inserts and removes. A music bed's media_start is the second
 // of its file played at start (a trimmed head); fade_in / fade_out are seconds of fade in the mix.
+// workflow_mode is how the project is run (the director leads, quick template, cut to the music,
+// or timeline editing); only the gateway op set_workflow_mode writes it.
 // Seconds are rounded to 3 decimals. Shots are sorted, back to back from 0, and the last shot's
 // end is the duration. Paths are relative and stay inside the project.
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -24,6 +27,7 @@ export const SCHEMA = "opus-video/project@1";
 export const FILE = "project.json";
 export const GATES = ["pass", "stale", "unknown"];
 export const SHOT_ID = /^s\d+[A-Za-z]?$/;
+export const WORKFLOW_MODES = Object.freeze(["dao-dien", "nhanh", "tu-nhac", "timeline"]);
 const EPS = 1e-3;
 export const r3 = (n) => Math.round(n * 1000) / 1000;
 
@@ -81,6 +85,7 @@ export function validate(m) {
     if (fadeIn != null && fadeOut != null && isNum(b?.start) && fadeIn + fadeOut > (b.end ?? m.duration) - b.start + EPS) errs.push(`${tag}: fade_in + fade_out dài hơn khối nhạc`);
   });
   m.assets.forEach((a, i) => { if (!insidePath(a?.path)) errs.push(`asset #${i + 1}: path phải là đường dẫn tương đối trong dự án`); });
+  if (m.workflow_mode != null && !WORKFLOW_MODES.includes(m.workflow_mode)) errs.push(`workflow_mode phải là một trong ${WORKFLOW_MODES.join(", ")}`);
   if (m.events != null) {
     if (!Array.isArray(m.events)) { errs.push("events phải là mảng"); return errs; }
     const evIds = new Set();
