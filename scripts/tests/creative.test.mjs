@@ -541,3 +541,30 @@ test("checkCreative quick mode: direction checks skipped, the final-stage animat
     assert.deepEqual(other, [], "a non-quick override still skips the whole gate");
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
+
+test("native frame seams: impact-frame, smear-cut, ink-wipe and speed-lines pass the plan gate and reach the recipe pack", () => {
+  const ids = ["impact-frame", "smear-cut", "ink-wipe", "speed-lines"];
+  for (const id of ids) {
+    assert.equal(data.seams.find((s) => s.id === id)?.kind, "native", id);
+    assert.deepEqual(classifySeams(id, data), [{ token: id, class: "continuous" }], id);
+  }
+  // "smear-cut" holds the banned word "cut"; masking the known id must keep it continuous.
+  assert.deepEqual(classifySeams("whip-pan + smear-cut", data).map((x) => x.class), ["continuous", "continuous"]);
+  assert.deepEqual(classifySeams("beat-cut + impact-frame", data).map((x) => x.class), ["continuous", "continuous"]);
+  assert.ok(classifySeams("smear-cut rồi cut", data).some((x) => x.class === "banned"));
+  const d = tmp();
+  try {
+    cpSync(fx("creative-good"), d, { recursive: true });
+    const plan = join(d, "PLAN.md");
+    const rows = ["impact-frame", "whip-pan + smear-cut", "ink-wipe", "speed-lines"];
+    let i = 0;
+    writeFileSync(plan, readFileSync(plan, "utf8").replace(/^(\| [1-4] \|(?:[^|]*\|){4}) [^|]+ \|/gm, (_, head) => `${head} ${rows[i++]} |`));
+    assert.equal(i, 4, "four seam cells rewritten");
+    const r = preflight({ project: d });
+    assert.equal(r.pass, true, JSON.stringify(r.errors));
+    const t = planTokens(readFileSync(plan, "utf8"), data, upstream());
+    for (const id of ids) assert.ok(t.seams.includes(id), id);
+    const md = buildRecipes({ ...t, direction: data.directions[1], style: data.directions[1].style }, data, upstream());
+    for (const id of ids) assert.match(md, new RegExp(`## seam \`${id}\` \\(native\\)\\n\\n.*fx/transitions/${id}/recipe\\.md`), id);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});

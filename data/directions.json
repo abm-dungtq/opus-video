@@ -48,7 +48,11 @@
     { "id": "swirl-vortex", "kind": "shader" },
     { "id": "chromatic-split", "kind": "shader" },
     { "id": "beat-cut", "kind": "native", "mo_ta": "Cắt thẳng đúng downbeat, đổi cực màu nền (đen ↔ trắng/màu nhấn) trong 1 khung; dùng kèm rule kinetic-beat-slam" },
-    { "id": "match-cut", "kind": "native", "mo_ta": "Vật thể cuối cảnh trước trùng vị trí/hình dạng vật thể đầu cảnh sau (pattern-library: match cut); đo vị trí lúc chạy" }
+    { "id": "match-cut", "kind": "native", "mo_ta": "Vật thể cuối cảnh trước trùng vị trí/hình dạng vật thể đầu cảnh sau (pattern-library: match cut); đo vị trí lúc chạy" },
+    { "id": "impact-frame", "kind": "native", "mo_ta": "2–3 khung âm bản hoặc bóng đen trên nền trắng ngay điểm cắt, kèm tia tốc độ tỏa từ tâm đòn; đặt bằng tl.set từng khung. Recipe và snippet: gói impact-frame của Motion Studio (fx/transitions/impact-frame/recipe.md)" },
+    { "id": "smear-cut", "kind": "native", "mo_ta": "1–2 khung nhoè kéo giãn theo hướng chuyển động quanh điểm cắt (feGaussianBlur một trục + scale); đặt bằng tl.set từng khung. Recipe: gói smear-cut của Motion Studio (fx/transitions/smear-cut/recipe.md)" },
+    { "id": "ink-wipe", "kind": "native", "mo_ta": "Vết mực loang phủ kín khung, đổi cảnh dưới lớp mực, rồi lỗ mở dần lộ cảnh sau (SVG mask + feTurbulence seed cố định). Recipe: gói ink-wipe của Motion Studio (fx/transitions/ink-wipe/recipe.md)" },
+    { "id": "speed-lines", "kind": "native", "mo_ta": "Tia tốc độ tỏa từ tâm trên canvas, vẽ lại từ thời gian timeline với PRNG có seed, rút đi ở 35% cuối. Recipe: gói speed-lines của Motion Studio (fx/transitions/speed-lines/recipe.md)" }
   ],
   "directions": [
     {
