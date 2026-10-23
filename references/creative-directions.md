@@ -51,7 +51,7 @@ Hướng quyết định cách kể bằng hình. Giao diện (màu, chữ, ch�
 - Hook: Giây đầu: một từ khoá đập vào giữa khung trên nhịp trống đầu tiên, nền đảo màu.
 - Styleframe 3 giây: 3 giây: ba từ khoá của chủ đề lần lượt đập vào theo 3 beat, từ sau húc văng từ trước, nền đổi cực màu ở beat thứ ba.
 - Style: style `Maximalist Type` · Blueprint: `kinetic-type-beats`, `ticker-takeover` · Rule: `kinetic-beat-slam`, `reactive-displacement`, `waterfall-entry`
-- Style profile gợi ý: `kinetic-typography` Chữ chuyển động (4/5), `athletic-impact` Thể thao bùng nổ (5/5), `extreme-energy` Cảm giác mạnh (5/5), `swiss-kinetic-editorial` Chữ Thuỵ Sĩ chuyển động (3/5)
+- Style profile gợi ý: `kinetic-typography` Chữ chuyển động (4/5), `athletic-impact` Thể thao bùng nổ (5/5), `extreme-energy` Cảm giác mạnh (5/5), `swiss-kinetic-editorial` Chữ Thuỵ Sĩ chuyển động (3/5), `pixel-arcade` Trò chơi điện tử pixel (4/5)
 - Chuyển cảnh: `beat-cut`, `waterfall-cut`
 - SFX: "punchy modern electronic stomp clap", "tight transient percussion hit" · Nhịp: don-dap · Nhóm: motion, story-music, product
 - Case tham khảo: `y:raphaelaubryy-687877`, `y:techhalla-498547`
@@ -90,7 +90,7 @@ Hướng quyết định cách kể bằng hình. Giao diện (màu, chữ, ch�
 - Hook: Giây đầu: một câu in trên giấy, nét bút dạ quẹt tô sáng đúng từ đang được đọc.
 - Styleframe 3 giây: 3 giây: tiêu đề chủ đề in kiểu tạp chí, bút dạ khoanh tròn từ khoá, máy quay lia nhẹ sang đoạn kế trên cùng trang giấy.
 - Style: preset `code-editorial` · Blueprint: `spatial-pan-stations`, `transcript-scroll-artifact-reveal` · Rule: `css-marker-patterns`, `svg-path-draw`, `asr-keyword-glow`
-- Style profile gợi ý: `editorial-intelligence` Bài luận về AI (2/5), `calm-workspace` Trang làm việc yên tĩnh (1/5), `quirky-editorial` Tạp chí lập dị (3/5), `paper-cut-collage` Cắt dán giấy (3/5)
+- Style profile gợi ý: `editorial-intelligence` Bài luận về AI (2/5), `calm-workspace` Trang làm việc yên tĩnh (1/5), `quirky-editorial` Tạp chí lập dị (3/5), `paper-cut-collage` Cắt dán giấy (3/5), `lemo-watercolor` Thuỷ màu tự vẽ (2/5)
 - Chuyển cảnh: `multi-phase-camera`, `push-slide` (cho phép chuyển cảnh mềm: `focus-pull`, `blur-crossfade`, `cross-warp-morph`, `thermal-distortion`, `light-leak`)
 - SFX: "felt tip marker stroke on textured paper", "crisp magazine page snap" · Nhịp: em/vua · Nhóm: explainer, story-music
 
