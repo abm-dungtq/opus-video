@@ -25,7 +25,9 @@ export const SKILLS = Object.freeze(["ov-studio", "ov-build", "ov-script", "ov-a
 // Scripts Studio runs as `node <path> …`: each value is an absolute path to a .mjs file. `choose`
 // is the direction gate (it writes direction: into BRIEF.md): Studio replaces {project} and {pick}
 // in args and runs `node <file> ...args`. suggest prints three directions (one per tier) and their
-// styles as JSON.
+// styles as JSON. pitchInit builds the pitch from directions the user already chose ({directions}:
+// comma-separated ids, first is pick 1); Studio fills {topic}, {aspect}, {category}, {energy} from
+// BRIEF.md, empty when missing.
 const script = (f) => join(SCRIPTS, f);
 export const COMMANDS = Object.freeze({
   render: script("render-final.mjs"),
@@ -39,6 +41,8 @@ export const COMMANDS = Object.freeze({
   styles: script("styles.mjs"),
   suggest: Object.freeze({ file: script("suggest.mjs"), args: Object.freeze(["--project", "{project}", "--json"]) }),
   choose: Object.freeze({ file: script("make-pitch.mjs"), args: Object.freeze(["choose", "--project", "{project}", "--pick", "{pick}", "--accept-warnings"]) }),
+  pitchInit: Object.freeze({ file: script("make-pitch.mjs"), args: Object.freeze(["init", "--project", "{project}", "--topic", "{topic}",
+    "--aspect", "{aspect}", "--category", "{category}", "--energy", "{energy}", "--directions", "{directions}"]) }),
 });
 
 // The director (`claude -p` started by Studio) reaches the plugin's MCP server under this prefix.

@@ -5,6 +5,7 @@
 ### New
 - `data/directions.json`: four `native` seams, `impact-frame`, `smear-cut`, `ink-wipe` and `speed-lines`. The plan gate accepts them in the "Nối sang beat sau" column, the recipe pack prints their `mo_ta` (which names the Motion Studio recipe), and `whip-pan + smear-cut` no longer trips the banned word `cut`.
 - `scripts/suggest.mjs --project <dir> [--json]`: deterministic suggestion from BRIEF.md, the three directions `make-pitch init` would pick (one per tier) with their reasons and the `styles_goi_y` that fit the brief's energy; no network, no file written. `COMMANDS.suggest` declares it for Studio (`{ file, args: ["--project", "{project}", "--json"] }`).
+- `make-pitch.mjs init --directions <A?,A?,…>`: builds the pitch from one to three directions the user chose, in that order (picks 1..n, each keeps its tier) instead of the three `directions.mjs pick` would choose; an unknown, repeated, banned or aspect-mismatched id exits 2. `COMMANDS.pitchInit` declares it for Studio with `{project}`, `{topic}`, `{aspect}`, `{category}`, `{energy}` and `{directions}`; empty `--category` and `--energy` keep the old defaults.
 
 ## v2.5.0 (2026-10-22): STUDIO_API 4
 
