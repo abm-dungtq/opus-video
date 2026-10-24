@@ -194,3 +194,55 @@ test("an override stamp is not a pass, and a roles.json value that is no role id
     assert.ok(warnings.some((w) => /roles\.json "01" không phải id vai/.test(w)), warnings.join("; "));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("buildFilm( in index.html marks the picture as built from code", () => {
+  const dir = tmp();
+  try {
+    cpSync(FIXTURE, dir, { recursive: true });
+    assert.equal(importProject(dir).manifest.capabilities.picture_from_code, undefined);
+    const html = readFileSync(join(dir, "index.html"), "utf8");
+    writeFileSync(join(dir, "index.html"), html.replace("</body>", `<script type="module">const shots = buildFilm({ timing: window.TIMING });</script></body>`));
+    assert.equal(importProject(dir).manifest.capabilities.picture_from_code, true);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// Three shots from the timing fixture; one voice tag per shot, numbered 01–03.
+const withVoices = (dir) => {
+  cpSync(FIXTURE, dir, { recursive: true });
+  const html = readFileSync(join(dir, "index.html"), "utf8").replace(/\s*<audio id="vo-01"[^>]*><\/audio>/,
+    ["0.5:1", "3:2", "6:3"].map((x) => { const [t, n] = x.split(":"); return `\n      <audio id="vo-0${n}" src="assets/voice/0${n}.mp3" data-start="${t}" data-duration="1" data-track-index="1${n}" data-volume="1"></audio>`; }).join(""));
+  writeFileSync(join(dir, "index.html"), html);
+  for (const n of [1, 2, 3]) writeFileSync(join(dir, "assets", "voice", `0${n}.mp3`), "x");
+  mkdirSync(join(dir, "script"), { recursive: true });
+};
+
+test("script/scenes.json groups shots by the scene of their lines, with Đầu phim before any numbered line", () => {
+  const dir = tmp();
+  try {
+    withVoices(dir);
+    writeFileSync(join(dir, "script", "scenes.json"), JSON.stringify({ "02": 1, "03": 1 }));
+    let { manifest: m, warnings } = importProject(dir);
+    assert.deepEqual(m.scenes, [{ id: "c0", label: "Đầu phim", shots: ["s1"] }, { id: "c1", label: "Cảnh 1", shots: ["s2", "s3"] }]);
+    assert.deepEqual(validate(m), []);
+    assert.deepEqual(warnings, []);
+    writeFileSync(join(dir, "script", "scenes.json"), JSON.stringify({ "01": 1, "02": 2 }));
+    ({ manifest: m } = importProject(dir));
+    assert.deepEqual(m.scenes.map((c) => [c.id, c.shots]), [["c1", ["s1"]], ["c2", ["s2", "s3"]]], "a shot without a numbered line stays in the scene before it");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("scenes/scenes.json is used when valid, a WARN and the script map otherwise; neither leaves scenes out", () => {
+  const dir = tmp();
+  try {
+    withVoices(dir);
+    assert.equal(importProject(dir).manifest.scenes, undefined);
+    mkdirSync(join(dir, "scenes"), { recursive: true });
+    writeFileSync(join(dir, "scenes", "scenes.json"), JSON.stringify([{ id: "c1", title: "Mở", shots: ["s1", "s2"] }, { id: "c2", label: "Kết", shots: ["s3"] }]));
+    assert.deepEqual(importProject(dir).manifest.scenes, [{ id: "c1", label: "Mở", shots: ["s1", "s2"] }, { id: "c2", label: "Kết", shots: ["s3"] }]);
+    writeFileSync(join(dir, "scenes", "scenes.json"), JSON.stringify([{ id: "c1", label: "a", shots: ["s1", "s9"] }, { id: "c2", label: "b", shots: ["s1"] }]));
+    writeFileSync(join(dir, "script", "scenes.json"), JSON.stringify({ "01": 4 }));
+    const { manifest: m, warnings } = importProject(dir);
+    assert.ok(warnings.some((w) => /scenes\/scenes\.json bỏ qua: .*s9.*s1 đã thuộc c1/.test(w)), warnings.join("\n"));
+    assert.deepEqual(m.scenes, [{ id: "c4", label: "Cảnh 4", shots: ["s1", "s2", "s3"] }]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

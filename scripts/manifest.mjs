@@ -3,13 +3,14 @@
 // everything else reads it through load(). Node built-ins only.
 // Shape (schema "opus-video/project@1"):
 //   { schema, title, fps, width, height, duration, html,
-//     capabilities: { timing_markers, editable },
+//     capabilities: { timing_markers, editable, picture_from_code? },
 //     shots:  [{ id: "s<#>", name, start, end, transition_in, motion_note, assets: [path] }],
 //     lines:  [{ id, shot, text, file, start, duration, gate: "pass"|"stale"|"unknown", speaker? }],
 //     music:  [{ id, file, start, end, gain }],
 //     assets: [{ path, kind }],
 //     events: [{ id, shot, offset, sound?, label, volume?, studio? }],   optional
 //     workflow_mode: "dao-dien"|"nhanh"|"tu-nhac"|"timeline",             optional
+//     scenes: [{ id: "c<#>", label, shots: [shot id] }],                   optional
 //     version, updated }
 // An event is a sound effect tied to a shot: id names its <audio id> in the HTML, whose data-start
 // the gateway writes as shot.start + offset, so the sound moves with its shot. sound is the src,
@@ -17,6 +18,11 @@
 // <audio data-studio-sfx> tag derive inserts and removes. A music bed's media_start is the second
 // of its file played at start (a trimmed head); fade_in / fade_out are seconds of fade in the mix.
 // A line's speaker (optional) is the cast role id voicing it (scenes/roles.json of a series episode).
+// scenes group shots into the script's scenes (Studio reviews and rebuilds one group at a time):
+// each shot is in at most one scene, and listing every scene's shots in order follows the shot
+// order. capabilities.picture_from_code marks a project whose picture is built by code from the
+// TIMING data (index.html calls buildFilm): its shot windows follow the voice, so the gateway
+// refuses resize_shot, add_shot and remove_shot there and only moving a line is allowed.
 // workflow_mode is how the project is run (the director leads, quick template, cut to the music,
 // or timeline editing); only the gateway op set_workflow_mode writes it.
 // Seconds are rounded to 3 decimals. Shots are sorted, back to back from 0, and the last shot's
@@ -30,6 +36,7 @@ export const GATES = ["pass", "stale", "unknown"];
 export const SHOT_ID = /^s\d+[A-Za-z]?$/;
 export const WORKFLOW_MODES = Object.freeze(["dao-dien", "nhanh", "tu-nhac", "timeline"]);
 export const SPEAKER = /^[a-z0-9][a-z0-9-]{0,40}$/;
+export const SCENE_ID = /^c\d+$/;
 const EPS = 1e-3;
 export const r3 = (n) => Math.round(n * 1000) / 1000;
 
@@ -45,6 +52,7 @@ export function validate(m) {
   for (const k of ["fps", "width", "height"]) if (!isNum(m[k]) || m[k] <= 0) errs.push(`${k} phải là số dương`);
   if (!insidePath(m.html)) errs.push("html phải là đường dẫn tương đối trong dự án");
   if (!m.capabilities || typeof m.capabilities.editable !== "boolean" || typeof m.capabilities.timing_markers !== "boolean") errs.push("capabilities cần editable và timing_markers kiểu boolean");
+  else if (m.capabilities.picture_from_code != null && typeof m.capabilities.picture_from_code !== "boolean") errs.push("capabilities.picture_from_code phải là boolean");
   for (const k of ["shots", "lines", "music", "assets"]) if (!Array.isArray(m[k])) errs.push(`${k} phải là mảng`);
   if (errs.length) return errs;
 
@@ -87,6 +95,7 @@ export function validate(m) {
     const fadeOut = b?.fade_out != null && (!isNum(b.fade_out) || b.fade_out < 0) ? (errs.push(`${tag}: fade_out phải ≥ 0`), null) : b?.fade_out ?? 0;
     if (fadeIn != null && fadeOut != null && isNum(b?.start) && fadeIn + fadeOut > (b.end ?? m.duration) - b.start + EPS) errs.push(`${tag}: fade_in + fade_out dài hơn khối nhạc`);
   });
+  if (m.scenes != null) errs.push(...validateScenes(m.scenes, m.shots));
   m.assets.forEach((a, i) => { if (!insidePath(a?.path)) errs.push(`asset #${i + 1}: path phải là đường dẫn tương đối trong dự án`); });
   if (m.workflow_mode != null && !WORKFLOW_MODES.includes(m.workflow_mode)) errs.push(`workflow_mode phải là một trong ${WORKFLOW_MODES.join(", ")}`);
   if (m.events != null) {
@@ -109,6 +118,32 @@ export function validate(m) {
       if (e?.studio != null && typeof e.studio !== "boolean") errs.push(`${tag}: studio phải là boolean`);
     });
   }
+  return errs;
+}
+
+// scenes + shots → [error text]; [] means valid. Shared by validate and the gateway's set_scenes.
+export function validateScenes(scenes, shots) {
+  if (!Array.isArray(scenes)) return ["scenes phải là mảng"];
+  const errs = [];
+  const order = new Map((shots ?? []).map((s, i) => [s?.id, i]));
+  const ids = new Set();
+  const owner = new Map();
+  let last = -1;
+  scenes.forEach((c, i) => {
+    const tag = c?.id ?? `cảnh #${i + 1}`;
+    if (!SCENE_ID.test(String(c?.id ?? ""))) errs.push(`${tag}: id cảnh phải dạng c<#>`);
+    else if (ids.has(c.id)) errs.push(`${c.id}: id cảnh bị trùng`);
+    ids.add(c?.id);
+    if (typeof c?.label !== "string") errs.push(`${tag}: label phải là chuỗi`);
+    if (!Array.isArray(c?.shots) || !c.shots.length) { errs.push(`${tag}: shots phải là mảng id shot không rỗng`); return; }
+    for (const id of c.shots) {
+      if (!order.has(id)) { errs.push(`${tag}: shot "${id}" không tồn tại`); continue; }
+      if (owner.has(id)) { errs.push(`${tag}: shot ${id} đã thuộc ${owner.get(id)}`); continue; }
+      owner.set(id, tag);
+      if (order.get(id) < last) errs.push(`${tag}: shot ${id} lệch thứ tự shot (cảnh và shot trong cảnh phải theo thứ tự thời gian)`);
+      last = Math.max(last, order.get(id));
+    }
+  });
   return errs;
 }
 

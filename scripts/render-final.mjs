@@ -6,9 +6,11 @@
 // beds ducked under their voice, loudness-normalized to -14 LUFS / -1.5 dBTP) and writes the
 // sidecar <output>.render.json {composition, visual_hash, audio_hash, mode, mixer, source,
 // source_sha256 (of that MP4), created}.
-//   node render-final.mjs [--project .] -- [hyperframes render args, e.g. -c compositions/main-9x16.html --output renders/x-9x16.mp4]
+//   node render-final.mjs [--project .] [--legacy-mtime] -- [hyperframes render args, e.g. -c compositions/main-9x16.html --output renders/x-9x16.mp4]
 //   node render-final.mjs [--project .] --audio-only <old final.mp4> -- [-c <composition>] --output <new.mp4>
 //   node render-final.mjs --help | -h
+// --legacy-mtime is handed to the preflight: the animatic is checked by file dates even when DEMO.md
+// has visual_hash: (a WARN says so; the flag goes after 2026-10-31).
 // Draft and QA renders (--quality draft|looks) stay plain `hyperframes render`.
 // A --quality/-q in the forwarded args is refused: this command always renders delivery.
 // Paths in the forwarded args and after --audio-only resolve from the project directory; paths
@@ -132,32 +134,77 @@ function subScenes(root, comp) {
 
 const compTracks = (root, comp) => parseTracks(readFileSync(comp, "utf8"), dirname(comp), root);
 
-export function visualHash(project, composition = "index.html") {
+// The TIMING block timing.mjs writes from the voice and PLAN.md (the markers stay).
+const TIMING_BLOCK = /(\/\*\s*TIMING:BEGIN\s*\*\/)[\s\S]*?(\/\*\s*TIMING:END\s*\*\/)/g;
+// Sound files and their sidecars (word timings, viet-pro stamps): never picture, wherever they sit.
+const SOUND_FILE = /\.(?:mp3|wav|m4a|aac|ogg|oga|flac|opus)$|\.words\.json$|\.gate\.json$/i;
+
+// What the picture hashes read, in order: [{ path, digest }]. Options:
+//   timing "keep" | "drop": hash the TIMING block of the HTML, or only its markers;
+//   scenesDir: add every file under scenes/ (the ES modules a buildFilm composition imports);
+//   soundFiles "keep" | "drop": hash sound files under assets/ outside the sound folders, or skip them.
+function pictureInputs(project, composition, { timing = "keep", scenesDir = false, soundFiles = "keep" } = {}) {
   const { root, comp } = compPaths(project, composition);
   if (!existsSync(comp)) throw new Error(`composition not found: ${comp}`);
-  const h = createHash("sha256");
-  const add = (p, digest) => h.update(`${posix(root, p)}\0${digest}\n`);
-  const html = stripAudio(readFileSync(comp, "utf8"));
+  const out = [];
+  const add = (p, digest) => out.push({ path: p, digest });
+  const view = (text) => {
+    const pic = stripAudio(text);
+    return timing === "drop" ? pic.replace(TIMING_BLOCK, "$1$2") : pic;
+  };
+  const html = view(readFileSync(comp, "utf8"));
   add(comp, shaText(html));
   const refs = new Set(localRefs(html, root, dirname(comp)));
   const subs = subScenes(root, comp);
   for (const f of subs.found) {
-    const sub = stripAudio(readFileSync(f, "utf8"));
+    const sub = view(readFileSync(f, "utf8"));
     add(f, shaText(sub));
     for (const r of localRefs(sub, root, dirname(comp))) refs.add(r);
   }
   for (const p of subs.missing) refs.add(p);
   // non-HTML files under compositions/ (styles, scripts) can change the picture without a reference
   for (const f of walk(join(root, "compositions"))) if (!f.endsWith(".html")) add(f, shaFile(f));
+  if (scenesDir) for (const f of walk(join(root, "scenes"))) add(f, shaFile(f));
   for (const f of walk(join(root, "assets"))) {
     const rel = posix(root, f);
-    if (rel !== ONSET_CACHE && !SOUND_DIRS.some((d) => rel.startsWith(`assets/${d}/`))) add(f, shaFile(f));
+    if (rel === ONSET_CACHE || SOUND_DIRS.some((d) => rel.startsWith(`assets/${d}/`))) continue;
+    if (soundFiles === "drop" && SOUND_FILE.test(rel)) continue;
+    add(f, shaFile(f));
   }
   const files = [...refs].sort(byName);
   const missing = files.filter((p) => !existsSync(p) || !statSync(p).isFile());
   if (missing.length) throw new Error(`referenced file not found:\n  ${missing.join("\n  ")}`);
   for (const p of files) add(p, shaFile(p));
+  return { root, inputs: out };
+}
+
+const digestOf = ({ root, inputs }) => {
+  const h = createHash("sha256");
+  for (const { path, digest } of inputs) h.update(`${posix(root, path)}\0${digest}\n`);
   return h.digest("hex");
+};
+
+// The picture of a render (--audio-only refuses a changed one): every byte the composition shows,
+// TIMING included.
+export function visualHash(project, composition = "index.html") {
+  return digestOf(pictureInputs(project, composition));
+}
+
+// The picture the user approved in the animatic (check-preflight --stage final compares it with
+// DEMO.md visual_hash:). Like visualHash, but without the TIMING block (timing.mjs rewrites it from
+// the voice and PLAN.md; PLAN.md keeps its own mtime check) and without sound files anywhere under
+// assets/, plus every file under scenes/. A new voice take therefore leaves it as it was, while an
+// edit to scenes/*.mjs changes it.
+export const PICTURE_OPTIONS = Object.freeze({ timing: "drop", scenesDir: true, soundFiles: "drop" });
+export function pictureHash(project, composition = "index.html") {
+  return digestOf(pictureInputs(project, composition, PICTURE_OPTIONS));
+}
+
+// The files pictureHash reads, project-relative, sorted; the gate names the ones edited after the
+// animatic when the hash differs.
+export function pictureFiles(project, composition = "index.html") {
+  const r = pictureInputs(project, composition, PICTURE_OPTIONS);
+  return [...new Set(r.inputs.map((x) => posix(r.root, x.path)))].sort(byName);
 }
 
 export function audioHash(project, composition = "index.html") {
@@ -339,8 +386,10 @@ export function main(argv = process.argv.slice(2), { checkImpl = check, spawn = 
   const fwd = sep >= 0 ? argv.slice(sep + 1) : [];
   let project = ".";
   let old;
+  let legacyMtime = false;
   for (let i = 0; i < own.length; i++) {
-    if (own[i] === "--project" || own[i] === "--audio-only") {
+    if (own[i] === "--legacy-mtime") legacyMtime = true;
+    else if (own[i] === "--project" || own[i] === "--audio-only") {
       const v = own[++i];
       if (!v || v === "--") { err(`render-final: ${own[i - 1]} needs a value`); return 2; }
       if (own[i - 1] === "--project") project = v; else old = v;
@@ -361,7 +410,7 @@ export function main(argv = process.argv.slice(2), { checkImpl = check, spawn = 
     if (!existsSync(old)) { err(`render-final --audio-only: not found: ${old}`); return 2; }
     if (sameFile(old, resolve(root, o))) { err("render-final --audio-only: --output must be a new file, not the old final"); return 2; }
   }
-  const r = checkImpl({ project, stage: "final" });
+  const r = checkImpl({ project, stage: "final", ...(legacyMtime ? { legacyMtime } : {}) });
   report(r, (m) => err(m));
   if (!r.pass) return PREFLIGHT_EXIT;
   const missing = missingTools(spawn);

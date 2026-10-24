@@ -10,7 +10,8 @@
 // STUDIO_API bump because nothing existing changes shape; set_line_speaker and set_line_audio (a
 // line's optional speaker, a new voice take) and the timing key of COMMANDS are added the same way.
 // SERIES_FILE, validateSeries and seriesDirOf (a series folder's studio-series.json and the series
-// of a project) are added the same way, without a bump.
+// of a project) are added the same way, without a bump. So are the gateway op set_scenes (the
+// optional project.json scenes groups) and the mixBalance key of COMMANDS (mix-balance.mjs).
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -45,6 +46,7 @@ export const COMMANDS = Object.freeze({
   cases: script("find-cases.mjs"),
   styles: script("styles.mjs"),
   timing: script("timing.mjs"),
+  mixBalance: script("mix-balance.mjs"),
   suggest: Object.freeze({ file: script("suggest.mjs"), args: Object.freeze(["--project", "{project}", "--json"]) }),
   choose: Object.freeze({ file: script("make-pitch.mjs"), args: Object.freeze(["choose", "--project", "{project}", "--pick", "{pick}", "--accept-warnings"]) }),
   pitchInit: Object.freeze({ file: script("make-pitch.mjs"), args: Object.freeze(["init", "--project", "{project}", "--topic", "{topic}",
