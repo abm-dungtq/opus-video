@@ -44,7 +44,7 @@ Giao diện web trên máy để làm video từ đầu tới bản giao: tạo 
 
 Studio là repo riêng [abm-dungtq/motion-studio](https://github.com/abm-dungtq/motion-studio). Clone về thư mục nào cũng được rồi đặt `MOTION_STUDIO_HOME` là thư mục đó. `$OV/scripts/studio.mjs` là shim: tìm Studio ở `MOTION_STUDIO_HOME`, không đặt thì ở `~/Projects/motion-studio`, và chạy `bin/motion-studio.mjs` với cùng tham số. Chưa có Studio thì shim in lệnh `git clone`, dòng `export MOTION_STUDIO_HOME=…` và exit 2.
 
-Đạo diễn do Studio chạy có `MOTION_STUDIO_RUNNER=cli` (Studio cũ đặt `OPUS_STUDIO_RUNNER=cli`). MCP server đọc tên mới trước, không có thì đọc tên cũ.
+Đạo diễn do Studio chạy có `MOTION_STUDIO_RUNNER=cli` (Studio cũ đặt `OPUS_STUDIO_RUNNER=cli`). MCP server đọc tên mới trước, không có thì đọc tên cũ. Với biến này, `make-demo.mjs --record-audio-review` thoát mã 2 (lời "Nghe rồi, được" là của người dùng, Studio ghi khi người dùng bấm), và trong một tập series `eleven.mjs` chỉ chạy `sfx`, `music` (lệnh khác thoát mã 5).
 
 ```bash
 node $OV/scripts/studio.mjs start --background   # http://127.0.0.1:4317, gốc /Volumes/2/Edit-Video

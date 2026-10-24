@@ -137,6 +137,24 @@ test("final gate by hash: a new voice take only warns, audio_review silences it,
   assert.match(r.errors[0], /^hình đã đổi sau animatic được duyệt \(.*scenes\/s01\.mjs.*\); chạy lại make-demo\.mjs --animatic$/);
 }));
 
+test("files under assets/gen/ (drawing batches, raw and keyed drawings, rig previews) are not the picture", () => withProject((dir) => {
+  approve(dir);
+  const p0 = pictureHash(dir), v0 = visualHash(dir);
+  for (const [f, text] of [["assets/gen/batches/thumbnail.json", "[{\"id\":\"thumb\"}]"], ["assets/gen/raw/thumb-1.png", "png-raw"],
+    ["assets/gen/keyed/ba-noi/pose-1.png", "png-keyed"], ["assets/gen/rig-preview/ba-noi.png", "png-preview"]]) {
+    mkdirSync(join(dir, f, ".."), { recursive: true });
+    edit(dir, f, text);
+  }
+  assert.equal(pictureHash(dir), p0, "a drawing batch written after the animatic leaves the approved picture as it was");
+  assert.equal(visualHash(dir), v0, "render-final --audio-only reads the same picture");
+  assert.ok(!pictureFiles(dir).some((x) => x.startsWith("assets/gen/")), pictureFiles(dir).join(", "));
+  assert.deepEqual(gate(dir), { errors: [], warnings: [] });
+  // A composition that loads a file from assets/gen/ shows it, so that file is the picture again.
+  edit(dir, "index.html", html().replace('<img src="assets/img/a.png">', '<img src="assets/img/a.png"><img src="assets/gen/raw/thumb-1.png">'));
+  assert.notEqual(pictureHash(dir), p0);
+  assert.ok(pictureFiles(dir).includes("assets/gen/raw/thumb-1.png"));
+}));
+
 test("without visual_hash: or with --legacy-mtime the file dates decide, and --legacy-mtime says so", () => withProject((dir) => {
   approve(dir);
   edit(dir, "index.html", html(6));

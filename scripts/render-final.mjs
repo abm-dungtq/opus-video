@@ -46,6 +46,11 @@ import { ONSET_CACHE } from "./sfx-sync.mjs";
 export const PREFLIGHT_EXIT = 5;
 export const AUDIO_ONLY_EXIT = 6;
 const SOUND_DIRS = ["voice", "sfx", "bgm"];
+// assets/gen/ holds the drawing work behind the picture (batch files, raw and keyed drawings, rig
+// previews, the thumbnail batch). The composition shows what was synced or copied out of it
+// (assets/rig, assets/bg, …), so a folder walk skips it; a file there the composition references
+// directly is still hashed through its reference.
+const WORK_DIR = "assets/gen/";
 
 const posix = (root, p) => relative(root, p).split(SEP).join("/");
 const byName = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -167,7 +172,7 @@ function pictureInputs(project, composition, { timing = "keep", scenesDir = fals
   if (scenesDir) for (const f of walk(join(root, "scenes"))) add(f, shaFile(f));
   for (const f of walk(join(root, "assets"))) {
     const rel = posix(root, f);
-    if (rel === ONSET_CACHE || SOUND_DIRS.some((d) => rel.startsWith(`assets/${d}/`))) continue;
+    if (rel === ONSET_CACHE || rel.startsWith(WORK_DIR) || SOUND_DIRS.some((d) => rel.startsWith(`assets/${d}/`))) continue;
     if (soundFiles === "drop" && SOUND_FILE.test(rel)) continue;
     add(f, shaFile(f));
   }

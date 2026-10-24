@@ -17,6 +17,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { findSkill } from "./skill-paths.mjs";
+import { ELEVEN_REFUSED } from "./director-guard.mjs";
 
 export { load, validate, SCHEMA, FILE, SERIES_FILE, validateSeries, seriesDirOf } from "./manifest.mjs";
 export { patch, undo, redo, redoTarget, readHistory, derive, EXIT, ACTORS, OPS } from "./gateway.mjs";
@@ -78,11 +79,15 @@ export const ALLOWED_TOOLS = ["Read", "Glob", "Grep", `Bash(node ${OV}/scripts/*
 // The approval gates are the user's: Studio writes DEMO.md and BRIEF.md. Claude Code reads only
 // Edit(path) rules for file writes (they cover Write too) and a bare name matches at any depth;
 // the Bash rules close make-pitch choose (it writes direction:), replace-in-file, cp and mv
-// (checked against claude -p 2.1.294 with haiku: Edit, Write, replace-in-file and cp all denied).
+// (checked against claude -p 2.1.294 with haiku: Edit, Write, replace-in-file and cp all denied),
+// and make-demo --record-audio-review (the user's "Nghe rồi, được"). Bash rules match text, so a
+// quoted or split word still passes them (claude -p 2.1.304); make-demo and eleven.mjs refuse the
+// director themselves (director-guard.mjs), the rules are the first line.
 export const DENIED_TOOLS = ["WebFetch", "WebSearch", `Edit(/${OV}/**)`, `Write(/${OV}/**)`, `Bash(node ${OV}/scripts/*../*)`,
   "Edit(DEMO.md)", "Edit(BRIEF.md)", `Bash(node ${OV}/scripts/make-pitch.mjs choose*)`,
-  "Bash(*replace-in-file.mjs*)", "Bash(cp *)", "Bash(mv *)", "Bash(*DEMO.md*)", "Bash(*BRIEF.md*)"];
+  "Bash(*replace-in-file.mjs*)", "Bash(cp *)", "Bash(mv *)", "Bash(*DEMO.md*)", "Bash(*BRIEF.md*)", "Bash(*--record-audio-review*)"];
 // Added to DENIED_TOOLS by Studio for an episode of a series: its voices go only through the series
-// tools behind a consent card, so the director may not voice lines itself. audio-meta voices every
-// line too. sfx and music stay allowed.
-export const VOICE_DENIED_TOOLS = Object.freeze([`Bash(node ${OV}/scripts/eleven.mjs tts*)`, `Bash(node ${OV}/scripts/eleven.mjs audio-meta*)`]);
+// tools behind a consent card, so the director runs no eleven.mjs command but sfx and music
+// (tts, audio-meta and probe-models spend credits). The leading * also covers `scripts/./` and
+// `//` in the path (claude -p 2.1.304); eleven.mjs refuses the rest itself (director-guard.mjs).
+export const VOICE_DENIED_TOOLS = Object.freeze(ELEVEN_REFUSED.map((c) => `Bash(*eleven.mjs ${c}*)`));

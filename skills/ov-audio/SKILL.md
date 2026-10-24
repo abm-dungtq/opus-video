@@ -35,7 +35,7 @@ Chỉ bắt đầu khi `check-viet-pro.mjs --project .` đã PASS ở bước 2 
 | File | Dùng khi |
 |---|---|
 | `$OV/references/audio-pipeline.md` | Bước 5: voice, SFX, nhạc nền, mix, bản quyền |
-| `$OV/scripts/eleven.mjs` | `doctor`, `voice-info`, `models`, `tts`, `sfx`, `music`, `probe-models`, `audio-meta`; `tts`/`audio-meta` qua cổng viet-pro (`scripts/voice-gate.mjs`, exit 4) |
+| `$OV/scripts/eleven.mjs` | `doctor`, `voice-info`, `models`, `tts`, `sfx`, `music`, `probe-models`, `audio-meta`; `tts`/`audio-meta` qua cổng viet-pro (`scripts/voice-gate.mjs`, exit 4); đạo diễn Studio của tập series chỉ chạy `sfx`, `music` (lệnh khác exit 5) |
 | `$OV/scripts/timing.mjs` | Mốc TIMING từ PLAN.md hoặc `project.json` và `words.json` (cú pháp ở `--help`) |
 | `$OV/scripts/beat-grid.mjs` | Nhịp nhạc: BPM, BEAT0, kick, drop; `--write` ghi `<nhạc>.beats.json` khi ổn định |
 | `$OV/scripts/mix-balance.mjs` | Cân bằng nhạc dưới giọng lúc có lời |
