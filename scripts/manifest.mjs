@@ -123,3 +123,125 @@ export function save(dir, m) {
   writeFileSync(tmp, JSON.stringify(m, null, 2) + "\n");
   renameSync(tmp, f);
 }
+
+// ── Series declaration ────────────────────────────────────────────────────────────────────────
+// A series folder (shared cast, voices, backgrounds and tools of many episodes) holds
+// studio-series.json: what Studio may run there and where it may read and write. Every path is
+// relative to the series folder; {char} is a checked character id, {N} / {NN} the episode number,
+// and a tool's `writes` may also start with {project} (the episode) or {root} (Studio's root).
+// Shape (schema "opus-video/series@1"):
+//   { schema, name, characters?, voices?: { <key>: path }, read?: [path],
+//     writable?: { <key>: path }, episode?: { tool, name }, delivery_dir?, drive?: { account, folder },
+//     image_styles?: { <kind>: prompt },
+//     tools: { <name>: { file, flags?: { "--flag": type }, positional?: type, writes?: [path], timeout_s? } } }
+// Flag types: bool, int, number, id, word, text, range, slot, path:read, path:write, project,
+// root; a trailing * lets the flag (or the positional list) repeat.
+export const SERIES_FILE = "studio-series.json";
+export const SERIES_SCHEMA = "opus-video/series@1";
+export const SERIES_FLAG_TYPES = Object.freeze(["bool", "int", "number", "id", "word", "text", "range", "slot", "path:read", "path:write", "project", "root"]);
+const SERIES_TOOL = /^[a-z][a-z0-9-]{0,40}$/;
+const SERIES_KEY = /^[a-z][a-z0-9_-]{0,40}$/;
+const SERIES_FLAG = /^--[a-z][a-z0-9-]{0,40}$/;
+const isObj = (v) => v != null && typeof v === "object" && !Array.isArray(v);
+
+// A series-relative path template → why it is refused, or null. vars: the placeholders allowed
+// anywhere; lead: those allowed only as the whole first segment.
+function seriesPathProblem(p, vars, lead = []) {
+  if (typeof p !== "string" || !p.trim()) return "cần một đường dẫn";
+  if (p.startsWith("/") || /^[A-Za-z]:/.test(p) || p.includes("\\")) return "phải là đường tương đối trong thư mục series";
+  const parts = p.split("/");
+  for (const [i, seg] of parts.entries()) {
+    if (seg === "" || seg === "." || seg === "..") return "không được có đoạn rỗng, '.' hay '..'";
+    if (seg.startsWith(".")) return "không được có đoạn bắt đầu bằng dấu chấm";
+    for (const m of seg.matchAll(/\{([^}]*)\}/g)) {
+      if (lead.includes(m[1])) { if (i !== 0 || seg !== m[0]) return `{${m[1]}} chỉ đứng ở đầu đường`; }
+      else if (!vars.includes(m[1])) return `không biết chỗ thay {${m[1]}}`;
+    }
+  }
+  return null;
+}
+const flagTypeOk = (t) => typeof t === "string" && SERIES_FLAG_TYPES.includes(t.replace(/\*$/, ""));
+
+// studio-series.json → [error text]; [] means valid.
+export function validateSeries(s) {
+  if (!isObj(s)) return ["studio-series.json phải là một object"];
+  const errs = [];
+  const path = (where, p, vars = ["char"], lead = []) => { const why = seriesPathProblem(p, vars, lead); if (why) errs.push(`${where}: ${why}`); };
+  if (s.schema !== SERIES_SCHEMA) errs.push(`schema phải là ${SERIES_SCHEMA}`);
+  if (typeof s.name !== "string" || !s.name.trim() || s.name.length > 80) errs.push("thiếu name (tên series, tối đa 80 ký tự)");
+  if (s.characters !== undefined) path("characters", s.characters, []);
+  if (s.voices !== undefined) {
+    if (!isObj(s.voices)) errs.push("voices phải là object { khóa: đường }");
+    else for (const [k, v] of Object.entries(s.voices)) path(`voices.${k}`, v, []);
+  }
+  if (s.read !== undefined) {
+    if (!Array.isArray(s.read)) errs.push("read phải là mảng đường");
+    else s.read.forEach((p, i) => path(`read[${i}]`, p, []));
+  }
+  if (s.writable !== undefined) {
+    if (!isObj(s.writable)) errs.push("writable phải là object { khóa: đường }");
+    else for (const [k, v] of Object.entries(s.writable)) {
+      if (!SERIES_KEY.test(k)) errs.push(`writable: khóa "${k}" không hợp lệ`);
+      path(`writable.${k}`, v);
+    }
+  }
+  if (s.delivery_dir !== undefined) path("delivery_dir", s.delivery_dir, ["N", "NN"]);
+  if (s.drive !== undefined && !(isObj(s.drive) && typeof s.drive.account === "string" && /^[^@\s]+@[^@\s]+$/.test(s.drive.account) && typeof s.drive.folder === "string" && s.drive.folder.trim()))
+    errs.push("drive phải là { account: email, folder: tên thư mục }");
+  if (s.image_styles !== undefined) {
+    if (!isObj(s.image_styles)) errs.push("image_styles phải là object { loại: prompt }");
+    else for (const [k, v] of Object.entries(s.image_styles)) {
+      if (!SERIES_KEY.test(k)) errs.push(`image_styles: loại "${k}" không hợp lệ`);
+      if (typeof v !== "string" || !v.trim()) errs.push(`image_styles.${k}: cần prompt`);
+    }
+  }
+  if (!isObj(s.tools) || !Object.keys(s.tools).length) errs.push("thiếu tools (ít nhất một công cụ)");
+  else for (const [name, t] of Object.entries(s.tools)) {
+    const tag = `tools.${name}`;
+    if (!SERIES_TOOL.test(name)) errs.push(`${tag}: tên công cụ phải khớp ${SERIES_TOOL}`);
+    if (!isObj(t)) { errs.push(`${tag}: phải là object`); continue; }
+    path(`${tag}.file`, t.file);
+    if (typeof t.file === "string" && !t.file.endsWith(".mjs")) errs.push(`${tag}.file: phải là file .mjs`);
+    if (t.flags !== undefined) {
+      if (!isObj(t.flags)) errs.push(`${tag}.flags phải là object { "--cờ": kiểu }`);
+      else for (const [f, type] of Object.entries(t.flags)) {
+        if (!SERIES_FLAG.test(f)) errs.push(`${tag}: cờ "${f}" sai dạng (--chữ-thường)`);
+        if (!flagTypeOk(type)) errs.push(`${tag}: cờ ${f} có kiểu lạ "${type}" (được: ${SERIES_FLAG_TYPES.join(", ")}, thêm * để lặp)`);
+      }
+    }
+    if (t.positional !== undefined && !flagTypeOk(t.positional)) errs.push(`${tag}.positional: kiểu lạ "${t.positional}"`);
+    if (t.writes !== undefined) {
+      if (!Array.isArray(t.writes)) errs.push(`${tag}.writes phải là mảng đường`);
+      else t.writes.forEach((p, i) => path(`${tag}.writes[${i}]`, p, ["char"], ["project", "root"]));
+    }
+    if (t.timeout_s !== undefined && !(Number.isInteger(t.timeout_s) && t.timeout_s >= 1 && t.timeout_s <= 3600)) errs.push(`${tag}.timeout_s phải là số nguyên 1–3600`);
+  }
+  if (s.episode !== undefined) {
+    if (!isObj(s.episode) || typeof s.episode.tool !== "string" || typeof s.episode.name !== "string") errs.push("episode phải là { tool, name }");
+    else {
+      if (isObj(s.tools) && !s.tools[s.episode.tool]) errs.push(`episode.tool: không có công cụ "${s.episode.tool}" trong tools`);
+      if (!/^[A-Za-z0-9._-]*\{NN?\}[A-Za-z0-9._-]*$/.test(s.episode.name)) errs.push("episode.name: một tên thư mục có {N} hoặc {NN}, ví dụ a-{NN}");
+    }
+  }
+  return errs;
+}
+
+// The BRIEF.md frontmatter key `series:`, else the line "- Thư mục series: <path>" under
+// "## series_bible" (older episodes) → the series folder, absolute; null without one or when the
+// folder holds no studio-series.json. A relative path is taken from the project folder.
+export function seriesDirOf(projectDir) {
+  const base = resolve(projectDir);
+  let text;
+  try { text = readFileSync(join(base, "BRIEF.md"), "utf8"); } catch { return null; }
+  let p = null;
+  const fm = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  const key = fm?.[1].match(/^series:\s*(.*?)\s*(?:\s#.*)?$/m);
+  if (key?.[1]) p = key[1].replace(/^["']|["']$/g, "");
+  if (!p) {
+    const sec = text.split(/^##\s+/m).find((x) => /^series_bible\s*$/m.test(x.split(/\r?\n/)[0]));
+    p = sec?.match(/^\s*-\s*Thư mục series:\s*(.+?)\s*$/m)?.[1]?.replace(/^`|`$/g, "") ?? null;
+  }
+  if (!p) return null;
+  const dir = resolve(base, p);
+  return existsSync(join(dir, SERIES_FILE)) ? dir : null;
+}
