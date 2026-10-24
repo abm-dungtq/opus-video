@@ -16,7 +16,7 @@ principles and the beat-grid, reframe and style-resolution algorithms, rewritten
 opus-video.
 
 This product includes material adapted from Lemo-Opuscar
-(https://github.com/lemomo-ai/lemo-opuscar, commit b5e8ef93930b6d828f352055a689320f138237b1),
+(https://github.com/lemomo-ai/lemo-opuscar, commit 413a6bd6d78ebd3bdd5abaec9538a26867f890df),
 MIT License (see third_party/lemo-opuscar/LICENSE): the lemo-watercolor and lemo-glass-product
 style profiles (data/styles/), adapted from its style guides, and the scene templates in
 templates/lemo/, written against its watercolor and glass-product engines. scripts/lemo.mjs

@@ -4,20 +4,25 @@ Trong corpus 513 case (yihui), Opus 5.5 hầu như luôn viết animation thành
 
 ## 1. HyperFrames (mặc định)
 
-Dùng cho phần lớn trường hợp. Gọi skill `hyperframes` (cửa vào bắt buộc). Có `BRIEF.md` với trường `workflow:` thì nó đi thẳng vào workflow tương ứng. Các workflow có pipeline audio riêng (faceless-explainer, product-launch-video, pr-to-video) dùng được giọng ElevenLabs tiếng Việt nhờ cầu nối `eleven.mjs audio-meta` (xem `audio-pipeline.md` § Cầu nối HyperFrames). Chạy cầu nối này **thay cho** `audio.mjs generate` của workflow:
+Dùng cho phần lớn trường hợp. Gọi skill `hyperframes` (cửa vào bắt buộc), rồi đọc file loại video mà nó trỏ tới. Từ HyperFrames 0.8.185, bộ skill chỉ còn 7: `hyperframes`, `hyperframes-cli`, `hyperframes-registry`, `media-use`, `slideshow`, `remotion-to-hyperframes`, `figma`. Các workflow cũ (`general-video`, `faceless-explainer`, `product-launch-video`, `pr-to-video`, `motion-graphics`, `music-to-video`, `embedded-captions`, `talking-head-recut`) và skill `hyperframes-animation`, `hyperframes-creative`, `hyperframes-core`, `hyperframes-keyframes`, `hyperframes-audio`, `hyperframes-studio` không còn được cài. Phần công thức opus-video cần (blueprint, rule, transitions, `visual-styles.md`, `cut-catalog.md`) nằm sẵn trong `third_party/hyperframes-skills/` của plugin, lấy từ tag v0.8.184; `recipe-pack.mjs` và cổng PLAN đọc bản này. Trong tài liệu opus-video, tên workflow cũ vẫn dùng làm nhãn cho cách dựng; mặc định là dựng tay (`general-video`) trên khung `composition.mjs init`.
 
-| Loại video | Workflow HyperFrames |
-|---|---|
-| Explainer không footage, kiến thức, list, how-to | `faceless-explainer` khi đã chạy `eleven.mjs audio-meta`; `general-video` khi dựng tay |
-| Quảng cáo / ra mắt sản phẩm, có URL | `product-launch-video` |
-| Bám nhạc: lyric video, slideshow theo beat | `music-to-video` |
-| Ngắn, không lời, motion là chính (intro, title) | `motion-graphics` |
-| Dài hơn, nhiều cảnh, montage, sizzle | `general-video` |
-| Phụ đề nằm trong video | `embedded-captions` (dùng kèm) |
-| Footage thật: talking-head, phỏng vấn, UGC cần cắt khoảng lặng | nhánh footage (beta), xem `references/footage-lane.md` |
-| Nhiều biến thể của một mẫu quảng cáo | composition có biến + `render --batch` |
+| Loại video | Đọc trong skill `hyperframes` | Nhãn workflow cũ |
+|---|---|---|
+| Explainer không footage, kiến thức, list, how-to | `references/types/explainer.md` | `general-video` (dựng tay); `faceless-explainer` khi máy còn skill cũ |
+| Quảng cáo / ra mắt sản phẩm, có URL | `references/types/launch.md`, `references/film.md` (website làm chủ thể: `npx hyperframes capture <url> --json`) | `product-launch-video` |
+| Pull request, script, website thành video | `references/film.md` | `pr-to-video` |
+| Bám nhạc: lyric video, slideshow theo beat | `references/types/music.md` | `music-to-video` |
+| Ngắn, không lời, motion là chính (intro, title) | `references/motion.md` | `motion-graphics` |
+| Số liệu, biểu đồ | `references/types/data.md` | `general-video` |
+| Dọc 9:16 cho mạng xã hội | `references/types/vertical.md` | `general-video` |
+| 3D, mô phỏng, generative | `references/types/3d.md` | `general-video` |
+| Phụ đề nằm trong video, thẻ phủ lên talking-head | `references/captions.md`, `references/overlays.md` | `embedded-captions`, `talking-head-recut` |
+| Footage thật: talking-head, phỏng vấn, UGC cần cắt khoảng lặng | nhánh footage (beta), xem `references/footage-lane.md` | |
+| Nhiều biến thể của một mẫu quảng cáo | composition có biến + `render --batch` | |
 
-CLI (binary đã cài, `hyperframes` ≥ 0.8.144): `lint` → `check` → `render`. Trước khi tự viết motion, tìm primitive có sẵn bằng `hyperframes catalog --query "<hiệu ứng>"`.
+Máy còn workflow có pipeline audio riêng (faceless-explainer, product-launch-video, pr-to-video, từ HyperFrames ≤ 0.8.184) thì vẫn dùng được giọng ElevenLabs tiếng Việt nhờ cầu nối `eleven.mjs audio-meta` (xem `audio-pipeline.md` § Cầu nối HyperFrames), chạy **thay cho** `audio.mjs generate` của workflow. `npx hyperframes skills update` của 0.8.192 không xoá các skill cũ đã cài; bản 0.8.185–0.8.191 thì xoá, nên đừng chạy lệnh đó bằng các bản ấy.
+
+CLI (binary đã cài, `hyperframes` ≥ 0.8.192): `lint` → `check` → `render`. Trước khi tự viết motion, tìm primitive có sẵn bằng `hyperframes catalog --query "<hiệu ứng>"`.
 
 ## 1b. HyperFrames cùng lớp lemo-canvas
 
@@ -46,7 +51,7 @@ Chỉ dùng khi hai engine trên không làm được, vì đường này không
 
 ## Font preset & tiếng Việt
 
-Mỗi frame preset (`hyperframes-creative/frame-presets/`) nạp font từ Google Fonts, và không phải font nào cũng đủ dấu tiếng Việt.
+Mỗi frame preset (`hyperframes/assets/frame-presets/`; bản cũ: `hyperframes-creative/frame-presets/`) nạp font từ Google Fonts, và không phải font nào cũng đủ dấu tiếng Việt.
 - **Đã kiểm chứng (2026-10-08):** mọi file Inter có sẵn trong các skill HyperFrames (`code-editorial`, `embedded-captions`, `talking-head-recut`) đều là subset latin, **thiếu** ư ễ đ ạ ơ. Không có Playfair Display local. `captions.mjs` cũng bắt buộc có file font trong `assets/fonts/`. Vì vậy với video tiếng Việt, **mặc định thay mọi `fontFamily` trong `frame.md` bằng `Be Vietnam Pro`** (`node $OV/scripts/replace-in-file.mjs frame.md 'fontFamily: "[^"]*"' 'fontFamily: "Be Vietnam Pro"'`) và copy `BeVietnamPro-{Regular,Medium,SemiBold,Bold}.ttf` (tải từ Google Fonts; nếu đã cài thì nằm ở `~/Library/Fonts/` trên macOS, `~/.local/share/fonts/` trên Linux, `%LOCALAPPDATA%\Microsoft\Windows\Fonts\` trên Windows) vào `assets/fonts/` ngay sau `build-frame.mjs`, **trước** khi giao việc cho các frame worker.
 - Cách kiểm tra: render 1 frame có chuỗi `Ánh nắng ơ ư đ ễ ạ ỹ`, rồi trích ảnh bằng `ffmpeg -ss T -frames:v 1` để xem.
 - Thiếu dấu hoặc lẫn font fallback: đặt `fontFamily` của role đó trong `frame.md` thành `Be Vietnam Pro`, rồi copy file `.ttf` vào `assets/fonts/` **trước** khi chạy `captions.mjs build`. Nếu không, lint sẽ báo `font_family_without_font_face`.
@@ -63,7 +68,7 @@ Dự án mới có `aspect: both` chỉ có một thư mục và một `index.ht
 
 1. **Dựng 16:9 kèm override.** Bố cục đặt trong class, không viết inline style, vì CSS không ghi đè được inline style. Khung lấy kích thước từ `--W`/`--H`. Phần khác cho khổ dọc viết trong khối `html[data-ratio="9x16"] …` (khổ vuông là `html[data-ratio="1x1"] …`) của `index.html`: vùng an toàn, cỡ chữ, bố cục trái–phải chuyển thành trên–dưới. Skeleton có sẵn một ví dụ cho `.headline`.
 2. **Sinh bản dọc.** Chạy `node $OV/scripts/reframe.mjs . --ratio 9x16` (hoặc `--ratio 1x1`). Lệnh tạo `../<tên>-9x16/` với root 1080×1920, `data-ratio="9x16"` và `aspect: 9:16` trong BRIEF. `assets/` được clone APFS từng tệp: cùng giọng đọc, nhạc và SFX, không tốn thêm dung lượng cho tới khi một bên đổi tệp. Mỗi dòng `WARN layout` chỉ ra một giá trị `left/top/width/height` ≥ 1080 px nằm ngoài khối override: sửa giá trị đó trong bản gốc. Không sửa thư mục bản dọc. Mỗi lần bản gốc đổi thì chạy lại với `--force`.
-3. **Kiểm tra trong thư mục mới.** `cd ../<tên>-9x16 && npx --yes hyperframes@0.8.144 lint && npx --yes hyperframes@0.8.144 check`.
+3. **Kiểm tra trong thư mục mới.** `cd ../<tên>-9x16 && npx --yes hyperframes@0.8.192 lint && npx --yes hyperframes@0.8.192 check`.
 4. **Render** trong thư mục mới như bản 16:9 (`render-final.mjs` hoặc `npm run render`), rồi nén theo bước 9 của quy trình.
 
 Giới hạn cần biết:
@@ -71,7 +76,7 @@ Giới hạn cần biết:
 - `--force` chỉ thay thư mục rỗng hoặc thư mục do chính `reframe.mjs` tạo cho bản gốc này (có tệp `.reframe.json`). Thư mục khác bị từ chối, kể cả khi có `--force`. Khi chạy lại, lệnh chỉ thay những gì nó sinh ra (`index.html`, `BRIEF.md`, `compositions/`, `assets/`, `PLAN.md`, `package.json`, `hyperframes.json`, `.reframe.json`). `renders/`, `demo/`, `DEMO.md`, `QA.md`, `REVISIONS.md` và mọi tệp khác của bản dọc được giữ.
 - Dòng `WARN layout` chỉ quét `left/top/width/height` trong CSS và `style=""`. Lệnh không bắt `x:` hay `translate(...px)` của GSAP, không bắt `right/bottom/inset`, cũng không bắt `data-width="1920"` ở root của composition con trong `compositions/`. Hết WARN chưa có nghĩa bố cục đã vừa khung: vẫn phải xem bản dọc.
 - `assets/` của bản dọc là bản clone (copy-on-write trên APFS, chép thường khi khác ổ). Ghi vào `assets/` của bản dọc không đổi file của bản gốc, và ngược lại. Asset sinh lại ở bản gốc chỉ tới bản dọc sau khi chạy lại `reframe.mjs --force`.
-- Bản 1:1 ghi `data-resolution="square"`. Đây là tên preset 1080×1080 có trong `hyperframes render --resolution` của 0.8.144. Đã kiểm: `npx --yes hyperframes@0.8.144 lint` trên một bản 1:1 trong `/tmp` cho 0 lỗi (2026-10-15).
+- Bản 1:1 ghi `data-resolution="square"`. Đây là tên preset 1080×1080 có trong `hyperframes render --resolution` (0.8.144 và 0.8.192). Đã kiểm: `npx --yes hyperframes@0.8.192 lint` trên một bản 1:1 sinh bằng `reframe.mjs` cho 0 lỗi (2026-10-24).
 
 Dự án cũ, dự án tạo bằng `new-project.sh --legacy-pair` và workflow frame-worker vẫn làm bản 9:16 bằng cách copy thành dự án riêng như các mục dưới đây. `reframe.mjs` từ chối dự án có `compositions/frames/`.
 
@@ -91,7 +96,7 @@ Dự án cũ, dự án tạo bằng `new-project.sh --legacy-pair` và workflow 
   - Mỗi SFX đặt trên một `data-track-index` riêng và có `data-duration`, để tránh cảnh báo `duplicate_audio_track`.
   - Chữ trắng trên nền màu nhấn phải đạt contrast ≥ 3:1. `hyperframes check` sẽ báo nếu không đạt.
   - GSAP nạp từ CDN lúc render, nên render offline sẽ lỗi. Cần offline thì tải gsap.min.js vào `assets/` và trỏ tới bản local.
-- Bài học từ smoke v2 (workflow faceless-explainer, 2026-10-08):
+- Bài học từ smoke v2 (workflow faceless-explainer, 2026-10-08; chỉ áp dụng khi máy còn skill này):
   - Với workflow có frame worker, bản 9:16 là **một project riêng**: copy project, bỏ `compositions/frames/` và `.hyperframes/frame-packets/`, đổi `format: 1080x1920` trong STORYBOARD. Sau đó chạy lại frame-packets → workers (dispatch ghi `canvas 1080x1920` và vùng nội dung y 230–1320) → `captions.mjs build` → assemble → transitions. Giữ nguyên `audio_meta.json` và sidecar.
   - `captions.mjs build` cho 1080×1920 đặt caption band ở `top: 1600px`, tức nằm trong vùng bị UI che. Sửa `--cap-band-top: 1340px; --cap-band-height: 200px` trong `compositions/captions.html`. Mỗi lần build lại caption phải sửa lại.
   - `assemble-index` từ chối frame có hai clip **cùng `data-track-index`** mà khung thời gian chồng nhau. Dặn worker cho mỗi clip một lane riêng.

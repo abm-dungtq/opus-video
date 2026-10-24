@@ -364,7 +364,7 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
       const words = [...new Set((r[bp] || "").replace(/`/g, " ").match(/[a-z0-9]+(?:-[a-z0-9]+)+/g) || [])];
       const real = words.filter((w) => tokenExists({ kind: "blueprint", name: w }, data, up) || tokenExists({ kind: "rule", name: w }, data, up));
       const fake = words.filter((w) => !real.includes(w));
-      for (const w of fake) errors.push(`PLAN.md "## Cảnh" row ${i + 1}: "${w}" is not a blueprint or rule in hyperframes-animation`);
+      for (const w of fake) errors.push(`PLAN.md "## Cảnh" row ${i + 1}: "${w}" is not a blueprint or rule in hyperframes-animation (third_party/hyperframes-skills)`);
       if (!words.length) errors.push(`PLAN.md "## Cảnh" row ${i + 1} cites no blueprint/rule (each beat names how it is built)`);
       real.forEach((w) => all.add(w));
     });

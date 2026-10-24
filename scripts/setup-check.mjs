@@ -4,13 +4,12 @@
 //   node setup-check.mjs [--json]
 //   node setup-check.mjs --help | -h
 // Required (MISSING → exit 1, with the fix command for this OS):
-//   Node.js ≥ 22, git, ffmpeg + ffprobe, the hyperframes CLI ≥ 0.8.144 (via npx),
+//   Node.js ≥ 22, git, ffmpeg + ffprobe, the hyperframes CLI ≥ 0.8.192 (via npx),
 //   skills found on any agent host (see skill-paths.mjs): viet-pro (+ its self-tests),
-//   hyperframes core (hyperframes, hyperframes-*, media-use) and every HyperFrames workflow that
-//   opus-video routes to, ELEVENLABS_API_KEY + OPUS_VIDEO_VOICE_ID (presence only), and
-//   data/directions.json: every creative-direction token names a real blueprint/rule/preset/
-//   style/seam in the installed HyperFrames (directions.mjs check; skipped while
-//   hyperframes-animation is missing).
+//   the HyperFrames skills (CORE_SKILLS, WORKFLOW_SKILLS), ELEVENLABS_API_KEY +
+//   OPUS_VIDEO_VOICE_ID (presence only), and data/directions.json: every creative-direction token
+//   names a real blueprint/rule/style/seam in third_party/hyperframes-skills or a frame preset of
+//   the hyperframes skill (directions.mjs check).
 // Optional (WARN, never fails): agy (judge.mjs video QA), TYPESAFE_API_KEY (Jev), a Remotion
 //   skill (only for engine: remotion), and `opus-video plugin: installed|missing`: whether this
 //   checkout is the Claude Code plugin layout (.claude-plugin/plugin.json + skills/). Codex and
@@ -29,9 +28,11 @@ import { findSkill, skillRoots } from "./skill-paths.mjs";
 import { checkData, loadDirections } from "./directions.mjs";
 
 export const MIN_NODE = 22;
-export const MIN_HYPERFRAMES = "0.8.144";
-export const CORE_SKILLS = ["hyperframes", "hyperframes-core", "hyperframes-animation", "hyperframes-keyframes", "hyperframes-creative", "hyperframes-audio", "hyperframes-cli", "hyperframes-registry", "hyperframes-studio", "media-use"];
-export const WORKFLOW_SKILLS = ["general-video", "faceless-explainer", "product-launch-video", "pr-to-video", "motion-graphics", "music-to-video", "slideshow", "embedded-captions", "talking-head-recut", "remotion-to-hyperframes"];
+export const MIN_HYPERFRAMES = "0.8.192";
+// HyperFrames 0.8.185 cut its skill pack to these; the recipes opus-video reads from the dropped
+// skills ship in third_party/hyperframes-skills (checked below through directions.mjs).
+export const CORE_SKILLS = ["hyperframes", "hyperframes-cli", "hyperframes-registry", "media-use"];
+export const WORKFLOW_SKILLS = ["slideshow", "remotion-to-hyperframes"];
 const ENV_FILE = join(homedir(), ".config", "opus-video", ".env");
 const PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const WIN = process.platform === "win32";
@@ -40,8 +41,8 @@ const FIX = {
   node: { darwin: "brew install node@22   (or https://nodejs.org)", linux: "nvm install 22   (or your distro's nodejs ≥ 22)", win32: "winget install OpenJS.NodeJS.LTS" },
   git: { darwin: "xcode-select --install   (or brew install git)", linux: "sudo apt install git   (or dnf/pacman)", win32: "winget install Git.Git" },
   ffmpeg: { darwin: "brew install ffmpeg", linux: "sudo apt install ffmpeg   (or dnf/pacman)", win32: "winget install Gyan.FFmpeg   (then reopen the terminal)" },
-  hyperframes: "npx hyperframes skills   (installs the CLI on demand and every HyperFrames skill for all supported agents)",
-  vietpro: { default: "curl -fsSL https://raw.githubusercontent.com/abm-dungtq/viet-pro-codex/v5.3.0/install.sh | bash", win32: "see README.md § Windows (git clone viet-pro-codex, copy skills/viet-pro)" },
+  hyperframes: "npx hyperframes skills   (installs the CLI on demand and the HyperFrames skills for all supported agents; `npx hyperframes skills update` refreshes them)",
+  vietpro: { default: "curl -fsSL https://raw.githubusercontent.com/abm-dungtq/viet-pro-codex/v5.6.1/install.sh | bash", win32: "see README.md § Windows (git clone viet-pro-codex, copy skills/viet-pro)" },
   keys: "create the opus-video env file (README.md § Keys) with ELEVENLABS_API_KEY=… and OPUS_VIDEO_VOICE_ID=…",
 };
 const fix = (k) => (typeof FIX[k] === "string" ? FIX[k] : FIX[k][process.platform] || FIX[k].default || FIX[k].linux);
@@ -99,7 +100,7 @@ export function runChecks({ findSkillImpl = findSkill, versionImpl = version, ke
     add(d ? "ok" : "missing", `skill ${s}`, d || "not installed", fix("hyperframes"));
   }
   for (const k of ["ELEVENLABS_API_KEY", "OPUS_VIDEO_VOICE_ID"]) add(keys.has(k) ? "ok" : "missing", k, keys.has(k) ? "present" : "absent", FIX.keys);
-  if (findSkillImpl("hyperframes-animation")) {
+  {
     const d = directionsImpl();
     add(d.pass ? "ok" : "missing", "creative directions", d.pass ? `data/directions.json: ${d.tokens} token có thật` : `${d.errors.length} token không có trong HyperFrames: ${d.errors[0]}`, "HyperFrames đổi tên: sửa data/directions.json theo `node scripts/directions.mjs check`, rồi `directions.mjs doc --write`");
   }

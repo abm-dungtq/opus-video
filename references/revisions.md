@@ -40,19 +40,20 @@ Sau khi sửa một mục, kiểm ngay bằng ảnh chụp trên composition hi�
 
 ```bash
 # Chụp hình hiện tại quanh mốc t (ví dụ t = 6.5s): ngay trước, đúng lúc, và sau đó
-npx hyperframes snapshot . --at <t-0.3>,<t>,<t+0.5> --no-end
+npx hyperframes snapshot . --at <t-0.3>,<t>,<t+0.5> --no-end -o snapshots/rev-<N>
 
 # Tìm chữ đè nhau hoặc tràn ở chỗ nối cảnh
 npx hyperframes check --at-transitions
 
-# cần đúng bản 0.8.144:
-npx --yes hyperframes@0.8.144 snapshot . --at <t-0.3>,<t>,<t+0.5> --no-end
+# cần đúng bản dự án ghim (0.8.192):
+npx --yes hyperframes@0.8.192 snapshot . --at <t-0.3>,<t>,<t+0.5> --no-end -o snapshots/rev-<N>
 ```
 
 - Thêm vào `--at` các mốc ghi ở `Giữ nguyên` để chắc rằng chúng không bị đổi.
 - Các mốc trong `--at` không nhỏ hơn 0: mục ở đầu video thì bỏ mốc `t-0.3`.
-- Lệnh `npx hyperframes` không ghim phiên bản có thể chạy bản cài toàn cục trên máy. Dự án ghim `hyperframes@0.8.144` trong `package.json`, nên khi cần đúng bản đó thì gọi bằng lệnh cuối trong khối trên. Các cờ dùng ở đây (`--at`, `--no-end`, `--at-transitions`) có trong bản 0.8.144.
-- Bản 0.8.144 không có cờ `--range` cho `snapshot` hay `check`, nên không dùng cờ đó.
+- Lệnh `npx hyperframes` không ghim phiên bản có thể chạy bản cài toàn cục trên máy. Dự án ghim `hyperframes@0.8.192` trong `package.json`, nên khi cần đúng bản đó thì gọi bằng lệnh cuối trong khối trên. Các cờ dùng ở đây (`--at`, `--no-end`, `-o`, `--at-transitions`) có trong bản 0.8.192.
+- Không có `-o`, từ 0.8.152 `snapshot` ghi ảnh vào `.hyperframes/artifacts/snapshots/<id>/` và mỗi lần `check` lưu một report vào `.hyperframes/artifacts/checks/`. Ghi `-o snapshots/rev-<N>` để ảnh của vòng sửa nằm một chỗ dễ tìm.
+- Từ 0.8.151 có `--range <a>,<b>` cho `snapshot` và `check`: kiểm lại đúng đoạn vừa sửa (`npx hyperframes check --range 6,8`) nhanh hơn check cả phim.
 - `--at-transitions` chỉ để chẩn đoán và báo nhầm khi chữ trượt qua mask (cùng lời ở `qa-checklist.md`, mục "Đo bằng lệnh"). Dòng báo ở mốc không nằm trong `Vị trí` hay `Giữ nguyên` thì xem ảnh rồi mới kết luận.
 
 ## 5. Cho người dùng xem "trước" một đoạn

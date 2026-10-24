@@ -4,7 +4,7 @@
 |---|---|---|---|
 | https://github.com/yihui-dev/awesome-opus5-5-videos | 92aee2f | MIT | 703 hiện có + 105 upstream_removed (`id` bắt đầu bằng `y:`) |
 | https://github.com/chuspeeism/awesome-opus-5-5-videos | 028bc52 | MIT | 300 case (`id` bắt đầu bằng `c:`) |
-| https://github.com/abm-dungtq/viet-pro-codex | 49926d0 (v5.3.0) | MIT (Humanizer: xem THIRD_PARTY_NOTICES) | quy trình kịch bản (`references/script-workflow.md`) |
+| https://github.com/abm-dungtq/viet-pro-codex | 2902c19 (v5.6.1) | MIT (Humanizer: xem THIRD_PARTY_NOTICES) | quy trình kịch bản (`references/script-workflow.md`) |
 
 Ngày lấy: 2026-10-16. Case `upstream_removed: true` là case có ở bản 7562902 nhưng upstream đã gỡ (không làm từ một prompt Opus 5.5 đơn thuần); giữ lại với dữ liệu cũ, `find-cases` và `rerank-cases` ẩn chúng trừ khi thêm `--include-removed`. Prompt thuộc về tác giả gốc (`author`, `url` trong từng dòng). Video gốc chỉ đặt link, không phân phối lại.
 
