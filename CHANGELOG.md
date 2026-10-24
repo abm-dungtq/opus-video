@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+Nothing yet.
+
+## v2.6.0 (2026-10-24): HyperFrames 0.8.192
+
+Why: HyperFrames moved from 0.8.144 to 0.8.192, and 0.8.185 cut its skill pack from 21 to 7 skills. The recipes `directions.mjs`, `recipe-pack.mjs`, `make-pitch.mjs` and the PLAN gate read (blueprints, rules, transitions, `visual-styles.md`, `cut-catalog.md`) no longer install on a new machine, so a fresh install failed `setup-check` and could not pitch or plan. This release also takes in the source repos that moved since v2.5.0. It ships with the Unreleased work below (STUDIO_API stays 4).
+
+### Changed
+- HyperFrames pin 0.8.144 → 0.8.192: `MIN_HYPERFRAMES`, `reframe.mjs` next-step line, the composition skeleton header and the docs; the workspace template `package.json` pins `hyperframes@0.8.192`. `lint`, `check --json --caption-zone`, `snapshot -o`, `render --quality delivery`, `render --resolution square` and `preview --background/--status/--stop` were run against 0.8.192 and behave as the scripts expect.
+- `third_party/hyperframes-skills/`: the files opus-video reads from `hyperframes-animation` (`blueprints/`, `rules/`, `transitions/`), `hyperframes-creative/references/visual-styles.md` and `faceless-explainer/references/cut-catalog.md`, copied unchanged from HyperFrames tag v0.8.184 (commit d15a274, Apache-2.0, LICENSE and SOURCE.md beside them). `directions.mjs upstream()` reads this copy first and falls back to an installed skill of the same name; frame presets come from `hyperframes/assets/frame-presets/` (older installs: `hyperframes-creative/frame-presets/`). `upstream()` gains a `presets` field and an optional vendor path argument; `VENDOR` is exported.
+- `setup-check.mjs`: `CORE_SKILLS` is `hyperframes`, `hyperframes-cli`, `hyperframes-registry`, `media-use`; `WORKFLOW_SKILLS` is `slideshow`, `remotion-to-hyperframes`. The creative-directions check always runs (it no longer waits for `hyperframes-animation`).
+- `recipe-pack.mjs`, `make-pitch.mjs`: the missing-recipes message names `third_party/hyperframes-skills`; a preset points to `hyperframes/assets/frame-presets/`. `check-preflight.mjs` names the vendored folder in its unknown blueprint/rule error.
+- viet-pro pin v5.3.0 → v5.6.1 (`install.sh`, `install.ps1`, `setup-check.mjs`, README, `docs/cai-dat-agent.md`, `data/SOURCES.md`). Its scripts keep their flags, exit codes and output; v5.5.0 added `check-platform.mjs`, which Motion Studio calls.
+- lemo-opuscar pin b5e8ef9 → 413a6bd (`data/lemo/styles.json`, NOTICE). The seven engine files keep their paths; upstream only translated comments. three stays 0.170.0 (lemo still asks for `^0.170.0`), gsap stays 3.14.2 (the version HyperFrames 0.8.192 pins).
+- Docs: `engine-selection.md` maps each kind of video to `hyperframes/references/types/*.md` and keeps the old workflow names as labels; `ov-build` and `ov-audio` mark the frame-worker workflows (faceless-explainer, pr-to-video, product-launch-video) as available only where the old skills are still installed; `footage-lane.md` and `audio-pipeline.md` point to `hyperframes/references/motion.md`, `overlays.md` and `sound.md`. `revisions.md` and the guide drop "0.8.144 has no `--range`" (0.8.151 added `--range` to `snapshot` and `check`) and write snapshots with `-o snapshots/rev-<N>`, since 0.8.152 puts them under `.hyperframes/artifacts/` otherwise.
+
+### Fixed
+- The sample `files_read` in `references/script-workflow.md` and `skills/ov-script/SKILL.md` lacked `review/translationese-vi.md`, which viet-pro requires since v5.4.0; a record copied from them failed `check-viet-pro.mjs` ("files_read does not list").
+
+### Unchanged sources
+- open-edit (1d3b75b), the two case corpora (yihui 92aee2f, chuspeeism 028bc52) and the AgentKit motion-video material (v1.3.0) have no new commits that touch opus-video.
+
+
 ### New
 - `scripts/captions-from-words.mjs --project <dir> --out <file.srt> [--max-chars 42] [--max-lines 2]`: an SRT file for upload from the voice lines of `project.json` (imported in memory when the project has none) and the word timings of their takes (`audio_meta.json`, else `<file>.words.json`). Cues stay within one voice line, hold at most 2 lines of 42 characters, last 1–6 s and break at sentence ends (and at commas once half full); a line without words is spread over its duration with a WARN; `[bíp]` is dropped from the shown text. Never overwrites `--out` (exit 2).
 - `COMMANDS` names the delivery steps: `export` (`export.mjs`), `vietPro` (`check-viet-pro.mjs`), `captions` (`captions-from-words.mjs`) and `platform`, viet-pro's `check-platform.mjs` found through `skill-paths.mjs` (`null` without viet-pro; `lint-vietnamese-content.mjs` sits beside it).
@@ -23,7 +45,7 @@
 - `make-pitch.mjs init --directions <A?,A?,…>`: builds the pitch from one to three directions the user chose, in that order (picks 1..n, each keeps its tier) instead of the three `directions.mjs pick` would choose; an unknown, repeated, banned or aspect-mismatched id exits 2. `COMMANDS.pitchInit` declares it for Studio with `{project}`, `{topic}`, `{aspect}`, `{category}`, `{energy}` and `{directions}`; empty `--category` and `--energy` keep the old defaults.
 - Gateway op `set_workflow_mode` (`{ op, mode }`, mode `dao-dien`, `nhanh`, `tu-nhac` or `timeline`) writes the optional `project.json` field `workflow_mode`; `manifest.mjs` validates it when present. `gateway.mjs` exports `OPS`, the frozen list of every op `applyOps` accepts, and `studio-api.mjs` re-exports it so Studio checks an op before sending it. `STUDIO_API` stays 4: no existing export changes shape.
 
-### Fixed
+### Fixed (Studio, gates)
 - `pictureHash` and `visualHash` (`render-final.mjs`) skip `assets/gen/` when walking `assets/`: drawing batches, raw and keyed drawings and rig previews are not on screen, so a thumbnail batch or a late redraw no longer FAILs `check-preflight --stage final` ("hình đã đổi sau animatic") or refuses `--audio-only`. A file there that the composition references directly is still hashed.
 - The director Motion Studio runs (`MOTION_STUDIO_RUNNER`/`OPUS_STUDIO_RUNNER=cli`) is refused by the scripts themselves, since Claude Code matches Bash rules as text and `eleven.mjs "tts"` or `scripts/./eleven.mjs` passed them: in an episode of a series (the cwd or any project the command names), `eleven.mjs` runs only `sfx` and `music` and every other command exits 5 before reading the key; `make-demo.mjs --record-audio-review` exits 2 for any director (the user's "Nghe rồi, được" is recorded by Studio). New `scripts/director-guard.mjs`.
 - `VOICE_DENIED_TOOLS` now lists `Bash(*eleven.mjs <cmd>*)` for every `eleven.mjs` command but `sfx` and `music` (adds `probe-models`, `doctor`, `voice-info`, `models`; the leading `*` covers `./` and `//` in the path), and `DENIED_TOOLS` adds `Bash(*--record-audio-review*)`. Same shape, `STUDIO_API` stays 4.

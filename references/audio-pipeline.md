@@ -129,8 +129,8 @@ node $OV/scripts/mix-balance.mjs --project . [--write-qa]
 | `gemini-argon-dot2-9x16` (có carve, strength 0,8) | PASS 6,1 dB | nhạc tự nhiên 3,7 dB dưới giọng, duck thêm 2,4 dB; bản mix −15,6 LUFS, đỉnh −1,5 dBTP (đỉnh giới hạn mức tăng ở +1,4 dB) |
 | `claude-code-ceo-sme` (dự án cũ, nhạc `data-volume` 0,2, không carve) | WARN 8,4 dB (id giọng `el-NN-…-voice`) | ngoài khoảng 4–7 dB; ngưỡng giữ nguyên, chờ người dùng nghe |
 
-- Trong HyperFrames, đặt volume theo `hyperframes-audio`. Ducking dùng `data-fx-carve` trên track nhạc (mục trên); bản giao do `audio-mix.mjs` thực hiện.
-- Chỉnh mức bằng lệnh thay vì thử tay: `hyperframes normalize-audio --lufs=-16 --target <id> --write` cho từng track voice; đặt limiter ở bus master theo `hyperframes-audio` để đạt −1 dBTP. Sau đó đo lại trên file render.
+- Trong HyperFrames, đặt volume theo `hyperframes/references/sound.md` (skill `hyperframes-audio` cũ). Ducking dùng `data-fx-carve` trên track nhạc (mục trên); bản giao do `audio-mix.mjs` thực hiện.
+- Chỉnh mức bằng lệnh thay vì thử tay: `hyperframes normalize-audio --lufs=-16 --target <id> --write` cho từng track voice; đặt limiter ở bus master theo `hyperframes/references/sound.md` để đạt −1 dBTP. Sau đó đo lại trên file render.
 - Đo loudness và true peak: `node $OV/scripts/qc-mp4.mjs renders/x.mp4 --project ./` (dòng `LOUDNESS` và `TRUE_PEAK`).
 - Bản giao do `render-final.mjs` dựng lại tiếng bằng `audio-mix.mjs` (ffmpeg) từ các thuộc tính audio tĩnh trong composition. Đo trên một video 9:16 dài 60 giây, loudness của hai cách mix chỉ lệch 0,1 LU.
 

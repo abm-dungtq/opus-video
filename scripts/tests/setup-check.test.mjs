@@ -53,7 +53,7 @@ test("runChecks: every required item missing → MISSING with a fix; optional on
 test("runChecks: everything present → no MISSING", () => {
   const items = runChecks({
     findSkillImpl: (n) => `/skills/${n}`,
-    versionImpl: (cmd) => (cmd === "npx" ? "0.8.144" : "ok"),
+    versionImpl: (cmd) => (cmd === "npx" ? "0.8.192" : "ok"),
     keys: new Set(["ELEVENLABS_API_KEY", "OPUS_VIDEO_VOICE_ID", "TYPESAFE_API_KEY"]),
   });
   assert.deepEqual(items.filter((i) => i.level !== "ok"), []);

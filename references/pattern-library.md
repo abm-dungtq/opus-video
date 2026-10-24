@@ -172,7 +172,7 @@ Công cụ được nhắc đến (`/tmp/ov-stats.json`): Remotion 89 bài (ch�
 
 ## Thẻ kỹ thuật
 
-Mỗi thẻ là một kỹ thuật lặp lại trong các prompt dài nhất của corpus (> 1500 ký tự), viết lại ngắn gọn. Dòng `HyperFrames:` chỉ dùng tên có thật trong `hyperframes-animation` (blueprint, rule), `hyperframes-creative/frame-presets` và registry (`hyperframes catalog`).
+Mỗi thẻ là một kỹ thuật lặp lại trong các prompt dài nhất của corpus (> 1500 ký tự), viết lại ngắn gọn. Dòng `HyperFrames:` chỉ dùng tên có thật trong `hyperframes-animation` (bản kèm plugin ở `third_party/hyperframes-skills/`; blueprint, rule), `hyperframes-creative/frame-presets` và registry (`hyperframes catalog`).
 
 ### Thẻ 1 — UI có con trỏ dẫn dắt
 Con trỏ là diễn viên chính: mọi thay đổi trạng thái đều do một cú click, kéo, hover hay gõ phím thật gây ra. Kéo là thao tác trực tiếp (giá trị bám theo vị trí con trỏ, nhả ra thì spring về từ đúng vị trí và vận tốc lúc nhả). Kéo quá giới hạn thì thanh trượt giãn ra rồi co lại. UI lấy từ sản phẩm thật, dữ liệu thật, không placeholder.
@@ -228,7 +228,7 @@ HyperFrames: blueprint `cursor-ui-demo` · rule `context-sensitive-cursor`
 
 ## Bảng nối nhóm → HyperFrames
 
-Tên trong bảng đều có thật (blueprint/rule trong `hyperframes-animation`, preset trong `hyperframes-creative/frame-presets`, block lấy từ output của câu `catalog --query` cùng dòng).
+Tên trong bảng đều có thật (blueprint/rule trong `hyperframes-animation`, preset trong `hyperframes/assets/frame-presets`, block lấy từ output của câu `catalog --query` cùng dòng).
 
 | Nhóm | Workflow | Blueprint | Rule | `catalog --query` (block) | Preset |
 |---|---|---|---|---|---|

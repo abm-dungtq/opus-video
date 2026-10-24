@@ -16,7 +16,7 @@ Dùng khi người dùng đưa clip quay thật (talking-head, phỏng vấn, UG
    ```
    Mỗi range bắt đầu và kết thúc trong một gap. Bỏ câu hỏng, lặp, ngập ngừng dài. Giữ thứ tự kể chuyện.
 5. **Ghép.** `node $OV/scripts/cut.mjs apply-edl --edl edl.json --out assets/footage/cut.mp4`. Exit 2 nghĩa là nguồn lệch fps/màu hoặc là HDR/10-bit (quay lại bước 1). Chỉ một clip và vài đoạn giữ lại thì `media-use/scripts/transcript-cut.mjs` cũng đủ; dùng `cut.mjs` khi có nhiều nguồn hoặc cần EDL để duyệt lại.
-6. **Dựng lớp trên.** Project HyperFrames với `cut.mp4` là lớp `<video>` nền. Đồ hoạ thông tin theo `talking-head-recut`; zoom, punch-in, reframe theo `hyperframes-keyframes` và `hyperframes-core/references/creator-editing-recipes.md`. Âm thanh gốc chỉnh bằng `normalize-audio` (xem `audio-pipeline.md`).
+6. **Dựng lớp trên.** Project HyperFrames với `cut.mp4` là lớp `<video>` nền. Đồ hoạ thông tin theo `talking-head-recut`; zoom, punch-in, reframe theo `hyperframes/references/motion.md` và `references/overlays.md` (skill `hyperframes-keyframes`, `hyperframes-core` chỉ còn trên máy cài HyperFrames ≤ 0.8.184). Âm thanh gốc chỉnh bằng `normalize-audio` (xem `audio-pipeline.md`).
 7. **9:16.** Project riêng như bài học trong `engine-selection.md`; khung người nói đặt bằng crop/reframe thủ công theo từng đoạn (chưa có reframe theo khuôn mặt).
 8. **QA.** Như `qa-checklist.md`. Thêm: chạy `cut.mjs probe` trên bản render; không còn khoảng lặng > 0,8 s ngoài chủ đích.
 

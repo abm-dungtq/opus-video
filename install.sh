@@ -16,7 +16,7 @@ set -euo pipefail
 
 REPO="https://github.com/abm-dungtq/opus-video.git"
 REF="main"
-VP_REF="v5.3.0"
+VP_REF="v5.6.1"
 WANT_CLAUDE=false WANT_CODEX=false WANT_AGY=false WANT_AGY_CLI=false EXPLICIT=false
 WORKSPACE=false SKIP_DEPS=false WITH_REMOTION=false
 

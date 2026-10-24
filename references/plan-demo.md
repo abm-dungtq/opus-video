@@ -99,7 +99,7 @@ Cổng plan kiểm: đủ 6 mục, bảng Cảnh có ít nhất một dòng, s�
 **Cổng sáng tạo** (khi BRIEF có `direction:`; dự án chỉ cắt footage đặt `creative_override: <lý do ≥10 ký tự>`):
 
 - Có `## Ý đồ sáng tạo` với các dòng `Hướng:`, `Chuyển cảnh:`, `Luật chống slideshow:`.
-- Bảng `## Cảnh` có cột **Blueprint/Rule** và **Nối sang beat sau**. Mỗi hàng nêu ít nhất một blueprint/rule có thật trong `hyperframes-animation` (tên bịa bị chặn); toàn bảng có ít nhất 2 token khác nhau.
+- Bảng `## Cảnh` có cột **Blueprint/Rule** và **Nối sang beat sau**. Mỗi hàng nêu ít nhất một blueprint/rule có thật trong `hyperframes-animation` (bản kèm plugin ở `third_party/hyperframes-skills/hyperframes-animation/`; tên bịa bị chặn); toàn bảng có ít nhất 2 token khác nhau.
 - Mọi hàng trừ hàng cuối nêu seam trong từ vựng ở `references/creative-directions.md`. `fade`, `crossfade`, `cut`, "hiện", "mờ dần"… bị chặn; seam mềm (`focus-pull`, `blur-crossfade`, `cross-warp-morph`…) chỉ dùng được với hướng có `allow_soft` (A7, A8).
 - Các hàng có Lời đọc `—`, `(nhạc)` hoặc `không lời` cộng lại ≥ `music_only_s` của BRIEF (hình dẫn, lời theo).
 - Có `## Sự kiện` (bảng `Thời điểm | Sự kiện | Âm thanh`, hoặc dòng `không có SFX gắn sự kiện`); thiếu thì stage plan chặn. Mục để trống, chỉ có tiêu đề bảng hay chỉ có `TODO` cũng chặn; dòng `không có SFX gắn sự kiện` chỉ có nghĩa khi bảng không có hàng. Stage final chạy `sfx-sync`: dòng FAIL chặn, dòng WARN chỉ cảnh báo, thiếu mục này chỉ WARN.

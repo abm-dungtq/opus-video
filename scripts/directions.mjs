@@ -9,8 +9,10 @@
 //                            [--effect id] [--transition id] [--sfx id] [--style-profile <id|alias>] [--json]
 //   node directions.mjs doc [--write]            render references/creative-directions.md
 //   node directions.mjs --help | -h
+// The animation, creative and faceless files come from third_party/hyperframes-skills (HyperFrames
+// v0.8.184), else from the installed skill of that name.
 // check: blueprint → hyperframes-animation/blueprints/<n>.md · rule → rules/<n>.md ·
-//   preset → hyperframes-creative/frame-presets/<n>/ · style → "## N. <name>" in
+//   preset → hyperframes/assets/frame-presets/<n>/ (older installs: hyperframes-creative/frame-presets/) · style → "## N. <name>" in
 //   hyperframes-creative/references/visual-styles.md · seam → listed in data "seams" and, by kind,
 //   a "## N. <heading>" in faceless-explainer/references/cut-catalog.md, a rule file, or the name in
 //   hyperframes-animation/transitions/*.md (css, shader); kind native is opus-video's own.
@@ -43,11 +45,19 @@ export const TIER_VI = { fit: "khớp chủ đề nhất", continuous: "liền m
 export const fold = (s) => String(s || "").normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/gi, "d").toLowerCase().replace(/\s+/g, " ").trim();
 export const loadDirections = (path = DATA) => JSON.parse(readFileSync(path, "utf8"));
 
-export function upstream() {
-  const anim = findSkill("hyperframes-animation");
-  const creative = findSkill("hyperframes-creative");
-  const faceless = findSkill("faceless-explainer");
-  return { anim, creative, faceless };
+// HyperFrames 0.8.185 dropped hyperframes-animation, hyperframes-creative and faceless-explainer from
+// its skill pack; third_party/hyperframes-skills keeps the files read here (tag v0.8.184), and an
+// installed skill of the same name is the fallback. Frame presets live in the hyperframes skill.
+export const VENDOR = fileURLToPath(new URL("../third_party/hyperframes-skills", import.meta.url));
+export function upstream(vendor = VENDOR) {
+  const pick = (name, probe) => (vendor && existsSync(join(vendor, name, probe)) ? join(vendor, name) : findSkill(name));
+  const anim = pick("hyperframes-animation", "blueprints");
+  const creative = pick("hyperframes-creative", join("references", "visual-styles.md"));
+  const faceless = pick("faceless-explainer", join("references", "cut-catalog.md"));
+  const hf = findSkill("hyperframes");
+  const oldCreative = findSkill("hyperframes-creative");
+  const presets = [hf && join(hf, "assets", "frame-presets"), oldCreative && join(oldCreative, "frame-presets")].find((d) => d && existsSync(d)) || null;
+  return { anim, creative, faceless, presets };
 }
 
 const cache = new Map();
@@ -66,7 +76,7 @@ export function tokenExists(token, data, up = upstream()) {
   if (kind === "sfx") return Array.isArray(token.prompts) && token.prompts.length > 0;
   if (kind === "blueprint") return !!up.anim && existsSync(join(up.anim, "blueprints", `${name}.md`));
   if (kind === "rule") return !!up.anim && existsSync(join(up.anim, "rules", `${name}.md`));
-  if (kind === "preset") return !!up.creative && existsSync(join(up.creative, "frame-presets", name));
+  if (kind === "preset") return !!up.presets && existsSync(join(up.presets, name));
   if (kind === "style") return !!up.creative && new RegExp(`^##\\s+\\d+\\.\\s+${name}\\b`, "m").test(read(join(up.creative, "references", "visual-styles.md")));
   if (kind === "seam") {
     const s = seamDef(name, data);
@@ -95,7 +105,7 @@ export function allTokens(data) {
 
 export function checkData(data, up = upstream()) {
   const errors = [];
-  if (!up.anim || !up.creative || !up.faceless) errors.push(`HyperFrames skills not found (hyperframes-animation: ${up.anim || "missing"}, hyperframes-creative: ${up.creative || "missing"}, faceless-explainer: ${up.faceless || "missing"})`);
+  if (!up.anim || !up.creative || !up.faceless) errors.push(`HyperFrames recipes not found (hyperframes-animation: ${up.anim || "missing"}, hyperframes-creative: ${up.creative || "missing"}, faceless-explainer: ${up.faceless || "missing"}); third_party/hyperframes-skills is missing from the plugin`);
   const ids = new Set();
   for (const d of data.directions) {
     if (ids.has(d.id)) errors.push(`duplicate direction id ${d.id}`);
@@ -273,7 +283,7 @@ export function renderDoc(data = loadDirections(), profiles = loadProfiles()) {
   L.push(`- **Bị chặn:** ${data.seam_classes.banned.map((s) => `\`${s}\``).join(", ")}.`);
   L.push(`- **Mềm** (chỉ hướng có \`allow_soft\`): ${data.seam_classes.soft.map((s) => `\`${s}\``).join(", ")}.`);
   L.push(`- **Liền mạch:** ${data.seams.filter((s) => !data.seam_classes.soft.includes(s.id)).map((s) => `\`${s.id}\` (${s.kind})`).join(", ")}.`);
-  L.push("- Nguồn công thức: `cut-catalog` → `faceless-explainer/references/cut-catalog.md`; `rule` → `hyperframes-animation/rules/<id>.md`; `css`/`shader` → `hyperframes-animation/transitions/`; `native` → mô tả trong `data/directions.json`.", "");
+  L.push("- Nguồn công thức (trong `third_party/hyperframes-skills/`, lấy từ HyperFrames v0.8.184): `cut-catalog` → `faceless-explainer/references/cut-catalog.md`; `rule` → `hyperframes-animation/rules/<id>.md`; `css`/`shader` → `hyperframes-animation/transitions/`; `native` → mô tả trong `data/directions.json`.", "");
   return L.join("\n");
 }
 

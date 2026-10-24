@@ -50,6 +50,13 @@ Các video dưới đây do opus-video dựng. Bấm vào ảnh để mở file 
 
 ## Có gì mới
 
+### v2.6.0 (2026-10-24): HyperFrames 0.8.192
+
+- **Ghim HyperFrames 0.8.192.** Dự án mới (`new-project.sh`) ghim `hyperframes@0.8.192`; `setup-check` đòi CLI ≥ 0.8.192. Lint, check, render, preview nền và bản 1:1 đã chạy thử trên bản mới.
+- **Cài trên máy mới không còn hỏng.** Từ 0.8.185, HyperFrames chỉ cài 7 skill và bỏ `hyperframes-animation`, `hyperframes-creative`, `faceless-explainer`. Blueprint, rule, transitions và danh mục cắt cảnh mà opus-video dùng giờ nằm sẵn trong `third_party/hyperframes-skills/` (lấy từ v0.8.184), nên chọn hướng, gom công thức và cổng PLAN chạy được mà không cần skill cũ.
+- **viet-pro v5.6.1 và lemo-opuscar 413a6bd.** Mẫu `files_read` có thêm `review/translationese-vi.md`, file mà viet-pro bắt buộc từ v5.4.0.
+- **Ảnh snapshot ghi vào `snapshots/`.** Vòng sửa dùng `snapshot … -o snapshots/rev-<N>`, và có thể kiểm riêng đoạn vừa sửa bằng `check --range`. `sweep-after-final.sh` của workspace dọn thêm `.hyperframes/artifacts/`.
+
 ### v2.5.0 (2026-10-22): STUDIO_API 4 cho Motion Studio
 
 - **Studio không còn ghi cứng tên script của plugin.** `scripts/studio-api.mjs` có `STUDIO_API = 4`, thêm `SKILLS` (các skill đạo diễn dùng) và `COMMANDS` (đường tuyệt đối tới script render, mix, pitch, import, demo, recipe, preflight, cases, styles, cùng lệnh chọn hướng `COMMANDS.choose`). Mọi export của API 3 giữ nguyên, Studio cũ vẫn chạy.
@@ -172,8 +179,8 @@ Dùng sâu: [hướng dẫn chuyên sâu về các tính năng](docs/huong-dan-c
 Installer cài **toàn bộ** những gì skill cần, cho mọi agent tìm thấy trên máy:
 
 - opus-video vào thư mục skill của từng agent (bản cũ được chuyển vào `~/.opus-video-backups/`, không xoá; thư mục là git checkout thì để nguyên). Claude Code nạp thư mục `~/.claude/skills/opus-video` tại chỗ thành plugin `opus-video@skills-dir`, nên **không** chạy thêm `claude plugin install` trên máy đó; skill điểm vào gọi bằng `/opus-video:opus-video` (các skill khác: `/opus-video:ov-brief`…). Codex và Antigravity chưa có plugin: installer chép `SKILL.md` điểm vào ra gốc thư mục `opus-video` và tạo link `ov-*` cạnh nó (Windows: bản sao);
-- `viet-pro` v5.3.0 (bằng installer của chính nó, cùng các agent);
-- CLI `hyperframes` và **mọi** skill HyperFrames (`hyperframes`, `hyperframes-core/-animation/-keyframes/-creative/-audio/-cli/-registry/-studio`, `media-use` và mọi workflow: `general-video`, `faceless-explainer`, `product-launch-video`, `pr-to-video`, `motion-graphics`, `music-to-video`, `slideshow`, `embedded-captions`, `talking-head-recut`, `remotion-to-hyperframes`) qua `npx hyperframes skills`;
+- `viet-pro` v5.6.1 (bằng installer của chính nó, cùng các agent);
+- CLI `hyperframes` và bộ skill HyperFrames (từ 0.8.185 còn 7: `hyperframes`, `hyperframes-cli`, `hyperframes-registry`, `media-use`, `slideshow`, `remotion-to-hyperframes`, `figma`) qua `npx hyperframes skills`. Blueprint, rule, transitions, `visual-styles.md` và `cut-catalog.md` mà opus-video cần nằm sẵn trong `third_party/hyperframes-skills/` (lấy từ HyperFrames v0.8.184);
 - file key mẫu `~/.config/opus-video/.env` (quyền chỉ chủ sở hữu đọc được);
 - cuối cùng chạy `scripts/setup-check.mjs` và báo `READY` hoặc liệt kê mục còn thiếu kèm lệnh sửa.
 
@@ -249,7 +256,7 @@ node ~/.claude/skills/opus-video/scripts/setup-check.mjs
 
 `setup-check` tìm skill trong **mọi** thư mục agent: `~/.claude/skills`, `~/.agents/skills`, `~/.codex/skills`, `~/.gemini/config/skills`, `~/.gemini/antigravity-cli/skills`, `./.claude/skills`, `./.agents/skills`, và thư mục cùng cấp với opus-video. Nó kiểm:
 
-- **Bắt buộc:** Node ≥ 22, git, ffmpeg, ffprobe, CLI `hyperframes` ≥ 0.8.144, `viet-pro` (chạy cả self-test), đủ 20 skill HyperFrames kể trên, `ELEVENLABS_API_KEY`, `OPUS_VIDEO_VOICE_ID` (chỉ kiểm có/không).
+- **Bắt buộc:** Node ≥ 22, git, ffmpeg, ffprobe, CLI `hyperframes` ≥ 0.8.192, `viet-pro` (chạy cả self-test), 6 skill HyperFrames (`hyperframes`, `hyperframes-cli`, `hyperframes-registry`, `media-use`, `slideshow`, `remotion-to-hyperframes`), token hướng đạo diễn có thật trong `third_party/hyperframes-skills/`, `ELEVENLABS_API_KEY`, `OPUS_VIDEO_VOICE_ID` (chỉ kiểm có/không).
 - **Tuỳ chọn (WARN):** `agy`, `TYPESAFE_API_KEY`, skill Remotion.
 
 Sau đó kiểm kết nối ElevenLabs:
@@ -267,7 +274,7 @@ Mở **phiên agent mới** sau khi cài để agent nạp skill.
 git clone https://github.com/abm-dungtq/opus-video ~/.claude/skills/opus-video
 
 # 2. viet-pro (macOS/Linux/WSL; cờ agent giống bảng ở mục 1)
-curl -fsSL https://raw.githubusercontent.com/abm-dungtq/viet-pro-codex/v5.3.0/install.sh | bash -s -- --claude
+curl -fsSL https://raw.githubusercontent.com/abm-dungtq/viet-pro-codex/v5.6.1/install.sh | bash -s -- --claude
 
 # 3. HyperFrames CLI + toàn bộ skill, cho mọi agent được hỗ trợ
 npx --yes hyperframes skills
@@ -281,7 +288,7 @@ npx --yes skills add remotion-dev/skills
 node ~/.claude/skills/opus-video/scripts/setup-check.mjs
 ```
 
-Windows không có `curl | bash` cho viet-pro: `git clone --depth 1 --branch v5.3.0 https://github.com/abm-dungtq/viet-pro-codex.git`, rồi copy thư mục `skills\viet-pro` vào thư mục skill của agent (ví dụ `%USERPROFILE%\.claude\skills\viet-pro`).
+Windows không có `curl | bash` cho viet-pro: `git clone --depth 1 --branch v5.6.1 https://github.com/abm-dungtq/viet-pro-codex.git`, rồi copy thư mục `skills\viet-pro` vào thư mục skill của agent (ví dụ `%USERPROFILE%\.claude\skills\viet-pro`).
 
 Cài opus-video bằng `git clone` thì cập nhật bằng `git -C <thư mục> pull`; installer không ghi đè git checkout. Với Codex/Antigravity, clone xong phải tự đưa skill ra: chép `skills/opus-video/SKILL.md` thành `opus-video/SKILL.md` và link từng `skills/ov-*` vào thư mục skill của agent (installer làm việc này khi cài từ bản sao).
 

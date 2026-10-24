@@ -15,7 +15,7 @@ Viết `STORYBOARD.md` từ bảng của viet-pro và hướng đã chọn, cộ
 
 Chọn theo `references/engine-selection.md` (`$OV/references/engine-selection.md`). Mặc định là HyperFrames. Ghi `engine`, `workflow`, `engine_reason` vào `BRIEF.md`. Nhiều biến thể của cùng một mẫu thì dùng `render --batch` của HyperFrames, không chuyển sang Remotion.
 
-- **Dựng tay** (general-video): khung là `node $OV/scripts/composition.mjs init --project .` (`new-project.sh` đã gọi sẵn): `index.html` có bộ hàm hoạt hình, `W(cảnh, "cụm từ")` mốc theo lời, `B(n)` mốc theo phách. Không gõ tay số giây.
+- **Dựng tay** (general-video, mặc định; HyperFrames 0.8.185 trở đi chỉ còn cách này, loại video đọc ở `hyperframes/references/types/`): khung là `node $OV/scripts/composition.mjs init --project .` (`new-project.sh` đã gọi sẵn): `index.html` có bộ hàm hoạt hình, `W(cảnh, "cụm từ")` mốc theo lời, `B(n)` mốc theo phách. Không gõ tay số giây.
 - **Lớp lemo-canvas** (`lemo_style:` trong BRIEF, hoặc `style_profile` có `engine: lemo-canvas`): `node $OV/scripts/lemo.mjs add --project . --style <slug>` rồi viết `assets/lemo/scene.js` hoặc `scene3d.js`. Đọc `$OV/references/lemo-canvas.md` trước khi viết scene.
 
 ## 4b. Plan
@@ -41,7 +41,7 @@ Chép mục "Sàn chất lượng", "Chống slideshow" và "Kỷ luật GSAP" c
 - Với `aspect: both`, bản dọc phải dàn lại bố cục, không crop:
   - **Dự án mới** (một `index.html`): viết phần khác của khổ dọc trong `html[data-ratio="9x16"]`, rồi `node $OV/scripts/reframe.mjs ./ --ratio 9x16` (hoặc `1x1`) sinh `../<project>-9x16`. Chi tiết và giới hạn ở `engine-selection.md`.
   - **Dự án cũ dựng tay**: 2 composition trong cùng project, gồm `index.html` (1920×1080) và `compositions/main-9x16.html` (1080×1920).
-  - **Workflow có frame worker** (faceless-explainer, pr-to-video, product-launch-video): làm **một project 9:16 riêng**, theo mục "Bài học từ smoke v2" trong `engine-selection.md`. Sau mỗi lần `captions.mjs build` ở 1080×1920, **bắt buộc** chạy `node $OV/scripts/replace-in-file.mjs compositions/captions.html "--cap-band-top: [0-9]*px;" "--cap-band-top: 1340px;" "--cap-band-height: [0-9]*px;" "--cap-band-height: 200px;"`, vì mặc định 1600px rơi vào vùng UI che.
+  - **Workflow có frame worker** (faceless-explainer, pr-to-video, product-launch-video; chỉ khi máy còn skill cũ của HyperFrames ≤ 0.8.184): làm **một project 9:16 riêng**, theo mục "Bài học từ smoke v2" trong `engine-selection.md`. Sau mỗi lần `captions.mjs build` ở 1080×1920, **bắt buộc** chạy `node $OV/scripts/replace-in-file.mjs compositions/captions.html "--cap-band-top: [0-9]*px;" "--cap-band-top: 1340px;" "--cap-band-height: [0-9]*px;" "--cap-band-height: 200px;"`, vì mặc định 1600px rơi vào vùng UI che.
 - Áp dụng banned list trong brief.
 - Đặt câu chữ dài nhất sẽ dùng vào cảnh rồi chạy `npx hyperframes check --at-transitions`: chữ tràn hay đè nhau ở chỗ nối cảnh thì sửa chữ hoặc bố cục trước khi chỉnh chuyển động.
 

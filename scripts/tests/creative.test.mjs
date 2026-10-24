@@ -340,13 +340,13 @@ test("make-pitch render: missing ffmpeg/ffprobe exits 1 before rendering anythin
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 
-test("make-pitch init: reports missing HyperFrames skills before scaffolding anything", () => {
+test("make-pitch init: reports missing HyperFrames recipes before scaffolding anything", () => {
   const d = tmp();
   try {
     const errs = [];
     const code = noTools(() => pitchInit({ project: d, topic: "t", aspect: "9:16" }, loadDirections(), { anim: "", creative: "", faceless: "" }));
     assert.equal(code.code, 1);
-    assert.match(code.msg, /HyperFrames skills/);
+    assert.match(code.msg, /HyperFrames recipes/);
     assert.equal(existsSync(join(d, "pitch")), false);
   } finally { rmSync(d, { recursive: true, force: true }); }
 });

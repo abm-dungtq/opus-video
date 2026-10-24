@@ -11,12 +11,12 @@ description: "Bước 5 của opus-video: giọng đọc ElevenLabs (eleven.mjs 
 
 Chỉ bắt đầu khi `check-viet-pro.mjs --project .` đã PASS ở bước 2 (`ov-script`) và `check-preflight --stage plan` đã PASS ở bước 4b (`ov-build`) (đổi lời đọc sau đó thì chạy lại cổng trước khi tạo lại voice; `eleven.mjs` exit 4 nghĩa là cổng chặn). Làm theo `$OV/references/audio-pipeline.md`.
 
-- **Dùng workflow HyperFrames chuyên biệt** (faceless-explainer, product-launch-video, pr-to-video): **không** chạy `audio.mjs generate` của workflow. Thay vào đó chạy:
+- **Dùng workflow HyperFrames chuyên biệt** (faceless-explainer, product-launch-video, pr-to-video; chỉ có khi máy còn skill của HyperFrames ≤ 0.8.184, bản 0.8.185 trở đi không cài nữa): **không** chạy `audio.mjs generate` của workflow. Thay vào đó chạy:
   ```bash
   node $OV/scripts/eleven.mjs audio-meta --script SCRIPT.md --hyperframes . --bgm assets/bgm/bgm.mp3 --bgm-volume 0.2
   ```
   Lệnh này ghi `audio_meta.json` và `audio_engine_meta.json`. **Không xoá sidecar**, vì `fetch-sfx` cần nó để giữ giọng. Sau đó vẫn chạy `sync-durations` và `fetch-sfx` của workflow như bình thường.
-- **Dựng tay** (general-video): voice làm trước: `node $OV/scripts/eleven.mjs tts --text-file script/01.txt --out assets/voice/01.mp3` (sinh kèm `01.mp3.words.json`).
+- **Dựng tay** (general-video, mặc định): voice làm trước: `node $OV/scripts/eleven.mjs tts --text-file script/01.txt --out assets/voice/01.mp3` (sinh kèm `01.mp3.words.json`).
 - Chỉnh mốc storyboard theo thời lượng giọng thật. Frame dài đúng bằng voice, nên frame cuối (CTA) phải cộng thêm khoảng 1 giây giữ hình trước khi assemble.
 - SFX: chạy `hyperframes media-use resolve --type sfx …` trước, nếu không có thì dùng `eleven.mjs sfx`.
 - Nhạc nền: `eleven.mjs music`. Nếu exit 3 (`MUSIC_UNAVAILABLE`) thì dùng `media-use resolve --type bgm`.

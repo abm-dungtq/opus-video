@@ -24,7 +24,7 @@
 //   master's frame (a 2D canvas keeps 1920x1080 and is stretched), so the edition needs its own scene.
 // A frame-worker project (compositions/frames/) is refused: its 9:16 edition is a separate project,
 //   see references/engine-selection.md.
-// Next: cd <edition> && npx --yes hyperframes@0.8.144 lint && npx --yes hyperframes@0.8.144 check
+// Next: cd <edition> && npx --yes hyperframes@0.8.192 lint && npx --yes hyperframes@0.8.192 check
 // Exit: 0 written (WARN lines allowed) · 1 edition exists, frame-worker project, no root
 //   composition, or a write failed · 2 bad usage, or the project / its index.html is missing.
 
@@ -205,7 +205,7 @@ export function main(argv = process.argv.slice(2), { out = (s) => process.stdout
   const f = RATIOS[o.ratio];
   out(lines.map((l) => `${l}\n`).join(""));
   out(`OK    reframe ${o.ratio} ${f.width}x${f.height} → ${dest} (assets: ${assets.files} tệp clone)\n`);
-  out(`next: cd ${dest} && npx --yes hyperframes@0.8.144 lint && npx --yes hyperframes@0.8.144 check\n`);
+  out(`next: cd ${dest} && npx --yes hyperframes@0.8.192 lint && npx --yes hyperframes@0.8.192 check\n`);
   return 0;
 }
 

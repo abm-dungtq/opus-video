@@ -18,7 +18,7 @@ param(
 $ErrorActionPreference = "Stop"
 $Repo = "https://github.com/abm-dungtq/opus-video.git"
 $VpRepo = "https://github.com/abm-dungtq/viet-pro-codex.git"
-$VpRef = "v5.3.0"
+$VpRef = "v5.6.1"
 function Say($m) { Write-Host "==> $m" }
 function Need($cmd, $fix) { if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) { throw "$cmd not found — $fix" } }
 
