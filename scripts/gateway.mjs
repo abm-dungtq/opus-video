@@ -21,6 +21,12 @@
 //                                                            events stay, its "chữ:" rows in PLAN.md follow it
 //   { "op": "set_shot", "id": "s2", "field": "name|transition_in|motion_note|assets", "value": … }
 //   { "op": "set_line_text", "id": "vo-02", "text": "…" }    gate becomes "stale" (viet-pro again)
+//   { "op": "set_line_speaker", "id": "vo-02", "speaker": "ba-noi" }   gate becomes "stale" (voice again);
+//                                                            key NN of scenes/roles.json follows, when the file exists
+//   { "op": "set_line_audio", "id": "vo-02", "file": "assets/mix/voice-02.mp3", "duration": 2.4 }
+//                                                            a new voice take: the file must exist in the project; the
+//                                                            gate is read again from its stamp (line-gate.mjs); start
+//                                                            stays, a take running past its shot is a CẢNH BÁO only
 //   { "op": "set_music", "id": "bgm", "field": "gain|start|end", "value": 0.3 }
 //   { "op": "update_music", "id": "bgm", "start"?: 1, "end"?: 9 | null, "media_start"?: 0.5,
 //     "gain"?: 0.6, "fade_in"?: 1, "fade_out"?: 2 }          several fields of a bed at once; end null = to the end
@@ -46,10 +52,11 @@
 // 5 INVALID (unknown op or id, or the result breaks project.json rules) · 7 nothing to undo ·
 // 8 BUSY (another writer holds the lock) · 9 nothing to redo.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
-import { load, save, validate, r3, WORKFLOW_MODES } from "./manifest.mjs";
+import { load, save, validate, r3, SPEAKER, WORKFLOW_MODES } from "./manifest.mjs";
+import { gateOf, lineNumber, writeRoles } from "./line-gate.mjs";
 import { buildTiming, injectTiming, manifestScenes } from "./timing.mjs";
 import { EVENTS_SECTION, SECTIONS, fold, parseTable, sceneId } from "./check-preflight.mjs";
 import { eventTime } from "./sfx-sync.mjs";
@@ -58,8 +65,8 @@ export const EXIT = { ok: 0, io: 1, usage: 2, conflict: 3, viewOnly: 4, invalid:
 export const ACTORS = ["human", "director", "timing", "import", "undo", "redo"];
 export { WORKFLOW_MODES };
 // OPS names every op applyOps accepts; Studio checks it before sending one.
-export const OPS = Object.freeze(["resize_shot", "move_line", "set_shot", "set_line_text", "set_music", "update_music",
-  "move_event", "add_event", "remove_event", "add_shot", "remove_shot", "set_workflow_mode"]);
+export const OPS = Object.freeze(["resize_shot", "move_line", "set_shot", "set_line_text", "set_line_speaker", "set_line_audio",
+  "set_music", "update_music", "move_event", "add_event", "remove_event", "add_shot", "remove_shot", "set_workflow_mode"]);
 const VIEW_ONLY = "dự án chỉ xem: index.html không có TIMING:BEGIN/END";
 const LOCK_STALE_MS = 30_000;
 const LOCK_WAIT_MS = 5_000;
@@ -77,7 +84,8 @@ const historyPath = (dir) => join(opusDir(dir), "history.jsonl");
 
 // Pure: manifest + ops → { next, receipt: [text] }. Throws OpError on an unknown op, id or field.
 // html (optional): the index.html text, so add_event's default id skips <audio> ids already there.
-export function applyOps(m, ops, { html = null } = {}) {
+// root (optional): the project folder; set_line_audio needs it to find the file and its stamp.
+export function applyOps(m, ops, { html = null, root = null } = {}) {
   if (!Array.isArray(ops) || !ops.length) throw new OpError("ops phải là mảng không rỗng");
   const next = structuredClone(m);
   const receipt = [];
@@ -157,6 +165,30 @@ export function applyOps(m, ops, { html = null } = {}) {
         l.text = op.text;
         l.gate = "stale";
         receipt.push(`${l.id}: sửa lời, cần duyệt viet-pro và lồng tiếng lại`);
+        break;
+      }
+      case "set_line_speaker": {
+        const l = lineOf(op.id);
+        if (typeof op.speaker !== "string" || !SPEAKER.test(op.speaker)) throw new OpError(`${op.id}: speaker phải là id vai (chữ thường, số, gạch nối)`);
+        receipt.push(`${l.id}: đổi người nói ${l.speaker ?? "chưa có"} → ${op.speaker}, cần lồng tiếng lại`);
+        l.speaker = op.speaker;
+        l.gate = "stale";
+        break;
+      }
+      case "set_line_audio": {
+        const l = lineOf(op.id);
+        if (!root) throw new OpError("set_line_audio: cần thư mục dự án");
+        const file = typeof op.file === "string" ? op.file : "";
+        if (!file || file.startsWith("/") || /^[A-Za-z]:[\\/]/.test(file) || file.split(/[\\/]/).includes("..")) throw new OpError(`${op.id}: file phải là đường dẫn tương đối trong dự án`);
+        if (!fileInside(root, file)) throw new OpError(`${op.id}: không có file ${file} trong dự án`);
+        const d = Number(op.duration);
+        if (!Number.isFinite(d) || d <= 0) throw new OpError(`${op.id}: duration phải là số dương`);
+        l.file = file;
+        l.duration = r3(d);
+        l.gate = gateOf(root, l);
+        receipt.push(`${l.id}: giọng mới ${file} ${fmt(d)}, cổng ${l.gate}`);
+        const s = next.shots.find((x) => x.id === l.shot);
+        if (s && l.start + l.duration > s.end + EPS) receipt.push(`CẢNH BÁO ${l.id}: kết thúc ${fmt(l.start + l.duration)}, sau khi ${s.id} kết thúc ${fmt(s.end)}`);
         break;
       }
       case "set_music": {
@@ -324,14 +356,39 @@ function commit(dir, { base, actor, build, lockWaitMs }) {
     if (w.code) return w;
     // Dropped "## Sự kiện" rows are kept in the history line, so an undo can put them back.
     record(dir, r.next, { actor, base: m.version, ops: r.ops, receipt: [...r.receipt, ...w.events], ...(w.dropped.length ? { dropped_rows: w.dropped } : {}), ...(r.extra ?? {}) });
-    return { code: EXIT.ok, version: r.next.version, receipt: r.receipt, lines: w.lines, warnings: w.warnings };
+    // A speaker change reaches scenes/roles.json too (still under the lock), so an import from the
+    // files keeps it. project.json is already the truth, so a failed write is a warning.
+    const warnings = [...w.warnings];
+    try { writeRoles(resolve(dir), speakerChanges(m, r.next)); }
+    catch (e) { warnings.push(`không ghi được scenes/roles.json: ${e.message}`); }
+    return { code: EXIT.ok, version: r.next.version, receipt: r.receipt, lines: w.lines, warnings };
   } finally { release(); }
 }
 
 // note: optional free text kept in the history line (the director's reason, a Studio request id).
 export function patch(dir, { actor, base, ops, note, lockWaitMs }) {
   if (!ACTORS.includes(actor) || actor === "undo" || actor === "redo" || actor === "import") return { code: EXIT.usage, error: `actor phải là human | director | timing` };
-  return commit(dir, { base, actor, lockWaitMs, build: (m) => ({ ...applyOps(m, ops, { html: readHtml(dir, m) }), ops, ...(note ? { extra: { note: String(note) } } : {}) }) });
+  return commit(dir, { base, actor, lockWaitMs, build: (m) => ({ ...applyOps(m, ops, { html: readHtml(dir, m), root: resolve(dir) }), ops, ...(note ? { extra: { note: String(note) } } : {}) }) });
+}
+
+// Line number → new speaker, for each line whose speaker the change set or changed.
+function speakerChanges(prev, next) {
+  const before = new Map(prev.lines.map((l) => [l.id, l.speaker]));
+  const out = {};
+  for (const l of next.lines) {
+    const nn = lineNumber(l.file);
+    if (nn && l.speaker && l.speaker !== before.get(l.id)) out[nn] = l.speaker;
+  }
+  return out;
+}
+
+// true when rel names a regular file whose real path stays inside the project folder.
+function fileInside(root, rel) {
+  try {
+    const base = realpathSync(root);
+    const f = realpathSync(join(root, rel));
+    return (f === base || f.startsWith(base + sep)) && statSync(f).isFile();
+  } catch { return false; }
 }
 
 // The composition text for applyOps, or null when it cannot be read (derive reports that later).
@@ -417,7 +474,7 @@ function liveMatches(html, re) {
 const eventStart = (e, shotOf) => r3(shotOf.get(e.shot).start + e.offset);
 
 // HTML text + manifest → { html, missing, missingEvents, conflicts }: the root data-duration, each voice
-// line's data-start / data-duration, each music bed's data-start / data-duration / data-volume
+// line's data-start / data-duration (and its src when the line's file changed since prev), each music bed's data-start / data-duration / data-volume
 // (gain) / data-media-start / data-fade-in / data-fade-out (the last three only when > 0, removed
 // otherwise) and each event's <audio> data-start (shot.start + offset) and data-volume set.
 // Otherwise only attribute values change, with one exception: the <audio data-studio-sfx> tags
@@ -426,13 +483,17 @@ const eventStart = (e, shotOf) => r3(shotOf.get(e.shot).start + e.offset);
 // data-studio-sfx tag whose id is no longer an event is removed. A tag without data-studio-sfx is
 // never inserted or removed, and never edited for a studio event: conflicts lists the studio event
 // ids that hit such a tag. missing / missingEvents list the ids with no live tag.
-export function deriveHtml(html, m) {
+export function deriveHtml(html, m, prev = null) {
+  const fileBefore = new Map((prev?.lines ?? []).map((l) => [l.id, l.file]));
   let out = replaceLive(html, /<[a-z][^>]*\sdata-composition-id\s*=[^>]*>/i, (tag) => setAttr(tag, "data-duration", m.duration)).text;
   const missing = [];
   for (const l of m.lines) {
     const r = replaceLive(out, new RegExp(`<(?:audio|video)\\b[^>]*\\sid\\s*=\\s*["']${esc(l.id)}["'][^>]*>`, "i"), (tag) => {
       let t = setAttr(tag, "data-start", r3(l.start));
       if (l.duration != null) t = setAttr(t, "data-duration", r3(l.duration));
+      // set_line_audio pointed the line at another take: the tag plays it. A src that differs
+      // from an unchanged file is the author's and stays.
+      if (l.file && fileBefore.has(l.id) && fileBefore.get(l.id) !== l.file) t = setAttr(t, "src", l.file);
       return t;
     });
     out = r.text;
@@ -588,7 +649,7 @@ export function derive(dir, { manifest = null, prev = null, dry = false, restore
   const planPath = join(root, "PLAN.md");
   let html, plan = null, r, next, missing = [], missingEvents = [], events = [], dropped = [];
   try {
-    const dh = deriveHtml(readFileSync(htmlPath, "utf8"), m);
+    const dh = deriveHtml(readFileSync(htmlPath, "utf8"), m, prev);
     html = dh.html;
     missing = dh.missing;
     missingEvents = dh.missingEvents;

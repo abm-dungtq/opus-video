@@ -150,3 +150,47 @@ test("--force keeps the SFX added in Studio, which PLAN.md does not list", () =>
     assert.deepEqual(validate(after), []);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("series lines: text and speaker by line number, gate from the assets/voice stamp", async () => {
+  const { writeStamp } = await import("../script-md.mjs");
+  const dir = tmp();
+  try {
+    const tags = [1, 2, 3].map((n) => `<audio id="vo-0${n}" src="assets/mix/voice-0${n}.mp3" data-start="${(n - 1) * 2}" data-duration="1.5" data-track-index="${n}"></audio>`).join("\n");
+    writeFileSync(join(dir, "index.html"), `<div data-composition-id="main" data-duration="6">\n${tags}\n</div>\n`);
+    mkdirSync(join(dir, "script"));
+    mkdirSync(join(dir, "scenes"));
+    mkdirSync(join(dir, "assets/voice"), { recursive: true });
+    mkdirSync(join(dir, "assets/mix"), { recursive: true });
+    const texts = ["Câu một của bà.", "Câu hai của Sóng.", "Câu ba."];
+    texts.forEach((t, i) => writeFileSync(join(dir, "script", `0${i + 1}.txt`), `${t}\n`));
+    writeFileSync(join(dir, "scenes/roles.json"), JSON.stringify({ "01": "ba-noi", "02": "song" }));
+    writeStamp(join(dir, "assets/voice/01.mp3"), { text: texts[0], script: "script/01.txt" });
+    writeStamp(join(dir, "assets/voice/02.mp3"), { text: "Lời cũ đã sửa.", script: "script/02.txt" });
+    const { manifest: m } = importProject(dir);
+    assert.deepEqual(validate(m), []);
+    assert.deepEqual(m.lines.map((l) => [l.id, l.text, l.speaker, l.gate]), [
+      ["vo-01", texts[0], "ba-noi", "pass"],
+      ["vo-02", texts[1], "song", "stale"],
+      ["vo-03", texts[2], undefined, "unknown"],
+    ]);
+    assert.ok(!("speaker" in m.lines[2]), "no roles.json key, no speaker field");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("an override stamp is not a pass, and a roles.json value that is no role id is a WARN", async () => {
+  const { writeStamp } = await import("../script-md.mjs");
+  const dir = tmp();
+  try {
+    writeFileSync(join(dir, "index.html"), `<div data-composition-id="main" data-duration="3">\n<audio id="vo-01" src="assets/voice/01.mp3" data-start="0" data-duration="1" data-track-index="1"></audio>\n</div>\n`);
+    mkdirSync(join(dir, "script"));
+    mkdirSync(join(dir, "scenes"));
+    mkdirSync(join(dir, "assets/voice"), { recursive: true });
+    writeFileSync(join(dir, "script/01.txt"), "Một câu.");
+    writeFileSync(join(dir, "scenes/roles.json"), JSON.stringify({ "01": "Bà Nội" }));
+    writeStamp(join(dir, "assets/voice/01.mp3"), { text: "Một câu.", override: "--lang en" });
+    const { manifest: m, warnings } = importProject(dir);
+    assert.equal(m.lines[0].gate, "stale");
+    assert.ok(!("speaker" in m.lines[0]));
+    assert.ok(warnings.some((w) => /roles\.json "01" không phải id vai/.test(w)), warnings.join("; "));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

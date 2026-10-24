@@ -504,3 +504,52 @@ test("redoTarget stays non-null while undos are left to redo", () => withProject
   assert.equal(redoTarget(readHistory(dir)), null);
   assert.equal(redoTarget([{ v: 1, actor: "undo", undoes: 2 }, { v: 2, actor: "import" }]), null, "an import ends the stack");
 }));
+
+test("set_line_speaker marks the line stale and writes its number in scenes/roles.json", () => withProject((dir) => {
+  mkdirSync(join(dir, "scenes"));
+  writeFileSync(join(dir, "scenes/roles.json"), JSON.stringify({ "01": "song", "02": "me" }));
+  const r = patch(dir, { actor: "human", base: 1, ops: [{ op: "set_line_speaker", id: "vo-01", speaker: "ba-noi" }] });
+  assert.equal(r.code, EXIT.ok, r.error);
+  const l = load(dir).lines[0];
+  assert.deepEqual([l.speaker, l.gate], ["ba-noi", "stale"]);
+  assert.deepEqual(JSON.parse(readFileSync(join(dir, "scenes/roles.json"), "utf8")), { "01": "ba-noi", "02": "me" });
+  assert.match(readHistory(dir).at(-1).receipt.join("; "), /vo-01: đổi người nói chưa có → ba-noi, cần lồng tiếng lại/);
+  assert.equal(patch(dir, { actor: "human", base: 2, ops: [{ op: "set_line_speaker", id: "vo-01", speaker: "Bà" }] }).code, EXIT.invalid);
+  // Without scenes/roles.json only project.json changes.
+  rmSync(join(dir, "scenes"), { recursive: true });
+  assert.equal(patch(dir, { actor: "human", base: 2, ops: [{ op: "set_line_speaker", id: "vo-01", speaker: "song" }] }).code, EXIT.ok);
+  assert.ok(!existsSync(join(dir, "scenes")));
+}));
+
+test("set_line_audio: a stamped take passes, the HTML plays the new file, a missing file is refused", async () => {
+  const { writeStamp } = await import("../script-md.mjs");
+  return withProject((dir) => {
+    const text = load(dir).lines[0].text;
+    mkdirSync(join(dir, "assets/mix"), { recursive: true });
+    writeFileSync(join(dir, "assets/mix/voice-01.mp3"), "");
+    writeStamp(join(dir, "assets/voice/01.mp3"), { text, script: "script/01.txt" });
+    const r = patch(dir, { actor: "human", base: 1, ops: [{ op: "set_line_audio", id: "vo-01", file: "assets/mix/voice-01.mp3", duration: 4 }] });
+    assert.equal(r.code, EXIT.ok, r.error);
+    const l = load(dir).lines[0];
+    assert.deepEqual([l.file, l.duration, l.gate, l.start], ["assets/mix/voice-01.mp3", 4, "pass", 2.5]);
+    // 2.5 + 4 runs past s2 (5.8): kept, with a warning.
+    assert.match(r.receipt.join("; "), /CẢNH BÁO vo-01: kết thúc 6\.5s, sau khi s2 kết thúc 5\.8s/);
+    assert.match(readFileSync(join(dir, "index.html"), "utf8"), /id="vo-01" src="assets\/mix\/voice-01\.mp3" data-start="2\.5" data-duration="4"/);
+    // Another text than the stamp's: stale.
+    writeStamp(join(dir, "assets/voice/01.mp3"), { text: "Lời khác." });
+    assert.equal(patch(dir, { actor: "human", base: 2, ops: [{ op: "set_line_audio", id: "vo-01", file: "assets/mix/voice-01.mp3", duration: 3 }] }).code, EXIT.ok);
+    assert.equal(load(dir).lines[0].gate, "stale");
+    for (const bad of [{ file: "assets/mix/none.mp3", duration: 2 }, { file: "../x.mp3", duration: 2 }, { file: "assets/mix/voice-01.mp3", duration: 0 }]) {
+      const b = patch(dir, { actor: "human", base: 3, ops: [{ op: "set_line_audio", id: "vo-01", ...bad }] });
+      assert.equal(b.code, EXIT.invalid, JSON.stringify(bad));
+    }
+    assert.equal(load(dir).version, 3);
+  });
+});
+
+test("set_line_speaker and set_line_audio are refused on a view-only project", () => withProject((dir) => {
+  const m = load(dir);
+  m.capabilities = { timing_markers: false, editable: false };
+  save(dir, m);
+  for (const op of [{ op: "set_line_speaker", id: "vo-01", speaker: "song" }, { op: "set_line_audio", id: "vo-01", file: "index.html", duration: 1 }]) assert.equal(patch(dir, { actor: "human", base: 1, ops: [op] }).code, EXIT.viewOnly);
+}));
