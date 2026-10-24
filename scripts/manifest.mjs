@@ -5,7 +5,7 @@
 //   { schema, title, fps, width, height, duration, html,
 //     capabilities: { timing_markers, editable },
 //     shots:  [{ id: "s<#>", name, start, end, transition_in, motion_note, assets: [path] }],
-//     lines:  [{ id, shot, text, file, start, duration, gate: "pass"|"stale"|"unknown" }],
+//     lines:  [{ id, shot, text, file, start, duration, gate: "pass"|"stale"|"unknown", speaker? }],
 //     music:  [{ id, file, start, end, gain }],
 //     assets: [{ path, kind }],
 //     events: [{ id, shot, offset, sound?, label, volume?, studio? }],   optional
@@ -16,6 +16,7 @@
 // volume (0–1) its data-volume; studio: true marks an event the gateway added (add_event), whose
 // <audio data-studio-sfx> tag derive inserts and removes. A music bed's media_start is the second
 // of its file played at start (a trimmed head); fade_in / fade_out are seconds of fade in the mix.
+// A line's speaker (optional) is the cast role id voicing it (scenes/roles.json of a series episode).
 // workflow_mode is how the project is run (the director leads, quick template, cut to the music,
 // or timeline editing); only the gateway op set_workflow_mode writes it.
 // Seconds are rounded to 3 decimals. Shots are sorted, back to back from 0, and the last shot's
@@ -28,6 +29,7 @@ export const FILE = "project.json";
 export const GATES = ["pass", "stale", "unknown"];
 export const SHOT_ID = /^s\d+[A-Za-z]?$/;
 export const WORKFLOW_MODES = Object.freeze(["dao-dien", "nhanh", "tu-nhac", "timeline"]);
+export const SPEAKER = /^[a-z0-9][a-z0-9-]{0,40}$/;
 const EPS = 1e-3;
 export const r3 = (n) => Math.round(n * 1000) / 1000;
 
@@ -73,6 +75,7 @@ export function validate(m) {
     if (!GATES.includes(l?.gate)) errs.push(`${tag}: gate phải là ${GATES.join(" | ")}`);
     if (l?.file != null && !insidePath(l.file)) errs.push(`${tag}: file phải là đường dẫn tương đối trong dự án`);
     if (typeof l?.text !== "string") errs.push(`${tag}: text phải là chuỗi`);
+    if (l?.speaker != null && (typeof l.speaker !== "string" || !SPEAKER.test(l.speaker))) errs.push(`${tag}: speaker phải là id vai (chữ thường, số, gạch nối)`);
   });
   m.music.forEach((b, i) => {
     const tag = b?.id ?? `music #${i + 1}`;

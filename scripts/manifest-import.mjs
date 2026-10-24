@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // manifest-import.mjs — build project.json for a project that has none (every project made before
-// the manifest), reading only: index.html, PLAN.md, audio_meta.json, script/NN.txt, BRIEF.md,
-// hyperframes.json and the assets/ listing. No existing file is changed; --write adds only
-// project.json and .opus/ (version 1, actor "import").
+// the manifest), reading only: index.html, PLAN.md, audio_meta.json, script/NN.txt,
+// scenes/roles.json, the voice gate stamps, BRIEF.md, hyperframes.json and the assets/ listing. No
+// existing file is changed; --write adds only project.json and .opus/ (version 1, actor "import").
 //   node manifest-import.mjs --project <dir> [--write] [--force]
 //   node manifest-import.mjs --help | -h
 // Shots, first source found: the PLAN.md "## Cảnh" table (name: the first quoted text of the
@@ -11,8 +11,12 @@
 //   back · one shot over the root data-duration. Windows are snapped back to back from 0 and the
 //   last one reaches the root data-duration; every snap is a WARN line.
 // Lines: the voice tracks (isVoice in audio-mix.mjs) with their id, src, data-start and
-//   data-duration; text from script/<NN>.txt matching the voice file name, else the audio_meta.json
-//   words, else the <voice>.words.json sidecar; gate "unknown". Each line belongs to the shot holding its midpoint.
+//   data-duration. NN is the number ending the voice file name (voice-01 → 01). Text from
+//   script/<file name>.txt, else script/<NN>.txt, else the audio_meta.json words, else the
+//   <voice>.words.json sidecar. speaker from key NN of scenes/roles.json when present. gate from the
+//   stamp <file>.gate.json, else assets/voice/<NN>.mp3.gate.json (line-gate.mjs): "pass" when it
+//   hashes the text and is no override, "stale" when it does not, "unknown" without a stamp.
+//   Each line belongs to the shot holding its midpoint.
 // Music: the bed tracks (isBed) with data-volume as gain.
 // Events: each PLAN.md "## Sự kiện" row that names a sound file, matched to an <audio id> of that
 //   src (the one with the nearest data-start, each tag used once), in the shot holding the row's
@@ -29,12 +33,13 @@ import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { basename, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
-import { SCHEMA, load, validate, r3 } from "./manifest.mjs";
+import { SCHEMA, SPEAKER, load, validate, r3 } from "./manifest.mjs";
 import { record, takeLock } from "./gateway.mjs";
 import { planScenes } from "./timing.mjs";
 import { SECTIONS, parsePlan, parseTable } from "./check-preflight.mjs";
 import { parseTracks, isVoice, isBed } from "./audio-mix.mjs";
 import { parseEvents } from "./sfx-sync.mjs";
+import { gateOf, lineNumber, readRoles } from "./line-gate.mjs";
 
 const EPS = 1e-3;
 const KINDS = { ".png": "image", ".jpg": "image", ".jpeg": "image", ".webp": "image", ".gif": "image", ".svg": "image", ".mp4": "video", ".mov": "video", ".webm": "video" };
@@ -153,19 +158,25 @@ export function importProject(dir) {
   // A line belongs to the shot holding its midpoint: PLAN.md rounds its windows, so a voice that
   // starts 0.04 s before its scene still lands in it.
   const holder = (t) => (shots.find((s, i) => t >= s.start - EPS && (t < s.end || i === shots.length - 1)) ?? shots[0]).id;
+  const roles = readRoles(root);
   const lines = tracks.filter(isVoice).map((t, i) => {
     const file = rel(root, t.src);
-    const nn = basename(file, extname(file));
+    const nn = lineNumber(file);
     let text = "";
-    const txt = join(root, "script", `${nn}.txt`);
-    if (existsSync(txt)) text = readFileSync(txt, "utf8").trim();
+    const txt = [basename(file, extname(file)), nn].filter(Boolean).map((n) => join(root, "script", `${n}.txt`)).find((f) => existsSync(f));
+    if (txt) text = readFileSync(txt, "utf8").trim();
     else {
       const v = meta?.voices?.find((x) => x.path === file);
       let words = v?.words ?? null;
       if (!words && existsSync(`${t.src}.words.json`)) { try { words = JSON.parse(readFileSync(`${t.src}.words.json`, "utf8")); } catch { warnings.push(`${file}.words.json không đọc được`); } }
       if (Array.isArray(words)) text = words.map((w) => w.text).join(" ");
     }
-    return { id: t.id ?? `vo-${String(i + 1).padStart(2, "0")}`, shot: holder(t.start + (t.duration ?? 0) / 2), text, file, start: r3(t.start), duration: t.duration != null ? r3(t.duration) : null, gate: "unknown" };
+    const id = t.id ?? `vo-${String(i + 1).padStart(2, "0")}`;
+    const speaker = nn != null ? roles?.[nn] : undefined;
+    if (speaker != null && (typeof speaker !== "string" || !SPEAKER.test(speaker))) warnings.push(`${id}: scenes/roles.json "${nn}" không phải id vai, bỏ người nói`);
+    const line = { id, shot: holder(t.start + (t.duration ?? 0) / 2), text, file, start: r3(t.start), duration: t.duration != null ? r3(t.duration) : null, gate: gateOf(root, { file, text }) };
+    if (typeof speaker === "string" && SPEAKER.test(speaker)) line.speaker = speaker;
+    return line;
   });
   const music = tracks.filter((t) => isBed(t) && !isVoice(t)).map((t, i) => ({ id: t.id ?? `bgm-${i + 1}`, file: rel(root, t.src), start: r3(t.start), end: t.duration != null ? r3(t.start + t.duration) : r3(info.duration), gain: Math.min(1, r3(t.volume)) }));
 

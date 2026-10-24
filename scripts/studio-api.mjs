@@ -7,7 +7,8 @@
 // API 4 adds SKILLS and COMMANDS, so Studio names no plugin skill, script file or argv of its own;
 // every API 3 export stays as it was.
 // OPS lists the gateway ops (set_workflow_mode writes project.json workflow_mode); added without a
-// STUDIO_API bump because nothing existing changes shape.
+// STUDIO_API bump because nothing existing changes shape; set_line_speaker and set_line_audio (a
+// line's optional speaker, a new voice take) and the timing key of COMMANDS are added the same way.
 // SERIES_FILE, validateSeries and seriesDirOf (a series folder's studio-series.json and the series
 // of a project) are added the same way, without a bump.
 import { readFileSync } from "node:fs";
@@ -43,6 +44,7 @@ export const COMMANDS = Object.freeze({
   preflight: script("check-preflight.mjs"),
   cases: script("find-cases.mjs"),
   styles: script("styles.mjs"),
+  timing: script("timing.mjs"),
   suggest: Object.freeze({ file: script("suggest.mjs"), args: Object.freeze(["--project", "{project}", "--json"]) }),
   choose: Object.freeze({ file: script("make-pitch.mjs"), args: Object.freeze(["choose", "--project", "{project}", "--pick", "{pick}", "--accept-warnings"]) }),
   pitchInit: Object.freeze({ file: script("make-pitch.mjs"), args: Object.freeze(["init", "--project", "{project}", "--topic", "{topic}",

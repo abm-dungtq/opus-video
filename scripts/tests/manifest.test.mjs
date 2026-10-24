@@ -42,6 +42,13 @@ test("music gain above 1", () => fails((m) => { m.music[0].gain = 1.5; }, /gain/
 test("absolute asset path", () => fails((m) => { m.assets[0].path = "/etc/passwd"; }, /tương đối/));
 test("parent-directory path", () => fails((m) => { m.shots[1].assets = ["../x.png"]; }, /tương đối/));
 test("version must be a positive integer", () => fails((m) => { m.version = 0; }, /version/));
+test("speaker is optional; when present it is a role id", () => {
+  const m = sample();
+  m.lines[0].speaker = "ba-noi";
+  assert.deepEqual(validate(m), []);
+  fails((x) => { x.lines[0].speaker = "Bà Nội"; }, /speaker/);
+  fails((x) => { x.lines[0].speaker = 7; }, /speaker/);
+});
 
 test("save then load round-trips and leaves no temp file", () => {
   const dir = mkdtempSync(join(tmpdir(), "manifest-"));
