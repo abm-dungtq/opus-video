@@ -5,8 +5,8 @@
 //   node eleven.mjs voice-info [--voice id]
 //   node eleven.mjs models
 //   node eleven.mjs tts   --text-file <project>/script/NN.txt --out f.mp3 [--project dir] [--voice id] [--model id] [--speed 1.0] [--lang vi] [--skip-viet-pro-gate]
-//   node eleven.mjs sfx   --text "english description" --seconds 1.5 --out f.mp3 [--influence 0.3]
-//   node eleven.mjs music --prompt str --seconds 15 --out f.mp3
+//   node eleven.mjs sfx   --text "english description" --seconds 1.5 --out f.mp3 [--influence 0.3] [--no-normalize]
+//   node eleven.mjs music --prompt str --seconds 15 --out f.mp3 [--no-normalize]
 //   node eleven.mjs probe-models --text-file path [--models a,b,c]   (writes to $TMPDIR/ov-probe)
 //   node eleven.mjs audio-meta --script SCRIPT.md [--hyperframes .] [--project dir] [--bgm assets/bgm/x.mp3 --bgm-volume 0.2] [--reuse] [--skip-viet-pro-gate]
 //
@@ -20,6 +20,11 @@
 // hash + override); --reuse and the delivery gate accept only a matching non-override stamp.
 // A non-Vietnamese BRIEF needs a matching --lang (the default vi is refused there). doctor/voice-info/models/sfx/music/probe-models
 // are not gated.
+//
+// sfx and music: the file written is then trimmed of head/tail silence and brought to -12.5 LUFS
+// (TP -1.5 dBTP) by normalize-bed.mjs, which prints one NORMALIZE line. --no-normalize keeps the
+// API bytes as they are. A failed normalize keeps the file as written, prints
+// "WARN normalize: <reason>" and still exits 0, so a paid generation is never lost.
 //
 // audio-meta feeds HyperFrames workflows (faceless-explainer, product-launch-video, …) with
 // eleven_v4 Vietnamese narration instead of their own TTS step. It writes BOTH
@@ -43,6 +48,7 @@ import { voiceGate, GATE_EXIT } from "./voice-gate.mjs";
 import { loadKey, ping } from "./jev-client.mjs";
 import { defaultVp, frontmatter } from "./check-viet-pro.mjs";
 import { DEFAULT_VOICE, DEFAULT_TTS_MODEL, pickVoice } from "./voice-defaults.mjs";
+import { BED_DEFAULTS, writeGenerated } from "./normalize-bed.mjs";
 maybeHelp(process.argv.slice(2), import.meta.url);
 
 const API = "https://api.elevenlabs.io";
@@ -127,6 +133,10 @@ async function call(path, { method = "GET", body, binary = false } = {}) {
 function writeOut(path, buf) {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, buf);
+}
+// sfx/music output: written, then normalized to the bed level unless --no-normalize.
+function writeBed(path, buf) {
+  writeGenerated(path, buf, { normalize: !args["no-normalize"], lufs: BED_DEFAULTS.lufs, log: (s) => console.error(s), warn: (s) => console.error(s) });
 }
 
 // Group character-level alignment into words split on whitespace.
@@ -264,7 +274,7 @@ const commands = {
         model_id: DEFAULTS.sfxModel,
       },
     });
-    writeOut(need("out"), buf);
+    writeBed(need("out"), buf);
     console.error(`sfx → ${args.out} (${buf.length} bytes)`);
   },
 
@@ -278,7 +288,7 @@ const commands = {
     for (let attempt = 0; ; attempt++) {
       try {
         const buf = await call("/v1/music", { method: "POST", binary: true, body });
-        writeOut(need("out"), buf);
+        writeBed(need("out"), buf);
         console.error(`music → ${args.out} (${buf.length} bytes)`);
         return;
       } catch (err) {

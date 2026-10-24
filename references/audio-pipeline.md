@@ -71,6 +71,13 @@ node $OV/scripts/eleven.mjs music --prompt "calm curious ambient, 100 BPM, light
 - Nếu script exit 3 và in `MUSIC_UNAVAILABLE`, chuyển sang:
   `hyperframes media-use resolve --type bgm --intent "<mood>" --project .`
 - Ghi BPM vào prompt để storyboard bám beat được, rồi đo nhịp thật của file (mục 3b).
+- File nhạc và SFX do `eleven.mjs music` và `eleven.mjs sfx` sinh ra đã được cắt im lặng ở đầu và cuối (chừa 0,05 giây) và chuẩn hóa về -12,5 LUFS, đỉnh -1,5 dBTP. Lệnh in một dòng `NORMALIZE … lufs_in=… lufs_out=… trimmed_head=… trimmed_tail=…`. Thêm `--no-normalize` khi cần giữ nguyên file của API. Chuẩn hóa lỗi thì file vẫn giữ như API trả về, lệnh in `WARN normalize: …` và vẫn thoát 0.
+- File tải về hoặc lấy từ catalog thì chuẩn hóa bằng tay trước khi đặt vào composition:
+  ```bash
+  node $OV/scripts/normalize-bed.mjs --in assets/bgm/bgm.mp3            # ghi đè tại chỗ
+  node $OV/scripts/normalize-bed.mjs --in tai-ve.mp3 --out assets/sfx/x.mp3 [--lufs -12.5] [--tp -1.5] [--silence-db -50] [--keep-head 0.05]
+  ```
+  Cắt im lặng làm `sfx-sync.mjs` đo đầu tiếng chính xác hơn. Mức trộn cuối vẫn do `data-volume` và `audio-mix.mjs` quyết định.
 
 ## 3b. Đo nhịp nhạc (`beat-grid.mjs`)
 
