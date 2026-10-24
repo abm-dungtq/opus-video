@@ -36,7 +36,8 @@
 // Voice (tts, audio-meta): --voice/--model, then BRIEF.md `voice_id`/`tts_model`, then
 // OPUS_VIDEO_VOICE_ID/OPUS_VIDEO_TTS_MODEL, then the defaults; the chosen source is printed.
 // The key is never printed. Exit codes: 0 ok, 1 error, 2 usage, 3 music unavailable on plan,
-// 4 viet-pro gate blocked.
+// 4 viet-pro gate blocked, 5 refused to the Studio director of a series episode (director-guard.mjs:
+// it runs only sfx and music; voices go through Studio's series tools behind a consent card).
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
@@ -49,6 +50,7 @@ import { loadKey, ping } from "./jev-client.mjs";
 import { defaultVp, frontmatter } from "./check-viet-pro.mjs";
 import { DEFAULT_VOICE, DEFAULT_TTS_MODEL, pickVoice } from "./voice-defaults.mjs";
 import { BED_DEFAULTS, writeGenerated } from "./normalize-bed.mjs";
+import { elevenRefusal, REFUSED_EXIT } from "./director-guard.mjs";
 maybeHelp(process.argv.slice(2), import.meta.url);
 
 const API = "https://api.elevenlabs.io";
@@ -381,6 +383,13 @@ const commands = {
     }
   },
 };
+
+// The cwd and every project the command names (a text or script file: its folder and the one above,
+// for <project>/script/NN.txt and <project>/SCRIPT.md): one of them in a series is enough to refuse.
+const named = [process.cwd(), args.project, args.hyperframes,
+  ...[args["text-file"], args.script].filter(Boolean).flatMap((p) => [dirname(resolve(p)), dirname(dirname(resolve(p)))])];
+const refused = elevenRefusal(cmd, named);
+if (refused) die(refused, REFUSED_EXIT);
 
 if (!commands[cmd]) {
   console.error(`usage: eleven.mjs <${Object.keys(commands).join("|")}> [--flags]`);

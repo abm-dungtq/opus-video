@@ -35,7 +35,8 @@
 //   - --record-audio-review <who>: no capture. Writes or replaces `audio_review: <who> <ISO time>
 //     <audioHash now>` in DEMO.md (above "## Frames"; approval: is left as it is): the user listened to
 //     the current sound, so the final gate stops warning that the sound changed after the animatic.
-//     <who> is letters, digits and . _ @ : + - (user@studio). Exit 2 without DEMO.md.
+//     <who> is letters, digits and . _ @ : + - (user@studio). Exit 2 without DEMO.md, and exit 2 for the
+//     director Studio runs (MOTION_STUDIO_RUNNER/OPUS_STUDIO_RUNNER=cli): only the user confirms.
 // DEMO.md keeps animatic:, scene_sheets:, visual_hash:, audio_hash: and audio_review: across runs.
 // Exit: 0 frames captured · 1 capture failed · 2 bad usage / PLAN.md missing timestamps.
 
@@ -48,6 +49,7 @@ import { wantsHelp, helpText } from "./cli-help.mjs";
 import { parsePlan } from "./check-preflight.mjs";
 import { planScenes } from "./timing.mjs";
 import { audioHash, pictureHash } from "./render-final.mjs";
+import { audioReviewRefusal } from "./director-guard.mjs";
 
 const WIN = process.platform === "win32";
 // With shell:true (npx on Windows) Node joins args unquoted, so a path with spaces splits in two.
@@ -165,6 +167,8 @@ export function main(argv = process.argv.slice(2)) {
   if (o.bad) { console.error(`make-demo: ${o.bad}`); return 2; }
   const project = resolve(o.project);
   if (o.review !== undefined) {
+    const refused = audioReviewRefusal();
+    if (refused) { console.error(`make-demo: ${refused}`); return 2; }
     try { console.log(`make-demo: ${recordAudioReview(project, o.review)}`); return 0; }
     catch (e) { console.error(`make-demo: ${e.message}`); return e.code === "USAGE" ? 2 : 1; }
   }

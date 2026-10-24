@@ -315,7 +315,9 @@ Mọi lệnh âm thanh đi qua `node $OV/scripts/eleven.mjs <lệnh>`. Mặc đ�
 | `probe-models --text-file <file> --models a,b` | So giọng hoặc model, file luôn ghi vào `$TMPDIR/ov-probe/` | không |
 | `audio-meta --script SCRIPT.md --hyperframes .` | Cầu nối sang workflow HyperFrames, tuỳ chọn `--project`, `--bgm`, `--bgm-volume`, `--reuse`, `--skip-viet-pro-gate` | có |
 
-Mã thoát của `eleven.mjs`: 0 thành công, 1 lỗi, 2 sai cú pháp, 3 nhạc không dùng được trên gói hiện tại, 4 cổng viet-pro chặn.
+Mã thoát của `eleven.mjs`: 0 thành công, 1 lỗi, 2 sai cú pháp, 3 nhạc không dùng được trên gói hiện tại, 4 cổng viet-pro chặn, 5 từ chối đạo diễn Studio của một tập series.
+
+Đạo diễn do Motion Studio chạy (`MOTION_STUDIO_RUNNER=cli` hoặc `OPUS_STUDIO_RUNNER=cli`) trong một tập series chỉ chạy được `sfx` và `music`. Mọi lệnh con khác thoát mã 5 trước khi đọc khoá, vì giọng của series đi qua tool series của Studio, có thẻ đồng ý. Script tự kiểm thư mục hiện tại và mọi dự án lệnh nêu tên (`--project`, `--hyperframes`, thư mục của `--text-file`, `--script`). Luật chặn Bash của Claude Code so khớp chữ, nên một chữ trong ngoặc kép như `eleven.mjs "tts"` vẫn lọt luật; vì thế kiểm nằm trong script.
 
 ### 6.2 Giọng đọc và dấu kiểm
 

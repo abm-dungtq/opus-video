@@ -54,13 +54,13 @@ test("platform is viet-pro's check-platform.mjs, found among the skills, or null
   assert.ok(isAbsolute(api.COMMANDS.platform));
 });
 
-test("VOICE_DENIED_TOOLS closes the voice commands of eleven.mjs and leaves sfx and music", () => {
+test("VOICE_DENIED_TOOLS closes every eleven.mjs command but sfx and music", () => {
   const eleven = join(api.SCRIPTS, "eleven.mjs");
-  assert.deepEqual([...api.VOICE_DENIED_TOOLS], [`Bash(node ${eleven} tts*)`, `Bash(node ${eleven} audio-meta*)`]);
+  assert.deepEqual([...api.VOICE_DENIED_TOOLS], ["doctor", "voice-info", "models", "tts", "probe-models", "audio-meta"].map((c) => `Bash(*eleven.mjs ${c}*)`));
   assert.ok(Object.isFrozen(api.VOICE_DENIED_TOOLS));
   // A Bash rule's * is a glob over the whole command line.
   const matches = (rule, cmd) => new RegExp("^" + rule.slice(5, -1).replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$").test(cmd);
-  for (const cmd of [`node ${eleven} tts --help`, `node ${eleven} audio-meta --project .`]) assert.ok(api.VOICE_DENIED_TOOLS.some((r) => matches(r, cmd)), cmd);
-  for (const cmd of [`node ${eleven} sfx --help`, `node ${eleven} music --prompt x`, `node ${eleven} voice-info`]) assert.ok(!api.VOICE_DENIED_TOOLS.some((r) => matches(r, cmd)), cmd);
+  for (const cmd of [`node ${eleven} tts --help`, `node ${eleven} audio-meta --project .`, `node ${eleven} probe-models --text x`, `node ${api.SCRIPTS}/./eleven.mjs tts --help`]) assert.ok(api.VOICE_DENIED_TOOLS.some((r) => matches(r, cmd)), cmd);
+  for (const cmd of [`node ${eleven} sfx --help`, `node ${eleven} music --prompt x`]) assert.ok(!api.VOICE_DENIED_TOOLS.some((r) => matches(r, cmd)), cmd);
   assert.ok(!api.DENIED_TOOLS.some((r) => api.VOICE_DENIED_TOOLS.includes(r)), "not denied for every project");
 });
