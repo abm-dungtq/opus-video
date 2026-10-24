@@ -59,3 +59,18 @@ test("save then load round-trips and leaves no temp file", () => {
     assert.deepEqual(readdirSync(dir), ["project.json"]);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("scenes: optional groups of real shots, each shot in one scene, in shot order", () => {
+  const ok = sample();
+  ok.scenes = [{ id: "c0", label: "Đầu phim", shots: ["s1"] }, { id: "c1", label: "Cảnh 1", shots: ["s2", "s3"] }];
+  ok.capabilities.picture_from_code = true;
+  assert.deepEqual(validate(ok), []);
+  fails((m) => { m.scenes = [{ id: "c1", label: "x", shots: ["s9"] }]; }, /shot "s9" không tồn tại/);
+  fails((m) => { m.scenes = [{ id: "c1", label: "x", shots: ["s1", "s2"] }, { id: "c2", label: "y", shots: ["s2"] }]; }, /s2 đã thuộc c1/);
+  fails((m) => { m.scenes = [{ id: "c1", label: "x", shots: ["s2"] }, { id: "c2", label: "y", shots: ["s1"] }]; }, /lệch thứ tự shot/);
+  fails((m) => { m.scenes = [{ id: "x1", label: "x", shots: ["s1"] }]; }, /id cảnh phải dạng c<#>/);
+  fails((m) => { m.scenes = [{ id: "c1", label: "x", shots: ["s1"] }, { id: "c1", label: "y", shots: ["s2"] }]; }, /id cảnh bị trùng/);
+  fails((m) => { m.scenes = [{ id: "c1", label: "x", shots: [] }]; }, /không rỗng/);
+  fails((m) => { m.scenes = {}; }, /scenes phải là mảng/);
+  fails((m) => { m.capabilities.picture_from_code = "yes"; }, /picture_from_code phải là boolean/);
+});

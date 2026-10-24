@@ -553,3 +553,39 @@ test("set_line_speaker and set_line_audio are refused on a view-only project", (
   save(dir, m);
   for (const op of [{ op: "set_line_speaker", id: "vo-01", speaker: "song" }, { op: "set_line_audio", id: "vo-01", file: "index.html", duration: 1 }]) assert.equal(patch(dir, { actor: "human", base: 1, ops: [op] }).code, EXIT.viewOnly);
 }));
+
+test("a picture built from code refuses resize_shot, add_shot and remove_shot with the reason; move_line still works", () => {
+  const m = load(FIXTURE);
+  m.capabilities.picture_from_code = true;
+  for (const op of [{ op: "resize_shot", id: "s1", duration: 3 }, { op: "add_shot", after: "s1", duration: 1 }, { op: "remove_shot", id: "s3" }])
+    assert.throws(() => applyOps(m, [op]), /^Error: hình dựng bằng mã \(buildFilm\): mốc shot đi theo lời; sửa lời hoặc scenes\/\*\.mjs, không kéo mép$/, op.op);
+  const { next } = applyOps(m, [{ op: "move_line", id: "vo-01", start: 6 }]);
+  assert.equal(next.lines[0].shot, "s3");
+});
+
+test("set_scenes writes valid groups, refuses a broken one, and [] removes them", () => withProject((dir) => {
+  const scenes = [{ id: "c1", label: "Mở", shots: ["s1", "s2"] }, { id: "c2", label: "Kết", shots: ["s3"] }];
+  const r = patch(dir, { actor: "human", base: 1, ops: [{ op: "set_scenes", scenes }] });
+  assert.equal(r.code, EXIT.ok, r.error);
+  assert.deepEqual(load(dir).scenes, scenes);
+  assert.match(readHistory(dir).at(-1).receipt.join("; "), /đổi nhóm cảnh: 2 cảnh/);
+  const bad = patch(dir, { actor: "human", base: 2, ops: [{ op: "set_scenes", scenes: [{ id: "c1", label: "x", shots: ["s1", "s9"] }] }] });
+  assert.equal(bad.code, EXIT.invalid);
+  assert.match(bad.error, /set_scenes: c1: shot "s9" không tồn tại/);
+  assert.throws(() => applyOps(load(dir), [{ op: "set_scenes", scenes: [{ id: "c1", label: "x", shots: ["s1"] }, { id: "c2", label: "y", shots: ["s1"] }] }]), /s1 đã thuộc c1/);
+  assert.equal(patch(dir, { actor: "human", base: 2, ops: [{ op: "set_scenes", scenes: [] }] }).code, EXIT.ok);
+  assert.equal(load(dir).scenes, undefined);
+}));
+
+test("add_shot joins the scene of the shot before it; remove_shot leaves its scene and drops an empty one", () => {
+  const m = load(FIXTURE);
+  m.scenes = [{ id: "c1", label: "Mở", shots: ["s1"] }, { id: "c2", label: "Kết", shots: ["s2", "s3"] }];
+  const added = applyOps(m, [{ op: "add_shot", after: "s2", duration: 1 }]);
+  assert.deepEqual(added.next.scenes.map((c) => c.shots), [["s1"], ["s2", "s4", "s3"]]);
+  assert.match(added.receipt.join("; "), /s4 vào cảnh c2/);
+  const head = applyOps(m, [{ op: "add_shot", after: null, duration: 1 }]).next;
+  assert.deepEqual(head.scenes.map((c) => c.shots), [["s4", "s1"], ["s2", "s3"]]);
+  const removed = applyOps(m, [{ op: "remove_shot", id: "s1" }]);
+  assert.deepEqual(removed.next.scenes, [{ id: "c2", label: "Kết", shots: ["s2", "s3"] }]);
+  assert.match(removed.receipt.join("; "), /bỏ cảnh c1 vì không còn shot/);
+});

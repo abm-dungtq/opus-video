@@ -28,7 +28,7 @@ test("API 4: SKILLS names installed skills; COMMANDS are absolute paths to scrip
   assert.ok(Array.isArray(api.SKILLS) && api.SKILLS.length);
   for (const s of api.SKILLS) assert.ok(existsSync(join(ROOT, "skills", s, "SKILL.md")), s);
   const { choose, suggest, pitchInit, ...scripts } = api.COMMANDS;
-  assert.deepEqual(Object.keys(scripts).sort(), ["cases", "demo", "import", "mix", "pitch", "preflight", "recipe", "render", "styles", "timing"]);
+  assert.deepEqual(Object.keys(scripts).sort(), ["cases", "demo", "import", "mix", "mixBalance", "pitch", "preflight", "recipe", "render", "styles", "timing"]);
   for (const [k, f] of Object.entries(scripts)) {
     assert.ok(isAbsolute(f) && f.startsWith(api.SCRIPTS + "/") && f.endsWith(".mjs"), k);
     assert.ok(existsSync(f), `${k}: ${f}`);

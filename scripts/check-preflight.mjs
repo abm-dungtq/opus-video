@@ -2,7 +2,7 @@
 // check-preflight.mjs — gate: a video has a written plan and approved demo frames before the
 // final render (SKILL.md steps 4b, 6b and 7). render-final.mjs runs `--stage final` and refuses to
 // render on failure.
-//   node check-preflight.mjs [--project .] [--stage plan|final] [--json]
+//   node check-preflight.mjs [--project .] [--stage plan|final] [--json] [--legacy-mtime]
 //   node check-preflight.mjs --help | -h
 // Stage "plan" — PLAN.md in the project with these `##` sections, each non-empty and free of
 //   placeholders (headings match without diacritics, so "Canh" = "Cảnh"):
@@ -37,6 +37,14 @@
 //     and compositions/*.html, whose
 //     motion passes qc-mp4 MOTION (FAIL when ≥60% near-still frames and 90th-pct YDIF < 1.5), and
 //     build/RECIPES.md (recipe-pack.mjs) newer than PLAN.md.
+//     When DEMO.md has `visual_hash:` (make-demo.mjs --animatic writes it with `audio_hash:`), the
+//     main animatic is compared by hash, not by the dates of index.html and compositions/*.html:
+//     render-final.mjs pictureHash differing is a FAIL (the picture changed after the approved
+//     animatic), while audioHash differing from `audio_hash:` is only a WARN (listen again, run
+//     mix-balance.mjs and the sound QC, then "Nghe rồi, được"), silenced by `audio_review: <who>
+//     <ISO> <hash>` naming the current audioHash (make-demo.mjs --record-audio-review). PLAN.md newer
+//     than the animatic still FAILs. Without `visual_hash:`, and with --legacy-mtime (a WARN; the
+//     flag goes after 2026-10-31), the dates decide as before. The 9:16 animatic always uses dates.
 //   - PLAN.md "## Sự kiện": a table Thời điểm | Sự kiện | Âm thanh (seconds on the root timeline,
 //     src as in the HTML, "—" for no sound), or a line "không có SFX gắn sự kiện" (WARN only).
 //     plan: a missing section, or one with no event row (empty, TODO, header-only table) FAILs;
@@ -78,6 +86,7 @@ import { loadDirections, classifySeams, tokenExists, upstream, wordBudget } from
 import { measureMotion, motionVerdict, QUICK_MODE } from "./qc-mp4.mjs";
 import { checkSync, parseEventsBody, isLegacy } from "./sfx-sync.mjs";
 import { resolveProject } from "./styles.mjs";
+import { audioHash, pictureFiles, pictureHash } from "./render-final.mjs";
 import { checkWords } from "./word-sync.mjs";
 import { checkBalance } from "./mix-balance.mjs";
 
@@ -245,9 +254,39 @@ export function beatWarnings(plan) {
 
 export { QUICK_MODE };
 
+// DEMO.md key → its value, "" without one.
+const demoValue = (text, key) => text.match(new RegExp(`^\\s*[-*]?\\s*${key}:\\s*(\\S.*)$`, "im"))?.[1].trim() ?? "";
+export const LEGACY_MTIME_WARN = "đang dùng --legacy-mtime: cổng final so ngày sửa file thay cho visual_hash/audio_hash (cờ này bỏ sau 2026-10-31)";
+
+// The picture of the main animatic against DEMO.md visual_hash: → the FAIL text, or "" when it is
+// the same picture. Names the hashed files edited after the animatic, when there are any.
+function pictureChange({ dir, want, animPath, picture, files }) {
+  let now;
+  try { now = picture(dir); } catch (e) { return `cannot hash the picture for the approved animatic: ${e.message}`; }
+  if (now === want) return "";
+  let edited = [];
+  try { edited = files(dir).filter((f) => statSync(join(dir, f)).mtimeMs > statSync(animPath).mtimeMs).slice(0, 3); } catch { /* the hash already decided; naming files is only a hint */ }
+  return `hình đã đổi sau animatic được duyệt${edited.length ? ` (${edited.join(", ")})` : ""}; chạy lại make-demo.mjs --animatic`;
+}
+
+// Sound against DEMO.md audio_hash: → a WARN text, or "". audio_review: naming the current hash
+// means the user already listened to it.
+function soundChange({ dir, text, sound }) {
+  const want = demoValue(text, "audio_hash");
+  if (!want) return "";
+  let now;
+  try { now = sound(dir); } catch (e) { return `không tính được hash tiếng để so với animatic: ${e.message}`; }
+  if (now === want) return "";
+  const review = demoValue(text, "audio_review").split(/\s+/);
+  if (review.length >= 3 && review.at(-1) === now) return "";
+  return "tiếng đã đổi sau animatic: nghe lại, chạy mix-balance.mjs và qc âm thanh, rồi bấm Nghe rồi, được";
+}
+
 // The approved animatic (and the 9:16 one when required) exists, is newer than PLAN.md and the
-// composition, is portrait for 9:16, and moves (qc-mp4 MOTION). Records motion into out.
-function checkAnimatic({ dir, fm, out, errors, warnings, motion, probe }) {
+// composition (or, for the main one with DEMO.md visual_hash:, shows the same picture), is portrait
+// for 9:16, and moves (qc-mp4 MOTION). Records motion into out. picture, files and sound are the
+// hash functions, replaceable in tests.
+function checkAnimatic({ dir, fm, out, errors, warnings, motion, probe, legacyMtime = false, picture = pictureHash, files = pictureFiles, sound = audioHash }) {
   const planTime = statSync(join(dir, "PLAN.md")).mtimeMs;
   const demoMd = join(dir, "DEMO.md");
   const demoText = existsSync(demoMd) ? readFileSync(demoMd, "utf8") : "";
@@ -257,11 +296,13 @@ function checkAnimatic({ dir, fm, out, errors, warnings, motion, probe }) {
     const anim = animaticOf(demoText, key);
     const animPath = anim ? resolve(dir, anim) : "";
     const rerun = key === "animatic_9x16" ? verticalHint(dir) : "make-demo.mjs --animatic";
+    const hashed = key === "animatic" && !legacyMtime ? demoValue(demoText, "visual_hash") : "";
     let bad;
     if (!anim) errors.push(`DEMO.md has no \`${key}:\` — run ${rerun} so the user approves motion, not stills`);
     else if (!existsSync(animPath)) errors.push(`DEMO.md animatic ${anim} not found`);
     else if (statSync(animPath).mtimeMs < planTime) errors.push(`animatic ${anim} is older than PLAN.md; re-run ${rerun}`);
-    else if (newerThan(dir, statSync(animPath).mtimeMs).length) errors.push(`${newerThan(dir, statSync(animPath).mtimeMs).join(", ")} newer than the animatic ${anim}; the user approved older motion, re-run ${rerun}`);
+    else if (hashed && (bad = pictureChange({ dir, want: hashed, animPath, picture, files }))) errors.push(bad);
+    else if (!hashed && newerThan(dir, statSync(animPath).mtimeMs).length) errors.push(`${newerThan(dir, statSync(animPath).mtimeMs).join(", ")} newer than the animatic ${anim}; the user approved older motion, re-run ${rerun}`);
     else if (key === "animatic_9x16" && (bad = notPortrait(probe, animPath, anim, rerun))) errors.push(bad);
     else {
       let m;
@@ -272,12 +313,14 @@ function checkAnimatic({ dir, fm, out, errors, warnings, motion, probe }) {
         if (v.level === "FAIL") errors.push(`animatic ${anim}: ${v.detail}`);
         else if (v.level === "WARN") warnings.push(`animatic ${anim}: ${v.detail}`);
       }
+      const heard = hashed ? soundChange({ dir, text: demoText, sound }) : "";
+      if (heard) warnings.push(heard);
     }
   }
 }
 
 // Creative gate on PLAN.md + BRIEF.md. Pushes into errors/warnings; returns a summary or null.
-export function checkCreative({ dir, plan, brief, stage, errors, warnings, data = loadDirections(), up = upstream(), motion = measureMotion, probe = probeSize, sync = checkSync, words = checkWords }) {
+export function checkCreative({ dir, plan, brief, stage, errors, warnings, data = loadDirections(), up = upstream(), motion = measureMotion, probe = probeSize, sync = checkSync, words = checkWords, legacyMtime = false, hashes = {} }) {
   const fm = frontmatter(brief);
   if (fm.creative_override) {
     const reason = fm.creative_override.trim();
@@ -286,7 +329,7 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
     if (!quick) { warnings.push(`creative gate skipped: creative_override "${reason}"`); return null; }
     warnings.push(`creative direction checks skipped: quick mode from case ${quick[1]} (the animatic gate stays)`);
     const out = { quick: quick[1] };
-    if (stage === "final") checkAnimatic({ dir, fm, out, errors, warnings, motion, probe });
+    if (stage === "final") checkAnimatic({ dir, fm, out, errors, warnings, motion, probe, legacyMtime, ...hashes });
     return out;
   }
   const id = String(fm.direction || "").trim().toUpperCase().split(/\s/)[0];
@@ -358,7 +401,7 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
 
   if (stage === "final") {
     const planTime = statSync(join(dir, "PLAN.md")).mtimeMs;
-    checkAnimatic({ dir, fm, out, errors, warnings, motion, probe });
+    checkAnimatic({ dir, fm, out, errors, warnings, motion, probe, legacyMtime, ...hashes });
     let s;
     try { s = sync({ dir }); } catch (e) { errors.push(`sfx-sync: ${e.message}`); }
     if (s) {
@@ -476,7 +519,7 @@ export function checkRevisions(text, { sheets = false } = {}) {
   return warnings;
 }
 
-export function check({ project = ".", stage = "plan", sync = checkSync, words = checkWords, balance = checkBalance } = {}) {
+export function check({ project = ".", stage = "plan", sync = checkSync, words = checkWords, balance = checkBalance, legacyMtime = false } = {}) {
   const dir = resolve(project);
   const errors = [], warnings = [];
   const out = { project: dir, stage, pass: false, errors, warnings, plan: null, demo: null };
@@ -497,7 +540,8 @@ export function check({ project = ".", stage = "plan", sync = checkSync, words =
   const brief = existsSync(join(dir, "BRIEF.md")) ? readFileSync(join(dir, "BRIEF.md"), "utf8") : "";
   const both = /^both$/i.test((frontmatter(brief).aspect || "").trim());
   if (both && !(plan.demo916 && plan.demo916.length)) errors.push('BRIEF.md aspect: both — PLAN.md needs "## Khung hình demo 9:16" with timestamps');
-  out.creative = checkCreative({ dir, plan, brief, stage, errors, warnings, sync, words });
+  if (legacyMtime && stage === "final") warnings.push(LEGACY_MTIME_WARN);
+  out.creative = checkCreative({ dir, plan, brief, stage, errors, warnings, sync, words, legacyMtime });
   out.style = checkStyle({ dir, brief, errors, warnings });
   warnings.push(...holdWarnings(parseTable(plan.sections[SECTIONS.scenes])));
   warnings.push(...beatWarnings(plan));
@@ -552,6 +596,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--json") o.json = true;
+    else if (a === "--legacy-mtime") o.legacyMtime = true;
     else if (["--project", "--stage"].includes(a)) o[a.slice(2)] = argv[++i];
     else return { bad: `unknown argument ${a}` };
   }
@@ -568,7 +613,7 @@ export function report(r, log = console.log) {
 export function main(argv = process.argv.slice(2)) {
   if (wantsHelp(argv)) { process.stdout.write(helpText(import.meta.url)); return 0; }
   const o = parseArgs(argv);
-  if (o.bad) { console.error(`check-preflight: ${o.bad}\nusage: node check-preflight.mjs [--project .] [--stage plan|final] [--json]`); return 2; }
+  if (o.bad) { console.error(`check-preflight: ${o.bad}\nusage: node check-preflight.mjs [--project .] [--stage plan|final] [--json] [--legacy-mtime]`); return 2; }
   const r = check(o);
   if (o.json) console.log(JSON.stringify(r, null, 2));
   else report(r);

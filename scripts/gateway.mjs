@@ -35,8 +35,14 @@
 //                                                            a studio event: derive inserts its <audio data-studio-sfx>;
 //                                                            an id already on another <audio> is INVALID
 //   { "op": "remove_event", "id": "sfx-1" }                  studio events only; derive removes its data-studio-sfx tag
-//   { "op": "add_shot", "after": "s2" | null, "name": "…", "duration": 3 }   later shots ripple
-//   { "op": "remove_shot", "id": "s4" }                      refused while a line belongs to it; its events are dropped
+//   { "op": "add_shot", "after": "s2" | null, "name": "…", "duration": 3 }   later shots ripple; the new shot joins
+//                                                            the scene of the shot before it (of the next one at the head)
+//   { "op": "remove_shot", "id": "s4" }                      refused while a line belongs to it; its events are dropped,
+//                                                            it leaves its scene (a scene left empty goes too)
+//   { "op": "set_scenes", "scenes": [{ "id": "c1", "label": "…", "shots": ["s1", "s2"] }] }   the scene groups
+//                                                            (manifest.mjs rules); [] removes them
+// capabilities.picture_from_code (the picture is built by code from TIMING, buildFilm): resize_shot,
+// add_shot and remove_shot are INVALID there, since its shot windows follow the voice; move_line works.
 // --base is the version the caller last saw; another version is a CONFLICT and nothing is written.
 // Writers are serialized by .opus/lock (a lock older than 30 s is stale and removed); a writer
 // that cannot get it within 5 s exits 8 BUSY and may retry. The derived files are written before
@@ -55,7 +61,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, rena
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
-import { load, save, validate, r3, SPEAKER, WORKFLOW_MODES } from "./manifest.mjs";
+import { load, save, validate, validateScenes, r3, SPEAKER, WORKFLOW_MODES } from "./manifest.mjs";
 import { gateOf, lineNumber, writeRoles } from "./line-gate.mjs";
 import { buildTiming, injectTiming, manifestScenes } from "./timing.mjs";
 import { EVENTS_SECTION, SECTIONS, fold, parseTable, sceneId } from "./check-preflight.mjs";
@@ -66,8 +72,10 @@ export const ACTORS = ["human", "director", "timing", "import", "undo", "redo"];
 export { WORKFLOW_MODES };
 // OPS names every op applyOps accepts; Studio checks it before sending one.
 export const OPS = Object.freeze(["resize_shot", "move_line", "set_shot", "set_line_text", "set_line_speaker", "set_line_audio",
-  "set_music", "update_music", "move_event", "add_event", "remove_event", "add_shot", "remove_shot", "set_workflow_mode"]);
+  "set_music", "update_music", "move_event", "add_event", "remove_event", "add_shot", "remove_shot", "set_scenes", "set_workflow_mode"]);
 const VIEW_ONLY = "dự án chỉ xem: index.html không có TIMING:BEGIN/END";
+const PICTURE_FROM_CODE = "hình dựng bằng mã (buildFilm): mốc shot đi theo lời; sửa lời hoặc scenes/*.mjs, không kéo mép";
+const SHOT_EDITS = new Set(["resize_shot", "add_shot", "remove_shot"]);
 const LOCK_STALE_MS = 30_000;
 const LOCK_WAIT_MS = 5_000;
 const SHOT_FIELDS = ["name", "transition_in", "motion_note", "assets"];
@@ -125,6 +133,7 @@ export function applyOps(m, ops, { html = null, root = null } = {}) {
 
   for (const op of ops) {
     const before = next.duration;
+    if (SHOT_EDITS.has(op?.op) && next.capabilities?.picture_from_code === true) throw new OpError(PICTURE_FROM_CODE);
     switch (op?.op) {
       case "resize_shot": {
         const i = shotAt(op.id);
@@ -251,6 +260,10 @@ export function applyOps(m, ops, { html = null, root = null } = {}) {
         ripple(i, d);
         next.shots.splice(i, 0, { id, name: String(op.name ?? ""), start: r3(start), end: r3(start + d), transition_in: "", motion_note: "", assets: [] });
         receipt.push(`thêm ${id} ${fmt(d)}${op.after ? ` sau ${op.after}` : " ở đầu"}`);
+        // The new shot joins the scene of the shot before it, or of the next one at the head.
+        const near = i === 0 ? next.shots[1]?.id : next.shots[i - 1].id;
+        const scene = (next.scenes ?? []).find((c) => c.shots.includes(near));
+        if (scene) { scene.shots.splice(scene.shots.indexOf(near) + (i === 0 ? 0 : 1), 0, id); receipt.push(`${id} vào cảnh ${scene.id}`); }
         retime(before);
         break;
       }
@@ -262,12 +275,27 @@ export function applyOps(m, ops, { html = null, root = null } = {}) {
         if (next.shots.length === 1) throw new OpError("không xoá được shot cuối cùng");
         next.shots.splice(i, 1);
         receipt.push(`xoá ${s.id}`);
+        if (next.scenes) {
+          for (const c of next.scenes) c.shots = c.shots.filter((id) => id !== s.id);
+          for (const c of next.scenes.filter((c) => !c.shots.length)) receipt.push(`bỏ cảnh ${c.id} vì không còn shot`);
+          next.scenes = next.scenes.filter((c) => c.shots.length);
+          if (!next.scenes.length) delete next.scenes;
+        }
         if (next.events) {
           for (const e of next.events.filter((e) => e.shot === s.id)) receipt.push(`CẢNH BÁO bỏ sự kiện ${e.id}: ${s.id} đã xoá, thẻ <audio id="${e.id}"> vẫn ở HTML với data-start cũ, xoá thẻ hoặc gắn lại`);
           next.events = next.events.filter((e) => e.shot !== s.id);
         }
         ripple(i, -(s.end - s.start));
         retime(before);
+        break;
+      }
+      case "set_scenes": {
+        const scenes = op.scenes;
+        const errs = validateScenes(scenes, next.shots);
+        if (errs.length) throw new OpError(`set_scenes: ${errs.join("; ")}`);
+        if (scenes.length) next.scenes = scenes.map((c) => ({ id: c.id, label: c.label, shots: [...c.shots] }));
+        else delete next.scenes;
+        receipt.push(`đổi nhóm cảnh: ${scenes.length} cảnh`);
         break;
       }
       case "set_workflow_mode": {

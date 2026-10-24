@@ -24,6 +24,14 @@
 //   The key is left out when no event is found.
 // capabilities.timing_markers and editable: whether index.html has TIMING:BEGIN. A project without
 //   it is view only in Studio and the gateway (the director edits its HTML directly).
+//   capabilities.picture_from_code: true when index.html calls buildFilm( (the picture is built by
+//   code from TIMING); the key is left out otherwise.
+// Scenes (groups of shots), first source found: scenes/scenes.json, an array of
+//   { id: "c<#>", label (or title), shots: [shot id] }, used when it passes the manifest rules (a WARN
+//   otherwise) · script/scenes.json, a map of line number NN → script scene number: each shot joins
+//   the scene of its first numbered line, a shot with none stays in the scene before it, and the
+//   shots before any numbered line form the scene c0 "Đầu phim"; labels "Cảnh N". Without either the
+//   key is left out.
 // Without --write the manifest is printed and nothing is written.
 // Prints `IMPORT <dir> shots=N lines=N music=N editable=<bool>` and the WARN lines.
 // --force  import again over an existing project.json, as the next version (history is kept).
@@ -33,7 +41,7 @@ import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { basename, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
-import { SCHEMA, SPEAKER, load, validate, r3 } from "./manifest.mjs";
+import { SCHEMA, SPEAKER, load, validate, validateScenes, r3 } from "./manifest.mjs";
 import { record, takeLock } from "./gateway.mjs";
 import { planScenes } from "./timing.mjs";
 import { SECTIONS, parsePlan, parseTable } from "./check-preflight.mjs";
@@ -106,6 +114,53 @@ function planNames(text) {
   const table = parseTable(parsePlan(text).sections[SECTIONS.scenes]);
   const hi = table.headers.findIndex((h) => /^hinh/.test(h));
   return table.rows.map((r) => (hi >= 0 ? shotName(r[hi]) : ""));
+}
+
+const readJson = (f, warnings) => {
+  try { return JSON.parse(readFileSync(f, "utf8")); }
+  catch (e) { warnings.push(`${f.split(/[\\/]/).slice(-2).join("/")} không đọc được (${e.message}), bỏ qua`); return undefined; }
+};
+
+// Shots and lines → scenes from scenes/scenes.json or script/scenes.json (see the header), or null.
+export function importScenes(root, shots, lines, warnings = []) {
+  const own = join(root, "scenes", "scenes.json");
+  if (existsSync(own)) {
+    const list = readJson(own, warnings);
+    if (list !== undefined) {
+      const scenes = Array.isArray(list) ? list.map((c, i) => ({ id: c?.id, label: typeof c?.label === "string" ? c.label : typeof c?.title === "string" ? c.title : `Cảnh ${i + 1}`, shots: c?.shots })) : list;
+      const errs = validateScenes(scenes, shots);
+      if (!errs.length) return scenes;
+      warnings.push(`scenes/scenes.json bỏ qua: ${errs.join("; ")}`);
+    }
+  }
+  const byLine = join(root, "script", "scenes.json");
+  if (!existsSync(byLine)) return null;
+  const map = readJson(byLine, warnings);
+  if (map === undefined) return null;
+  if (!map || typeof map !== "object" || Array.isArray(map)) { warnings.push("script/scenes.json phải là bản đồ { số câu: số cảnh }, bỏ qua"); return null; }
+  const sceneOfLine = new Map();
+  for (const [nn, v] of Object.entries(map)) {
+    const n = Number(v);
+    if (Number.isInteger(n) && n >= 0) sceneOfLine.set(nn, n);
+    else warnings.push(`script/scenes.json "${nn}": số cảnh "${v}" không đọc được, bỏ qua`);
+  }
+  const byShot = new Map();
+  for (const l of [...lines].sort((a, b) => a.start - b.start)) {
+    const n = sceneOfLine.get(lineNumber(l.file) ?? "");
+    if (n != null && !byShot.has(l.shot)) byShot.set(l.shot, n);
+  }
+  const scenes = [];
+  for (const s of shots) {
+    const n = byShot.get(s.id);
+    const cur = scenes.at(-1);
+    if (n == null || (cur && cur.n === n)) { if (cur) cur.shots.push(s.id); else scenes.push({ n: null, id: "c0", label: "Đầu phim", shots: [s.id] }); continue; }
+    if (scenes.some((c) => c.n === n)) { warnings.push(`${s.id}: cảnh ${n} của script/scenes.json đã qua, giữ shot trong ${cur.id}`); cur.shots.push(s.id); continue; }
+    scenes.push({ n, id: `c${n}`, label: `Cảnh ${n}`, shots: [s.id] });
+  }
+  // A script scene numbered 0 would take the id of "Đầu phim": number the head scene after the rest.
+  const head = scenes.find((c) => c.n === null);
+  if (head && scenes.some((c) => c.n === 0)) head.id = `c${Math.max(...scenes.map((c) => c.n ?? 0)) + 1}`;
+  return scenes.length ? scenes.map(({ id, label, shots: ids }) => ({ id, label, shots: ids })) : null;
 }
 
 // Project dir → { manifest, warnings }. Reads only.
@@ -201,11 +256,13 @@ export function importProject(dir) {
   let fps = 30;
   try { const v = Number(JSON.parse(readFileSync(join(root, "hyperframes.json"), "utf8")).fps); if (v > 0) fps = v; } catch { /* no hyperframes.json or no fps: HyperFrames defaults to 30 */ }
   const markers = /\/\*\s*TIMING:BEGIN\s*\*\//.test(html);
+  const scenes = importScenes(root, shots, lines, warnings);
   const manifest = {
     schema: SCHEMA, title: title(root), fps, width: info.width, height: info.height, duration: last.end, html: "index.html",
-    capabilities: { timing_markers: markers, editable: markers },
+    capabilities: { timing_markers: markers, editable: markers, ...(html.includes("buildFilm(") ? { picture_from_code: true } : {}) },
     shots, lines, music, assets: listAssets(root),
     ...(events.length ? { events } : {}),
+    ...(scenes ? { scenes } : {}),
     version: 1, updated: new Date().toISOString(),
   };
   return { manifest, warnings, source };

@@ -4,6 +4,7 @@
 // (`approval: <who, when, what>`); render-final.mjs refuses the final render until then.
 //   node make-demo.mjs [--project .] [--hyperframes <dir>] [--composition <file>] [--aspect 9x16] [--animatic]
 //   node make-demo.mjs [--project .] --from-video <draft.mp4> [--aspect 9x16]
+//   node make-demo.mjs [--project .] --record-audio-review <who>
 //   node make-demo.mjs --help | -h
 // Timestamps: "## Khung hình demo" (or "## Khung hình demo 9:16" with --aspect 9x16) in PLAN.md.
 // Output: <project>/demo/ (or demo/9x16/). Old frame-*.png there are removed first.
@@ -27,6 +28,15 @@
 //     0.5 s gets a WARN and no sheet; a sheet ffmpeg cannot cut is a WARN, never a failure.
 //     With --composition, a composition shorter than the PLAN.md timeline leaves the scenes that
 //     start past the animatic's end without a sheet ("ffmpeg không cắt được sheet" WARN).
+//     The main animatic of the project's own index.html (no --aspect, --composition or
+//     --hyperframes) also writes `visual_hash:` (render-final.mjs pictureHash: the picture without
+//     TIMING and sound) and `audio_hash:` (audioHash) to DEMO.md; check-preflight --stage final then
+//     compares hashes instead of file dates. Another main animatic removes the two keys (dates again).
+//   - --record-audio-review <who>: no capture. Writes or replaces `audio_review: <who> <ISO time>
+//     <audioHash now>` in DEMO.md (above "## Frames"; approval: is left as it is): the user listened to
+//     the current sound, so the final gate stops warning that the sound changed after the animatic.
+//     <who> is letters, digits and . _ @ : + - (user@studio). Exit 2 without DEMO.md.
+// DEMO.md keeps animatic:, scene_sheets:, visual_hash:, audio_hash: and audio_review: across runs.
 // Exit: 0 frames captured · 1 capture failed · 2 bad usage / PLAN.md missing timestamps.
 
 import { existsSync, readFileSync, writeFileSync, readdirSync, rmSync, mkdirSync, mkdtempSync, realpathSync, statSync, renameSync } from "node:fs";
@@ -37,6 +47,7 @@ import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { parsePlan } from "./check-preflight.mjs";
 import { planScenes } from "./timing.mjs";
+import { audioHash, pictureHash } from "./render-final.mjs";
 
 const WIN = process.platform === "win32";
 // With shell:true (npx on Windows) Node joins args unquoted, so a path with spaces splits in two.
@@ -44,23 +55,51 @@ export const winArgs = (args, win = WIN) => (win ? args.map((a) => (/[\s&()^|<>"
 const run = (cmd, args, opts = {}) => spawnSync(cmd, cmd === "npx" ? winArgs(args) : args, { stdio: "inherit", shell: WIN && cmd === "npx", ...opts });
 
 // DEMO.md keys make-demo owns, in the order they are written above `approval:`.
-const DEMO_KEYS = ["animatic", "animatic_9x16", "scene_sheets", "scene_sheets_9x16"];
+const DEMO_KEYS = ["animatic", "animatic_9x16", "scene_sheets", "scene_sheets_9x16", "visual_hash", "audio_hash"];
+// Written by --record-audio-review, kept by writeDemoMd (just above approval:).
+const REVIEW_KEY = "audio_review";
+const OWN_KEY = "(?:animatic|scene_sheets)(?:_9x16)?|visual_hash|audio_hash|audio_review";
+const REVIEWER = /^[A-Za-z0-9._@:+-]{1,80}$/;
 
 // Rewrite DEMO.md: keep any free text above "## Frames", replace the frame list, reset approval.
 // `sheets` (per-scene contact sheets of the animatic) is written as one comma-separated line.
-export function writeDemoMd(project, frames, label, source = "", animatic = "", sheets = []) {
+// hashes: undefined keeps visual_hash/audio_hash, null removes them, { visual_hash, audio_hash } sets them.
+export function writeDemoMd(project, frames, label, source = "", animatic = "", sheets = [], hashes = undefined) {
   const p = join(project, "DEMO.md");
   const old = existsSync(p) ? readFileSync(p, "utf8") : "";
   const suffix = label === "9:16" ? "_9x16" : "";
-  const kept = Object.fromEntries([...old.matchAll(/^\s*[-*]?\s*((?:animatic|scene_sheets)(?:_9x16)?):\s*(\S.*)$/gim)].map((m) => [m[1].toLowerCase(), m[2].trim()]));
+  const kept = Object.fromEntries([...old.matchAll(new RegExp(`^\\s*[-*]?\\s*(${OWN_KEY}):\\s*(\\S.*)$`, "gim"))].map((m) => [m[1].toLowerCase(), m[2].trim()]));
   if (animatic) kept[`animatic${suffix}`] = animatic; else delete kept[`animatic${suffix}`];
   if (animatic && sheets.length) kept[`scene_sheets${suffix}`] = sheets.join(", "); else delete kept[`scene_sheets${suffix}`];
-  const head = old.split(/^## Frames/m)[0].replace(/^\s*[-*]?\s*(?:approval|(?:animatic|scene_sheets)(?:_9x16)?):.*$/gim, "").trimEnd() || "# DEMO";
+  if (hashes !== undefined) for (const k of ["visual_hash", "audio_hash"]) { if (hashes?.[k]) kept[k] = hashes[k]; else delete kept[k]; }
+  const head = old.split(/^## Frames/m)[0].replace(new RegExp(`^\\s*[-*]?\\s*(?:approval|${OWN_KEY}):.*$`, "gim"), "").trimEnd() || "# DEMO";
   const keep = (old.split(/^## Frames/m)[1] || "").split(/\r?\n/).filter((l) => l.trim() && !l.includes(`(${label})`) && /^\s*-\s/.test(l));
   const list = [...keep, ...frames.map((f) => `- ${f} (${label})`)];
   const head2 = head.replace(/^\s*source:.*$/gim, "").trimEnd();
-  const anim = DEMO_KEYS.filter((k) => kept[k]).map((k) => `${k}: ${kept[k]}\n`).join("");
+  const anim = [...DEMO_KEYS, REVIEW_KEY].filter((k) => kept[k]).map((k) => `${k}: ${kept[k]}\n`).join("");
   writeFileSync(p, `${head2}\n\n${source ? `source: ${source}\n` : ""}${anim}approval: pending\n\n## Frames\n\n${list.join("\n")}\n`);
+}
+
+// Writes or replaces DEMO.md `audio_review: <who> <ISO> <audioHash>` and returns the line; the rest
+// of the file (approval: included) keeps its bytes. Throws when DEMO.md is missing or the sound
+// cannot be hashed.
+export function recordAudioReview(project, who, { now = new Date(), hash = audioHash } = {}) {
+  if (!REVIEWER.test(String(who ?? ""))) throw Object.assign(new Error(`người nghe "${who}" không hợp lệ (chữ, số và . _ @ : + -)`), { code: "USAGE" });
+  const p = join(project, "DEMO.md");
+  if (!existsSync(p)) throw Object.assign(new Error("chưa có DEMO.md: chạy make-demo.mjs --animatic trước"), { code: "USAGE" });
+  const line = `${REVIEW_KEY}: ${who} ${now.toISOString()} ${hash(project)}`;
+  const text = readFileSync(p, "utf8");
+  const own = new RegExp(`^[ \\t]*[-*]?[ \\t]*${REVIEW_KEY}:.*$`, "im");
+  let next;
+  if (own.test(text)) next = text.replace(own, () => line);
+  else {
+    const at = [/^[ \t]*[-*]?[ \t]*approval:/im, /^## Frames/m].map((re) => text.search(re)).find((i) => i >= 0);
+    next = at == null ? `${text.replace(/\n*$/, "\n")}${line}\n` : `${text.slice(0, at)}${line}\n${text.slice(at)}`;
+  }
+  const tmp = `${p}.${process.pid}.tmp`;
+  writeFileSync(tmp, next);
+  renameSync(tmp, p);
+  return line;
 }
 
 // Tile PNG frames side by side into one JPEG (best effort; returns false when ffmpeg fails).
@@ -110,8 +149,10 @@ function parseArgs(argv) {
     if (["--project", "--hyperframes", "--composition", "--aspect"].includes(a)) o[a.slice(2)] = argv[++i];
     else if (a === "--from-video") o.fromVideo = argv[++i];
     else if (a === "--animatic") o.animatic = true;
+    else if (a === "--record-audio-review") { o.review = argv[++i]; if (!o.review) return { bad: "--record-audio-review needs a name (user@studio)" }; }
     else return { bad: `unknown argument ${a}` };
   }
+  if (o.review !== undefined && (o.animatic || o.fromVideo || o.composition || o.aspect || o.hyperframes)) return { bad: "--record-audio-review captures nothing; pass only --project with it" };
   if (o.fromVideo && o.composition) return { bad: "--from-video and --composition are exclusive" };
   if (o.fromVideo && o.animatic) return { bad: "--from-video and --animatic are exclusive (an animatic is a fresh full draft render)" };
   if (o.aspect && o.aspect !== "9x16") return { bad: "--aspect only accepts 9x16" };
@@ -123,6 +164,10 @@ export function main(argv = process.argv.slice(2)) {
   const o = parseArgs(argv);
   if (o.bad) { console.error(`make-demo: ${o.bad}`); return 2; }
   const project = resolve(o.project);
+  if (o.review !== undefined) {
+    try { console.log(`make-demo: ${recordAudioReview(project, o.review)}`); return 0; }
+    catch (e) { console.error(`make-demo: ${e.message}`); return e.code === "USAGE" ? 2 : 1; }
+  }
   const planPath = join(project, "PLAN.md");
   if (!existsSync(planPath)) { console.error("make-demo: PLAN.md not found"); return 2; }
   const plan = parsePlan(readFileSync(planPath, "utf8"));
@@ -133,7 +178,7 @@ export function main(argv = process.argv.slice(2)) {
   for (const f of readdirSync(outDir)) if (/^frame-.*\.png$/i.test(f)) rmSync(join(outDir, f));
   const hf = resolve(o.hyperframes || project);
 
-  let animatic = "", sheets = [];
+  let animatic = "", sheets = [], hashes;
   if (o.animatic) {
     const mp4 = join(outDir, "animatic.mp4"), full = join(outDir, "animatic.full.mp4");
     const args = ["hyperframes", "render", ...(o.composition ? ["-c", o.composition] : []), "--quality", "draft", "-o", full];
@@ -147,6 +192,15 @@ export function main(argv = process.argv.slice(2)) {
     let scenes = [];
     try { scenes = planScenes(readFileSync(planPath, "utf8")); } catch (e) { console.error(`WARN không làm sheet từng cảnh: ${e.message}`); }
     sheets = sceneSheets(mp4, scenes, outDir).map((f) => relative(project, f).split("\\").join("/"));
+    // Only the main animatic of index.html is what the final gate hashes; any other main one drops
+    // the keys so the gate goes back to file dates.
+    if (!o.aspect) {
+      hashes = null;
+      if (!o.composition && hf === project) {
+        try { hashes = { visual_hash: pictureHash(project), audio_hash: audioHash(project) }; }
+        catch (e) { console.error(`WARN không ghi visual_hash/audio_hash (cổng final so ngày sửa file): ${e.message}`); }
+      }
+    }
   } else if (o.fromVideo) {
     const mp4 = resolve(o.fromVideo);
     if (!existsSync(mp4)) { console.error(`make-demo: ${o.fromVideo} not found`); return 2; }
@@ -168,7 +222,7 @@ export function main(argv = process.argv.slice(2)) {
     finally { rmSync(tmp, { recursive: true, force: true }); }
   }
   const frames = readdirSync(outDir).filter((f) => /^frame-.*\.png$/i.test(f)).sort().map((f) => relative(project, join(outDir, f)).split("\\").join("/"));
-  writeDemoMd(project, frames, o.aspect ? "9:16" : "main", o.fromVideo ? relative(project, resolve(o.fromVideo)).split("\\").join("/") : "", animatic, sheets);
+  writeDemoMd(project, frames, o.aspect ? "9:16" : "main", o.fromVideo ? relative(project, resolve(o.fromVideo)).split("\\").join("/") : "", animatic, sheets, hashes);
   const sheet = join(outDir, "contact-sheet.jpg");
   const sheetOk = contactSheet(frames.map((f) => join(project, f)), sheet);
   console.log(`make-demo: ${frames.length} frames → ${relative(project, outDir) || "."}/${animatic ? ` · animatic ${animatic} · ${sheets.length} scene sheet(s)` : ""}${sheetOk ? ` · ${relative(project, sheet).split("\\").join("/")}` : ""} · DEMO.md approval reset to pending`);
