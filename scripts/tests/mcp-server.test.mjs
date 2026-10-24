@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { enqueue } from "../requests.mjs";
+import { OPS } from "../gateway.mjs";
 
 const server = fileURLToPath(new URL("../../mcp/server.mjs", import.meta.url));
 const FIXTURE = fileURLToPath(new URL("./fixtures/manifest", import.meta.url));
@@ -41,6 +42,9 @@ test("initialize, tools/list, project_patch as director, stale base → CONFLICT
     assert.deepEqual(r[1].result.capabilities, { tools: {} });
     assert.equal(r[1].result.serverInfo.name, "opus-video");
     assert.deepEqual(r[2].result.tools.map((t) => t.name).sort(), ["project_get", "project_log", "project_patch", "project_undo", "studio_ask", "studio_request_done", "studio_request_next"]);
+    const patchTool = r[2].result.tools.find((t) => t.name === "project_patch");
+    for (const op of OPS) assert.ok(patchTool.description.includes(op), `project_patch description lists ${op}`);
+    for (const op of ["set_scenes", "set_line_speaker", "set_line_audio"]) assert.ok(OPS.includes(op), op);
     assert.ok(!r[3].result.isError, r[3].result.content[0].text);
     assert.equal(JSON.parse(r[3].result.content[0].text).version, v + 1);
     const last = readFileSync(join(dir, ".opus", "history.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l)).at(-1);
