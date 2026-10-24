@@ -1,0 +1,160 @@
+{
+ "id": "pixel-arcade-hd",
+ "name": "Pixel Arcade HD",
+ "ten_vi": "Hoạt hình pixel 16-bit HD",
+ "mo_ta_vi": "Hoạt hình kể chuyện pixel 16-bit: khung gốc 480x270 phóng 4x, nhân vật có biểu cảm, cắt theo key pose, bảng 32 màu cố định.",
+ "family": "aesthetic",
+ "aliases": [
+  "pixel 16-bit",
+  "pixel hd",
+  "song lag"
+ ],
+ "summary": "16-bit HD pixel storytelling; 480x270 canvas at 4x, rigged expressive characters, stepped motion, 32-colour palette.",
+ "energy": 4,
+ "best_for": [
+  "storytelling",
+  "comedy",
+  "character-animation",
+  "social-cut"
+ ],
+ "character": "A narrated comedy told in 16-bit pixel art: hard pixel edges, characters with readable faces and lip-sync, pose-to-pose cuts with holds and smears, parody set-pieces (news, documentary) rendered as pixel scenes.",
+ "dimensions": {
+  "palette": {
+   "mode": "dark",
+   "colors": {
+    "bg": "#181425",
+    "ink": "#ffffff",
+    "accent": "#feae34",
+    "rust": "#be4a2f",
+    "ember": "#d77643",
+    "sand": "#ead4aa",
+    "skin": "#e4a672",
+    "clay": "#b86f50",
+    "umber": "#733e39",
+    "plum-dark": "#3e2731",
+    "crimson": "#a22633",
+    "red": "#e43b44",
+    "orange": "#f77622",
+    "yellow": "#fee761",
+    "green": "#63c74d",
+    "leaf": "#3e8948",
+    "forest": "#265c42",
+    "deep-teal": "#193c3e",
+    "navy": "#124e89",
+    "sky": "#0099db",
+    "cyan": "#2ce8f5",
+    "mist": "#c0cbdc",
+    "slate": "#8b9bb4",
+    "steel": "#5a6988",
+    "dusk": "#3a4466",
+    "night": "#262b44",
+    "hot-red": "#ff0044",
+    "grape": "#68386c",
+    "magenta": "#b55088",
+    "rose": "#f6757a",
+    "skin-light": "#e8b796",
+    "tan": "#c28569"
+   },
+   "rule": "32-colour song-lag-32 palette only; no gradients or alpha blends; shading by per-character ramps and dithered tiles"
+  },
+  "typography": [
+   "VT323 (Vietnamese-complete) for all on-screen text, sizes multiples of 4 px at art resolution, rendered to canvas and alpha-thresholded to a single palette colour"
+  ],
+  "layout": [
+   "Base canvas 480x270 art px; 1 art px = 4 screen px; every position snapped to whole art px",
+   "No HUD by default; diegetic text only (signs, screens, news lower-thirds)"
+  ],
+  "material": [
+   "Flat pixel sprites and tiles; 1 art px (4 screen px) outline in palette index p; image-rendering pixelated on all art"
+  ],
+  "texture": [
+   "Baked ordered-dither patterns",
+   "Parallax tile layers moving in whole art px"
+  ],
+  "camera": [
+   "Pan in whole art px steps (4 screen px)",
+   "Screen shake 1 art px for up to 4 steps",
+   "Zoom only at integer scales (1x, 2x) through an iris transition"
+  ],
+  "transitions": [
+   "pixel-dissolve (mosaic block 1 -> 8 -> 1 art px, stepped, 0.4 s)",
+   "iris (square closes on subject in 6 steps, opens on next)",
+   "blink (3x on/off then cut)",
+   "hard cut on pose change"
+  ],
+  "pacing": {
+   "bpm": [
+    90,
+    130
+   ],
+   "rhythm": "Comedy timing first: holds before punchlines, hard cuts on the joke beat; music follows the narration."
+  },
+  "beat_response": [
+   "HUD score digits tick up on every beat",
+   "Coins or stars bounce one tile on kick beats",
+   "Background tiles shift one art pixel on kick downbeats"
+  ],
+  "ui_choreography": [
+   "UI redrawn as pixel panels with 8 px borders",
+   "Menu cursor arrow jumps between items on spoken words",
+   "Items appear with a power-up pop (scale 0 -> 1.25 -> 1, steps(3))",
+   "Numbers count through odo in pixel digits"
+  ],
+  "diagrams": [
+   "Flows as tile maps: nodes are blocks, paths drawn tile by tile",
+   "Bar charts as stacked 8 px blocks filling in steps"
+  ],
+  "character_motion": [
+   "on2 = 12 steps/s; rig tweens only blink, mouth visemes, eye darts, 1-2 art px head bob/breathing",
+   "large actions cut to key poses with holds and 2-3 frame smears",
+   "lip-sync from Vietnamese syllable visemes with a 2-step minimum hold"
+  ],
+  "captions": [
+   "No burned-in captions; subtitles delivered via YouTube CC"
+  ],
+  "sound": [
+   "chiptune is NOT mandatory: parody genres (news fanfare, product-intro bed, temple bell) are allowed as deliberate exception",
+   "SFX short and punchy, synced to pose cuts"
+  ]
+ },
+ "scene_types": {
+  "prefer": [
+   "cover",
+   "hook",
+   "feature",
+   "timeline",
+   "cta",
+   "outro"
+  ],
+  "avoid": [
+   "product-hero"
+  ]
+ },
+ "signature_moves": [
+  "Pose-cut punchline with a 2-3 frame smear",
+  "Pixel-dissolve between story beats",
+  "Iris into a callback",
+  "Freeze-frame with spinner for meta jokes"
+ ],
+ "strengths": [
+  "Instantly readable gamification",
+  "Great for developer and gaming audiences",
+  "Low render cost"
+ ],
+ "constraints": [
+  "All positions and sizes snap to the 480x270 art grid (4 screen px)",
+  "Motion uses stepped timing at 12 steps/s; no eased tweens on sprites",
+  "Fixed 32-colour palette; no gradients or blur"
+ ],
+ "avoid": [
+  "Smooth eased camera moves",
+  "Photographic assets",
+  "Thin hairline typography"
+ ],
+ "pairs_well_with": [
+  "retro-crt-broadcast",
+  "comic-multiverse",
+  "playful-game-system",
+  "vaporwave-memphis"
+ ]
+}
