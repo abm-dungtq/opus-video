@@ -11,7 +11,7 @@ import { existsSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { load } from "../scripts/manifest.mjs";
-import { patch, undo, readHistory } from "../scripts/gateway.mjs";
+import { patch, undo, readHistory, OPS } from "../scripts/gateway.mjs";
 import { next, finish, ask, ASK_KINDS } from "../scripts/requests.mjs";
 
 // A director started by Studio (`claude -p`, director.mjs in the motion-studio repo) runs this server with
@@ -41,7 +41,8 @@ export const TOOLS = [
   },
   {
     name: "project_patch",
-    description: "Sửa timeline qua cổng lệnh với actor director: một danh sách op (resize_shot, move_line, set_shot, set_line_text, set_music, update_music, move_event, add_event, remove_event, add_shot, remove_shot) thành một phiên bản mới, kèm biên nhận tiếng Việt. Sai base trả CONFLICT, op sai trả INVALID.",
+    // The op list comes from the gateway, so a new op reaches the director without editing this text.
+    description: `Sửa timeline qua cổng lệnh với actor director: một danh sách op (${OPS.join(", ")}) thành một phiên bản mới, kèm biên nhận tiếng Việt. Sai base trả CONFLICT, op sai trả INVALID.`,
     inputSchema: {
       type: "object",
       properties: {

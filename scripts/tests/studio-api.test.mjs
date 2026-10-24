@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as api from "../studio-api.mjs";
+import { findSkill } from "../skill-paths.mjs";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url)).replace(/\/$/, "");
 
@@ -27,8 +28,8 @@ test("the director writes only through acceptEdits in its cwd: no Edit or Write 
 test("API 4: SKILLS names installed skills; COMMANDS are absolute paths to scripts that exist", () => {
   assert.ok(Array.isArray(api.SKILLS) && api.SKILLS.length);
   for (const s of api.SKILLS) assert.ok(existsSync(join(ROOT, "skills", s, "SKILL.md")), s);
-  const { choose, suggest, pitchInit, ...scripts } = api.COMMANDS;
-  assert.deepEqual(Object.keys(scripts).sort(), ["cases", "demo", "import", "mix", "mixBalance", "pitch", "preflight", "recipe", "render", "styles", "timing"]);
+  const { choose, suggest, pitchInit, platform, ...scripts } = api.COMMANDS;
+  assert.deepEqual(Object.keys(scripts).sort(), ["captions", "cases", "demo", "export", "import", "mix", "mixBalance", "pitch", "preflight", "recipe", "render", "styles", "timing", "vietPro"]);
   for (const [k, f] of Object.entries(scripts)) {
     assert.ok(isAbsolute(f) && f.startsWith(api.SCRIPTS + "/") && f.endsWith(".mjs"), k);
     assert.ok(existsSync(f), `${k}: ${f}`);
@@ -44,4 +45,22 @@ test("API 4: SKILLS names installed skills; COMMANDS are absolute paths to scrip
 test("the choose command is the one the director is denied: only Studio runs the direction gate", () => {
   const { file, args } = api.COMMANDS.choose;
   assert.ok(api.DENIED_TOOLS.includes(`Bash(node ${file} ${args[0]}*)`));
+});
+
+test("platform is viet-pro's check-platform.mjs, found among the skills, or null without viet-pro", () => {
+  const vp = findSkill("viet-pro");
+  if (!vp) { assert.equal(api.COMMANDS.platform, null); return; }
+  assert.equal(api.COMMANDS.platform, join(vp, "scripts", "check-platform.mjs"));
+  assert.ok(isAbsolute(api.COMMANDS.platform));
+});
+
+test("VOICE_DENIED_TOOLS closes the voice commands of eleven.mjs and leaves sfx and music", () => {
+  const eleven = join(api.SCRIPTS, "eleven.mjs");
+  assert.deepEqual([...api.VOICE_DENIED_TOOLS], [`Bash(node ${eleven} tts*)`, `Bash(node ${eleven} audio-meta*)`]);
+  assert.ok(Object.isFrozen(api.VOICE_DENIED_TOOLS));
+  // A Bash rule's * is a glob over the whole command line.
+  const matches = (rule, cmd) => new RegExp("^" + rule.slice(5, -1).replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$").test(cmd);
+  for (const cmd of [`node ${eleven} tts --help`, `node ${eleven} audio-meta --project .`]) assert.ok(api.VOICE_DENIED_TOOLS.some((r) => matches(r, cmd)), cmd);
+  for (const cmd of [`node ${eleven} sfx --help`, `node ${eleven} music --prompt x`, `node ${eleven} voice-info`]) assert.ok(!api.VOICE_DENIED_TOOLS.some((r) => matches(r, cmd)), cmd);
+  assert.ok(!api.DENIED_TOOLS.some((r) => api.VOICE_DENIED_TOOLS.includes(r)), "not denied for every project");
 });

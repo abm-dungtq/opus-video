@@ -11,10 +11,12 @@
 // line's optional speaker, a new voice take) and the timing key of COMMANDS are added the same way.
 // SERIES_FILE, validateSeries and seriesDirOf (a series folder's studio-series.json and the series
 // of a project) are added the same way, without a bump. So are the gateway op set_scenes (the
-// optional project.json scenes groups) and the mixBalance key of COMMANDS (mix-balance.mjs).
+// optional project.json scenes groups) and the mixBalance key of COMMANDS (mix-balance.mjs), the
+// delivery keys export, vietPro, captions and platform of COMMANDS, and VOICE_DENIED_TOOLS.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { findSkill } from "./skill-paths.mjs";
 
 export { load, validate, SCHEMA, FILE, SERIES_FILE, validateSeries, seriesDirOf } from "./manifest.mjs";
 export { patch, undo, redo, redoTarget, readHistory, derive, EXIT, ACTORS, OPS } from "./gateway.mjs";
@@ -33,8 +35,11 @@ export const SKILLS = Object.freeze(["ov-studio", "ov-build", "ov-script", "ov-a
 // in args and runs `node <file> ...args`. suggest prints three directions (one per tier) and their
 // styles as JSON. pitchInit builds the pitch from directions the user already chose ({directions}:
 // comma-separated ids, first is pick 1); Studio fills {topic}, {aspect}, {category}, {energy} from
-// BRIEF.md, empty when missing.
+// BRIEF.md, empty when missing. platform is viet-pro's check-platform.mjs (found like
+// check-viet-pro.mjs finds viet-pro; lint-vietnamese-content.mjs sits beside it), null when viet-pro
+// is not installed.
 const script = (f) => join(SCRIPTS, f);
+const vietPro = findSkill("viet-pro");
 export const COMMANDS = Object.freeze({
   render: script("render-final.mjs"),
   mix: script("audio-mix.mjs"),
@@ -47,6 +52,10 @@ export const COMMANDS = Object.freeze({
   styles: script("styles.mjs"),
   timing: script("timing.mjs"),
   mixBalance: script("mix-balance.mjs"),
+  export: script("export.mjs"),
+  vietPro: script("check-viet-pro.mjs"),
+  captions: script("captions-from-words.mjs"),
+  platform: vietPro ? join(vietPro, "scripts", "check-platform.mjs") : null,
   suggest: Object.freeze({ file: script("suggest.mjs"), args: Object.freeze(["--project", "{project}", "--json"]) }),
   choose: Object.freeze({ file: script("make-pitch.mjs"), args: Object.freeze(["choose", "--project", "{project}", "--pick", "{pick}", "--accept-warnings"]) }),
   pitchInit: Object.freeze({ file: script("make-pitch.mjs"), args: Object.freeze(["init", "--project", "{project}", "--topic", "{topic}",
@@ -73,3 +82,7 @@ export const ALLOWED_TOOLS = ["Read", "Glob", "Grep", `Bash(node ${OV}/scripts/*
 export const DENIED_TOOLS = ["WebFetch", "WebSearch", `Edit(/${OV}/**)`, `Write(/${OV}/**)`, `Bash(node ${OV}/scripts/*../*)`,
   "Edit(DEMO.md)", "Edit(BRIEF.md)", `Bash(node ${OV}/scripts/make-pitch.mjs choose*)`,
   "Bash(*replace-in-file.mjs*)", "Bash(cp *)", "Bash(mv *)", "Bash(*DEMO.md*)", "Bash(*BRIEF.md*)"];
+// Added to DENIED_TOOLS by Studio for an episode of a series: its voices go only through the series
+// tools behind a consent card, so the director may not voice lines itself. audio-meta voices every
+// line too. sfx and music stay allowed.
+export const VOICE_DENIED_TOOLS = Object.freeze([`Bash(node ${OV}/scripts/eleven.mjs tts*)`, `Bash(node ${OV}/scripts/eleven.mjs audio-meta*)`]);
