@@ -23,6 +23,7 @@ Chỉ bắt đầu khi `check-viet-pro.mjs --project .` đã PASS ở bước 2 
 - **Không** dùng TTS của media-use cho tiếng Việt.
 - Composition từ skeleton: có giọng thì chạy `node $OV/scripts/timing.mjs --project .` để ghi khối TIMING từ `words.json`; sửa giọng xong chỉ chạy lại lệnh này. Dự án đã có `project.json` (xem `ov-studio`): `timing.mjs` lấy khung shot từ manifest qua `gateway.mjs derive`, và đổi thời lượng shot phải đi qua `gateway.mjs patch`, không sửa tay số giây trong PLAN.md hay HTML.
 - Hướng `don-dap` hoặc nhóm `story-music`: đo nhịp `node $OV/scripts/beat-grid.mjs assets/bgm/bgm.mp3 --write` rồi chạy lại `timing.mjs`. `UNSTABLE` thì không dùng `B()`; nhạc chậm bị đọc gấp đôi tempo thì thêm `--max-bpm 100`.
+- Nhạc theo composition plan (drop phải rơi đúng phách): `eleven.mjs music --plan <plan.json> --out assets/bgm/raw/bgm-raw.mp3`, đo `beat-grid.mjs --write` trên bản thô, viết `assets/bgm/music-arrangement.json`, rồi `node $OV/scripts/arrange-music.mjs --project .` và `node $OV/scripts/verify-arrangement.mjs --project .` (phải `VERIFY PASS`). Chi tiết ở mục 3c của `audio-pipeline.md`.
 - Đo mix: `node $OV/scripts/mix-balance.mjs --project .`, đích nhạc thấp hơn giọng 4–7 dB lúc có lời. `audio-mix` tự giảm nhạc nền có `data-fx-carve` theo giọng.
 
 ## Theo hướng vận hành
@@ -37,6 +38,8 @@ Chỉ bắt đầu khi `check-viet-pro.mjs --project .` đã PASS ở bước 2 
 | `$OV/references/audio-pipeline.md` | Bước 5: voice, SFX, nhạc nền, mix, bản quyền |
 | `$OV/scripts/eleven.mjs` | `doctor`, `voice-info`, `models`, `tts`, `sfx`, `music`, `probe-models`, `audio-meta`; `tts`/`audio-meta` qua cổng viet-pro (`scripts/voice-gate.mjs`, exit 4); đạo diễn Studio của tập series chỉ chạy `sfx`, `music` (lệnh khác exit 5) |
 | `$OV/scripts/timing.mjs` | Mốc TIMING từ PLAN.md hoặc `project.json` và `words.json` (cú pháp ở `--help`) |
-| `$OV/scripts/beat-grid.mjs` | Nhịp nhạc: BPM, BEAT0, kick, drop; `--write` ghi `<nhạc>.beats.json` khi ổn định |
+| `$OV/scripts/beat-grid.mjs` | Nhịp nhạc: BPM, BEAT0, `beats` đo tới mẫu, `maxDriftMs`, kick, drop; `--write` ghi `<nhạc>.beats.json` khi ổn định |
+| `$OV/scripts/arrange-music.mjs` | Ghép nguyên ô nhịp từ nhạc thô sang phách đích theo `music-arrangement.json`, ra WAV và `beats.json` (mục 3c) |
+| `$OV/scripts/verify-arrangement.mjs` | Đo lệch từng mối ghép so với nhạc thô (≤ 2 ms) và `maxDriftMs` của output |
 | `$OV/scripts/mix-balance.mjs` | Cân bằng nhạc dưới giọng lúc có lời |
 | `$OV/scripts/audio-mix.mjs` | Bước 7 (do `render-final` gọi): dựng lại tiếng của composition thành một WAV bằng ffmpeg từ các thuộc tính audio tĩnh; `--dry-run` in lệnh ffmpeg |

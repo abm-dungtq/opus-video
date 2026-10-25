@@ -92,6 +92,26 @@ node $OV/scripts/timing.mjs --project .
 - `stability` là độ lệch chuẩn giữa lưới phách và onset dải trầm. Trên 45 ms thì lệnh in `UNSTABLE`, exit 1 và không ghi file: nhạc trôi tempo hoặc không đọc được nhịp, không dùng `B()` cho bài này. Ngưỡng 45 ms đo trên 6 bản nhạc thật trong workspace (16–40 ms, cả 6 đọc đúng tempo); một chuỗi kick trôi từ 100 lên 140 BPM cho khoảng 100 ms.
 - Nhạc chậm mà lệnh đọc ra gấp đôi tempo nghe được: chạy lại với `--max-bpm 100`.
 - Dự án có nhiều file `*.beats.json` trong `assets/bgm/` thì `timing.mjs` cần `--music <file>`.
+- `beats.json` còn có `beats` (giây của từng phách, đo tới mẫu ở chỗ năng lượng dâng dốc nhất) và `maxDriftMs` (phách đo được lệch xa nhất bao nhiêu so với lưới đều `BEAT0 + n·beatLen` mà `B()` dùng). `BEAT0` neo vào trung vị pha của `beats`. Nhạc sinh ra hay trôi vài chục ms trong một bài; `maxDriftMs` lớn thì ghép lại theo mục 3c.
+
+## 3c. Nhạc theo composition plan và ghép ô nhịp
+
+ElevenLabs không giữ đúng độ dài từng section của composition plan, nên không hứa "drop đúng giây X" với file vừa sinh. Luôn ghép lại nguyên ô nhịp từ bản thô sang đúng phách đích, rồi đo mối ghép.
+
+```bash
+node $OV/scripts/eleven.mjs music --plan music-plan.json --out assets/bgm/raw/bgm-raw.mp3
+node $OV/scripts/beat-grid.mjs assets/bgm/raw/bgm-raw.mp3 --write
+# viết assets/bgm/music-arrangement.json (cú pháp: arrange-music.mjs --help)
+node $OV/scripts/arrange-music.mjs --project .        # --dry: chỉ in bảng
+node $OV/scripts/verify-arrangement.mjs --project .   # VERIFY PASS mới dùng
+node $OV/scripts/timing.mjs --project .
+```
+
+- `music --plan` gửi `composition_plan` (`positive_global_styles`, `negative_global_styles`, `sections[]` với `section_name`, `duration_ms` 3000–120000, `positive_local_styles`, `negative_local_styles`, `lines`). Không dùng chung với `--prompt`.
+- Nhạc thô nằm trong `assets/bgm/raw/`: `timing.mjs` chỉ quét `assets/bgm/*.beats.json` (không đệ quy) và báo lỗi khi có hơn một file, nên `beats.json` của bản thô không được nằm cạnh bản đã ghép.
+- `arrange-music.mjs` cắt nguồn ở `beats[]` đo được của bản thô và đặt vào lưới đều của chính nó. Đoạn nào nguồn dài hơn hoặc ngắn hơn đích quá 5 ms thì kéo giãn bằng `asetrate` (chính xác tới mẫu, lệch cao độ ≤ 0,5 %, không nghe ra). Crossfade 25 ms nằm trước downbeat. Output là WAV, kèm `bgm.wav.beats.json` mang lưới đích, `kick` và `drops` của nguồn chuyển sang phách đích, `arranged_from`.
+- `verify-arrangement.mjs` so từng đoạn của output với nguồn bằng tương quan chéo, lệch quá 2 ms là `FAIL`. Con số này chỉ chứng minh mối ghép chính xác tới mẫu. Phách có rơi đúng lưới không thì xem dòng `maxDriftMs` (đo phách của output so với lưới đích, trên 20 ms là `WARN`).
+- Nhạc outro: `eleven.mjs music --plan outro-plan.json --outro` ghi `assets/bgm/outro.mp3`. Gateway không có op thêm bed hay đổi `file` của bed (`set_music` chỉ có `gain|start|end`). Muốn dùng: thêm thẻ `<audio>` bed thứ hai vào `index.html`, chạy `manifest-import.mjs --project . --force`, rồi `update_music` đặt `start` và `fade_in` để outro chồng dưới đuôi nhạc chính.
 
 ## 4. Mix
 

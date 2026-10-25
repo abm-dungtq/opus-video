@@ -13,7 +13,8 @@ This product includes material adapted from the motion-video skill of AgentKit
 references (references/styles/detail/glass-keynote.md, comic-multiverse.md and
 cinematic-product-launch.md, copied verbatim), the composition skeleton, motion-craft
 principles and the beat-grid, reframe and style-resolution algorithms, rewritten for
-opus-video.
+opus-video. Adapted parts: scripts/arrange-music.mjs, scripts/verify-arrangement.mjs (logic
+ported from arrange-music.mjs and verify-arrangement.py).
 
 This product includes material adapted from Lemo-Opuscar
 (https://github.com/lemomo-ai/lemo-opuscar, commit 413a6bd6d78ebd3bdd5abaec9538a26867f890df),

@@ -7,6 +7,10 @@
 //   node eleven.mjs tts   --text-file <project>/script/NN.txt --out f.mp3 [--project dir] [--voice id] [--model id] [--speed 1.0] [--lang vi] [--skip-viet-pro-gate]
 //   node eleven.mjs sfx   --text "english description" --seconds 1.5 --out f.mp3 [--influence 0.3] [--no-normalize]
 //   node eleven.mjs music --prompt str --seconds 15 --out f.mp3 [--no-normalize]
+//   node eleven.mjs music --plan plan.json [--out f.mp3 | --outro] [--no-normalize]
+//     --plan: ElevenLabs composition plan (global styles + sections with duration_ms); the
+//     sections are a request, not a contract, so arrange the result with arrange-music.mjs.
+//     --outro: default --out assets/bgm/outro.mp3 (a second, calm bed under the ending).
 //   node eleven.mjs probe-models --text-file path [--models a,b,c]   (writes to $TMPDIR/ov-probe)
 //   node eleven.mjs audio-meta --script SCRIPT.md [--hyperframes .] [--project dir] [--bgm assets/bgm/x.mp3 --bgm-volume 0.2] [--reuse] [--skip-viet-pro-gate]
 //
@@ -53,7 +57,8 @@ import { BED_DEFAULTS, writeGenerated } from "./normalize-bed.mjs";
 import { elevenRefusal, REFUSED_EXIT } from "./director-guard.mjs";
 maybeHelp(process.argv.slice(2), import.meta.url);
 
-const API = "https://api.elevenlabs.io";
+// Base URL is overridable for tests only (a local fake server); real runs use the public API.
+const API = process.env.ELEVENLABS_API_BASE || "https://api.elevenlabs.io";
 const ENV_FILE = join(homedir(), ".config", "opus-video", ".env");
 const DEFAULTS = {
   voice: DEFAULT_VOICE,
@@ -139,6 +144,29 @@ function writeOut(path, buf) {
 // sfx/music output: written, then normalized to the bed level unless --no-normalize.
 function writeBed(path, buf) {
   writeGenerated(path, buf, { normalize: !args["no-normalize"], lufs: BED_DEFAULTS.lufs, log: (s) => console.error(s), warn: (s) => console.error(s) });
+}
+
+// Composition plan for `music --plan`: read and checked before any request; exit 2 names the bad field.
+function readPlan(file) {
+  let plan;
+  try {
+    plan = JSON.parse(readFileSync(file, "utf8"));
+  } catch (err) {
+    die(`--plan ${file}: ${err.message}`, 2);
+  }
+  const strings = (v) => Array.isArray(v) && v.every((x) => typeof x === "string");
+  for (const k of ["positive_global_styles", "negative_global_styles"]) {
+    if (!strings(plan?.[k])) die(`--plan: ${k} phải là mảng chuỗi`, 2);
+  }
+  if (!Array.isArray(plan.sections) || !plan.sections.length) die("--plan: sections phải là mảng không rỗng", 2);
+  plan.sections.forEach((sec, i) => {
+    const at = `--plan: sections[${i}]`;
+    if (typeof sec?.section_name !== "string" || !sec.section_name) die(`${at}.section_name phải là chuỗi`, 2);
+    if (!Number.isInteger(sec.duration_ms) || sec.duration_ms < 3000 || sec.duration_ms > 120000) die(`${at}.duration_ms phải là số nguyên 3000–120000`, 2);
+    for (const k of ["positive_local_styles", "negative_local_styles"]) if (!strings(sec[k])) die(`${at}.${k} phải là mảng chuỗi`, 2);
+    if (!Array.isArray(sec.lines)) die(`${at}.lines phải là mảng`, 2);
+  });
+  return plan;
 }
 
 // Group character-level alignment into words split on whitespace.
@@ -281,17 +309,21 @@ const commands = {
   },
 
   async music() {
-    const body = {
-      prompt: need("prompt"),
-      music_length_ms: Math.round(Number(need("seconds")) * 1000),
-      model_id: DEFAULTS.musicModel,
-      force_instrumental: true,
-    };
+    if (args.plan && args.prompt) die("chọn --plan hoặc --prompt", 2);
+    const body = args.plan
+      ? { composition_plan: readPlan(args.plan), model_id: DEFAULTS.musicModel }
+      : {
+          prompt: need("prompt"),
+          music_length_ms: Math.round(Number(need("seconds")) * 1000),
+          model_id: DEFAULTS.musicModel,
+          force_instrumental: true,
+        };
+    const out = args.out ?? (args.outro ? "assets/bgm/outro.mp3" : need("out"));
     for (let attempt = 0; ; attempt++) {
       try {
         const buf = await call("/v1/music", { method: "POST", binary: true, body });
-        writeBed(need("out"), buf);
-        console.error(`music → ${args.out} (${buf.length} bytes)`);
+        writeBed(out, buf);
+        console.error(`music → ${out} (${buf.length} bytes)`);
         return;
       } catch (err) {
         if ([401, 402, 403].includes(err.status)) {

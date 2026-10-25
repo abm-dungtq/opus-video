@@ -12,7 +12,8 @@
 // SERIES_FILE, validateSeries and seriesDirOf (a series folder's studio-series.json and the series
 // of a project) are added the same way, without a bump. So are the gateway op set_scenes (the
 // optional project.json scenes groups) and the mixBalance key of COMMANDS (mix-balance.mjs), the
-// delivery keys export, vietPro, captions and platform of COMMANDS, and VOICE_DENIED_TOOLS.
+// delivery keys export, vietPro, captions and platform of COMMANDS, and VOICE_DENIED_TOOLS. The music
+// keys arrange (arrange-music.mjs) and verifyArrangement (verify-arrangement.mjs) are new keys too.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,6 +54,8 @@ export const COMMANDS = Object.freeze({
   styles: script("styles.mjs"),
   timing: script("timing.mjs"),
   mixBalance: script("mix-balance.mjs"),
+  arrange: script("arrange-music.mjs"),
+  verifyArrangement: script("verify-arrangement.mjs"),
   export: script("export.mjs"),
   vietPro: script("check-viet-pro.mjs"),
   captions: script("captions-from-words.mjs"),

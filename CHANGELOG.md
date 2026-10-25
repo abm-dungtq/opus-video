@@ -2,7 +2,12 @@
 
 ## Unreleased
 
-Nothing yet.
+### Added
+- `eleven.mjs music --plan plan.json`: sends an ElevenLabs `composition_plan` (global styles, `sections[]` with `section_name`, `duration_ms` 3000–120000, local styles, `lines`), checked before any request (exit 2). `--outro` writes `assets/bgm/outro.mp3` when `--out` is absent. `--plan` with `--prompt` is refused. `ELEVENLABS_API_BASE` overrides the API host for tests only.
+- `beat-grid.mjs`: `beats` (time of every beat to the sample: the steepest 5 ms rise of a 12 ms running-max envelope of the full band, tracked from beat to beat) and `maxDriftMs` (the farthest measured beat from the grid `beat0 + n·beatLen`). `beat0` is now the median phase of `beats`, so `B()` lands on the hits instead of an 11.6 ms analysis frame; `bars[].start` follows it. `refineBeats` and `LOW_AF` are exported.
+- `scripts/arrange-music.mjs --project <dir> [--plan] [--dry]`: copies whole bars of a raw bed (`assets/bgm/raw/`) to target beats per `assets/bgm/music-arrangement.json`, cutting the source at its measured `beats` and resampling a piece onto the even grid (`asetrate`) when it is off by more than 5 ms; 25 ms crossfades end on each downbeat. Writes WAV and `<output>.beats.json` (target grid, carried `kick` and `drops`, `arranged_from`).
+- `scripts/verify-arrangement.mjs --project <dir> [--tolerance-ms 2] [--json]`: cross-correlates every segment of the output with the source (±50 ms, one-sample steps), FAIL over the tolerance, WARN under correlation 0.5, and reports the output's `maxDriftMs` against the target grid. Exit 1 on any FAIL.
+- `COMMANDS.arrange` and `COMMANDS.verifyArrangement`. `STUDIO_API` stays 4.
 
 ## v2.6.0 (2026-10-24): HyperFrames 0.8.192
 
