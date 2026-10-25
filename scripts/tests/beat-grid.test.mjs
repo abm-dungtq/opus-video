@@ -34,10 +34,14 @@ test("120 BPM kick train: BPM 118–122, BEAT0 within 20 ms of the first kick, s
     assert.ok(phaseGap(r.beat0, 0.25, r.beatLen) <= 0.02, `beat0 ${r.beat0}`);
     assert.ok(Math.abs(r.beatLen - 60 / r.bpm) < 1e-5);
     assert.ok(r.stability <= 25, `stability ${r.stability}`);
-    assert.deepEqual(Object.keys(r), ["bpm", "beat0", "beatLen", "bars", "kick", "drops", "stability"]);
+    assert.deepEqual(Object.keys(r), ["bpm", "beat0", "beatLen", "beats", "maxDriftMs", "bars", "kick", "drops", "stability"]);
     assert.ok(r.kick.length >= 1 && r.kick[0][1] - r.kick[0][0] >= 30, JSON.stringify(r.kick));
     assert.deepEqual(r.drops, []);
     assert.match(r.bars[1].kicks, /^KKKK$/);
+    // beats[] land on the start of every kick (a pure 60 Hz sine: no click to time, so 3 ms).
+    assert.ok(r.beats.length >= 39, `beats ${r.beats.length}`);
+    r.beats.forEach((t, n) => assert.ok(Math.abs(t - (0.25 + n * 0.5)) <= 0.003, `beat ${n}: ${t}`));
+    assert.ok(r.maxDriftMs <= 1, `maxDriftMs ${r.maxDriftMs}`);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -52,6 +56,8 @@ test("90 BPM kick train reads 88–92, not the double or a neighbour of 120", { 
     assert.ok(r.bpm >= 88 && r.bpm <= 92, `bpm ${r.bpm}`);
     assert.ok(phaseGap(r.beat0, 0.25, r.beatLen) <= 0.02, `beat0 ${r.beat0}`);
     assert.equal(existsSync(`${f}.beats.json`), false, "no --write, no file");
+    assert.ok(r.beats.length >= 29, `beats ${r.beats.length}`);
+    r.beats.forEach((t, n) => assert.ok(Math.abs(t - (0.25 + n * 60 / 90)) <= 0.003, `beat ${n}: ${t}`));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -107,5 +113,57 @@ test("bad usage, missing and undecodable files exit 2", { skip: !hasFfmpeg && "f
       assert.equal(main(argv, io), 2, `${argv.join(" ")}: ${buf.err}`);
       assert.match(buf.err, /^beat-grid: /);
     }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// 48 kHz mono 16-bit WAV with a hit at each time in `times`: a 10 ms 1 kHz click on top of a 60 ms
+// 60 Hz pulse (the low band needs energy too, or stability cannot be measured).
+const writeHits = (file, times, dur) => {
+  const sr = 48000, n = Math.round(sr * dur), pcm = Buffer.alloc(44 + n * 2);
+  pcm.write("RIFF", 0); pcm.writeUInt32LE(36 + n * 2, 4); pcm.write("WAVEfmt ", 8);
+  pcm.writeUInt32LE(16, 16); pcm.writeUInt16LE(1, 20); pcm.writeUInt16LE(1, 22);
+  pcm.writeUInt32LE(sr, 24); pcm.writeUInt32LE(sr * 2, 28); pcm.writeUInt16LE(2, 32); pcm.writeUInt16LE(16, 34);
+  pcm.write("data", 36); pcm.writeUInt32LE(n * 2, 40);
+  const x = new Float32Array(n);
+  for (const t0 of times) {
+    const a = Math.round(t0 * sr);
+    for (let i = 0; i < 0.06 * sr && a + i < n; i++) {
+      const t = i / sr;
+      x[a + i] += 0.5 * Math.sin(2 * Math.PI * 60 * t) * (1 - t / 0.06) + (t < 0.01 ? 0.4 * Math.sin(2 * Math.PI * 1000 * t) : 0);
+    }
+  }
+  for (let i = 0; i < n; i++) pcm.writeInt16LE(Math.round(Math.max(-1, Math.min(1, x[i])) * 32767), 44 + i * 2);
+  writeFileSync(file, pcm);
+};
+const jsonOf = (f) => { const { buf, io } = capture(); const code = main([f, "--json"], io); return { code, r: buf.out ? JSON.parse(buf.out) : null, err: buf.err }; };
+// The measured beat nearest to each true hit time.
+const nearestGap = (beats, t) => Math.min(...beats.map((b) => Math.abs(b - t)));
+
+test("beats[]: clicks every 0.5 s are measured to 2 ms, maxDriftMs stays small", { skip: !hasFfmpeg && "ffmpeg missing" }, () => {
+  const dir = mkdtempSync(join(tmpdir(), "beat-grid-"));
+  try {
+    const f = join(dir, "even.wav"), truth = Array.from({ length: 40 }, (_, n) => 0.1 + n * 0.5);
+    writeHits(f, truth, 20);
+    const { code, r, err } = jsonOf(f);
+    assert.equal(code, 0, err);
+    assert.ok(r.beats.length >= 39, `beats ${r.beats.length}`);
+    for (const t of truth.slice(0, 39)) assert.ok(nearestGap(r.beats, t) <= 0.002, `hit ${t}: ${nearestGap(r.beats, t)}`);
+    assert.ok(r.maxDriftMs <= 1, `maxDriftMs ${r.maxDriftMs}`);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("beats[]: a tempo ramp 120 → 120.5 BPM stays stable, beats follow it to 3 ms, maxDriftMs ≥ 5", { skip: !hasFfmpeg && "ffmpeg missing" }, () => {
+  const dir = mkdtempSync(join(tmpdir(), "beat-grid-"));
+  try {
+    // Beats per second rise linearly 2 → 2.0083 over 24 s; phase(t) = 2t + k t²/2, hit n where phase = n.
+    const T = 24, k = (0.5 / 60) / T, truth = [];
+    for (let n = 0; ; n++) { const t = 0.1 + (-2 + Math.sqrt(4 + 2 * k * n)) / k; if (t > T - 0.2) break; truth.push(t); }
+    const f = join(dir, "ramp.wav");
+    writeHits(f, truth, T);
+    const { code, r, err } = jsonOf(f);
+    assert.equal(code, 0, err);
+    assert.ok(r.stability <= LIMITS.stabilityMs, `stability ${r.stability}`);
+    assert.ok(r.maxDriftMs >= 5, `maxDriftMs ${r.maxDriftMs}`);
+    for (const t of truth) assert.ok(nearestGap(r.beats, t) <= 0.003, `hit ${t.toFixed(4)}: ${nearestGap(r.beats, t).toFixed(4)}`);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

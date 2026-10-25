@@ -302,7 +302,7 @@ Kiểm tra bằng cách render một khung có chuỗi `Ánh nắng ơ ư đ ễ
 
 ## 6. Âm thanh
 
-Mọi lệnh âm thanh đi qua `node $OV/scripts/eleven.mjs <lệnh>`. Mặc định: voice `eGSd0uV8dNQnZuEEX9lu`, TTS `eleven_v4`, nhạc `music_v2_5`, SFX `eleven_text_to_sound_v2`.
+Mọi lệnh âm thanh đi qua `node $OV/scripts/eleven.mjs <lệnh>`. Mặc định: voice `eGSd0uV8dNQnZuEEX9lu`, TTS `eleven_v4`, nhạc `music_v2_5` (`--plan`: `music_v1`), SFX `eleven_text_to_sound_v2`.
 
 ### 6.1 Các lệnh con
 

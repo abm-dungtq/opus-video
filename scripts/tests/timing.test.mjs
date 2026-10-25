@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
-import { buildTiming, injectTiming, phraseHits, planScenes, voiceWords, wordKey, main, NO_MARKERS } from "../timing.mjs";
+import { buildTiming, injectTiming, phraseHits, planScenes, readBeats, voiceWords, wordKey, main, NO_MARKERS } from "../timing.mjs";
 import { SKELETON } from "../composition.mjs";
 
 const FIXTURE = fileURLToPath(new URL("./fixtures/timing", import.meta.url));
@@ -170,6 +170,20 @@ test("beats.json in assets/bgm fills the beat grid", () => {
     writeFileSync(join(dir, "hyperframes.json"), JSON.stringify({ fps: 25 }));
     const { timing } = buildTiming({ dir });
     assert.deepEqual([timing.beat0, timing.beatLen, timing.kick, timing.drops, timing.fps], [0.12, 0.5, [[0, 16]], [8], 25]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("readBeats passes maxDriftMs on to beat-fit and cues; TIMING never carries it", () => {
+  const dir = project();
+  try {
+    mkdirSync(join(dir, "assets/bgm"), { recursive: true });
+    const f = join(dir, "assets/bgm/bgm.wav.beats.json");
+    writeFileSync(f, JSON.stringify({ bpm: 120, beat0: 0.1, beatLen: 0.5, beats: [0.1, 0.6], maxDriftMs: 7.5, kick: [], drops: [] }));
+    assert.equal(readBeats(dir).grid.maxDriftMs, 7.5);
+    assert.equal("maxDriftMs" in buildTiming({ dir }).timing, false);
+    assert.equal("beats" in buildTiming({ dir }).timing, false);
+    writeFileSync(f, JSON.stringify({ bpm: 120, beat0: 0.1, beatLen: 0.5, kick: [], drops: [] }));
+    assert.equal("maxDriftMs" in readBeats(dir).grid, false);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

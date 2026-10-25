@@ -32,16 +32,27 @@ export const norm = (t) => t.replace(/\s+/g, " ").trim();
 export const textHash = (t) => createHash("sha256").update(norm(t)).digest("hex");
 export const stampPath = (mp3) => `${mp3}.gate.json`;
 
-export function writeStamp(mp3, { text, script = null, override = "" }) {
-  writeFileSync(stampPath(mp3), JSON.stringify({ sha256: textHash(text), script, override: override || null }, null, 2) + "\n");
+// provider, model, voice, tempo: how the voice was made (eleven.mjs --provider/--model/--tempo; voice
+// only for gemini, where the Gemini voice name is not in BRIEF voice_id); written
+// only when given, so an ElevenLabs voice at tempo 1 keeps the old stamp shape.
+export function writeStamp(mp3, { text, script = null, override = "", provider, model, voice, tempo }) {
+  const how = { ...(provider ? { provider } : {}), ...(model ? { model } : {}), ...(voice ? { voice } : {}), ...(tempo && tempo !== 1 ? { tempo } : {}) };
+  writeFileSync(stampPath(mp3), JSON.stringify({ sha256: textHash(text), script, override: override || null, ...how }, null, 2) + "\n");
 }
 
 export function readStamp(mp3) {
   try { return JSON.parse(readFileSync(stampPath(mp3), "utf8")); } catch { return null; }
 }
 
-// true when mp3 has a non-override stamp whose hash equals the given text.
-export function stampMatches(mp3, text) {
+// true when mp3 has a non-override stamp whose hash equals the given text. want ({ provider, model,
+// voice, tempo }) also compares how the voice was made, only for the keys given: a stamp without
+// provider is elevenlabs, without tempo is 1; a stamp without model or voice matches any.
+export function stampMatches(mp3, text, want = {}) {
   const s = readStamp(mp3);
-  return !!s && !s.override && s.sha256 === textHash(text);
+  if (!s || s.override || s.sha256 !== textHash(text)) return false;
+  if (want.provider !== undefined && (s.provider ?? "elevenlabs") !== want.provider) return false;
+  if (want.tempo !== undefined && Number(s.tempo ?? 1) !== Number(want.tempo)) return false;
+  if (want.model !== undefined && s.model !== undefined && s.model !== want.model) return false;
+  if (want.voice !== undefined && s.voice !== undefined && s.voice !== want.voice) return false;
+  return true;
 }

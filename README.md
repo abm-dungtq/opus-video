@@ -50,6 +50,23 @@ Các video dưới đây do opus-video dựng. Bấm vào ảnh để mở file 
 
 ## Có gì mới
 
+### v2.7.1 (2026-10-25): sửa nhạc theo plan và karaoke
+
+- `eleven.mjs music --plan` gửi đúng model `music_v1` cho plan dạng sections (ElevenLabs từ chối model cũ).
+- Karaoke hiện sớm 0,12 s trước từ đầu, giữ 0,5 s sau từ cuối.
+- Chunk karaoke rất ngắn (hai giọng chồng nhau) không còn kẹt chữ tới hết video khi render seek từng khung. Dự án sinh từ skeleton cũ cần sửa tay khối karaoke trong `index.html`.
+
+### v2.7.0 (2026-10-25): tích hợp motion-video
+
+- **Nhạc ghép theo ô nhịp.** `eleven.mjs music --plan` gửi composition plan; `arrange-music.mjs` ghép các ô nhịp của bản nhạc thô vào lưới đích, `verify-arrangement.mjs` đo lệch từng đoạn so với nguồn (FAIL khi quá 2 ms).
+- **Cắt cảnh theo phách.** `beat-fit.mjs --apply` dời mỗi điểm cắt về phách gần nhất mà không cắt ngang lời của shot trước (`--tight`: phách đầu tiên ít nhất 0,12 s sau lời cuối), ghi một patch hoàn tác được.
+- **SFX bám lời.** `cues.mjs add --word …` gắn tiếng động vào một chữ được đọc, `place` đặt lại sau khi đổi mốc, `check` chạy trong preflight final.
+- **Karaoke tiếng Việt và voice envelope.** `<html data-karaoke data-voice-env>` cho `TIMING.captions` và `TIMING.env`; `composition.mjs add-part --part mascot|hud-counter`.
+- **Giọng thật có mốc từ.** `eleven.mjs align --audio … --text-file …` (forced alignment, qua cổng viet-pro) ghi `words.json` như TTS.
+- **Bản dọc nhanh.** `reframe.mjs --quick --video demo/animatic.mp4 --ratio 9x16` cho bản xem thử 1080x1920; bản giao vẫn dùng `reframe.mjs <project> --ratio`.
+- **Đạo diễn và thi công.** Agent `ov-director` (duyệt gu, `Review <n>: revise|ship`) và `ov-executor`, chế độ `--poor` một phiên; preflight final WARN khi review cuối chưa `ship`.
+- **Giọng Gemini tuỳ chọn và `--tempo`.** `voice_provider: gemini` (mốc từ vẫn bằng ElevenLabs), `--tempo 0.8–1.25` cho mọi giọng. Chưa kiểm Gemini live.
+
 ### v2.6.0 (2026-10-24): HyperFrames 0.8.192
 
 - **Ghim HyperFrames 0.8.192.** Dự án mới (`new-project.sh`) ghim `hyperframes@0.8.192`; `setup-check` đòi CLI ≥ 0.8.192. Lint, check, render, preview nền và bản 1:1 đã chạy thử trên bản mới.
@@ -159,7 +176,7 @@ Skill này là phần điều phối và không tự render. Nó nối các bư�
 1. **Chọn hướng bằng mắt:** `make-pitch.mjs` dựng 3 styleframe khoảng 3 giây bằng chính chủ đề của người dùng theo 3 hướng đạo diễn khác nhau; người dùng chọn một, kèm đổi từ khoá nếu muốn. Styleframe được chọn thành cảnh mở đầu, kịch bản viết sau và không vượt ngân sách lời của hướng.
 2. **Kịch bản:** viết bằng [viet-pro](https://github.com/abm-dungtq/viet-pro-codex) ở mức đầy đủ (đọc hết review/editorial, lượt Humanizer có ghi chép, lint), có kiểm chứng dữ kiện. `check-viet-pro.mjs` chặn khi chưa đạt; `eleven.mjs` tự chạy lại cổng và không tạo giọng (exit 4) khi chưa đạt.
 3. **Plan:** `PLAN.md` (mục tiêu, ý đồ sáng tạo, bảng cảnh, âm thanh, engine, mốc khung hình demo, QA) phải qua `check-preflight.mjs --stage plan` trước khi tạo giọng và dựng. Mỗi beat nêu blueprint hoặc rule có thật và cách nối sang beat sau; nối bằng mờ dần bị chặn. Bảng `## Sự kiện` ghi lúc nào trên hình có tiếng; chữ trên hình được kiểm có giữ đủ lâu để đọc.
-4. **Âm thanh:** ElevenLabs. Giọng `eleven_v4` có timestamp từng từ, SFX `eleven_text_to_sound_v2`, nhạc nền `music_v2_5`.
+4. **Âm thanh:** ElevenLabs. Giọng `eleven_v4` có timestamp từng từ, SFX `eleven_text_to_sound_v2`, nhạc nền `music_v2_5` (`--plan`: `music_v1`).
 5. **Dựng:** [HyperFrames](https://hyperframes.dev) là mặc định, theo công thức gom bằng `recipe-pack.mjs`. Remotion hoặc Canvas khi dự án cần.
 6. **Clip nháp và khung hình demo:** `make-demo.mjs --animatic` render clip nháp và cắt đúng các mốc trong plan; người dùng duyệt chuyển động (`DEMO.md`) rồi mới được render bản cuối. `render-final.mjs` là đường duy nhất ra bản giao (`--quality delivery`) và chặn (exit 5) khi thiếu plan, demo, duyệt, hoặc khi clip nháp đứng yên kiểu slideshow.
 7. **QA:** `sfx-sync.mjs` (tiếng khớp hình), `qc-mp4.mjs` (kỹ thuật và độ chuyển động), lint, check, vùng an toàn 9:16, Gemini (qua `agy`) xem video và chấm, tối đa 3 vòng. Kèm caption Facebook + TikTok qua viet-pro.

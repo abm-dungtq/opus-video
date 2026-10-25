@@ -30,10 +30,18 @@
 //   { "op": "set_music", "id": "bgm", "field": "gain|start|end", "value": 0.3 }
 //   { "op": "update_music", "id": "bgm", "start"?: 1, "end"?: 9 | null, "media_start"?: 0.5,
 //     "gain"?: 0.6, "fade_in"?: 1, "fade_out"?: 2 }          several fields of a bed at once; end null = to the end
-//   { "op": "move_event", "id": "sfx-1", "start": 3.5 }     the event joins the shot holding its new start
-//   { "op": "add_event", "start": 6, "sound": "assets/sfx/a.mp3", "label"?: "…", "volume"?: 0.8, "id"?: "sfx-1" }
+//   { "op": "move_event", "id": "sfx-1", "start": 3.5, "keep_anchor"?: true, "anchor"?: {…} }
+//                                                            the event joins the shot holding its new start; a hand
+//                                                            move drops its anchor, keep_anchor keeps it (and takes
+//                                                            "anchor" when given: cues.mjs re-placing it)
+//   { "op": "add_event", "start": 6, "sound": "assets/sfx/a.mp3", "label"?: "…", "volume"?: 0.8, "id"?: "sfx-1",
+//     "anchor"?: { "word": "…", "nth"?: 1, "shot": "s2" } | { "beat": 40 } | { "abs": 6 } }
 //                                                            a studio event: derive inserts its <audio data-studio-sfx>;
-//                                                            an id already on another <audio> is INVALID
+//                                                            an id already on another <audio> is INVALID; the anchor
+//                                                            (manifest.mjs rules) is what cues.mjs places it by
+//   { "op": "pin_beat", "target": "shot" | "line", "id": "s3", "beat": 40 | null }
+//                                                            a shot's cut_beat or a line's at_beat (null removes it;
+//                                                            never on the first shot); moves nothing, beat-fit.mjs does
 //   { "op": "remove_event", "id": "sfx-1" }                  studio events only; derive removes its data-studio-sfx tag
 //   { "op": "add_shot", "after": "s2" | null, "name": "…", "duration": 3 }   later shots ripple; the new shot joins
 //                                                            the scene of the shot before it (of the next one at the head)
@@ -72,7 +80,7 @@ export const ACTORS = ["human", "director", "timing", "import", "undo", "redo"];
 export { WORKFLOW_MODES };
 // OPS names every op applyOps accepts; Studio checks it before sending one.
 export const OPS = Object.freeze(["resize_shot", "move_line", "set_shot", "set_line_text", "set_line_speaker", "set_line_audio",
-  "set_music", "update_music", "move_event", "add_event", "remove_event", "add_shot", "remove_shot", "set_scenes", "set_workflow_mode"]);
+  "set_music", "update_music", "move_event", "add_event", "remove_event", "add_shot", "remove_shot", "set_scenes", "pin_beat", "set_workflow_mode"]);
 const VIEW_ONLY = "dự án chỉ xem: index.html không có TIMING:BEGIN/END";
 const PICTURE_FROM_CODE = "hình dựng bằng mã (buildFilm): mốc shot đi theo lời; sửa lời hoặc scenes/*.mjs, không kéo mép";
 const SHOT_EDITS = new Set(["resize_shot", "add_shot", "remove_shot"]);
@@ -223,7 +231,10 @@ export function applyOps(m, ops, { html = null, root = null } = {}) {
         const t = timeOf(op.id, op.start);
         const holder = holderAt(t);
         const from = next.shots.find((s) => s.id === e.shot);
-        receipt.push(`${e.id}: ${fmt((from?.start ?? 0) + e.offset)} → ${fmt(t)}${holder.id !== e.shot ? ` (sang ${holder.id})` : ""}`);
+        const dropAnchor = e.anchor != null && op.keep_anchor !== true;
+        receipt.push(`${e.id}: ${fmt((from?.start ?? 0) + e.offset)} → ${fmt(t)}${holder.id !== e.shot ? ` (sang ${holder.id})` : ""}${dropAnchor ? " (bỏ anchor)" : ""}`);
+        if (dropAnchor) delete e.anchor;
+        else if (op.keep_anchor === true && op.anchor != null) e.anchor = op.anchor;
         e.shot = holder.id;
         e.offset = r3(t - holder.start);
         break;
@@ -240,7 +251,7 @@ export function applyOps(m, ops, { html = null, root = null } = {}) {
         if (id == null) { let n = 1; while (used.has(`sfx-${n}`)) n++; id = `sfx-${n}`; }
         const label = op.label ?? op.sound.split(/[\\/]/).pop().replace(/\.[^.]*$/, "");
         next.events ??= [];
-        next.events.push({ id, shot: holder.id, offset: r3(t - holder.start), sound: op.sound, label, volume: op.volume ?? EVENT_VOLUME, studio: true });
+        next.events.push({ id, shot: holder.id, offset: r3(t - holder.start), sound: op.sound, label, volume: op.volume ?? EVENT_VOLUME, studio: true, ...(op.anchor != null ? { anchor: op.anchor } : {}) });
         receipt.push(`thêm ${id} lúc ${fmt(t)}`);
         break;
       }
@@ -296,6 +307,20 @@ export function applyOps(m, ops, { html = null, root = null } = {}) {
         if (scenes.length) next.scenes = scenes.map((c) => ({ id: c.id, label: c.label, shots: [...c.shots] }));
         else delete next.scenes;
         receipt.push(`đổi nhóm cảnh: ${scenes.length} cảnh`);
+        break;
+      }
+      case "pin_beat": {
+        if (op.beat !== null && !(Number.isInteger(op.beat) && op.beat >= 0)) throw new OpError("pin_beat: beat phải là số nguyên ≥ 0 hoặc null");
+        let x, key;
+        if (op.target === "shot") {
+          const i = shotAt(op.id);
+          if (i === 0 && op.beat !== null) throw new OpError(`pin_beat: ${op.id} là shot đầu, luôn bắt đầu ở 0s`);
+          x = next.shots[i]; key = "cut_beat";
+        } else if (op.target === "line") { x = lineOf(op.id); key = "at_beat"; }
+        else throw new OpError('pin_beat: target phải là "shot" hoặc "line"');
+        if (op.beat === null) delete x[key];
+        else x[key] = op.beat;
+        receipt.push(op.beat === null ? `${op.id}: bỏ ghim beat` : `${op.id}: ghim beat ${op.beat}`);
         break;
       }
       case "set_workflow_mode": {
@@ -689,7 +714,7 @@ export function derive(dir, { manifest = null, prev = null, dry = false, restore
       dropped = ev.dropped;
     }
     const bed = m.music.find((b) => existsSync(join(root, `${b.file}.beats.json`)));
-    r = buildTiming({ dir: root, html: m.html, music: bed?.file ?? null, scenes: manifestScenes(m), htmlText: html });
+    r = buildTiming({ dir: root, html: m.html, music: bed?.file ?? null, scenes: manifestScenes(m), htmlText: html, manifest: m });
     next = injectTiming(html, r.timing);
   } catch (e) { return { code: EXIT.io, error: e.message }; }
   if (!dry) {

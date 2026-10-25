@@ -16,6 +16,8 @@ node $OV/scripts/cut.mjs probe --in <clip> --out probe.json
 node $OV/scripts/cut.mjs apply-edl --edl <edl.json> --out <cut.mp4>
 ```
 
+Clip có lời nói cần mốc từng từ (chữ chốt theo lời, karaoke, SFX theo từ): viết lời đúng như người nói vào `script/NN.txt` qua viet-pro, tách tiếng ra file, rồi `node $OV/scripts/eleven.mjs align --audio <tiếng.wav> --text-file script/NN.txt` để có `.words.json` cùng dạng với TTS (mục 1c của `$OV/references/audio-pipeline.md`).
+
 (Cú pháp đầy đủ ở `--help`.) Clip thô đặt ở `footage/raw/`, clip đã cắt ở `footage/cut/` theo quy ước của workspace.
 
 ## Clip làm trục + nền dựng mới

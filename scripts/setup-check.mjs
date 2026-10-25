@@ -14,6 +14,8 @@
 //   skill (only for engine: remotion), and `opus-video plugin: installed|missing`: whether this
 //   checkout is the Claude Code plugin layout (.claude-plugin/plugin.json + skills/). Codex and
 //   Antigravity load the skills the installer exposes, so missing never fails.
+// Info (never fails): GEMINI_API_KEY present or not; only needed for voice_provider: gemini, whose
+//   word timing still needs ELEVENLABS_API_KEY (forced alignment).
 // Keys are read from the environment, else the opus-video env file in ~/.config; values are
 // never printed.
 // Exit: 0 ready · 1 something required is missing.
@@ -105,6 +107,7 @@ export function runChecks({ findSkillImpl = findSkill, versionImpl = version, ke
     add(d.pass ? "ok" : "missing", "creative directions", d.pass ? `data/directions.json: ${d.tokens} token có thật` : `${d.errors.length} token không có trong HyperFrames: ${d.errors[0]}`, "HyperFrames đổi tên: sửa data/directions.json theo `node scripts/directions.mjs check`, rồi `directions.mjs doc --write`");
   }
 
+  add("info", "GEMINI_API_KEY", `${keys.has("GEMINI_API_KEY") ? "có" : "không"} (chỉ cần khi voice_provider: gemini; words vẫn cần ELEVENLABS_API_KEY)`);
   add(versionImpl("agy", ["--version"]) ? "ok" : "warn", "agy (optional)", "Gemini video judge for judge.mjs; without it QA uses still frames", "install Antigravity CLI and sign in: https://antigravity.google");
   add(keys.has("TYPESAFE_API_KEY") ? "ok" : "warn", "TYPESAFE_API_KEY (optional)", keys.has("TYPESAFE_API_KEY") ? "present" : "absent — Jev ranking/audit off", "add TYPESAFE_API_KEY=… to the env file");
   const plugin = pluginStatus(pluginRoot);
@@ -122,7 +125,7 @@ export function main(argv = process.argv.slice(2)) {
   if (argv.includes("--json")) console.log(JSON.stringify({ ready, platform: process.platform, roots: skillRoots(), items }, null, 2));
   else {
     for (const i of items) {
-      console.log(`${i.level === "ok" ? "ok     " : i.level === "warn" ? "WARN   " : "MISSING"} ${i.name}: ${i.detail}`);
+      console.log(`${{ ok: "ok     ", warn: "WARN   ", info: "INFO   " }[i.level] ?? "MISSING"} ${i.name}: ${i.detail}`);
       if (i.fix) console.log(`        fix: ${i.fix}`);
     }
     console.log(ready ? "READY  opus-video setup is complete" : "NOT READY  install the MISSING items above, then run setup-check again");

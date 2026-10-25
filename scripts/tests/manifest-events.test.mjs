@@ -68,6 +68,35 @@ test("events are optional; each event needs an id, a known shot, a numeric offse
   assert.match(errs, /sự kiện cần id/);
 });
 
+test("beat pins and event anchors: a valid manifest passes, each bad form gives exactly one error", () => {
+  const base = load(FIXTURE);
+  const good = structuredClone(base);
+  good.shots[1].cut_beat = 8;
+  good.lines[0].at_beat = 5;
+  good.events = [
+    { id: "sfx-w", shot: "s2", offset: 0.4, label: "w", anchor: { word: "mã nguồn", nth: 1, shot: "s2", lead: 0.05 } },
+    { id: "sfx-b", shot: "s3", offset: 0.1, label: "b", anchor: { beat: 12 } },
+    { id: "sfx-a", shot: "s1", offset: 1, label: "a", anchor: { abs: 1 } },
+  ];
+  assert.deepEqual(validate(good), []);
+  const one = (mutate, re) => {
+    const m = structuredClone(good);
+    mutate(m);
+    const errs = validate(m);
+    assert.equal(errs.length, 1, errs.join("\n"));
+    assert.match(errs[0], re);
+  };
+  one((m) => { m.events[1].anchor = { beat: 1, abs: 2 }; }, /sự kiện sfx-b: anchor phải có đúng một trong word \| beat \| abs/);
+  one((m) => { m.events[1].anchor = {}; }, /đúng một trong/);
+  one((m) => { m.shots[1].cut_beat = -1; }, /s2: cut_beat phải là số nguyên ≥ 0/);
+  one((m) => { m.shots[0].cut_beat = 0; }, /s1: shot đầu không ghim cut_beat/);
+  one((m) => { m.lines[0].at_beat = 1.5; }, /vo-01: at_beat phải là số nguyên ≥ 0/);
+  one((m) => { m.events[0].anchor.nth = 0; }, /anchor\.nth phải là số nguyên ≥ 1/);
+  one((m) => { m.events[0].anchor.shot = "s9"; }, /anchor\.shot "s9" không tồn tại/);
+  one((m) => { m.events[2].anchor.abs = -1; }, /anchor\.abs phải là số giây ≥ 0/);
+  one((m) => { m.events[1].anchor.lead = -0.1; }, /anchor\.lead phải là số giây ≥ 0/);
+});
+
 test("music media_start / fade_in / fade_out and event volume / studio are validated", () => {
   const base = load(FIXTURE);
   const bed = { id: "bgm", file: "assets/bgm/bgm.mp3", start: 1, end: 9, gain: 0.5, media_start: 2, fade_in: 1, fade_out: 2 };

@@ -53,6 +53,8 @@
 //     its FAIL lines (sound outside ITU-R BT.1359-1 −90…+185 ms) block, its WARN lines warn.
 //     word-sync.mjs measures each "chữ: <cụm>" row against the spoken word the same way: FAIL
 //     (off by more than 250 ms, or never spoken) blocks, WARN warns.
+//     A project.json with an anchored event or a beat pin also runs cues.mjs check: its FAIL lines
+//     (anchor that no longer resolves) block, its WARN lines (event drifted from its anchor) warn.
 // Style axis (data/styles, styles.mjs), both stages: BRIEF.md `style_profile:` must name a style
 //   (id or alias) and resolve with its "## style_layers" against the "## Cảnh" rows (optional Loại
 //   column). FAIL in a project that is not legacy (BRIEF has direction: or brief_version: 2), WARN
@@ -89,6 +91,8 @@ import { resolveProject } from "./styles.mjs";
 import { audioHash, pictureFiles, pictureHash } from "./render-final.mjs";
 import { checkWords } from "./word-sync.mjs";
 import { checkBalance } from "./mix-balance.mjs";
+import { checkCues } from "./cues.mjs";
+import { load as loadManifest } from "./manifest.mjs";
 
 // make-demo needs the 9:16 source named, else hyperframes renders the 16:9 index.html. The default
 // source is the edition reframe.mjs derives next to the project; a project that still keeps its own
@@ -408,6 +412,15 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
       if (s.missing) warnings.push(EVENTS_MISSING);
       else { errors.push(...s.errors); warnings.push(...s.warnings); }
     }
+    // SFX anchored to a word, beat or second (cues.mjs), and beat pins: checked when project.json has them.
+    const pm = existsSync(join(dir, "project.json")) ? loadManifest(dir) : null;
+    if (pm && ((pm.events ?? []).some((e) => e.anchor) || pm.shots.some((x) => x.cut_beat != null) || pm.lines.some((l) => l.at_beat != null))) {
+      try {
+        const c = checkCues(dir, pm);
+        errors.push(...c.fails.map((x) => `cues: ${x}`));
+        warnings.push(...c.warns.map((x) => `cues: ${x}`));
+      } catch (e) { errors.push(`cues: ${e.message}`); }
+    }
     let w;
     try { w = words({ dir }); } catch (e) { errors.push(`word-sync: ${e.message}`); }
     if (w) { errors.push(...w.errors); warnings.push(...w.warnings); }
@@ -519,6 +532,18 @@ export function checkRevisions(text, { sheets = false } = {}) {
   return warnings;
 }
 
+// Director review (references/dao-dien-va-thi-cong.md): with build/DIRECTION.md, the highest
+// build/REVIEW-<n>.md must open with "Review <n>: ship". WARN only: the user still approves the animatic.
+export function reviewWarnings(dir) {
+  const build = join(dir, "build");
+  if (!existsSync(join(build, "DIRECTION.md"))) return [];
+  const reviews = readdirSync(build).map((f) => ({ f, n: Number(f.match(/^REVIEW-(\d+)\.md$/)?.[1]) })).filter((r) => r.n > 0).sort((a, b) => b.n - a.n);
+  const last = reviews[0];
+  const first = last ? readFileSync(join(build, last.f), "utf8").split(/\r?\n/).find((l) => l.trim()) ?? "" : "";
+  if (last && /^Review \d+: ship\b/.test(first.trim())) return [];
+  return [`đạo diễn chưa kết luận ship (build/${last ? last.f : "REVIEW-<n>.md"})`];
+}
+
 export function check({ project = ".", stage = "plan", sync = checkSync, words = checkWords, balance = checkBalance, legacyMtime = false } = {}) {
   const dir = resolve(project);
   const errors = [], warnings = [];
@@ -577,6 +602,7 @@ export function check({ project = ".", stage = "plan", sync = checkSync, words =
       const sheets = Boolean(out.creative) && existsSync(demoMd) && /^\s*[-*]?\s*scene_sheets(?:_9x16)?:\s*\S/im.test(readFileSync(demoMd, "utf8"));
       warnings.push(...checkRevisions(readFileSync(revisions, "utf8"), { sheets }));
     }
+    warnings.push(...reviewWarnings(dir));
     if (existsSync(join(dir, "index.html"))) {
       try {
         const b = balance({ dir });

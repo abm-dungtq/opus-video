@@ -175,7 +175,7 @@ test("eleven.mjs documents and parses --no-normalize for sfx and music", () => {
   assert.match(text, /sfx {3}--text .*\[--no-normalize\]/);
   assert.match(text, /music --prompt .*\[--no-normalize\]/);
   assert.match(text, /writeBed\(need\("out"\), buf\);\n {4}console\.error\(`sfx/);
-  assert.match(text, /writeBed\(need\("out"\), buf\);\n {8}console\.error\(`music/);
+  assert.match(text, /writeBed\(out, buf\);\n {8}console\.error\(`music/);
   // A missing key fails before any request, so this never reaches the API.
   const home = tmp();
   try {

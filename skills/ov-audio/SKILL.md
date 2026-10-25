@@ -17,12 +17,18 @@ Chỉ bắt đầu khi `check-viet-pro.mjs --project .` đã PASS ở bước 2 
   ```
   Lệnh này ghi `audio_meta.json` và `audio_engine_meta.json`. **Không xoá sidecar**, vì `fetch-sfx` cần nó để giữ giọng. Sau đó vẫn chạy `sync-durations` và `fetch-sfx` của workflow như bình thường.
 - **Dựng tay** (general-video, mặc định): voice làm trước: `node $OV/scripts/eleven.mjs tts --text-file script/01.txt --out assets/voice/01.mp3` (sinh kèm `01.mp3.words.json`).
+- Giọng thu thật hoặc lời nói trong clip (không phải TTS): `node $OV/scripts/eleven.mjs align --audio assets/voice/02.wav --text-file script/02.txt` ghi `02.wav.words.json` cùng dạng với TTS. Qua cổng viet-pro như `tts`; exit 3 (`ALIGN_UNAVAILABLE`) khi gói không có forced alignment. Chi tiết ở mục 1c của `audio-pipeline.md`.
+- Giọng Gemini (tuỳ chọn): `voice_provider: gemini` trong `BRIEF.md` hoặc `--provider gemini` cho `tts` và `audio-meta`. Cần `GEMINI_API_KEY`; words vẫn lấy bằng forced alignment của ElevenLabs nên vẫn cần `ELEVENLABS_API_KEY` và tốn credit ElevenLabs. Model: `--model` hoặc `gemini_tts_model`, mặc định `gemini-3.8-flash-tts` (chưa kiểm live); giọng `--voice` hoặc `gemini_voice`, mặc định `Kore`. Cổng viet-pro chạy trước như ElevenLabs.
+- `--tempo 0.8–1.25` (mọi provider): đổi tốc độ giọng sau khi tạo bằng ffmpeg `atempo`, mốc words chia theo. Stamp ghi provider, model, tempo; `--reuse` tạo lại câu có stamp làm theo cách khác.
 - Chỉnh mốc storyboard theo thời lượng giọng thật. Frame dài đúng bằng voice, nên frame cuối (CTA) phải cộng thêm khoảng 1 giây giữ hình trước khi assemble.
 - SFX: chạy `hyperframes media-use resolve --type sfx …` trước, nếu không có thì dùng `eleven.mjs sfx`.
 - Nhạc nền: `eleven.mjs music`. Nếu exit 3 (`MUSIC_UNAVAILABLE`) thì dùng `media-use resolve --type bgm`.
 - **Không** dùng TTS của media-use cho tiếng Việt.
 - Composition từ skeleton: có giọng thì chạy `node $OV/scripts/timing.mjs --project .` để ghi khối TIMING từ `words.json`; sửa giọng xong chỉ chạy lại lệnh này. Dự án đã có `project.json` (xem `ov-studio`): `timing.mjs` lấy khung shot từ manifest qua `gateway.mjs derive`, và đổi thời lượng shot phải đi qua `gateway.mjs patch`, không sửa tay số giây trong PLAN.md hay HTML.
 - Hướng `don-dap` hoặc nhóm `story-music`: đo nhịp `node $OV/scripts/beat-grid.mjs assets/bgm/bgm.mp3 --write` rồi chạy lại `timing.mjs`. `UNSTABLE` thì không dùng `B()`; nhạc chậm bị đọc gấp đôi tempo thì thêm `--max-bpm 100`.
+- Nhạc theo composition plan (drop phải rơi đúng phách): `eleven.mjs music --plan <plan.json> --out assets/bgm/raw/bgm-raw.mp3`, đo `beat-grid.mjs --write` trên bản thô, viết `assets/bgm/music-arrangement.json`, rồi `node $OV/scripts/arrange-music.mjs --project .` và `node $OV/scripts/verify-arrangement.mjs --project .` (phải `VERIFY PASS`). Chi tiết ở mục 3c của `audio-pipeline.md`.
+- Lịch cảnh theo beat (dự án có `project.json` và lưới beat): `node $OV/scripts/beat-fit.mjs --project . --tight` in bảng, `--apply` ghi qua gateway (hoàn tác bằng `gateway.mjs undo`). Ghim một cắt cảnh hay một câu vào beat bằng op `pin_beat`.
+- SFX theo anchor: `node $OV/scripts/cues.mjs add --project . --sound <file> --shot s2 --word "<cụm>" --apply`, sau khi đổi lịch thì `cues.mjs place --project . --apply`, kiểm bằng `cues.mjs check`. Chi tiết ở mục 3d của `audio-pipeline.md`.
 - Đo mix: `node $OV/scripts/mix-balance.mjs --project .`, đích nhạc thấp hơn giọng 4–7 dB lúc có lời. `audio-mix` tự giảm nhạc nền có `data-fx-carve` theo giọng.
 
 ## Theo hướng vận hành
@@ -35,8 +41,10 @@ Chỉ bắt đầu khi `check-viet-pro.mjs --project .` đã PASS ở bước 2 
 | File | Dùng khi |
 |---|---|
 | `$OV/references/audio-pipeline.md` | Bước 5: voice, SFX, nhạc nền, mix, bản quyền |
-| `$OV/scripts/eleven.mjs` | `doctor`, `voice-info`, `models`, `tts`, `sfx`, `music`, `probe-models`, `audio-meta`; `tts`/`audio-meta` qua cổng viet-pro (`scripts/voice-gate.mjs`, exit 4); đạo diễn Studio của tập series chỉ chạy `sfx`, `music` (lệnh khác exit 5) |
+| `$OV/scripts/eleven.mjs` | `doctor`, `voice-info`, `models`, `tts`, `align`, `sfx`, `music`, `probe-models`, `audio-meta`; `tts`/`align`/`audio-meta` qua cổng viet-pro (`scripts/voice-gate.mjs`, exit 4); đạo diễn Studio của tập series chỉ chạy `sfx`, `music` (lệnh khác exit 5) |
 | `$OV/scripts/timing.mjs` | Mốc TIMING từ PLAN.md hoặc `project.json` và `words.json` (cú pháp ở `--help`) |
-| `$OV/scripts/beat-grid.mjs` | Nhịp nhạc: BPM, BEAT0, kick, drop; `--write` ghi `<nhạc>.beats.json` khi ổn định |
+| `$OV/scripts/beat-grid.mjs` | Nhịp nhạc: BPM, BEAT0, `beats` đo tới mẫu, `maxDriftMs`, kick, drop; `--write` ghi `<nhạc>.beats.json` khi ổn định |
+| `$OV/scripts/arrange-music.mjs` | Ghép nguyên ô nhịp từ nhạc thô sang phách đích theo `music-arrangement.json`, ra WAV và `beats.json` (mục 3c) |
+| `$OV/scripts/verify-arrangement.mjs` | Đo lệch từng mối ghép so với nhạc thô (≤ 2 ms) và `maxDriftMs` của output |
 | `$OV/scripts/mix-balance.mjs` | Cân bằng nhạc dưới giọng lúc có lời |
 | `$OV/scripts/audio-mix.mjs` | Bước 7 (do `render-final` gọi): dựng lại tiếng của composition thành một WAV bằng ffmpeg từ các thuộc tính audio tĩnh; `--dry-run` in lệnh ffmpeg |

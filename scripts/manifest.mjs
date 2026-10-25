@@ -4,11 +4,11 @@
 // Shape (schema "opus-video/project@1"):
 //   { schema, title, fps, width, height, duration, html,
 //     capabilities: { timing_markers, editable, picture_from_code? },
-//     shots:  [{ id: "s<#>", name, start, end, transition_in, motion_note, assets: [path] }],
-//     lines:  [{ id, shot, text, file, start, duration, gate: "pass"|"stale"|"unknown", speaker? }],
+//     shots:  [{ id: "s<#>", name, start, end, transition_in, motion_note, assets: [path], cut_beat? }],
+//     lines:  [{ id, shot, text, file, start, duration, gate: "pass"|"stale"|"unknown", speaker?, at_beat? }],
 //     music:  [{ id, file, start, end, gain }],
 //     assets: [{ path, kind }],
-//     events: [{ id, shot, offset, sound?, label, volume?, studio? }],   optional
+//     events: [{ id, shot, offset, sound?, label, volume?, studio?, anchor? }],   optional
 //     workflow_mode: "dao-dien"|"nhanh"|"tu-nhac"|"timeline",             optional
 //     scenes: [{ id: "c<#>", label, shots: [shot id] }],                   optional
 //     version, updated }
@@ -17,6 +17,13 @@
 // volume (0–1) its data-volume; studio: true marks an event the gateway added (add_event), whose
 // <audio data-studio-sfx> tag derive inserts and removes. A music bed's media_start is the second
 // of its file played at start (a trimmed head); fade_in / fade_out are seconds of fade in the mix.
+// Beat pins (optional, integers ≥ 0, beat n of the grid beat0 + n·beatLen that B() uses): a shot's
+// cut_beat is the beat it starts on (never on the first shot), a line's at_beat the beat its first word
+// lands on. The gateway op pin_beat writes them; beat-fit.mjs moves the shots and lines onto them.
+// An event's anchor (optional) is what its sound follows; cues.mjs places it again when timing changes:
+// exactly one of { word, nth? (≥ 1, default 1), shot } (a word or phrase spoken in that shot),
+// { beat } or { abs } (seconds), plus lead? (≥ 0, seconds of silence at the head of the sound file).
+// A seconds-into-the-shot anchor is the plain offset. Moving an event by hand drops its anchor.
 // A line's speaker (optional) is the cast role id voicing it (scenes/roles.json of a series episode).
 // scenes group shots into the script's scenes (Studio reviews and rebuilds one group at a time):
 // each shot is in at most one scene, and listing every scene's shots in order follows the shot
@@ -41,6 +48,7 @@ const EPS = 1e-3;
 export const r3 = (n) => Math.round(n * 1000) / 1000;
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
+const isBeat = (v) => Number.isInteger(v) && v >= 0;
 const insidePath = (p) => typeof p === "string" && p !== "" && !p.startsWith("/") && !/^[A-Za-z]:[\\/]/.test(p) && !p.split(/[\\/]/).includes("..");
 
 // Manifest → [error text]; [] means valid.
@@ -68,6 +76,10 @@ export function validate(m) {
     if (Math.abs(s.start - prevEnd) > EPS) errs.push(`${tag}: start ${s.start}s không nối tiếp shot trước (${r3(prevEnd)}s), có khoảng hở hoặc chồng lấn`);
     prevEnd = s.end;
     if (s.assets != null && (!Array.isArray(s.assets) || !s.assets.every(insidePath))) errs.push(`${tag}: assets phải là đường dẫn tương đối trong dự án`);
+    if (s.cut_beat != null) {
+      if (!isBeat(s.cut_beat)) errs.push(`${tag}: cut_beat phải là số nguyên ≥ 0`);
+      else if (i === 0) errs.push(`${tag}: shot đầu không ghim cut_beat (luôn bắt đầu ở 0s)`);
+    }
   });
   if (!isNum(m.duration) || (m.shots.length && Math.abs(m.duration - prevEnd) > EPS)) errs.push(`duration ${m.duration}s phải bằng end của shot cuối (${r3(prevEnd)}s)`);
 
@@ -84,6 +96,7 @@ export function validate(m) {
     if (l?.file != null && !insidePath(l.file)) errs.push(`${tag}: file phải là đường dẫn tương đối trong dự án`);
     if (typeof l?.text !== "string") errs.push(`${tag}: text phải là chuỗi`);
     if (l?.speaker != null && (typeof l.speaker !== "string" || !SPEAKER.test(l.speaker))) errs.push(`${tag}: speaker phải là id vai (chữ thường, số, gạch nối)`);
+    if (l?.at_beat != null && !isBeat(l.at_beat)) errs.push(`${tag}: at_beat phải là số nguyên ≥ 0`);
   });
   m.music.forEach((b, i) => {
     const tag = b?.id ?? `music #${i + 1}`;
@@ -116,8 +129,26 @@ export function validate(m) {
       if (typeof e?.label !== "string") errs.push(`${tag}: label phải là chuỗi`);
       if (e?.volume != null && (!isNum(e.volume) || e.volume < 0 || e.volume > 1)) errs.push(`${tag}: volume phải trong 0–1`);
       if (e?.studio != null && typeof e.studio !== "boolean") errs.push(`${tag}: studio phải là boolean`);
+      if (e?.anchor != null) errs.push(...anchorErrors(e.anchor, `sự kiện ${tag}`, shotOf));
     });
   }
+  return errs;
+}
+
+// event anchor → [error text]; tag names the event, shotOf maps shot id → shot.
+function anchorErrors(a, tag, shotOf) {
+  if (typeof a !== "object" || Array.isArray(a)) return [`${tag}: anchor phải là object`];
+  const kinds = ["word", "beat", "abs"].filter((k) => a[k] != null);
+  if (kinds.length !== 1) return [`${tag}: anchor phải có đúng một trong word | beat | abs`];
+  const errs = [];
+  if (kinds[0] === "word") {
+    if (typeof a.word !== "string" || !a.word.trim()) errs.push(`${tag}: anchor.word phải là chuỗi không rỗng`);
+    if (a.nth != null && !(Number.isInteger(a.nth) && a.nth >= 1)) errs.push(`${tag}: anchor.nth phải là số nguyên ≥ 1`);
+    if (!shotOf.has(a.shot)) errs.push(`${tag}: anchor.shot "${a.shot}" không tồn tại`);
+  } else if (kinds[0] === "beat" && !isBeat(a.beat)) errs.push(`${tag}: anchor.beat phải là số nguyên ≥ 0`);
+  else if (kinds[0] === "abs" && !(isNum(a.abs) && a.abs >= 0)) errs.push(`${tag}: anchor.abs phải là số giây ≥ 0`);
+  if (kinds[0] !== "word" && (a.nth != null || a.shot != null)) errs.push(`${tag}: nth và shot chỉ dùng với anchor.word`);
+  if (a.lead != null && !(isNum(a.lead) && a.lead >= 0)) errs.push(`${tag}: anchor.lead phải là số giây ≥ 0`);
   return errs;
 }
 

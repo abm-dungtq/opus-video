@@ -103,3 +103,33 @@ test("bad usage exits 2 without writing", () => {
     assert.equal(existsSync(join(dir, "index.html")), false);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("add-part mascot: markup and script go in at the PARTS markers, <html> gets data-voice-env, a second run exits 2", () => {
+  const dir = mkdtempSync(join(tmpdir(), "parts-"));
+  try {
+    assert.equal(main(["init", "--project", dir], { out: () => {}, err: () => {} }), 0);
+    assert.equal(main(["add-part", "--project", dir, "--part", "mascot"], { out: () => {}, err: () => {} }), 0);
+    const html = readFileSync(join(dir, "index.html"), "utf8");
+    assert.equal((html.match(/data-part="mascot"/g) || []).length, 1);
+    assert.match(html, /^<html data-voice-env lang="vi"/m);
+    assert.ok(html.indexOf('data-part="mascot"') < html.indexOf("<!-- PARTS:END -->"));
+    assert.ok(html.indexOf("const M = \"#mascot\"") < html.indexOf("/* PARTS:END */"));
+    assert.doesNotMatch(html, /data-part-script/);
+    let msg = "";
+    assert.equal(main(["add-part", "--project", dir, "--part", "mascot"], { out: () => {}, err: (s) => { msg += s; } }), 2);
+    assert.match(msg, /đã có/);
+    assert.equal(main(["add-part", "--project", dir, "--part", "hud-counter"], { out: () => {}, err: () => {} }), 0);
+    assert.match(readFileSync(join(dir, "index.html"), "utf8"), /data-part="hud-counter"/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("add-part on an index.html without PARTS markers exits 2; an unknown part exits 2", () => {
+  const dir = mkdtempSync(join(tmpdir(), "parts-"));
+  try {
+    writeFileSync(join(dir, "index.html"), "<!DOCTYPE html><html><body></body></html>");
+    let msg = "";
+    assert.equal(main(["add-part", "--project", dir, "--part", "mascot"], { out: () => {}, err: (s) => { msg += s; } }), 2);
+    assert.match(msg, /PARTS/);
+    assert.equal(main(["add-part", "--project", dir, "--part", "nope"], { out: () => {}, err: () => {} }), 2);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

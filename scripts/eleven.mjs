@@ -5,12 +5,32 @@
 //   node eleven.mjs voice-info [--voice id]
 //   node eleven.mjs models
 //   node eleven.mjs tts   --text-file <project>/script/NN.txt --out f.mp3 [--project dir] [--voice id] [--model id] [--speed 1.0] [--lang vi] [--skip-viet-pro-gate]
+//                         [--provider elevenlabs|gemini] [--tempo 0.8–1.25]
 //   node eleven.mjs sfx   --text "english description" --seconds 1.5 --out f.mp3 [--influence 0.3] [--no-normalize]
 //   node eleven.mjs music --prompt str --seconds 15 --out f.mp3 [--no-normalize]
+//   node eleven.mjs music --plan plan.json [--out f.mp3 | --outro] [--no-normalize]
+//     --plan: ElevenLabs composition plan (global styles + sections with duration_ms), sent with
+//     model music_v1 (the only model that takes sections[]), respect_sections_durations and
+//     mp3_44100_128. The bar placement is still not a contract: arrange the result with arrange-music.mjs.
+//     --outro: default --out assets/bgm/outro.mp3 (a second, calm bed under the ending).
+//   node eleven.mjs align --audio f.mp3 --text-file <project>/script/NN.txt [--project dir] [--out f.words.json] [--force] [--lang vi] [--skip-viet-pro-gate]
+//     forced alignment for a voice that is not TTS (a real recording, a clip): writes <audio>.words.json
+//     in the TTS shape [{text,start,end}]. The text goes through the viet-pro gate like tts.
 //   node eleven.mjs probe-models --text-file path [--models a,b,c]   (writes to $TMPDIR/ov-probe)
 //   node eleven.mjs audio-meta --script SCRIPT.md [--hyperframes .] [--project dir] [--bgm assets/bgm/x.mp3 --bgm-volume 0.2] [--reuse] [--skip-viet-pro-gate]
+//                         [--provider elevenlabs|gemini] [--tempo 0.8–1.25]
 //
-// viet-pro gate (tts, audio-meta): when BRIEF.md `language:` is Vietnamese (or missing), voice is
+// --provider (tts, audio-meta): default BRIEF.md `voice_provider:`, else elevenlabs. gemini speaks with
+// Gemini TTS (gemini-tts.mjs; GEMINI_API_KEY; --model, else BRIEF `gemini_tts_model`, else
+// gemini-3.8-flash-tts; --voice, else BRIEF `gemini_voice`, a Gemini voice name, default Kore; --speed
+// is ignored with a WARN), converts to mp3 44.1 kHz 128k, then gets the words by ElevenLabs forced
+// alignment: it still needs ELEVENLABS_API_KEY (checked before the Gemini call) and spends ElevenLabs
+// credit. The viet-pro gate runs first, as for ElevenLabs.
+// --tempo x: any provider; ffmpeg atempo (in the same encode for gemini), every word time divided by x.
+// The stamp records provider (when not elevenlabs), model and voice (gemini) and tempo (when not 1),
+// and --reuse re-voices a line whose stamp was made another way.
+//
+// viet-pro gate (tts, align, audio-meta): when BRIEF.md `language:` is Vietnamese (or missing), voice is
 // generated only if check-viet-pro.mjs passes for the project AND the voiced text is the gated
 // text — tts takes only --text-file <project>/script/NN.txt (no --text), and every SCRIPT.md
 // frame must equal script/NN.txt (whitespace-insensitive). Project: --project, else the parent
@@ -38,22 +58,26 @@
 // The key is never printed. Exit codes: 0 ok, 1 error, 2 usage, 3 music unavailable on plan,
 // 4 viet-pro gate blocked, 5 refused to the Studio director of a series episode (director-guard.mjs:
 // it runs only sfx and music; voices go through Studio's series tools behind a consent card).
+// align also exits 2 when its output exists without --force and 3 when forced alignment is not on the
+// plan; tts and audio-meta with gemini exit 3 the same way (ALIGN_UNAVAILABLE).
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join, dirname, resolve, basename } from "node:path";
+import { join, dirname, resolve, basename, extname } from "node:path";
 import { spawnSync } from "node:child_process";
 import { maybeHelp } from "./cli-help.mjs";
 import { parseScript, writeStamp, stampMatches } from "./script-md.mjs";
 import { voiceGate, GATE_EXIT } from "./voice-gate.mjs";
 import { loadKey, ping } from "./jev-client.mjs";
 import { defaultVp, frontmatter } from "./check-viet-pro.mjs";
-import { DEFAULT_VOICE, DEFAULT_TTS_MODEL, pickVoice } from "./voice-defaults.mjs";
+import { DEFAULT_VOICE, DEFAULT_TTS_MODEL, pickVoice, briefValue } from "./voice-defaults.mjs";
 import { BED_DEFAULTS, writeGenerated } from "./normalize-bed.mjs";
 import { elevenRefusal, REFUSED_EXIT } from "./director-guard.mjs";
+import { synthGemini, DEFAULT_GEMINI_MODEL, DEFAULT_GEMINI_VOICE } from "./gemini-tts.mjs";
 maybeHelp(process.argv.slice(2), import.meta.url);
 
-const API = "https://api.elevenlabs.io";
+// Base URL is overridable for tests only (a local fake server); real runs use the public API.
+const API = process.env.ELEVENLABS_API_BASE || "https://api.elevenlabs.io";
 const ENV_FILE = join(homedir(), ".config", "opus-video", ".env");
 const DEFAULTS = {
   voice: DEFAULT_VOICE,
@@ -122,11 +146,12 @@ class HttpError extends Error {
   }
 }
 
-async function call(path, { method = "GET", body, binary = false } = {}) {
+// form: a FormData sent as multipart (fetch sets the boundary, so no Content-Type here).
+async function call(path, { method = "GET", body, form, binary = false } = {}) {
   const res = await fetch(API + path, {
     method,
     headers: { "xi-api-key": key(), ...(body ? { "Content-Type": "application/json" } : {}) },
-    body: body ? JSON.stringify(body) : undefined,
+    body: form ?? (body ? JSON.stringify(body) : undefined),
   });
   if (!res.ok) throw new HttpError(res.status, await res.text());
   return binary ? Buffer.from(await res.arrayBuffer()) : res.json();
@@ -139,6 +164,32 @@ function writeOut(path, buf) {
 // sfx/music output: written, then normalized to the bed level unless --no-normalize.
 function writeBed(path, buf) {
   writeGenerated(path, buf, { normalize: !args["no-normalize"], lufs: BED_DEFAULTS.lufs, log: (s) => console.error(s), warn: (s) => console.error(s) });
+}
+
+// Model for --plan: the sections[] composition plan is accepted by music_v1 only.
+const PLAN_MUSIC_MODEL = "music_v1";
+
+// Composition plan for `music --plan`: read and checked before any request; exit 2 names the bad field.
+function readPlan(file) {
+  let plan;
+  try {
+    plan = JSON.parse(readFileSync(file, "utf8"));
+  } catch (err) {
+    die(`--plan ${file}: ${err.message}`, 2);
+  }
+  const strings = (v) => Array.isArray(v) && v.every((x) => typeof x === "string");
+  for (const k of ["positive_global_styles", "negative_global_styles"]) {
+    if (!strings(plan?.[k])) die(`--plan: ${k} phải là mảng chuỗi`, 2);
+  }
+  if (!Array.isArray(plan.sections) || !plan.sections.length) die("--plan: sections phải là mảng không rỗng", 2);
+  plan.sections.forEach((sec, i) => {
+    const at = `--plan: sections[${i}]`;
+    if (typeof sec?.section_name !== "string" || !sec.section_name) die(`${at}.section_name phải là chuỗi`, 2);
+    if (!Number.isInteger(sec.duration_ms) || sec.duration_ms < 3000 || sec.duration_ms > 120000) die(`${at}.duration_ms phải là số nguyên 3000–120000`, 2);
+    for (const k of ["positive_local_styles", "negative_local_styles"]) if (!strings(sec[k])) die(`${at}.${k} phải là mảng chuỗi`, 2);
+    if (!Array.isArray(sec.lines)) die(`${at}.lines phải là mảng`, 2);
+  });
+  return plan;
 }
 
 // Group character-level alignment into words split on whitespace.
@@ -193,6 +244,106 @@ async function tts({ text, out, voice, model, speed, lang }) {
   writeFileSync(`${out}.words.json`, JSON.stringify(words, null, 2));
   console.error(`route: ${route} · model ${model} · ${words.length} words → ${out}`);
   return { route, words: words.length };
+}
+
+// ElevenLabs forced alignment of audio against text → { words, tokens, loss }. Words split like the
+// TTS words (toWords over characters) when that gives one word per token of the text, as karaoke
+// splits line.text; else the API's words[], trimmed. 401/402/403 print ALIGN_UNAVAILABLE, exit 3.
+async function forcedAlign(audio, text) {
+    const form = new FormData();
+    const mime = { ".mp3": "audio/mpeg", ".wav": "audio/wav", ".m4a": "audio/mp4", ".aac": "audio/aac", ".flac": "audio/flac", ".ogg": "audio/ogg" }[extname(audio).toLowerCase()];
+    form.append("file", new Blob([readFileSync(audio)], mime ? { type: mime } : {}), basename(audio));
+    form.append("text", text);
+    let data;
+    try {
+      data = await call("/v1/forced-alignment", { method: "POST", form });
+    } catch (err) {
+      if ([401, 402, 403].includes(err.status)) {
+        console.log("ALIGN_UNAVAILABLE");
+        console.error(err.message);
+        process.exit(3);
+      }
+      throw err;
+    }
+    const tokens = text.split(/\s+/).filter(Boolean).length;
+    const chars = (data.characters ?? []).filter((c) => Number.isFinite(c?.start) && Number.isFinite(c?.end));
+    const fromChars = toWords({ characters: chars.map((c) => c.text), character_start_times_seconds: chars.map((c) => c.start), character_end_times_seconds: chars.map((c) => c.end) });
+    const fromWords = (Array.isArray(data.words) ? data.words : [])
+      .map((w) => ({ text: String(w?.text ?? "").trim(), start: Number(w?.start), end: Number(w?.end) }))
+      .filter((w) => w.text && Number.isFinite(w.start) && Number.isFinite(w.end))
+      .map((w) => ({ text: w.text, start: +w.start.toFixed(3), end: +w.end.toFixed(3) }));
+    const words = fromChars.length === tokens ? fromChars : fromWords.length === tokens ? fromWords : fromWords.length ? fromWords : fromChars;
+    return { words, tokens, loss: data.loss };
+}
+
+// Voice settings for tts and audio-meta: --provider/--model/--voice/--tempo, then BRIEF.md (a
+// "<placeholder>" or empty BRIEF value counts as unset, as in voice-defaults.mjs).
+function voiceSpec(project) {
+  const b = join(project, "BRIEF.md");
+  const brief = existsSync(b) ? frontmatter(readFileSync(b, "utf8")) : {};
+  const provider = args.provider || briefValue(brief.voice_provider) || "elevenlabs";
+  if (!["elevenlabs", "gemini"].includes(provider)) die(`--provider (hoặc BRIEF voice_provider) phải là elevenlabs hoặc gemini, đang là "${provider}"`, 2);
+  const tempo = args.tempo === undefined ? 1 : Number(args.tempo);
+  if (!(tempo >= 0.8 && tempo <= 1.25)) die("--tempo phải trong khoảng 0.8–1.25", 2);
+  if (provider === "elevenlabs") return { provider, tempo, ...projectVoice(project) };
+  const key = env("GEMINI_API_KEY");
+  if (!key) die(`voice_provider gemini cần GEMINI_API_KEY (env hoặc ${ENV_FILE})`, 2);
+  // The words come from ElevenLabs forced alignment: check its key before Gemini spends a call.
+  if (!env("ELEVENLABS_API_KEY")) die(`voice_provider gemini vẫn cần ELEVENLABS_API_KEY cho mốc từ (env hoặc ${ENV_FILE})`, 2);
+  const model = args.model || briefValue(brief.gemini_tts_model) || DEFAULT_GEMINI_MODEL;
+  const voice = args.voice || briefValue(brief.gemini_voice) || DEFAULT_GEMINI_VOICE;
+  if (/^[A-Za-z0-9]{20}$/.test(voice)) die(`--voice "${voice}" trông như id giọng ElevenLabs; với gemini dùng tên giọng Gemini (vd ${DEFAULT_GEMINI_VOICE}) hoặc BRIEF gemini_voice`, 2);
+  if (args.speed !== undefined) console.error("WARN --speed chỉ dùng cho ElevenLabs; với gemini dùng --tempo");
+  console.error(`voice: gemini ${voice} · model: ${model} · words: ElevenLabs forced alignment`);
+  return { provider, tempo, model, voice, key };
+}
+const stampHow = (spec) => ({ ...(spec.provider === "gemini" ? { provider: "gemini", model: spec.model, voice: spec.voice } : {}), tempo: spec.tempo });
+const stampWant = (spec) => ({ provider: spec.provider, tempo: spec.tempo, ...(spec.provider === "gemini" ? { model: spec.model, voice: spec.voice } : {}) });
+
+// Throws (the caller cleans its temp files; the top-level catch exits 1).
+function ffmpeg(argv) {
+  const r = spawnSync("ffmpeg", ["-hide_banner", "-nostdin", "-v", "error", "-y", ...argv], { encoding: "utf8" });
+  if (r.error || r.status !== 0) throw new Error(`ffmpeg: ${r.error?.message ?? String(r.stderr).trim()}`);
+}
+
+// One voice line → out (mp3) + out.words.json, by the chosen provider, then --tempo. Gemini writes
+// to a temp mp3 (tempo in the same encode) and replaces out only after alignment succeeds, so out
+// never pairs with the words of an older take.
+async function speak({ text, out, spec, speed, lang }) {
+  if (spec.provider === "gemini") {
+    const wav = await synthGemini({ text, voice: spec.voice, model: spec.model, key: spec.key });
+    const tmp = join(tmpdir(), `ov-gemini-${process.pid}-${Date.now()}.wav`);
+    const part = `${out}.part.mp3`;
+    mkdirSync(dirname(out), { recursive: true });
+    try {
+      writeFileSync(tmp, wav);
+      ffmpeg(["-i", tmp, ...(spec.tempo !== 1 ? ["-filter:a", `atempo=${spec.tempo}`] : []), "-ar", "44100", "-c:a", "libmp3lame", "-b:a", "128k", part]);
+      const { words, tokens } = await forcedAlign(part, text);
+      if (!words.length) throw new Error("forced alignment không trả từ nào");
+      if (words.length !== tokens) console.error(`WARN align words=${words.length} khác chữ nguồn ${tokens}`);
+      renameSync(part, out);
+      writeFileSync(`${out}.words.json`, JSON.stringify(words, null, 2));
+      console.error(`route: gemini · model ${spec.model} · ${words.length} words${spec.tempo !== 1 ? ` · tempo ${spec.tempo}` : ""} → ${out}`);
+    } finally {
+      rmSync(tmp, { force: true });
+      rmSync(part, { force: true });
+    }
+    return;
+  }
+  await tts({ text, out, voice: spec.voice, model: spec.model, speed, lang });
+  if (spec.tempo !== 1) {
+    const tmp = `${out}.tempo.mp3`;
+    try {
+      ffmpeg(["-i", out, "-filter:a", `atempo=${spec.tempo}`, "-ar", "44100", "-c:a", "libmp3lame", "-b:a", "128k", tmp]);
+      renameSync(tmp, out);
+    } finally {
+      rmSync(tmp, { force: true });
+    }
+    const words = JSON.parse(readFileSync(`${out}.words.json`, "utf8"));
+    const r3 = (x) => +(x / spec.tempo).toFixed(3);
+    writeFileSync(`${out}.words.json`, JSON.stringify(words.map((w) => ({ ...w, start: r3(w.start), end: r3(w.end) })), null, 2));
+    console.error(`tempo ${spec.tempo} → ${out}`);
+  }
 }
 
 function probeDuration(file) {
@@ -255,14 +406,29 @@ const commands = {
     });
     const text = g.texts?.[0] ?? readText();
     const out = need("out");
-    await tts({
-      text,
-      out,
-      ...(({ voice, model }) => ({ voice, model }))(projectVoice(project)),
-      speed: Number(args.speed || 1.0),
-      lang,
-    });
-    if (!g.skipped) writeStamp(out, { text, script: textFile && `script/${basename(textFile)}`, override: g.override });
+    const spec = voiceSpec(project);
+    await speak({ text, out, spec, speed: Number(args.speed || 1.0), lang });
+    if (!g.skipped) writeStamp(out, { text, script: textFile && `script/${basename(textFile)}`, override: g.override, ...stampHow(spec) });
+  },
+
+  async align() {
+    const audio = resolve(need("audio"));
+    const textFile = resolve(need("text-file"));
+    if (!existsSync(audio)) die(`không thấy ${audio}`, 2);
+    const lang = args.lang || "vi";
+    const project = resolve(args.project || (basename(dirname(textFile)) === "script" ? dirname(dirname(textFile)) : "."));
+    const g = gate({ project, textFiles: [textFile], inline: false, skip: !!args["skip-viet-pro-gate"], voiceLang: lang });
+    const text = g.texts?.[0] ?? readFileSync(textFile, "utf8").trim();
+    const out = resolve(args.out || `${audio}.words.json`);
+    if (existsSync(out) && !args.force) die(`${out} đã có; thêm --force để ghi đè`, 2);
+    const { words, tokens, loss } = await forcedAlign(audio, text);
+    if (!words.length) die("forced alignment không trả từ nào");
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, JSON.stringify(words, null, 2));
+    if (!g.skipped) writeStamp(audio, { text, script: `script/${basename(textFile)}`, override: g.override });
+    if (words.length !== tokens) console.log(`WARN align words=${words.length} khác chữ nguồn ${tokens}`);
+    console.log(`ALIGN ${out} words=${words.length} loss=${loss ?? "?"}`);
+    if (Number(loss) > 1) console.log("WARN align loss cao, kiểm lại chữ và audio");
   },
 
   async sfx() {
@@ -281,17 +447,23 @@ const commands = {
   },
 
   async music() {
-    const body = {
-      prompt: need("prompt"),
-      music_length_ms: Math.round(Number(need("seconds")) * 1000),
-      model_id: DEFAULTS.musicModel,
-      force_instrumental: true,
-    };
+    if (args.plan && args.prompt) die("chọn --plan hoặc --prompt", 2);
+    // A plan with sections[] is the music_v1 format: ElevenLabs rejects it with music_v2/v2_5,
+    // which take a chunks[] plan instead. music_v1 keeps each section's duration_ms.
+    const body = args.plan
+      ? { composition_plan: readPlan(args.plan), model_id: PLAN_MUSIC_MODEL, respect_sections_durations: true }
+      : {
+          prompt: need("prompt"),
+          music_length_ms: Math.round(Number(need("seconds")) * 1000),
+          model_id: DEFAULTS.musicModel,
+          force_instrumental: true,
+        };
+    const out = args.out ?? (args.outro ? "assets/bgm/outro.mp3" : need("out"));
     for (let attempt = 0; ; attempt++) {
       try {
-        const buf = await call("/v1/music", { method: "POST", binary: true, body });
-        writeBed(need("out"), buf);
-        console.error(`music → ${args.out} (${buf.length} bytes)`);
+        const buf = await call(args.plan ? "/v1/music?output_format=mp3_44100_128" : "/v1/music", { method: "POST", binary: true, body });
+        writeBed(out, buf);
+        console.error(`music → ${out} (${buf.length} bytes)`);
         return;
       } catch (err) {
         if ([401, 402, 403].includes(err.status)) {
@@ -314,7 +486,7 @@ const commands = {
     if (!lines.length) die("no `## … (Frame N)` lines with indented text found in the script");
     const lang = args.lang || "vi";
     const g = gate({ project: resolve(args.project || hf), frames: lines, skip: !!args["skip-viet-pro-gate"], voiceLang: lang });
-    const { voice, model } = projectVoice(resolve(args.project || hf));
+    const spec = voiceSpec(resolve(args.project || hf));
 
     const voices = [];
     for (const { frame, text } of lines) {
@@ -322,12 +494,12 @@ const commands = {
       const rel = `assets/voice/${id}.mp3`;
       const abs = join(hf, rel);
       // Reuse only audio stamped by the gate for this exact text (never an override run).
-      const reuse = args.reuse && existsSync(abs) && existsSync(`${abs}.words.json`) && (g.skipped || stampMatches(abs, text));
+      const reuse = args.reuse && existsSync(abs) && existsSync(`${abs}.words.json`) && (g.skipped || stampMatches(abs, text, stampWant(spec)));
       if (reuse) console.error(`frame ${id}: reuse ${rel}`);
       else {
         if (args.reuse && existsSync(abs)) console.error(`frame ${id}: not reused (no matching gate stamp), re-voicing`);
-        await tts({ text, out: abs, voice, model, speed: Number(args.speed || 1.0), lang });
-        if (!g.skipped) writeStamp(abs, { text, script: `script/${id}.txt`, override: g.override });
+        await speak({ text, out: abs, spec, speed: Number(args.speed || 1.0), lang });
+        if (!g.skipped) writeStamp(abs, { text, script: `script/${id}.txt`, override: g.override, ...stampHow(spec) });
       }
       const words = JSON.parse(readFileSync(`${abs}.words.json`, "utf8")).map((w, i) => ({
         id: `w${i}`,
@@ -345,8 +517,8 @@ const commands = {
     }
 
     const engineMeta = {
-      tts_provider: "elevenlabs",
-      voice_id: voice,
+      tts_provider: spec.provider,
+      voice_id: spec.voice,
       bgm: null,
       bgm_pending: false,
       voices: voices.map(({ id, path, duration_s, words }) => ({ id, path, duration_s, words })),

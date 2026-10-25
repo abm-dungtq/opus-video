@@ -72,8 +72,8 @@ export function wrap(words, maxChars) {
   return lines;
 }
 
-// Timed words of one voice line → cues [{ start, end, lines }].
-export function cuesOf(words, { maxChars = 42, maxLines = 2 } = {}) {
+// Timed words of one voice line → cues [{ start, end, lines }]. maxWords caps the words of a cue (karaoke).
+export function cuesOf(words, { maxChars = 42, maxLines = 2, maxWords = Infinity } = {}) {
   const cues = [];
   let cur = [];
   const flush = () => { if (cur.length) cues.push({ start: cur[0].start, end: cur.at(-1).end, lines: wrap(cur.map((w) => w.text), maxChars) }); cur = []; };
@@ -81,7 +81,7 @@ export function cuesOf(words, { maxChars = 42, maxLines = 2 } = {}) {
   for (const w of words) {
     if (cur.length) {
       const fits = wrap([...cur, w].map((x) => x.text), maxChars).length <= maxLines;
-      if (!fits || w.end - cur[0].start > MAX_CUE_S) flush();
+      if (!fits || cur.length >= maxWords || w.end - cur[0].start > MAX_CUE_S) flush();
     }
     cur.push(w);
     const size = cur.reduce((n, x) => n + x.text.length + 1, -1);
