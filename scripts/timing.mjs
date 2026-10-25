@@ -118,6 +118,8 @@ function sourceText(root, manifest, t) {
 }
 
 // Karaoke chunks of every voice track, the text taken from the checked source. { captions, warnings }.
+// Lead, hold and gap follow the motion-video caption timing (build-timeline.mjs).
+const CAP_LEAD = 0.12, CAP_HOLD = 0.5, CAP_GAP = 0.16;
 export function karaoke(root, voice, given = undefined) {
   const manifest = given !== undefined ? given : existsSync(join(root, "project.json")) ? loadManifest(root) : null;
   const warnings = [], captions = [];
@@ -134,15 +136,33 @@ export function karaoke(root, voice, given = undefined) {
       if (tokens.length === words.length) tokens.forEach((x, i) => { words[i].text = x; });
       else warnings.push(`karaoke ${id}: số từ chữ nguồn ${tokens.length} khác words.json ${words.length}`);
     }
+    const chunks = [];
     let i = 0;
     for (const c of cuesOf(words, { maxChars: 42, maxLines: 2, maxWords: 9 })) {
       const n = c.lines.join(" ").split(" ").length;
-      captions.push({ start: r3(c.start), end: r3(c.end), words: words.slice(i, i + n).map((w) => [w.text.replace(/\u00a0/g, " "), r3(w.start), r3(w.end)]) });
+      chunks.push(words.slice(i, i + n));
       i += n;
     }
+    // On screen CAP_LEAD before the first word, held CAP_HOLD after its last word so it can be read,
+    // cut CAP_GAP before the next chunk's first word (a track may hold several sentences: no text
+    // stays up through a pause).
+    chunks.forEach((ws, k) => {
+      const next = chunks[k + 1];
+      captions.push({
+        start: r3(Math.max(0, ws[0].start - CAP_LEAD)),
+        end: r3(next ? Math.min(ws[ws.length - 1].end + CAP_HOLD, next[0].start - CAP_GAP) : ws[ws.length - 1].end + CAP_HOLD),
+        first: ws[0].start,
+        words: ws.map((w) => [w.text.replace(/\u00a0/g, " "), r3(w.start), r3(w.end)]),
+      });
+    });
   }
   captions.sort((a, b) => a.start - b.start);
-  captions.forEach((c, k) => { const next = captions[k + 1]; if (next && c.end > next.start) c.end = next.start; });
+  // Never over the next chunk (another line included): off CAP_GAP before its first word.
+  captions.forEach((c, k) => {
+    const next = captions[k + 1];
+    if (next) c.end = r3(Math.max(c.start, Math.min(c.end, next.first - CAP_GAP, next.start)));
+  });
+  captions.forEach((c) => delete c.first);
   return { captions, warnings };
 }
 

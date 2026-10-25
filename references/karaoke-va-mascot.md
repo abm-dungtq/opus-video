@@ -6,7 +6,7 @@ Bốn lớp tuỳ chọn của composition dựng từ skeleton (`composition.mj
 
 1. Thêm thuộc tính `data-karaoke` vào thẻ `<html>` của `index.html`.
 2. Chạy `node $OV/scripts/timing.mjs --project .`. Dự án có `project.json` thì chạy `gateway.mjs derive --project .`.
-3. Khối TIMING có thêm `captions`: danh sách chunk `{start, end, words: [[chữ, start, end]]}`. Lớp `#cap-layer` của skeleton dựng từng chunk và cho từng từ sáng lên đúng onset của nó.
+3. Khối TIMING có thêm `captions`: danh sách chunk `{start, end, words: [[chữ, start, end]]}`. Lớp `#cap-layer` của skeleton dựng từng chunk và cho từng từ sáng lên đúng onset của nó. Chunk hiện trước từ đầu 0,12 s, tắt trước từ đầu của chunk kế 0,16 s; mỗi chunk giữ thêm tối đa 0,5 s sau từ cuối để người xem kịp đọc, nên chunk cuối câu không nằm lại qua khoảng lặng.
 
 Luật chữ:
 

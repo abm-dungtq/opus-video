@@ -6,7 +6,7 @@ import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildTiming } from "../timing.mjs";
+import { buildTiming, karaoke } from "../timing.mjs";
 import { textHash } from "../script-md.mjs";
 
 const FIXTURE = fileURLToPath(new URL("./fixtures/timing", import.meta.url));
@@ -88,5 +88,44 @@ test("gateway patch: captions show the text of the version being written, not th
     assert.equal(r.code, EXIT.ok, r.error);
     const timing = JSON.parse(readFileSync(join(dir, "timing.json"), "utf8"));
     assert.equal(timing.captions[0].words[0][0], "XIN");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("caption timing: on 0.12 s before the first word, the line's last chunk held 0.5 s, no overlap", () => withProject({ script: "Bạn đưa cả mã nguồn, ảnh chụp." }, (dir) => {
+  const { timing } = buildTiming({ dir });
+  const caps = timing.captions;
+  caps.forEach((c, k) => {
+    assert.ok(Math.abs(c.start - Math.max(0, c.words[0][1] - 0.12)) <= 0.001, `start ${k}`);
+    const next = caps[k + 1];
+    if (next) assert.ok(c.end <= next.start + 1e-9 && c.end <= next.words[0][1] - 0.16 + 0.001, `end ${k}`);
+  });
+  const last = caps[caps.length - 1];
+  assert.ok(Math.abs(last.end - (last.words[last.words.length - 1][2] + 0.5)) <= 0.001, String(last.end));
+}));
+
+test("two lines of 12 and 3 words: lead, 0.16 s gap before every next chunk, 0.5 s hold at the end", () => {
+  const dir = mkdtempSync(join(tmpdir(), "karaoke-x-"));
+  try {
+    const mk = (id, n, t0) => Array.from({ length: n }, (_, i) => ({ id, text: `từ${i}`, start: t0 + i * 0.3, end: t0 + i * 0.3 + 0.25 }));
+    const a = mk("a", 12, 1), b = mk("b", 3, 1 + 11 * 0.3 + 0.25 + 0.3);
+    const { captions } = karaoke(dir, { tracks: [{ id: "a" }, { id: "b" }], words: [...a, ...b] }, null);
+    assert.equal(captions.length, 3);
+    const [c1, c2, c3] = captions;
+    assert.equal(c1.start, 0.88);
+    assert.equal(c1.end, +(c2.words[0][1] - 0.16).toFixed(3), "inside the line: off 0.16 s before the next chunk");
+    assert.equal(c2.end, +(c3.words[0][1] - 0.16).toFixed(3), "the hold is cut 0.16 s before the next line");
+    assert.equal(c3.end, +(b[2].end + 0.5).toFixed(3), "the last chunk is held 0.5 s");
+    for (let k = 0; k + 1 < captions.length; k++) assert.ok(captions[k].end <= captions[k + 1].start);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("a 2 s pause inside one track: the chunk before it goes off 0.5 s after its last word", () => {
+  const dir = mkdtempSync(join(tmpdir(), "karaoke-p-"));
+  try {
+    const w = (text, start) => ({ id: "a", text, start, end: start + 0.25 });
+    const words = [w("Một.", 1), w("Hai", 1.25 + 2), w("ba.", 3.55)];
+    const { captions } = karaoke(dir, { tracks: [{ id: "a" }], words }, null);
+    assert.ok(captions.length >= 2, JSON.stringify(captions));
+    assert.equal(captions[0].end, 1.75);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
