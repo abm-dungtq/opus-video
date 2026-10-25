@@ -32,6 +32,7 @@ import { constants, copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, re
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
+import { replaceRootHtmlTag, rootHtmlTag } from "./html-root.mjs";
 
 export const RATIOS = {
   "9x16": { width: 1080, height: 1920, aspect: "9:16", resolution: "portrait" },
@@ -58,10 +59,8 @@ export function editionHtml(text, ratio) {
   }
   const rootTag = root[0].replace(/\bdata-width="\d+"/, `data-width="${f.width}"`).replace(/\bdata-height="\d+"/, `data-height="${f.height}"`);
   let out = text.replace(rootRe, () => rootTag);
-  const html = out.match(/<html\b[^>]*>/i);
-  if (!html) throw new Error("không thấy thẻ <html>");
-  const htmlTag = html[0].replace(/\s(data-ratio|data-resolution)="[^"]*"/g, "").replace(/>$/, ` data-resolution="${f.resolution}" data-ratio="${ratio}">`);
-  out = out.replace(/<html\b[^>]*>/i, () => htmlTag);
+  if (!rootHtmlTag(out)) throw new Error("không thấy thẻ <html>");
+  out = replaceRootHtmlTag(out, (tag) => tag.replace(/\s(data-ratio|data-resolution)="[^"]*"/g, "").replace(/>$/, ` data-resolution="${f.resolution}" data-ratio="${ratio}">`));
   out = out.replace(/(<meta name="viewport" content=")[^"]*(")/, `$1width=${f.width}, height=${f.height}$2`);
   const vars = /(--W:\s*)\d+(px;\s*--H:\s*)\d+(px)/;
   if (vars.test(out)) out = out.replace(vars, `$1${f.width}$2${f.height}$3`);

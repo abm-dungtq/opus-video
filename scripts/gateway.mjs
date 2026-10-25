@@ -714,7 +714,7 @@ export function derive(dir, { manifest = null, prev = null, dry = false, restore
       dropped = ev.dropped;
     }
     const bed = m.music.find((b) => existsSync(join(root, `${b.file}.beats.json`)));
-    r = buildTiming({ dir: root, html: m.html, music: bed?.file ?? null, scenes: manifestScenes(m), htmlText: html });
+    r = buildTiming({ dir: root, html: m.html, music: bed?.file ?? null, scenes: manifestScenes(m), htmlText: html, manifest: m });
     next = injectTiming(html, r.timing);
   } catch (e) { return { code: EXIT.io, error: e.message }; }
   if (!dry) {

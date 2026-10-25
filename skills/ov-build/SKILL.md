@@ -15,7 +15,7 @@ Viết `STORYBOARD.md` từ bảng của viet-pro và hướng đã chọn, cộ
 
 Chọn theo `references/engine-selection.md` (`$OV/references/engine-selection.md`). Mặc định là HyperFrames. Ghi `engine`, `workflow`, `engine_reason` vào `BRIEF.md`. Nhiều biến thể của cùng một mẫu thì dùng `render --batch` của HyperFrames, không chuyển sang Remotion.
 
-- **Dựng tay** (general-video, mặc định; HyperFrames 0.8.185 trở đi chỉ còn cách này, loại video đọc ở `hyperframes/references/types/`): khung là `node $OV/scripts/composition.mjs init --project .` (`new-project.sh` đã gọi sẵn): `index.html` có bộ hàm hoạt hình, `W(cảnh, "cụm từ")` mốc theo lời, `B(n)` mốc theo phách. Không gõ tay số giây.
+- **Dựng tay** (general-video, mặc định; HyperFrames 0.8.185 trở đi chỉ còn cách này, loại video đọc ở `hyperframes/references/types/`): khung là `node $OV/scripts/composition.mjs init --project .` (`new-project.sh` đã gọi sẵn): `index.html` có bộ hàm hoạt hình, `W(cảnh, "cụm từ")` mốc theo lời, `B(n)` mốc theo phách. Không gõ tay số giây. Karaoke tiếng Việt (`data-karaoke`), envelope giọng (`data-voice-env`), mascot và HUD (`composition.mjs add-part`) là lớp tuỳ chọn, phải bật trước animatic: xem `$OV/references/karaoke-va-mascot.md`.
 - **Lớp lemo-canvas** (`lemo_style:` trong BRIEF, hoặc `style_profile` có `engine: lemo-canvas`): `node $OV/scripts/lemo.mjs add --project . --style <slug>` rồi viết `assets/lemo/scene.js` hoặc `scene3d.js`. Đọc `$OV/references/lemo-canvas.md` trước khi viết scene.
 
 ## 4b. Plan
@@ -75,7 +75,8 @@ Chép mục "Sàn chất lượng", "Chống slideshow" và "Kỷ luật GSAP" c
 | `$OV/scripts/recipe-pack.mjs` | Bước 6 (và 1b): gom blueprint/rule/seam theo PLAN.md hoặc theo hướng thành `build/RECIPES.md` |
 | `$OV/scripts/make-demo.mjs` | Bước 6b: chụp khung hình demo theo `PLAN.md`, ghi `DEMO.md`; `--animatic` render clip nháp toàn bộ + contact sheet (bắt buộc với dự án có `direction:`); `--from-video` cắt từ bản nháp người dùng đã xem |
 | `$OV/scripts/sfx-sync.mjs` | Bước 6b và 8: đo lúc SFX thật sự vang so với `## Sự kiện` trong `PLAN.md`, ngưỡng theo ITU-R BT.1359-1; `--fix` in đề xuất `data-start` (không sửa HTML); `--write-qa` ghi vào `QA.md` |
-| `$OV/scripts/composition.mjs` | Bước 4: khung composition từ skeleton (`init`) |
+| `$OV/scripts/composition.mjs` | Bước 4: khung composition từ skeleton (`init`), chèn mascot hay HUD (`add-part`) |
+| `$OV/references/karaoke-va-mascot.md` | Bước 4 và 6: karaoke, envelope giọng, mascot, HUD, chữ ký |
 | `$OV/scripts/lemo.mjs` | Bước 4 và 6: lớp lemo-canvas (`fetch`, `list`, `add --style`, `remove`) |
 | `$OV/references/lemo-canvas.md` | Bước 4 và 6: hợp đồng scene `lemoRender(t, win)`, ghi công, tốc độ render, thêm phong cách |
 | `$OV/scripts/reframe.mjs` | Bước 6: bản 9:16/1:1 của dự án một `index.html` |

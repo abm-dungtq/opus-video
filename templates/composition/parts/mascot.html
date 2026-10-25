@@ -1,0 +1,59 @@
+<!--
+  Part: mascot. Inserted by `node scripts/composition.mjs add-part --project <dir> --part mascot`:
+  the markup goes before the PARTS:END HTML marker in #root, the script before the PARTS:END
+  marker of the main timeline script, and <html> gets data-voice-env (the mouth follows
+  TIMING.env; run timing.mjs or gateway.mjs derive after adding it). Every key is a fixed time,
+  a spoken word or a beat: no Math.random, no wall clock. Move it with .mascot (left/bottom).
+  Layer names follow ak:motion-video (MIT): .m-move position, .m-squash squash from the feet,
+  .m-face head turn, .m-eyes blink, .m-mouth talk.
+-->
+<style>
+  .mascot { left: 80px; bottom: 140px; width: 220px; height: 240px; z-index: 4; }
+  .mascot svg { overflow: visible; }
+  .mascot .m-squash, .mascot .m-eyes, .mascot .m-mouth { transform-box: fill-box; }
+  .mascot .m-squash { transform-origin: 50% 100%; }
+  .mascot .m-eyes, .mascot .m-mouth { transform-origin: 50% 50%; }
+  html[data-ratio="9x16"] .mascot { bottom: calc(var(--cap-bottom) + 200px); }
+</style>
+<div id="mascot" class="abs mascot" data-part="mascot">
+  <svg viewBox="0 0 220 240" width="220" height="240">
+    <g class="m-move">
+      <g class="m-squash">
+        <ellipse cx="110" cy="232" rx="70" ry="8" fill="rgba(0,0,0,0.35)" />
+        <rect x="30" y="40" width="160" height="190" rx="80" fill="var(--accent)" />
+        <g class="m-face">
+          <g class="m-eyes">
+            <circle cx="82" cy="110" r="12" fill="#0a0a0f" />
+            <circle cx="138" cy="110" r="12" fill="#0a0a0f" />
+          </g>
+          <ellipse class="m-mouth" cx="110" cy="158" rx="22" ry="14" fill="#0a0a0f" transform="scale(1 0.2)" />
+        </g>
+      </g>
+    </g>
+  </svg>
+</div>
+<script data-part-script>
+{ // mascot: talks on every voice line (TIMING.env), blinks every 3.2 s, squashes on kick downbeats
+  const M = "#mascot";
+  tl.set(`${M} .m-mouth`, { scaleY: 0.2 }, 0);
+  if (T.env?.length) {
+    Object.values(SC).forEach((s) => (s.lines || []).forEach((l) => {
+      if (!l.words.length) return;
+      const t0 = l.words[0][1], t1 = l.words.at(-1)[2];
+      envKeys(`${M} .m-mouth`, t0, t1, 2 / 30, (v) => ({ scaleY: 0.2 + v }));
+      tl.to(`${M} .m-mouth`, { scaleY: 0.2, duration: 0.1, ease: "power1.out" }, t1);
+    }));
+  }
+  for (let t = 1.6; t < T.duration - 0.2; t += 3.2) {
+    tl.to(`${M} .m-eyes`, { scaleY: 0.1, duration: 0.05, ease: "none" }, t);
+    tl.to(`${M} .m-eyes`, { scaleY: 1, duration: 0.08, ease: "power1.out" }, t + 0.05);
+  }
+  if (T.beatLen > 0) {
+    for (let n = 0; B(n) < T.duration; n += 4) {
+      if (!isKick(n)) continue;
+      tl.to(`${M} .m-squash`, { scaleX: 1.08, scaleY: 0.9, duration: 0.06, ease: "power2.out" }, B(n));
+      tl.to(`${M} .m-squash`, { scaleX: 1, scaleY: 1, duration: 0.3, ease: "back.out(2)" }, B(n) + 0.06);
+    }
+  }
+}
+</script>

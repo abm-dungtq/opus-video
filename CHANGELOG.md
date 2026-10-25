@@ -13,6 +13,10 @@
 - Gateway op `pin_beat` (`target` shot or line, `beat` integer or null). Manifest fields `shots[].cut_beat` (not on the first shot), `lines[].at_beat` and `events[].anchor`, each validated. `move_event` drops `anchor` unless `keep_anchor: true` (which may also replace it); `add_event` accepts `anchor`.
 - `timing.mjs readBeats` returns `grid.maxDriftMs` when the beats file has it (it does not reach the TIMING block). `sfx-sync.mjs` exports `leadCache`.
 - `COMMANDS.beatFit` and `COMMANDS.cues`.
+- Karaoke captions: `<html data-karaoke>` makes `timing.mjs` and gateway `derive` write `TIMING.captions` (chunks of at most 9 words, 42 characters × 2 lines, each word on its `words.json` onset). The text shown is the checked text (`project.json` `line.text`, else the `script/NN.txt` named by the voice's `.gate.json`), with a WARN when it is missing or its word count differs. The skeleton's `#cap-layer` lights each word on time; the caption band sits left of the signature corner in 16:9, 64 px up in 1:1 and above `--safe-bottom` in 9:16. `cuesOf` takes `maxWords`.
+- Voice envelope: `<html data-voice-env>` adds `TIMING.env`, the voice loudness per frame (0–1), from `scripts/voice-envelope.mjs` (ffmpeg, RMS over the 95th percentile, cached in `assets/gen/vo-envelope.json`). The skeleton has `envAt(t)` and `envKeys(sel, t0, t1, step, map)`.
+- `composition.mjs add-part --project <dir> --part mascot|hud-counter`: inserts `templates/composition/parts/` markup and script at the skeleton's new PARTS markers; `mascot` talks on `TIMING.env`, blinks on a fixed clock and squashes on kick beats; `hud-counter` steps on spoken phrases. A hidden signature block (`#sig`) is in the skeleton.
+- `references/karaoke-va-mascot.md`.
 
 ## v2.6.0 (2026-10-24): HyperFrames 0.8.192
 

@@ -90,3 +90,11 @@ test("bad usage is exit 2", () => {
   assert.equal(main(["--project", "/x", "--out", "/tmp/x.srt", "--max-chars", "0"], quiet), 2);
   assert.equal(main(["--nope"], quiet), 2);
 });
+
+test("cuesOf maxWords: 20 short words make cues of at most 9 words", () => {
+  const words = Array.from({ length: 20 }, (_, i) => ({ text: "a", start: i * 0.2, end: i * 0.2 + 0.15 }));
+  const cues = cuesOf(words, { maxWords: 9 });
+  assert.ok(cues.length >= 3);
+  for (const c of cues) assert.ok(c.lines.join(" ").split(" ").length <= 9, JSON.stringify(c));
+  assert.equal(cues.reduce((n, c) => n + c.lines.join(" ").split(" ").length, 0), 20);
+});
