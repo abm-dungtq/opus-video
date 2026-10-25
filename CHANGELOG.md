@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+Nothing yet.
+
+## v2.7.0 (2026-10-25): tích hợp năng lực ak:motion-video
+
+Why: the motion-video skill of AgentKit does several things opus-video could not: music cut to the bar and checked against its source, cuts and SFX locked to the beat and to the spoken word, Vietnamese karaoke and a voice-driven envelope in the picture, forced alignment for a real voice, a quick vertical edition, a director/executor split with a taste review, and a cheaper one-session mode. This release brings them in as opus-video commands and gates, without Python and without new API calls by default. STUDIO_API stays 4. Not checked live: ElevenLabs composition plans and forced alignment, and Gemini TTS.
+
 ### Added
 - `eleven.mjs music --plan plan.json`: sends an ElevenLabs `composition_plan` (global styles, `sections[]` with `section_name`, `duration_ms` 3000–120000, local styles, `lines`), checked before any request (exit 2). `--outro` writes `assets/bgm/outro.mp3` when `--out` is absent. `--plan` with `--prompt` is refused. `ELEVENLABS_API_BASE` overrides the API host for tests only.
 - `beat-grid.mjs`: `beats` (time of every beat to the sample: the steepest 5 ms rise of a 12 ms running-max envelope of the full band, tracked from beat to beat) and `maxDriftMs` (the farthest measured beat from the grid `beat0 + n·beatLen`). `beat0` is now the median phase of `beats`, so `B()` lands on the hits instead of an 11.6 ms analysis frame; `bars[].start` follows it. `refineBeats` and `LOW_AF` are exported.

@@ -50,9 +50,16 @@ Các video dưới đây do opus-video dựng. Bấm vào ảnh để mở file 
 
 ## Có gì mới
 
-### v2.7.0: tích hợp motion-video
+### v2.7.0 (2026-10-25): tích hợp motion-video
 
-(Điền khi phát hành.)
+- **Nhạc ghép theo ô nhịp.** `eleven.mjs music --plan` gửi composition plan; `arrange-music.mjs` ghép các ô nhịp của bản nhạc thô vào lưới đích, `verify-arrangement.mjs` đo lệch từng đoạn so với nguồn (FAIL khi quá 2 ms).
+- **Cắt cảnh theo phách.** `beat-fit.mjs --apply` dời mỗi điểm cắt về phách gần nhất mà không cắt ngang lời của shot trước (`--tight`: phách đầu tiên ít nhất 0,12 s sau lời cuối), ghi một patch hoàn tác được.
+- **SFX bám lời.** `cues.mjs add --word …` gắn tiếng động vào một chữ được đọc, `place` đặt lại sau khi đổi mốc, `check` chạy trong preflight final.
+- **Karaoke tiếng Việt và voice envelope.** `<html data-karaoke data-voice-env>` cho `TIMING.captions` và `TIMING.env`; `composition.mjs add-part --part mascot|hud-counter`.
+- **Giọng thật có mốc từ.** `eleven.mjs align --audio … --text-file …` (forced alignment, qua cổng viet-pro) ghi `words.json` như TTS.
+- **Bản dọc nhanh.** `reframe.mjs --quick --video demo/animatic.mp4 --ratio 9x16` cho bản xem thử 1080x1920; bản giao vẫn dùng `reframe.mjs <project> --ratio`.
+- **Đạo diễn và thi công.** Agent `ov-director` (duyệt gu, `Review <n>: revise|ship`) và `ov-executor`, chế độ `--poor` một phiên; preflight final WARN khi review cuối chưa `ship`.
+- **Giọng Gemini tuỳ chọn và `--tempo`.** `voice_provider: gemini` (mốc từ vẫn bằng ElevenLabs), `--tempo 0.8–1.25` cho mọi giọng. Chưa kiểm Gemini live.
 
 ### v2.6.0 (2026-10-24): HyperFrames 0.8.192
 
