@@ -9,8 +9,9 @@
 //   node eleven.mjs sfx   --text "english description" --seconds 1.5 --out f.mp3 [--influence 0.3] [--no-normalize]
 //   node eleven.mjs music --prompt str --seconds 15 --out f.mp3 [--no-normalize]
 //   node eleven.mjs music --plan plan.json [--out f.mp3 | --outro] [--no-normalize]
-//     --plan: ElevenLabs composition plan (global styles + sections with duration_ms); the
-//     sections are a request, not a contract, so arrange the result with arrange-music.mjs.
+//     --plan: ElevenLabs composition plan (global styles + sections with duration_ms), sent with
+//     model music_v1 (the only model that takes sections[]), respect_sections_durations and
+//     mp3_44100_128. The bar placement is still not a contract: arrange the result with arrange-music.mjs.
 //     --outro: default --out assets/bgm/outro.mp3 (a second, calm bed under the ending).
 //   node eleven.mjs align --audio f.mp3 --text-file <project>/script/NN.txt [--project dir] [--out f.words.json] [--force] [--lang vi] [--skip-viet-pro-gate]
 //     forced alignment for a voice that is not TTS (a real recording, a clip): writes <audio>.words.json
@@ -164,6 +165,9 @@ function writeOut(path, buf) {
 function writeBed(path, buf) {
   writeGenerated(path, buf, { normalize: !args["no-normalize"], lufs: BED_DEFAULTS.lufs, log: (s) => console.error(s), warn: (s) => console.error(s) });
 }
+
+// Model for --plan: the sections[] composition plan is accepted by music_v1 only.
+const PLAN_MUSIC_MODEL = "music_v1";
 
 // Composition plan for `music --plan`: read and checked before any request; exit 2 names the bad field.
 function readPlan(file) {
@@ -444,8 +448,10 @@ const commands = {
 
   async music() {
     if (args.plan && args.prompt) die("chọn --plan hoặc --prompt", 2);
+    // A plan with sections[] is the music_v1 format: ElevenLabs rejects it with music_v2/v2_5,
+    // which take a chunks[] plan instead. music_v1 keeps each section's duration_ms.
     const body = args.plan
-      ? { composition_plan: readPlan(args.plan), model_id: DEFAULTS.musicModel }
+      ? { composition_plan: readPlan(args.plan), model_id: PLAN_MUSIC_MODEL, respect_sections_durations: true }
       : {
           prompt: need("prompt"),
           music_length_ms: Math.round(Number(need("seconds")) * 1000),
@@ -455,7 +461,7 @@ const commands = {
     const out = args.out ?? (args.outro ? "assets/bgm/outro.mp3" : need("out"));
     for (let attempt = 0; ; attempt++) {
       try {
-        const buf = await call("/v1/music", { method: "POST", binary: true, body });
+        const buf = await call(args.plan ? "/v1/music?output_format=mp3_44100_128" : "/v1/music", { method: "POST", binary: true, body });
         writeBed(out, buf);
         console.error(`music → ${out} (${buf.length} bytes)`);
         return;

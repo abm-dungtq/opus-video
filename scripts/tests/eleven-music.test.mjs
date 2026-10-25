@@ -41,6 +41,9 @@ test("music --plan sends the composition plan, not a prompt", async () => {
     assert.equal(body.composition_plan.sections.length, 2);
     assert.equal("prompt" in body, false);
     assert.equal("music_length_ms" in body, false);
+    assert.equal(body.model_id, "music_v1", "a sections[] plan is the music_v1 format");
+    assert.equal(body.respect_sections_durations, true);
+    assert.match(api.calls[0].url, /output_format=mp3_44100_128/);
   } finally {
     await api.close();
   }

@@ -128,7 +128,7 @@ node $OV/scripts/timing.mjs --project .
 
 ## 3c. Nhạc theo composition plan và ghép ô nhịp
 
-ElevenLabs không giữ đúng độ dài từng section của composition plan, nên không hứa "drop đúng giây X" với file vừa sinh. Luôn ghép lại nguyên ô nhịp từ bản thô sang đúng phách đích, rồi đo mối ghép.
+`music --plan` gửi plan dạng `sections[]` với model `music_v1` (model duy nhất nhận dạng này; `music_v2`/`v2_5` nhận plan dạng `chunks[]` và báo lỗi với `sections[]`), kèm `respect_sections_durations: true` và `mp3_44100_128`. Độ dài section được giữ, nhưng phách và drop trong bản sinh vẫn không khớp lưới của video, nên không hứa "drop đúng giây X" với file vừa sinh. Luôn ghép lại nguyên ô nhịp từ bản thô sang đúng phách đích, rồi đo mối ghép.
 
 ```bash
 node $OV/scripts/eleven.mjs music --plan music-plan.json --out assets/bgm/raw/bgm-raw.mp3
