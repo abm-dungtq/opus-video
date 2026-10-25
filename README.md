@@ -50,6 +50,12 @@ Các video dưới đây do opus-video dựng. Bấm vào ảnh để mở file 
 
 ## Có gì mới
 
+### v2.7.1 (2026-10-25): sửa nhạc theo plan và karaoke
+
+- `eleven.mjs music --plan` gửi đúng model `music_v1` cho plan dạng sections (ElevenLabs từ chối model cũ).
+- Karaoke hiện sớm 0,12 s trước từ đầu, giữ 0,5 s sau từ cuối.
+- Chunk karaoke rất ngắn (hai giọng chồng nhau) không còn kẹt chữ tới hết video khi render seek từng khung. Dự án sinh từ skeleton cũ cần sửa tay khối karaoke trong `index.html`.
+
 ### v2.7.0 (2026-10-25): tích hợp motion-video
 
 - **Nhạc ghép theo ô nhịp.** `eleven.mjs music --plan` gửi composition plan; `arrange-music.mjs` ghép các ô nhịp của bản nhạc thô vào lưới đích, `verify-arrangement.mjs` đo lệch từng đoạn so với nguồn (FAIL khi quá 2 ms).
