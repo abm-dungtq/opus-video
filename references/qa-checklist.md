@@ -34,7 +34,7 @@ mkdir -p qa && for T in 1 4 7 10 13; do ffmpeg -v error -y -ss $T -i renders/f.m
 - [ ] 9:16: không có nội dung chính trong 12% trên và 20% dưới.
 - [ ] Bảng màu và font đúng `<art_direction>`, không có thứ nằm trong banned list.
 - [ ] Mỗi mốc thời gian đúng cảnh như trong storyboard.
-- [ ] Nghi lỗi dấu ở chữ nhỏ: `hyperframes snapshot . --at <T> --zoom "<selector hoặc x,y,w,h>"` để xem ảnh phóng to (độ phân giải gấp 3) trước khi kết luận.
+- [ ] Nghi lỗi dấu ở chữ nhỏ: `hyperframes snapshot . --at <T> --zoom "<selector hoặc x,y,w,h>" -o snapshots/zoom` để xem ảnh phóng to (độ phân giải gấp 3) trước khi kết luận.
 
 ## Nghe
 

@@ -251,6 +251,8 @@ node $OV/scripts/rerank-cases.mjs --brief-json BRIEF.case-query.json --aspect <1
 
 ### 5.1 Chọn workflow
 
+Từ HyperFrames 0.8.185, `npx hyperframes skills` chỉ cài 7 skill (`hyperframes`, `hyperframes-cli`, `hyperframes-registry`, `media-use`, `slideshow`, `remotion-to-hyperframes`, `figma`). Các workflow trong bảng dưới chỉ còn trên máy đã cài từ bản ≤ 0.8.184; trên máy mới, tên workflow là nhãn cho cách dựng và agent dựng tay trên khung `composition.mjs init`, đọc loại video ở `hyperframes/references/types/` (bảng đầy đủ ở `references/engine-selection.md`). Công thức blueprint, rule, seam mà opus-video cần nằm sẵn trong `third_party/hyperframes-skills/`.
+
 | Loại video | Workflow HyperFrames |
 |---|---|
 | Explainer không footage, kiến thức, list, how-to | `faceless-explainer` khi đã chạy `eleven.mjs audio-meta`; `general-video` khi dựng tay |
@@ -300,7 +302,7 @@ Kiểm tra bằng cách render một khung có chuỗi `Ánh nắng ơ ư đ ễ
 
 ## 6. Âm thanh
 
-Mọi lệnh âm thanh đi qua `node $OV/scripts/eleven.mjs <lệnh>`. Mặc định: voice `eGSd0uV8dNQnZuEEX9lu`, TTS `eleven_v4`, nhạc `music_v2_5`, SFX `eleven_text_to_sound_v2`.
+Mọi lệnh âm thanh đi qua `node $OV/scripts/eleven.mjs <lệnh>`. Mặc định: voice `eGSd0uV8dNQnZuEEX9lu`, TTS `eleven_v4`, nhạc `music_v2_5` (`--plan`: `music_v1`), SFX `eleven_text_to_sound_v2`.
 
 ### 6.1 Các lệnh con
 
@@ -335,7 +337,7 @@ Không chép mp3 từ chỗ khác vào `assets/voice/` và không xoá file `.ga
 
 ### 6.3 Cầu nối HyperFrames với `audio-meta`
 
-Bước `audio.mjs generate` của các workflow HyperFrames ghim model không có tiếng Việt. Với `faceless-explainer`, `product-launch-video`, `pr-to-video`, agent bỏ bước đó và chạy:
+Mục này chỉ dùng khi máy còn workflow HyperFrames cũ (≤ 0.8.184). Bước `audio.mjs generate` của các workflow đó ghim model không có tiếng Việt. Với `faceless-explainer`, `product-launch-video`, `pr-to-video`, agent bỏ bước đó và chạy:
 
 ```bash
 node $OV/scripts/eleven.mjs audio-meta --script SCRIPT.md --hyperframes . --bgm assets/bgm/bgm.mp3 --bgm-volume 0.2
@@ -737,7 +739,7 @@ Mã thoát: 0 đạt, 1 bị chặn, 2 sai cú pháp. Ngoài các luật của c
 - `direction:` không có trong `data/directions.json`.
 - `## Ý đồ sáng tạo` thiếu, hoặc thiếu một trong ba dòng `Hướng:`, `Chuyển cảnh:`, `Luật chống slideshow:`.
 - Bảng `## Cảnh` thiếu cột `Blueprint/Rule` hoặc cột `Nối sang beat sau`.
-- Một hàng không nêu blueprint hay rule nào, nêu tên không có trong `hyperframes-animation` (`… is not a blueprint or rule in hyperframes-animation`), hoặc cả bảng có ít hơn 2 token khác nhau.
+- Một hàng không nêu blueprint hay rule nào, nêu tên không có trong `hyperframes-animation` (`… is not a blueprint or rule in hyperframes-animation (third_party/hyperframes-skills)`), hoặc cả bảng có ít hơn 2 token khác nhau.
 - Một hàng (trừ hàng cuối) nối sang beat sau bằng `fade`, `crossfade`, `cut`, "mờ dần", "hiện dần" hay các từ cấm khác (`… is a slide swap (banned)`), không nêu seam nào trong từ vựng (`no known seam in …`), hoặc dùng seam mềm khi hướng không cho phép.
 - Tổng thời lượng các hàng chỉ có nhạc ít hơn `music_only_s`. Hàng chỉ có nhạc là hàng có ô Lời đọc để trống, ghi `(nhạc)`, `không lời` hoặc một dấu gạch dài.
 
@@ -966,11 +968,11 @@ Mỗi loạt góp ý là một vòng `## Vòng <n>` trong `REVISIONS.md`, tiêu 
 Sửa xong một mục thì kiểm ngay trên composition hiện tại, không cần render:
 
 ```bash
-npx --yes hyperframes@0.8.144 snapshot ./ --at 6.2,6.5,7.0 --no-end
-npx --yes hyperframes@0.8.144 check --at-transitions
+npx --yes hyperframes@0.8.192 snapshot ./ --at 6.2,6.5,7.0 --no-end -o snapshots/rev-1
+npx --yes hyperframes@0.8.192 check --at-transitions
 ```
 
-Thêm vào `--at` các mốc ghi ở `Giữ nguyên`. Bản 0.8.144 không có cờ `--range` cho `snapshot` hay `check`. Hết vòng thì chạy một lần `make-demo.mjs --project ./ --animatic`; người dùng duyệt animatic mới, ảnh chụp và đoạn cắt không được tính là duyệt.
+Thêm vào `--at` các mốc ghi ở `Giữ nguyên`. Không có `-o` thì ảnh nằm trong `.hyperframes/artifacts/snapshots/`. Từ 0.8.151 có `--range <a>,<b>` để chỉ kiểm đoạn vừa sửa (`check --range 6,8`). Hết vòng thì chạy một lần `make-demo.mjs --project ./ --animatic`; người dùng duyệt animatic mới, ảnh chụp và đoạn cắt không được tính là duyệt.
 
 `check-preflight.mjs --stage final` đọc `REVISIONS.md` khi file có mặt và in WARN, không chặn:
 
@@ -1056,7 +1058,7 @@ Dự án mới `aspect: both` chỉ có một thư mục. Phần khác của kh�
 
 ```bash
 node $OV/scripts/reframe.mjs . --ratio 9x16      # hoặc --ratio 1x1
-cd ../<project>-9x16 && npx --yes hyperframes@0.8.144 lint
+cd ../<project>-9x16 && npx --yes hyperframes@0.8.192 lint
 ```
 
 - Lệnh tạo `../<project>-9x16/` với khung 1080×1920 (1:1 là 1080×1080, `data-resolution="square"`), giữ nguyên giọng, nhạc, TIMING và bản mix. `assets/` là bản clone APFS của bản gốc (chép thường khi khác ổ): ghi ở bản dọc không đổi file của bản gốc. Asset sinh lại ở bản gốc chỉ sang bản dọc sau khi chạy lại `--force`.

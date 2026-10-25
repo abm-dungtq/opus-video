@@ -25,8 +25,8 @@
 //   A slow bed that reads at twice its tempo: pass --max-bpm 100.
 // Output: `BPM 120.0  BEAT0 0.043 s  stability 6 ms`, then one row per 4-beat bar: beat index,
 //   start, kicks per beat ("K" or "."), RMS dB and a bar of #.
-// --json   print { bpm, beat0, beatLen, bars: [{ bar, start, kicks, rmsDb }], kick: [[a, b]],
-//          drops: [n], stability } instead (stability null when it cannot be measured).
+// --json   print { bpm, beat0, beatLen, beats: [s], maxDriftMs, bars: [{ bar, start, kicks, rmsDb }],
+//          kick: [[a, b]], drops: [n], stability } instead (stability null when it cannot be measured).
 // --write  write the same object to <music>.beats.json next to the file (only when stable).
 // Exit: 0 stable · 1 UNSTABLE or too short to fit a grid · 2 bad usage, missing or undecodable file.
 
@@ -40,7 +40,7 @@ export const SR = 22050;
 export const HOP = 256;
 export const FPS = SR / HOP;
 export const LIMITS = { stabilityMs: 45, minOnsets: 4, dropDb: 6, octaveRatio: 0.9, bpmStep: 0.02, beat0Step: 0.004 };
-const LOW_AF = "lowpass=f=150,lowpass=f=150";
+export const LOW_AF = "lowpass=f=150,lowpass=f=150";
 
 // Mono f32 samples of `file` at SR through the ffmpeg filter `af`. run: spawnSync or a stand-in.
 // Throws on failure.
@@ -137,11 +137,55 @@ function onsetPeaks(lowOn, thr) {
   return out;
 }
 
+// Measured time of every beat, to the sample: the frame-level onset envelope (HOP/SR ≈ 11.6 ms) is too
+// coarse for splicing bars. env is the running max of |x| over the last 12 ms, so a low kick does not
+// ripple with its own waveform. Near each expected beat (± a quarter beat) the beat is the steepest
+// 5 ms rise of env, timed where env passes half of that rise. The window follows the previous measured
+// beat, so a tempo that drifts slowly is tracked. A beat with no clear rise keeps the expected time.
+// Full band on purpose: lowpass 150 Hz delays an onset by ~3 ms and removes the click of a hit.
+const ENV_HOLD = Math.round(SR * 0.012), RISE = Math.round(SR * 0.005);
+export function refineBeats(full, beat0, beatLen) {
+  const n = full.length, env = new Float32Array(n), dq = new Int32Array(n);
+  for (let i = 0, h = 0, t = 0; i < n; i++) {
+    const v = Math.abs(full[i]);
+    while (t > h && Math.abs(full[dq[t - 1]]) <= v) t--;
+    dq[t++] = i;
+    if (dq[h] <= i - ENV_HOLD) h++;
+    env[i] = Math.abs(full[dq[h]]);
+  }
+  // Steepest rise near `c` → { t, rise }.
+  const sharpest = (c) => {
+    const a = Math.max(0, Math.round((c - beatLen / 4) * SR)), b = Math.min(n - 2 * RISE - 1, Math.round((c + beatLen / 4) * SR));
+    let k = -1, rise = -Infinity;
+    for (let i = a; i <= b; i++) if (env[i + RISE] - env[i] > rise) { rise = env[i + RISE] - env[i]; k = i; }
+    if (k < 0) return null;
+    const half = env[k] + 0.5 * rise;
+    let on = k;
+    while (on < k + 2 * RISE && env[on] < half) on++;
+    return { t: on / SR, rise };
+  };
+  const found = [];
+  for (let i = 0, c = beat0; c < n / SR - 2 * RISE / SR; i++) {
+    found.push(sharpest(c));
+    c = (found[i]?.t ?? c) + beatLen;
+  }
+  // A rise weaker than a quarter of the typical beat's is not an onset (a break, a fade, silence).
+  const thr = 0.25 * percentile(found.filter(Boolean).map((f) => f.rise), 50);
+  const beats = [];
+  for (let i = 0; i < found.length; i++) {
+    const expected = i ? beats[i - 1] + beatLen : beat0;
+    beats.push(found[i] && found[i].rise > thr ? found[i].t : expected);
+  }
+  return beats.map((t) => Math.round(t * 1e4) / 1e4);
+}
+
 const r2 = (n) => Math.round(n * 100) / 100;
 const r3 = (n) => Math.round(n * 1000) / 1000;
 
 // full, low: Float32Array mono at SR (full band, under 150 Hz). Returns the beats object
-// { bpm, beat0, beatLen, bars, kick, drops, stability } or null when the clip is too short.
+// { bpm, beat0, beatLen, beats, maxDriftMs, bars, kick, drops, stability } or null when the clip is
+// too short. beats: measured time of each beat (refineBeats); maxDriftMs: how far the measured beats
+// stray from the constant grid beat0 + n·beatLen that B() uses.
 export function analyze(full, low, { minBpm = 70, maxBpm = 180 } = {}) {
   const dur = full.length / SR;
   const lowOn = onset(low), fullOn = onset(full), rms = framesRms(full);
@@ -202,7 +246,13 @@ export function analyze(full, low, { minBpm = 70, maxBpm = 180 } = {}) {
     if (bars.length && db - bars[bars.length - 1].rmsDb >= LIMITS.dropDb) drops.push(bar * 4);
     bars.push({ bar, start: r3(t), kicks: kicked.slice(bar * 4, bar * 4 + 4).map((k) => (k ? "K" : ".")).join(""), rmsDb: Math.round(db * 10) / 10 });
   }
-  return { bpm: r2(fit.bpm), beat0: r3(b0), beatLen: Math.round(beat * 1e6) / 1e6, bars, kick, drops, stability: stability == null ? null : Math.round(stability * 10) / 10 };
+  // beat0 moves onto the measured beats (median phase), so B() lands on the hits to the sample and
+  // maxDriftMs measures the music leaving the grid, not the 11.6 ms frame of the onset envelope.
+  const beatLen = Math.round(beat * 1e6) / 1e6, beats = refineBeats(full, r3(b0), beatLen);
+  const beat0 = beats.length ? Math.round(percentile(beats.map((t, i) => t - i * beatLen), 50) * 1e4) / 1e4 : r3(b0);
+  for (const b of bars) b.start = r3(beat0 + b.bar * 4 * beat);
+  const maxDriftMs = Math.round(Math.max(0, ...beats.map((t, i) => Math.abs(t - (beat0 + i * beatLen)))) * 1e4) / 10;
+  return { bpm: r2(fit.bpm), beat0, beatLen, beats, maxDriftMs, bars, kick, drops, stability: stability == null ? null : Math.round(stability * 10) / 10 };
 }
 
 export const isStable = (r) => r.stability != null && r.stability <= LIMITS.stabilityMs;

@@ -17,7 +17,7 @@ Skill điều phối: biến một ý tưởng thành MP4 hoàn chỉnh. Skill n
 |---|---|---|
 | `dao-dien` đạo diễn đầy đủ (mặc định) | "làm video", "explainer", "quảng cáo" | ov-setup → ov-brief → ov-direction → ov-script → ov-audio → ov-build → ov-deliver |
 | `nhanh` theo mẫu | "làm nhanh", "theo mẫu", "giống video này" | ov-setup → ov-brief → ov-cases → ov-script → ov-audio → ov-build (vẫn giữ cổng animatic) → ov-deliver |
-| `tu-nhac` từ nhạc hoặc footage | "từ bài nhạc", "theo beat", "clip quay sẵn" | ov-setup → ov-brief → ov-audio (đo beat-grid trước) hoặc ov-footage → ov-direction → ov-script → ov-build → ov-deliver |
+| `tu-nhac` từ nhạc hoặc footage | "từ bài nhạc", "theo beat", "clip quay sẵn" | ov-setup → ov-brief → ov-audio (đo beat-grid trước) hoặc ov-footage → ov-direction → ov-script → ov-build (trước `make-demo --animatic`: `beat-fit.mjs --project . --tight`, xem bảng rồi `--apply`) → ov-deliver |
 | `timeline` sửa dự án đã có | "sửa video", "mở studio", "đổi shot" | ov-studio (nhập dự án nếu chưa có `project.json`) → lệnh gateway → ov-audio (chỉ câu thoại đã đổi) → ov-deliver |
 
 - Khi không rõ, hỏi đúng một câu: người dùng muốn hướng nào trong bốn hướng trên.
@@ -25,6 +25,15 @@ Skill điều phối: biến một ý tưởng thành MP4 hoàn chỉnh. Skill n
 - Ở mọi hướng, chữ tiếng Việt (lời đọc, chữ trên hình, caption) vẫn qua `ov-script`, và `render-final.mjs` vẫn giữ mọi cổng của nó.
 - Hướng `nhanh` chỉ tiết kiệm phần chọn hướng (một case thay cho 3 styleframe) và phải ghi `creative_override: nhanh theo case <id>` vào `BRIEF.md` (xem `ov-cases`).
 - Trong hướng `dao-dien`, `ov-cases` chạy bên trong `ov-build` (bước storyboard, tra case một lần mỗi dự án).
+
+## Vai trò và chế độ tiết kiệm
+
+- Hướng `dao-dien` và `tu-nhac` mặc định chia vai:
+  - `ov-director` (Opus, chỉ đọc) viết hướng dựng theo từng cảnh sau khi lời đã qua viet-pro, và duyệt gu trên contact sheet của animatic (`Review <n>: revise | ship`);
+  - `ov-executor` (Sonnet) chạy âm thanh, dựng và animatic theo `build/DIRECTION.md`;
+  - phiên chính ghi `build/DIRECTION.md`, `build/REVIEW-<n>.md` và kiểm kết quả.
+- `--poor` hoặc "tiết kiệm": một phiên làm hết, không subagent, hướng ngắn mỗi cảnh một dòng, một vòng duyệt. Không bỏ cổng nào.
+- Chi tiết: `$OV/references/dao-dien-va-thi-cong.md`. Đạo diễn của Motion Studio là đường riêng, không đổi.
 
 ## Bốn cổng
 

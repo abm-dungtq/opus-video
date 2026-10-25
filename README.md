@@ -50,6 +50,30 @@ Các video dưới đây do opus-video dựng. Bấm vào ảnh để mở file 
 
 ## Có gì mới
 
+### v2.7.1 (2026-10-25): sửa nhạc theo plan và karaoke
+
+- `eleven.mjs music --plan` gửi đúng model `music_v1` cho plan dạng sections (ElevenLabs từ chối model cũ).
+- Karaoke hiện sớm 0,12 s trước từ đầu, giữ 0,5 s sau từ cuối.
+- Chunk karaoke rất ngắn (hai giọng chồng nhau) không còn kẹt chữ tới hết video khi render seek từng khung. Dự án sinh từ skeleton cũ cần sửa tay khối karaoke trong `index.html`.
+
+### v2.7.0 (2026-10-25): tích hợp motion-video
+
+- **Nhạc ghép theo ô nhịp.** `eleven.mjs music --plan` gửi composition plan; `arrange-music.mjs` ghép các ô nhịp của bản nhạc thô vào lưới đích, `verify-arrangement.mjs` đo lệch từng đoạn so với nguồn (FAIL khi quá 2 ms).
+- **Cắt cảnh theo phách.** `beat-fit.mjs --apply` dời mỗi điểm cắt về phách gần nhất mà không cắt ngang lời của shot trước (`--tight`: phách đầu tiên ít nhất 0,12 s sau lời cuối), ghi một patch hoàn tác được.
+- **SFX bám lời.** `cues.mjs add --word …` gắn tiếng động vào một chữ được đọc, `place` đặt lại sau khi đổi mốc, `check` chạy trong preflight final.
+- **Karaoke tiếng Việt và voice envelope.** `<html data-karaoke data-voice-env>` cho `TIMING.captions` và `TIMING.env`; `composition.mjs add-part --part mascot|hud-counter`.
+- **Giọng thật có mốc từ.** `eleven.mjs align --audio … --text-file …` (forced alignment, qua cổng viet-pro) ghi `words.json` như TTS.
+- **Bản dọc nhanh.** `reframe.mjs --quick --video demo/animatic.mp4 --ratio 9x16` cho bản xem thử 1080x1920; bản giao vẫn dùng `reframe.mjs <project> --ratio`.
+- **Đạo diễn và thi công.** Agent `ov-director` (duyệt gu, `Review <n>: revise|ship`) và `ov-executor`, chế độ `--poor` một phiên; preflight final WARN khi review cuối chưa `ship`.
+- **Giọng Gemini tuỳ chọn và `--tempo`.** `voice_provider: gemini` (mốc từ vẫn bằng ElevenLabs), `--tempo 0.8–1.25` cho mọi giọng. Chưa kiểm Gemini live.
+
+### v2.6.0 (2026-10-24): HyperFrames 0.8.192
+
+- **Ghim HyperFrames 0.8.192.** Dự án mới (`new-project.sh`) ghim `hyperframes@0.8.192`; `setup-check` đòi CLI ≥ 0.8.192. Lint, check, render, preview nền và bản 1:1 đã chạy thử trên bản mới.
+- **Cài trên máy mới không còn hỏng.** Từ 0.8.185, HyperFrames chỉ cài 7 skill và bỏ `hyperframes-animation`, `hyperframes-creative`, `faceless-explainer`. Blueprint, rule, transitions và danh mục cắt cảnh mà opus-video dùng giờ nằm sẵn trong `third_party/hyperframes-skills/` (lấy từ v0.8.184), nên chọn hướng, gom công thức và cổng PLAN chạy được mà không cần skill cũ.
+- **viet-pro v5.6.1 và lemo-opuscar 413a6bd.** Mẫu `files_read` có thêm `review/translationese-vi.md`, file mà viet-pro bắt buộc từ v5.4.0.
+- **Ảnh snapshot ghi vào `snapshots/`.** Vòng sửa dùng `snapshot … -o snapshots/rev-<N>`, và có thể kiểm riêng đoạn vừa sửa bằng `check --range`. `sweep-after-final.sh` của workspace dọn thêm `.hyperframes/artifacts/`.
+
 ### v2.5.0 (2026-10-22): STUDIO_API 4 cho Motion Studio
 
 - **Studio không còn ghi cứng tên script của plugin.** `scripts/studio-api.mjs` có `STUDIO_API = 4`, thêm `SKILLS` (các skill đạo diễn dùng) và `COMMANDS` (đường tuyệt đối tới script render, mix, pitch, import, demo, recipe, preflight, cases, styles, cùng lệnh chọn hướng `COMMANDS.choose`). Mọi export của API 3 giữ nguyên, Studio cũ vẫn chạy.
@@ -152,7 +176,7 @@ Skill này là phần điều phối và không tự render. Nó nối các bư�
 1. **Chọn hướng bằng mắt:** `make-pitch.mjs` dựng 3 styleframe khoảng 3 giây bằng chính chủ đề của người dùng theo 3 hướng đạo diễn khác nhau; người dùng chọn một, kèm đổi từ khoá nếu muốn. Styleframe được chọn thành cảnh mở đầu, kịch bản viết sau và không vượt ngân sách lời của hướng.
 2. **Kịch bản:** viết bằng [viet-pro](https://github.com/abm-dungtq/viet-pro-codex) ở mức đầy đủ (đọc hết review/editorial, lượt Humanizer có ghi chép, lint), có kiểm chứng dữ kiện. `check-viet-pro.mjs` chặn khi chưa đạt; `eleven.mjs` tự chạy lại cổng và không tạo giọng (exit 4) khi chưa đạt.
 3. **Plan:** `PLAN.md` (mục tiêu, ý đồ sáng tạo, bảng cảnh, âm thanh, engine, mốc khung hình demo, QA) phải qua `check-preflight.mjs --stage plan` trước khi tạo giọng và dựng. Mỗi beat nêu blueprint hoặc rule có thật và cách nối sang beat sau; nối bằng mờ dần bị chặn. Bảng `## Sự kiện` ghi lúc nào trên hình có tiếng; chữ trên hình được kiểm có giữ đủ lâu để đọc.
-4. **Âm thanh:** ElevenLabs. Giọng `eleven_v4` có timestamp từng từ, SFX `eleven_text_to_sound_v2`, nhạc nền `music_v2_5`.
+4. **Âm thanh:** ElevenLabs. Giọng `eleven_v4` có timestamp từng từ, SFX `eleven_text_to_sound_v2`, nhạc nền `music_v2_5` (`--plan`: `music_v1`).
 5. **Dựng:** [HyperFrames](https://hyperframes.dev) là mặc định, theo công thức gom bằng `recipe-pack.mjs`. Remotion hoặc Canvas khi dự án cần.
 6. **Clip nháp và khung hình demo:** `make-demo.mjs --animatic` render clip nháp và cắt đúng các mốc trong plan; người dùng duyệt chuyển động (`DEMO.md`) rồi mới được render bản cuối. `render-final.mjs` là đường duy nhất ra bản giao (`--quality delivery`) và chặn (exit 5) khi thiếu plan, demo, duyệt, hoặc khi clip nháp đứng yên kiểu slideshow.
 7. **QA:** `sfx-sync.mjs` (tiếng khớp hình), `qc-mp4.mjs` (kỹ thuật và độ chuyển động), lint, check, vùng an toàn 9:16, Gemini (qua `agy`) xem video và chấm, tối đa 3 vòng. Kèm caption Facebook + TikTok qua viet-pro.
@@ -172,8 +196,8 @@ Dùng sâu: [hướng dẫn chuyên sâu về các tính năng](docs/huong-dan-c
 Installer cài **toàn bộ** những gì skill cần, cho mọi agent tìm thấy trên máy:
 
 - opus-video vào thư mục skill của từng agent (bản cũ được chuyển vào `~/.opus-video-backups/`, không xoá; thư mục là git checkout thì để nguyên). Claude Code nạp thư mục `~/.claude/skills/opus-video` tại chỗ thành plugin `opus-video@skills-dir`, nên **không** chạy thêm `claude plugin install` trên máy đó; skill điểm vào gọi bằng `/opus-video:opus-video` (các skill khác: `/opus-video:ov-brief`…). Codex và Antigravity chưa có plugin: installer chép `SKILL.md` điểm vào ra gốc thư mục `opus-video` và tạo link `ov-*` cạnh nó (Windows: bản sao);
-- `viet-pro` v5.3.0 (bằng installer của chính nó, cùng các agent);
-- CLI `hyperframes` và **mọi** skill HyperFrames (`hyperframes`, `hyperframes-core/-animation/-keyframes/-creative/-audio/-cli/-registry/-studio`, `media-use` và mọi workflow: `general-video`, `faceless-explainer`, `product-launch-video`, `pr-to-video`, `motion-graphics`, `music-to-video`, `slideshow`, `embedded-captions`, `talking-head-recut`, `remotion-to-hyperframes`) qua `npx hyperframes skills`;
+- `viet-pro` v5.6.1 (bằng installer của chính nó, cùng các agent);
+- CLI `hyperframes` và bộ skill HyperFrames (từ 0.8.185 còn 7: `hyperframes`, `hyperframes-cli`, `hyperframes-registry`, `media-use`, `slideshow`, `remotion-to-hyperframes`, `figma`) qua `npx hyperframes skills`. Blueprint, rule, transitions, `visual-styles.md` và `cut-catalog.md` mà opus-video cần nằm sẵn trong `third_party/hyperframes-skills/` (lấy từ HyperFrames v0.8.184);
 - file key mẫu `~/.config/opus-video/.env` (quyền chỉ chủ sở hữu đọc được);
 - cuối cùng chạy `scripts/setup-check.mjs` và báo `READY` hoặc liệt kê mục còn thiếu kèm lệnh sửa.
 
@@ -249,7 +273,7 @@ node ~/.claude/skills/opus-video/scripts/setup-check.mjs
 
 `setup-check` tìm skill trong **mọi** thư mục agent: `~/.claude/skills`, `~/.agents/skills`, `~/.codex/skills`, `~/.gemini/config/skills`, `~/.gemini/antigravity-cli/skills`, `./.claude/skills`, `./.agents/skills`, và thư mục cùng cấp với opus-video. Nó kiểm:
 
-- **Bắt buộc:** Node ≥ 22, git, ffmpeg, ffprobe, CLI `hyperframes` ≥ 0.8.144, `viet-pro` (chạy cả self-test), đủ 20 skill HyperFrames kể trên, `ELEVENLABS_API_KEY`, `OPUS_VIDEO_VOICE_ID` (chỉ kiểm có/không).
+- **Bắt buộc:** Node ≥ 22, git, ffmpeg, ffprobe, CLI `hyperframes` ≥ 0.8.192, `viet-pro` (chạy cả self-test), 6 skill HyperFrames (`hyperframes`, `hyperframes-cli`, `hyperframes-registry`, `media-use`, `slideshow`, `remotion-to-hyperframes`), token hướng đạo diễn có thật trong `third_party/hyperframes-skills/`, `ELEVENLABS_API_KEY`, `OPUS_VIDEO_VOICE_ID` (chỉ kiểm có/không).
 - **Tuỳ chọn (WARN):** `agy`, `TYPESAFE_API_KEY`, skill Remotion.
 
 Sau đó kiểm kết nối ElevenLabs:
@@ -267,7 +291,7 @@ Mở **phiên agent mới** sau khi cài để agent nạp skill.
 git clone https://github.com/abm-dungtq/opus-video ~/.claude/skills/opus-video
 
 # 2. viet-pro (macOS/Linux/WSL; cờ agent giống bảng ở mục 1)
-curl -fsSL https://raw.githubusercontent.com/abm-dungtq/viet-pro-codex/v5.3.0/install.sh | bash -s -- --claude
+curl -fsSL https://raw.githubusercontent.com/abm-dungtq/viet-pro-codex/v5.6.1/install.sh | bash -s -- --claude
 
 # 3. HyperFrames CLI + toàn bộ skill, cho mọi agent được hỗ trợ
 npx --yes hyperframes skills
@@ -281,7 +305,7 @@ npx --yes skills add remotion-dev/skills
 node ~/.claude/skills/opus-video/scripts/setup-check.mjs
 ```
 
-Windows không có `curl | bash` cho viet-pro: `git clone --depth 1 --branch v5.3.0 https://github.com/abm-dungtq/viet-pro-codex.git`, rồi copy thư mục `skills\viet-pro` vào thư mục skill của agent (ví dụ `%USERPROFILE%\.claude\skills\viet-pro`).
+Windows không có `curl | bash` cho viet-pro: `git clone --depth 1 --branch v5.6.1 https://github.com/abm-dungtq/viet-pro-codex.git`, rồi copy thư mục `skills\viet-pro` vào thư mục skill của agent (ví dụ `%USERPROFILE%\.claude\skills\viet-pro`).
 
 Cài opus-video bằng `git clone` thì cập nhật bằng `git -C <thư mục> pull`; installer không ghi đè git checkout. Với Codex/Antigravity, clone xong phải tự đưa skill ra: chép `skills/opus-video/SKILL.md` thành `opus-video/SKILL.md` và link từng `skills/ov-*` vào thư mục skill của agent (installer làm việc này khi cài từ bản sao).
 

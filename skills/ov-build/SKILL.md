@@ -15,7 +15,7 @@ Viết `STORYBOARD.md` từ bảng của viet-pro và hướng đã chọn, cộ
 
 Chọn theo `references/engine-selection.md` (`$OV/references/engine-selection.md`). Mặc định là HyperFrames. Ghi `engine`, `workflow`, `engine_reason` vào `BRIEF.md`. Nhiều biến thể của cùng một mẫu thì dùng `render --batch` của HyperFrames, không chuyển sang Remotion.
 
-- **Dựng tay** (general-video): khung là `node $OV/scripts/composition.mjs init --project .` (`new-project.sh` đã gọi sẵn): `index.html` có bộ hàm hoạt hình, `W(cảnh, "cụm từ")` mốc theo lời, `B(n)` mốc theo phách. Không gõ tay số giây.
+- **Dựng tay** (general-video, mặc định; HyperFrames 0.8.185 trở đi chỉ còn cách này, loại video đọc ở `hyperframes/references/types/`): khung là `node $OV/scripts/composition.mjs init --project .` (`new-project.sh` đã gọi sẵn): `index.html` có bộ hàm hoạt hình, `W(cảnh, "cụm từ")` mốc theo lời, `B(n)` mốc theo phách. Không gõ tay số giây. Karaoke tiếng Việt (`data-karaoke`), envelope giọng (`data-voice-env`), mascot và HUD (`composition.mjs add-part`) là lớp tuỳ chọn, phải bật trước animatic: xem `$OV/references/karaoke-va-mascot.md`.
 - **Lớp lemo-canvas** (`lemo_style:` trong BRIEF, hoặc `style_profile` có `engine: lemo-canvas`): `node $OV/scripts/lemo.mjs add --project . --style <slug>` rồi viết `assets/lemo/scene.js` hoặc `scene3d.js`. Đọc `$OV/references/lemo-canvas.md` trước khi viết scene.
 
 ## 4b. Plan
@@ -41,7 +41,7 @@ Chép mục "Sàn chất lượng", "Chống slideshow" và "Kỷ luật GSAP" c
 - Với `aspect: both`, bản dọc phải dàn lại bố cục, không crop:
   - **Dự án mới** (một `index.html`): viết phần khác của khổ dọc trong `html[data-ratio="9x16"]`, rồi `node $OV/scripts/reframe.mjs ./ --ratio 9x16` (hoặc `1x1`) sinh `../<project>-9x16`. Chi tiết và giới hạn ở `engine-selection.md`.
   - **Dự án cũ dựng tay**: 2 composition trong cùng project, gồm `index.html` (1920×1080) và `compositions/main-9x16.html` (1080×1920).
-  - **Workflow có frame worker** (faceless-explainer, pr-to-video, product-launch-video): làm **một project 9:16 riêng**, theo mục "Bài học từ smoke v2" trong `engine-selection.md`. Sau mỗi lần `captions.mjs build` ở 1080×1920, **bắt buộc** chạy `node $OV/scripts/replace-in-file.mjs compositions/captions.html "--cap-band-top: [0-9]*px;" "--cap-band-top: 1340px;" "--cap-band-height: [0-9]*px;" "--cap-band-height: 200px;"`, vì mặc định 1600px rơi vào vùng UI che.
+  - **Workflow có frame worker** (faceless-explainer, pr-to-video, product-launch-video; chỉ khi máy còn skill cũ của HyperFrames ≤ 0.8.184): làm **một project 9:16 riêng**, theo mục "Bài học từ smoke v2" trong `engine-selection.md`. Sau mỗi lần `captions.mjs build` ở 1080×1920, **bắt buộc** chạy `node $OV/scripts/replace-in-file.mjs compositions/captions.html "--cap-band-top: [0-9]*px;" "--cap-band-top: 1340px;" "--cap-band-height: [0-9]*px;" "--cap-band-height: 200px;"`, vì mặc định 1600px rơi vào vùng UI che.
 - Áp dụng banned list trong brief.
 - Đặt câu chữ dài nhất sẽ dùng vào cảnh rồi chạy `npx hyperframes check --at-transitions`: chữ tràn hay đè nhau ở chỗ nối cảnh thì sửa chữ hoặc bố cục trước khi chỉnh chuyển động.
 
@@ -70,12 +70,13 @@ Chép mục "Sàn chất lượng", "Chống slideshow" và "Kỷ luật GSAP" c
 | `$OV/references/engine-selection.md` | Bước 4 và 6: chọn engine, xử lý 16:9 / 9:16 |
 | `$OV/references/plan-demo.md` | Bước 4b, 6b, 7: mẫu `PLAN.md`, chụp và duyệt demo, `DEMO.md`, render bản cuối |
 | `$OV/references/edit-method.md` | Bước 3 và 6: chức năng câu → hình, sàn chất lượng, GSAP, SFX |
-| `$OV/references/motion-craft.md` | Bước 6 và 6b: mức hiệu ứng theo `energy`, 10 nguyên tắc, bộ kỹ thuật của skeleton, danh sách kiểm từng cảnh |
+| `$OV/references/motion-craft.md` | Bước 6 và 6b: mức hiệu ứng theo `energy`, 10 nguyên tắc, bộ kỹ thuật của skeleton, danh sách kiểm từng cảnh; mục 7: giới hạn renderer (khung đen khi quá nhiều gradient, blur, clip-path), phản ứng theo kick, drop, silent stop và cắt cảnh theo beat |
 | `$OV/scripts/check-preflight.mjs` | Bước 4b (`--stage plan`) và 6b (`--stage final`): cổng plan + demo + duyệt; cổng sáng tạo (Ý đồ sáng tạo, blueprint/rule có thật, seam mỗi beat, beat không lời, animatic không đứng yên, RECIPES.md) |
 | `$OV/scripts/recipe-pack.mjs` | Bước 6 (và 1b): gom blueprint/rule/seam theo PLAN.md hoặc theo hướng thành `build/RECIPES.md` |
 | `$OV/scripts/make-demo.mjs` | Bước 6b: chụp khung hình demo theo `PLAN.md`, ghi `DEMO.md`; `--animatic` render clip nháp toàn bộ + contact sheet (bắt buộc với dự án có `direction:`); `--from-video` cắt từ bản nháp người dùng đã xem |
 | `$OV/scripts/sfx-sync.mjs` | Bước 6b và 8: đo lúc SFX thật sự vang so với `## Sự kiện` trong `PLAN.md`, ngưỡng theo ITU-R BT.1359-1; `--fix` in đề xuất `data-start` (không sửa HTML); `--write-qa` ghi vào `QA.md` |
-| `$OV/scripts/composition.mjs` | Bước 4: khung composition từ skeleton (`init`) |
+| `$OV/scripts/composition.mjs` | Bước 4: khung composition từ skeleton (`init`), chèn mascot hay HUD (`add-part`) |
+| `$OV/references/karaoke-va-mascot.md` | Bước 4 và 6: karaoke, envelope giọng, mascot, HUD, chữ ký |
 | `$OV/scripts/lemo.mjs` | Bước 4 và 6: lớp lemo-canvas (`fetch`, `list`, `add --style`, `remove`) |
 | `$OV/references/lemo-canvas.md` | Bước 4 và 6: hợp đồng scene `lemoRender(t, win)`, ghi công, tốc độ render, thêm phong cách |
 | `$OV/scripts/reframe.mjs` | Bước 6: bản 9:16/1:1 của dự án một `index.html` |

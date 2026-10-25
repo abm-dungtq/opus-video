@@ -210,3 +210,14 @@ test("a master with a lemo-canvas layer gets one WARN lemo line", () => {
     assert.match(warns[0], /lemo-canvas watercolor vẽ theo khung gốc/);
   } finally { rmSync(parent, { recursive: true, force: true }); }
 });
+
+test("editionHtml on the real skeleton: the root <html> tag gets the ratio, not a comment that mentions <html>", async () => {
+  const { SKELETON, sizeSkeleton } = await import("../composition.mjs");
+  const { rootHtmlTag } = await import("../html-root.mjs");
+  const master = sizeSkeleton(readFileSync(SKELETON, "utf8"), "16:9");
+  for (const ratio of ["9x16", "1x1"]) {
+    const tag = rootHtmlTag(editionHtml(master, ratio)).tag;
+    assert.match(tag, new RegExp(`data-ratio="${ratio}"`), tag);
+    assert.doesNotMatch(tag, /data-ratio="16x9"/);
+  }
+});

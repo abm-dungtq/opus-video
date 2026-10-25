@@ -28,7 +28,7 @@ Kết quả đạt khi exit 0 và in ra `tier`, `tts model`, `voice`. Script t�
 - Tuỳ chọn: dòng `TYPESAFE_API_KEY=...` trong cùng file bật bước xếp hạng case bằng Jev ở bước 3. Thiếu thì bước 3 tự dùng `find-cases`, không cần hỏi người dùng.
 - Đổi giọng hoặc model theo dự án: dùng cờ `--voice` / `--model`, hoặc đặt `voice_id` / `tts_model` trong `BRIEF.md` rồi truyền vào lệnh.
 
-Mặc định: voice `eGSd0uV8dNQnZuEEX9lu`, TTS `eleven_v4` (có tiếng Việt), music `music_v2_5`, SFX `eleven_text_to_sound_v2`.
+Mặc định: voice `eGSd0uV8dNQnZuEEX9lu`, TTS `eleven_v4` (có tiếng Việt), music `music_v2_5` (`--plan`: `music_v1`), SFX `eleven_text_to_sound_v2`.
 
 Xong bước này thì quay về chuỗi của hướng vận hành (skill `opus-video`), thường là `ov-brief`.
 

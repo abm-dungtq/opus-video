@@ -14,7 +14,7 @@ export const underDirector = (env = process.env) => (env.MOTION_STUDIO_RUNNER ||
 // through Studio's series tools behind a consent card; every other command, present or future, is
 // refused.
 export const ELEVEN_DIRECTOR_COMMANDS = Object.freeze(["sfx", "music"]);
-export const ELEVEN_REFUSED = Object.freeze(["doctor", "voice-info", "models", "tts", "probe-models", "audio-meta"]);
+export const ELEVEN_REFUSED = Object.freeze(["doctor", "voice-info", "models", "tts", "align", "probe-models", "audio-meta"]);
 export const REFUSED_EXIT = 5;
 
 // The series folder of the first of dirs that belongs to one, or null.

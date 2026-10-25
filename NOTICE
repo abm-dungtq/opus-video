@@ -13,10 +13,16 @@ This product includes material adapted from the motion-video skill of AgentKit
 references (references/styles/detail/glass-keynote.md, comic-multiverse.md and
 cinematic-product-launch.md, copied verbatim), the composition skeleton, motion-craft
 principles and the beat-grid, reframe and style-resolution algorithms, rewritten for
-opus-video.
+opus-video. Adapted parts: scripts/arrange-music.mjs, scripts/verify-arrangement.mjs (logic
+ported from arrange-music.mjs and verify-arrangement.py), scripts/beat-fit.mjs and
+scripts/cues.mjs (beat-fit and cue placement), scripts/voice-envelope.mjs, the karaoke caption
+layer, envKeys and signature of templates/composition/index-skeleton.html, the mascot layer
+structure of templates/composition/parts/, references/karaoke-va-mascot.md, the director and
+executor roles of agents/ov-director.md and agents/ov-executor.md, references/dao-dien-va-thi-cong.md
+(orchestration and the --poor mode) and the beat reactions of references/motion-craft.md section 7.
 
 This product includes material adapted from Lemo-Opuscar
-(https://github.com/lemomo-ai/lemo-opuscar, commit b5e8ef93930b6d828f352055a689320f138237b1),
+(https://github.com/lemomo-ai/lemo-opuscar, commit 413a6bd6d78ebd3bdd5abaec9538a26867f890df),
 MIT License (see third_party/lemo-opuscar/LICENSE): the lemo-watercolor and lemo-glass-product
 style profiles (data/styles/), adapted from its style guides, and the scene templates in
 templates/lemo/, written against its watercolor and glass-product engines. scripts/lemo.mjs

@@ -11,6 +11,8 @@ Muốn hiểu từng bước agent sẽ làm, đọc [hướng dẫn chuyên sâ
 3. Dán vào agent. Prompt mẫu mở đầu bằng `/opus-video` theo cú pháp Claude Code. Codex dùng `$opus-video`; agent khác thì mở đầu bằng "Dùng skill opus-video để" (xem mục 6 của [README.md](../../README.md)).
 4. Trả lời khi agent hỏi chủ đề, khổ hình hoặc thời lượng còn thiếu. Với video dựng mới, chọn một trong 3 hướng agent gửi trong `PITCH.md` (mục 31). Sau đó duyệt plan và khung hình demo khi agent gửi.
 
+Dòng "Workflow" trong mỗi mục dùng tên workflow HyperFrames cũ làm nhãn cho cách dựng. Từ HyperFrames 0.8.185 các workflow này không còn được cài; agent dựng tay trên khung của opus-video và đọc loại video trong skill `hyperframes` (xem `references/engine-selection.md`).
+
 Khổ hình chỉ nhận ba giá trị: `16:9`, `9:16` hoặc `both`. Với `both`, bản dọc được dàn lại bố cục chứ không cắt từ bản ngang.
 
 ## Cấu trúc mỗi mục

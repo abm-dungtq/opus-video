@@ -222,7 +222,7 @@ export function init(o, data, up = upstream()) {
   const chosen = o.directions === undefined ? null : chosenDirections(o.directions, scoring, data);
   if (chosen?.msg) return { code: 2, msg: chosen.msg };
   const picks = chosen ? chosen.picks : pickDirections(scoring, data);
-  if (!up.anim || !up.faceless || !up.creative) return { code: 1, msg: "make-pitch: HyperFrames skills (hyperframes-animation, hyperframes-creative, faceless-explainer) not found; run setup-check.mjs" };
+  if (!up.anim || !up.faceless || !up.creative) return { code: 1, msg: "make-pitch: HyperFrames recipes (hyperframes-animation, hyperframes-creative, faceless-explainer) not found: third_party/hyperframes-skills is missing from the plugin; reinstall opus-video" };
   const briefPath = join(project, "BRIEF.md");
   const briefFm = existsSync(briefPath) ? frontmatter(readFileSync(briefPath, "utf8")) : {};
   const pitch = join(project, "pitch");

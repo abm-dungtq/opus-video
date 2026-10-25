@@ -51,7 +51,7 @@ Fedora dùng `dnf`, Arch dùng `pacman`. Trên Windows, mở terminal mới sau 
 
 ## 4. Cài cho từng agent
 
-Installer làm cùng một việc cho mọi agent: chép opus-video vào thư mục skill, cài viet-pro v5.3.0 cho cùng các agent đó, chạy `npx hyperframes skills` để cài CLI cùng toàn bộ skill HyperFrames, tạo file key mẫu, rồi chạy `setup-check`. Bản cũ được chuyển vào `~/.opus-video-backups/<thời điểm>/`; thư mục là git checkout thì installer để nguyên.
+Installer làm cùng một việc cho mọi agent: chép opus-video vào thư mục skill, cài viet-pro v5.6.1 cho cùng các agent đó, chạy `npx hyperframes skills` để cài CLI cùng toàn bộ skill HyperFrames, tạo file key mẫu, rồi chạy `setup-check`. Bản cũ được chuyển vào `~/.opus-video-backups/<thời điểm>/`; thư mục là git checkout thì installer để nguyên.
 
 ### Claude Code
 
@@ -115,7 +115,7 @@ Chọn agent:
 & ([scriptblock]::Create((irm https://raw.githubusercontent.com/abm-dungtq/opus-video/main/install.ps1))) -Hosts claude,codex
 ```
 
-`-Hosts` nhận `claude`, `codex`, `agy`, `agy-cli`. Thư mục tương ứng: `%USERPROFILE%\.claude\skills`, `%USERPROFILE%\.agents\skills`, `%USERPROFILE%\.gemini\config\skills`, `%USERPROFILE%\.gemini\antigravity-cli\skills`. viet-pro được cài bằng `git clone` thẻ `v5.3.0` vì chưa có installer PowerShell. Bản PowerShell chưa được chạy thử trên máy Windows thật; nếu gặp lỗi, dùng cách cài thủ công ở mục 5.
+`-Hosts` nhận `claude`, `codex`, `agy`, `agy-cli`. Thư mục tương ứng: `%USERPROFILE%\.claude\skills`, `%USERPROFILE%\.agents\skills`, `%USERPROFILE%\.gemini\config\skills`, `%USERPROFILE%\.gemini\antigravity-cli\skills`. viet-pro được cài bằng `git clone` thẻ `v5.6.1` vì chưa có installer PowerShell. Bản PowerShell chưa được chạy thử trên máy Windows thật; nếu gặp lỗi, dùng cách cài thủ công ở mục 5.
 
 Dùng WSL thì chạy lệnh bash bên trong WSL; agent cũng phải chạy trong WSL. Skill cài ở phía Windows không nhìn thấy được từ WSL. Chiều ngược lại cũng vậy.
 
@@ -130,13 +130,13 @@ git clone https://github.com/abm-dungtq/opus-video <SKILLS>/opus-video
 Cài viet-pro trên macOS, Linux hoặc WSL:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/abm-dungtq/viet-pro-codex/v5.3.0/install.sh | bash -s -- --claude
+curl -fsSL https://raw.githubusercontent.com/abm-dungtq/viet-pro-codex/v5.6.1/install.sh | bash -s -- --claude
 ```
 
 Trên Windows, hoặc khi muốn tự chép:
 
 ```bash
-git clone --depth 1 --branch v5.3.0 https://github.com/abm-dungtq/viet-pro-codex.git
+git clone --depth 1 --branch v5.6.1 https://github.com/abm-dungtq/viet-pro-codex.git
 ```
 
 rồi chép thư mục `skills/viet-pro` vào `<SKILLS>/viet-pro`.
@@ -186,10 +186,11 @@ Kết quả phải là `READY` (exit 0). Mỗi dòng `MISSING` đi kèm dòng `f
 `setup-check` kiểm các mục sau:
 
 - Node ≥ 22, git, ffmpeg, ffprobe
-- CLI `hyperframes` ≥ 0.8.144
+- CLI `hyperframes` ≥ 0.8.192
 - viet-pro, kèm hai self-test của nó
-- 10 skill lõi: `hyperframes`, `hyperframes-core`, `hyperframes-animation`, `hyperframes-keyframes`, `hyperframes-creative`, `hyperframes-audio`, `hyperframes-cli`, `hyperframes-registry`, `hyperframes-studio`, `media-use`
-- 10 workflow: `general-video`, `faceless-explainer`, `product-launch-video`, `pr-to-video`, `motion-graphics`, `music-to-video`, `slideshow`, `embedded-captions`, `talking-head-recut`, `remotion-to-hyperframes`
+- 4 skill lõi: `hyperframes`, `hyperframes-cli`, `hyperframes-registry`, `media-use`
+- 2 skill phụ: `slideshow`, `remotion-to-hyperframes`
+- `data/directions.json`: mọi token hướng đạo diễn có thật trong `third_party/hyperframes-skills/` (công thức của HyperFrames v0.8.184 mà bản 0.8.185 bỏ khỏi bộ skill) hoặc trong frame preset của skill `hyperframes`
 - `ELEVENLABS_API_KEY` và `OPUS_VIDEO_VOICE_ID` (chỉ kiểm có hay không)
 
 Sau đó kiểm kết nối ElevenLabs:
@@ -232,7 +233,7 @@ Gỡ bằng cách xoá thư mục `opus-video` trong thư mục skill của từ
 |---|---|---|
 | Agent không nhận lệnh `/opus-video` hay `$opus-video` | Phiên agent mở trước khi cài | Mở phiên mới; kiểm skill nằm đúng thư mục ở mục 2 |
 | `skill … not installed` | Skill HyperFrames chưa cài cho agent này | `npx hyperframes skills`, rồi mở phiên mới |
-| `skill viet-pro … self-test failed` | Bản viet-pro hỏng hoặc sai phiên bản | Cài lại viet-pro v5.3.0 (mục 5) |
+| `skill viet-pro … self-test failed` | Bản viet-pro hỏng hoặc sai phiên bản | Cài lại viet-pro v5.6.1 (mục 5) |
 | `hyperframes CLI: npx hyperframes did not run` | Mạng chặn npm, hoặc sandbox của agent chặn mạng | Cấp quyền mạng cho agent, chạy lại |
 | `ELEVENLABS_API_KEY: absent` | File key chưa điền hoặc sai đường dẫn | Điền file ở mục 6 |
 | `eleven.mjs` exit 4 | Kịch bản chưa qua cổng viet-pro | `check-viet-pro.mjs --project .`, sửa các dòng FAIL |

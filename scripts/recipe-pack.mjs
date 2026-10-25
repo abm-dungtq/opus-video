@@ -62,13 +62,13 @@ export function buildRecipes({ blueprints = [], rules = [], seams = [], directio
   out.push("> Sinh bằng `recipe-pack.mjs`. Đọc hết trước khi viết HTML. Mỗi beat trong PLAN.md phải dựng bằng đúng blueprint/rule/seam dưới đây, không tự chế bằng `opacity` + `y`.", "");
   out.push("## Luật dựng (opus-video)", "");
   out.push("1. **Không dồn hết lên đầu cảnh.** Phần tử của một beat lộ dần theo `words.json`, phần lớn rơi vào nửa sau của beat; không đặt toàn bộ DOM ở t=0 rồi đứng yên.");
-  out.push("2. **Không exit-rồi-enter.** Cấm cảnh cũ mờ về 0 rồi cảnh mới mới hiện (hyperframes-animation/transitions/overview.md). Hai cảnh phải chồng nhau trong seam đã khai.");
+  out.push("2. **Không exit-rồi-enter.** Cấm cảnh cũ mờ về 0 rồi cảnh mới mới hiện (third_party/hyperframes-skills/hyperframes-animation/transitions/overview.md của opus-video). Hai cảnh phải chồng nhau trong seam đã khai.");
   out.push("3. **Mỗi beat một chuyển động bậc cao** (scale/morph, camera, clip/mask, 3D, path draw, shader), không chỉ trượt và mờ. qc-mp4 MOTION chặn bản render có ≥60% khung đứng yên.");
   out.push("4. **Beat không lời là beat hình**: ở các đoạn `(nhạc)` trong PLAN.md, hình phải tự kể (morph, camera bay, chữ đập theo beat).");
   out.push("5. **Giữ Kỷ luật GSAP** của references/edit-method.md (`immediateRender:false`, không `.from` khi seek, id không bắt đầu bằng số).", "");
   if (direction) {
     out.push(`## Hướng ${direction.id} — ${direction.ten_vi}`, "", `- ${direction.mo_ta_vi}`, `- Hook: ${direction.hook_vi}`, `- Luật chống slideshow: ${direction.anti_slideshow_vi}`);
-    if (style) out.push(`- Style: ${style.kind} \`${style.name}\`${style.kind === "style" ? " — đọc mục tương ứng trong hyperframes-creative/references/visual-styles.md" : " — preset trong hyperframes-creative/frame-presets/" + style.name + "/"}`);
+    if (style) out.push(`- Style: ${style.kind} \`${style.name}\`${style.kind === "style" ? " — đọc mục tương ứng trong hyperframes-creative/references/visual-styles.md" : " — preset trong hyperframes/assets/frame-presets/" + style.name + "/"}`);
     out.push("");
   }
   if (style && style.kind === "style") {
@@ -135,7 +135,7 @@ export function main(argv = process.argv.slice(2), log = console.log, err = cons
   if (o.bad) { err(`recipe-pack: ${o.bad}`); return 2; }
   const data = loadDirections();
   const up = upstream();
-  if (!up.anim || !up.faceless || !up.creative) { err("recipe-pack: HyperFrames skills (hyperframes-animation, hyperframes-creative, faceless-explainer) not found; run setup-check.mjs"); return 1; }
+  if (!up.anim || !up.faceless || !up.creative) { err("recipe-pack: HyperFrames recipes (hyperframes-animation, hyperframes-creative, faceless-explainer) not found: third_party/hyperframes-skills is missing from the plugin; reinstall opus-video"); return 1; }
   let tokens = { blueprints: [], rules: [], seams: [] }, direction = null, style = null;
   const swaps = Object.fromEntries(DIMENSIONS.filter((d) => o[d]).map((d) => [d, o[d]]));
   let dirId = o.direction;

@@ -82,7 +82,7 @@ Ghi vào `BRIEF.md` (khuyên dùng) hoặc `script-table.md`. Mỗi trường m�
 ```markdown
 ## viet_pro
 - mode: Chuẩn
-- files_read: SKILL.md, review/lead.md, review/anti-ai.md, review/humanizer-patterns.md, review/natural.md, review/punctuation.md, review/capitalization.md, review/consistency.md, review/fact-check.md, editorial/lead.md, editorial/hook-close.md, editorial/rhythm.md, editorial/story-core.md, editorial/debunk.md, editorial/emphasis.md, editorial/metaphor.md, editorial/reframe.md, editorial/technical.md, publishing/video-script.md
+- files_read: SKILL.md, review/lead.md, review/anti-ai.md, review/humanizer-patterns.md, review/natural.md, review/punctuation.md, review/capitalization.md, review/consistency.md, review/fact-check.md, review/translationese-vi.md, editorial/lead.md, editorial/hook-close.md, editorial/rhythm.md, editorial/story-core.md, editorial/debunk.md, editorial/emphasis.md, editorial/metaphor.md, editorial/reframe.md, editorial/technical.md, publishing/video-script.md
 - humanizer: <pattern #N → câu gốc → cách sửa; hoặc "không thấy pattern 1–5">
 - lint: <file: số ERROR/WARN, WARN nào giữ và vì sao>
 - words: <số từ> / <thời lượng> giây

@@ -2,9 +2,16 @@
 // reframe.mjs — derive the 9:16 or 1:1 edition of a 16:9 project built from one ratio-aware
 // index.html. The edition keeps the master's voice, music, TIMING and mix; only the frame size and
 // the html data-ratio flag change, so the layout comes from the master's html[data-ratio="…"] CSS.
-// Never crops: write the overrides in the master, then run this again after every master change.
+// Never crops (only --quick below does, as a stopgap): write the overrides in the master, then run
+// this again after every master change.
 //   node reframe.mjs <project> --ratio 9x16|1x1 [--out <dir>] [--force]
+//   node reframe.mjs --quick --video <in.mp4> --ratio 9x16|1x1 [--out <out.mp4>]
 //   node reframe.mjs --help | -h
+// --quick  a stopgap from a rendered MP4, no project: 9x16 lays the video over a blurred, darkened
+//          copy of itself; 1x1 crops the centre square. Not a delivery edition (it prints a WARN);
+//          deliver the re-laid-out edition above. --out is a file here (default
+//          <video dir>/<name>-<ratio>-quick.mp4); an existing file is refused (exit 2), no --force.
+//          Prints QUICK <out> <w>x<h> (ffprobe). Needs ffmpeg and ffprobe.
 // --out    edition directory (default <project>-9x16 or <project>-1x1 next to the project).
 // --force  rewrite an edition this script wrote before (it holds .reframe.json naming the same
 //          master) or an empty directory. Any other existing directory is refused, even with --force.
@@ -24,14 +31,16 @@
 //   master's frame (a 2D canvas keeps 1920x1080 and is stretched), so the edition needs its own scene.
 // A frame-worker project (compositions/frames/) is refused: its 9:16 edition is a separate project,
 //   see references/engine-selection.md.
-// Next: cd <edition> && npx --yes hyperframes@0.8.144 lint && npx --yes hyperframes@0.8.144 check
+// Next: cd <edition> && npx --yes hyperframes@0.8.192 lint && npx --yes hyperframes@0.8.192 check
 // Exit: 0 written (WARN lines allowed) · 1 edition exists, frame-worker project, no root
 //   composition, or a write failed · 2 bad usage, or the project / its index.html is missing.
 
 import { constants, copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 import { wantsHelp, helpText } from "./cli-help.mjs";
+import { replaceRootHtmlTag, rootHtmlTag } from "./html-root.mjs";
 
 export const RATIOS = {
   "9x16": { width: 1080, height: 1920, aspect: "9:16", resolution: "portrait" },
@@ -58,10 +67,8 @@ export function editionHtml(text, ratio) {
   }
   const rootTag = root[0].replace(/\bdata-width="\d+"/, `data-width="${f.width}"`).replace(/\bdata-height="\d+"/, `data-height="${f.height}"`);
   let out = text.replace(rootRe, () => rootTag);
-  const html = out.match(/<html\b[^>]*>/i);
-  if (!html) throw new Error("không thấy thẻ <html>");
-  const htmlTag = html[0].replace(/\s(data-ratio|data-resolution)="[^"]*"/g, "").replace(/>$/, ` data-resolution="${f.resolution}" data-ratio="${ratio}">`);
-  out = out.replace(/<html\b[^>]*>/i, () => htmlTag);
+  if (!rootHtmlTag(out)) throw new Error("không thấy thẻ <html>");
+  out = replaceRootHtmlTag(out, (tag) => tag.replace(/\s(data-ratio|data-resolution)="[^"]*"/g, "").replace(/>$/, ` data-resolution="${f.resolution}" data-ratio="${ratio}">`));
   out = out.replace(/(<meta name="viewport" content=")[^"]*(")/, `$1width=${f.width}, height=${f.height}$2`);
   const vars = /(--W:\s*)\d+(px;\s*--H:\s*)\d+(px)/;
   if (vars.test(out)) out = out.replace(vars, `$1${f.width}$2${f.height}$3`);
@@ -145,8 +152,40 @@ function replaceable(out, project) {
   return { ok: true };
 }
 
-export function main(argv = process.argv.slice(2), { out = (s) => process.stdout.write(s), err = (s) => process.stderr.write(s) } = {}) {
+export const QUICK_FILTERS = {
+  "9x16": "[0:v]split[a][b];[a]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=40,eq=brightness=-0.25[bg];[b]scale=1080:1920:force_original_aspect_ratio=decrease:force_divisible_by=2[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,format=yuv420p[v]",
+  "1x1": "[0:v]crop='min(iw,ih)':'min(iw,ih)',scale=1080:1080,format=yuv420p[v]",
+};
+
+// --quick: blurred-fill 9:16 or centre-crop 1:1 of a rendered MP4. Returns the exit code.
+export function quickFit(argv, { out, err, run = spawnSync }) {
+  const usage = "usage: node reframe.mjs --quick --video <in.mp4> --ratio 9x16|1x1 [--out <out.mp4>]";
+  const o = { video: null, ratio: null, out: null };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--quick") continue;
+    if (a === "--video" || a === "--ratio" || a === "--out") { const v = argv[++i]; if (!v || v.startsWith("--")) { err(`reframe: ${a} needs a value\n${usage}\n`); return 2; } o[a.slice(2)] = v; }
+    else { err(`reframe --quick: unknown argument ${a}\n${usage}\n`); return 2; }
+  }
+  if (!o.video) { err(`reframe --quick: --video is required\n${usage}\n`); return 2; }
+  if (!QUICK_FILTERS[o.ratio]) { err(`reframe --quick: --ratio must be 9x16 or 1x1\n${usage}\n`); return 2; }
+  const video = resolve(o.video);
+  if (!existsSync(video)) { err(`reframe --quick: không thấy ${video}\n`); return 2; }
+  const dest = resolve(o.out ?? join(dirname(video), `${basename(video).replace(/\.[^.]+$/, "")}-${o.ratio}-quick.mp4`));
+  if (existsSync(dest)) { err(`reframe --quick: ${dest} đã có; chọn --out khác hoặc xoá file cũ\n`); return 2; }
+  err("WARN reframe --quick: bản tạm (nền mờ hoặc crop giữa), không thay bản re-layout; bản giao dùng reframe.mjs <project> --ratio\n");
+  mkdirSync(dirname(dest), { recursive: true });
+  const r = run("ffmpeg", ["-hide_banner", "-nostdin", "-v", "error", "-i", video, "-filter_complex", QUICK_FILTERS[o.ratio],
+    "-map", "[v]", "-map", "0:a?", "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", dest], { encoding: "utf8" });
+  if (r.error || r.status !== 0) { rmSync(dest, { force: true }); err(`reframe --quick: ffmpeg lỗi: ${r.error?.message ?? String(r.stderr ?? "").trim()}\n`); return 1; }
+  const p = run("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", dest], { encoding: "utf8" });
+  out(`QUICK ${dest} ${String(p.stdout ?? "").trim() || "?"}\n`);
+  return 0;
+}
+
+export function main(argv = process.argv.slice(2), { out = (s) => process.stdout.write(s), err = (s) => process.stderr.write(s), run = spawnSync } = {}) {
   if (wantsHelp(argv)) { out(helpText(import.meta.url)); return 0; }
+  if (argv.includes("--quick")) return quickFit(argv, { out, err, run });
   const usage = "usage: node reframe.mjs <project> --ratio 9x16|1x1 [--out <dir>] [--force]";
   const o = { project: null, ratio: null, out: null, force: false };
   for (let i = 0; i < argv.length; i++) {
@@ -205,7 +244,7 @@ export function main(argv = process.argv.slice(2), { out = (s) => process.stdout
   const f = RATIOS[o.ratio];
   out(lines.map((l) => `${l}\n`).join(""));
   out(`OK    reframe ${o.ratio} ${f.width}x${f.height} → ${dest} (assets: ${assets.files} tệp clone)\n`);
-  out(`next: cd ${dest} && npx --yes hyperframes@0.8.144 lint && npx --yes hyperframes@0.8.144 check\n`);
+  out(`next: cd ${dest} && npx --yes hyperframes@0.8.192 lint && npx --yes hyperframes@0.8.192 check\n`);
   return 0;
 }
 

@@ -53,10 +53,19 @@ test("runChecks: every required item missing → MISSING with a fix; optional on
 test("runChecks: everything present → no MISSING", () => {
   const items = runChecks({
     findSkillImpl: (n) => `/skills/${n}`,
-    versionImpl: (cmd) => (cmd === "npx" ? "0.8.144" : "ok"),
+    versionImpl: (cmd) => (cmd === "npx" ? "0.8.192" : "ok"),
     keys: new Set(["ELEVENLABS_API_KEY", "OPUS_VIDEO_VOICE_ID", "TYPESAFE_API_KEY"]),
   });
-  assert.deepEqual(items.filter((i) => i.level !== "ok"), []);
+  assert.deepEqual(items.filter((i) => i.level !== "ok" && i.level !== "info"), []);
+});
+
+test("GEMINI_API_KEY is an INFO line either way and never makes setup NOT READY", () => {
+  for (const keys of [new Set(), new Set(["GEMINI_API_KEY"])]) {
+    const item = runChecks({ findSkillImpl: () => "", versionImpl: () => null, keys }).find((i) => i.name === "GEMINI_API_KEY");
+    assert.equal(item.level, "info");
+    assert.match(item.detail, keys.size ? /^có / : /^không /);
+    assert.match(item.detail, /ELEVENLABS_API_KEY/);
+  }
 });
 
 test("opus-video plugin line: installed for the plugin layout, a WARN (never MISSING) otherwise", () => {

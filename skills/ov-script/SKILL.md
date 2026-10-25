@@ -19,7 +19,7 @@ description: "Bước 2 của opus-video: cổng viet-pro đầy đủ cho mọi
   ```markdown
   ## viet_pro
   - mode: Chuẩn
-  - files_read: SKILL.md, review/lead.md, review/anti-ai.md, review/humanizer-patterns.md, review/natural.md, review/punctuation.md, review/capitalization.md, review/consistency.md, review/fact-check.md, editorial/lead.md, editorial/hook-close.md, editorial/rhythm.md, editorial/story-core.md, editorial/debunk.md, editorial/emphasis.md, editorial/metaphor.md, editorial/reframe.md, editorial/technical.md, publishing/video-script.md
+  - files_read: SKILL.md, review/lead.md, review/anti-ai.md, review/humanizer-patterns.md, review/natural.md, review/punctuation.md, review/capitalization.md, review/consistency.md, review/fact-check.md, review/translationese-vi.md, editorial/lead.md, editorial/hook-close.md, editorial/rhythm.md, editorial/story-core.md, editorial/debunk.md, editorial/emphasis.md, editorial/metaphor.md, editorial/reframe.md, editorial/technical.md, publishing/video-script.md
   - humanizer: #4 dẫn dài "Trong thời đại…" → mở bằng hành vi người xem; #13 "thay đổi cuộc chơi" → bỏ; không còn pattern 1–5
   - lint: script-table.md + script/01–07.txt: 0 ERROR; giữ 14 WARN double-space/em-dash do cú pháp bảng
   - words: 158 từ / 60 giây

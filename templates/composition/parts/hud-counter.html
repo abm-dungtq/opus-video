@@ -1,0 +1,28 @@
+<!--
+  Part: hud-counter. Inserted by `node scripts/composition.mjs add-part --project <dir> --part hud-counter`:
+  the markup goes before the PARTS:END HTML marker in #root, the script before the PARTS:END
+  marker of the main timeline script. No data-voice-env needed.
+  A counter "01/12" that steps up when each phrase is spoken: edit STEPS (scene id, phrase as it
+  is spoken in that scene) and the total in .hud-t. Each step is keyed with W(), so it follows the
+  voice after every timing change.
+-->
+<style>
+  .hud { right: 64px; top: 56px; z-index: 4; font: 600 56px/1 "Be Vietnam Pro", sans-serif; font-variant-numeric: tabular-nums; color: var(--ink); opacity: 0; }
+  .hud .hud-t { color: var(--accent); }
+  html[data-ratio="9x16"] .hud { top: var(--safe-top); right: 48px; }
+</style>
+<div id="hud" class="abs hud" data-part="hud-counter"><span class="hud-n">00</span>/<span class="hud-t">12</span></div>
+<script data-part-script>
+{ // hud-counter: edit STEPS — one [scene id, spoken phrase] per step, in order
+  const STEPS = [
+    ["s1", "thay bằng cụm từ"],
+  ];
+  const pad = (n) => String(n).padStart(2, "0");
+  STEPS.forEach(([sid, phrase], i) => {
+    const t = W(sid, phrase);
+    if (i === 0) tl.fromTo("#hud", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.2, ease: "power2.out" }, Math.max(0, t - 0.2));
+    tl.set("#hud .hud-n", { textContent: pad(i + 1) }, t);
+    bump("#hud", t, { s: 1.12 });
+  });
+}
+</script>
