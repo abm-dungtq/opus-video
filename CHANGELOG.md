@@ -5,6 +5,7 @@
 ### Fixed
 - `eleven.mjs music --plan` sends `model_id: music_v1`, `respect_sections_durations: true` and `output_format=mp3_44100_128`. A `sections[]` composition plan is the music_v1 format; ElevenLabs rejects it with `music_v2`/`music_v2_5`, the model `--plan` sent before. `--prompt` keeps `music_v2_5`.
 - Karaoke captions (`TIMING.captions`) follow the motion-video timing: on 0.12 s before the first word, held 0.5 s after its last word, and off 0.16 s before the next chunk's first word when that comes sooner. Before, a line's last chunk began to fade 0.12 s before the voice ended.
+- Skeleton karaoke: a chunk shorter than 0.14 s (two voice tracks overlapping) stayed on to the end of the video when the renderer sought frame by frame, because its `set` to alpha 0 fell inside the running fade-in; a jump seek showed it off, so render and snapshot disagreed. The fade-in now lasts `min(0.14, end − start)` and a chunk shorter than one frame is skipped. Projects made from the old skeleton keep the old block. `scripts/tests/karaoke-skeleton-gsap.test.mjs` checks both seek modes on GSAP 3.14.2.
 
 ## v2.7.0 (2026-10-25): tích hợp năng lực ak:motion-video
 

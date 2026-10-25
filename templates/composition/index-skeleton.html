@@ -289,6 +289,8 @@
         if (T.captions?.length) {
           const capLayer = $("#cap-layer");
           T.captions.forEach((c) => {
+            const len = c.end - c.start;
+            if (len < FR) return; // shorter than a frame: no frame would show it
             const cap = document.createElement("div");
             cap.className = "cap";
             const box = document.createElement("div");
@@ -303,10 +305,13 @@
             });
             cap.append(box);
             capLayer.append(cap);
-            tl.fromTo(cap, { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: 0.14, ease: "power2.out" }, c.start);
+            // the fade-in ends by c.end, so the set below never lands inside it (frame-by-frame seeks
+            // would let the running fade-in bring alpha back to 1 and keep the chunk on to the end)
+            const fin = Math.min(0.14, len);
+            tl.fromTo(cap, { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: fin, ease: "power2.out" }, c.start);
             // off by c.end at the latest: timing.mjs keeps c.end ≤ the next chunk's start
             const off = c.end - 0.12;
-            if (off >= c.start + 0.14) tl.to(cap, { autoAlpha: 0, duration: 0.12, ease: "power1.in" }, off);
+            if (off >= c.start + fin) tl.to(cap, { autoAlpha: 0, duration: 0.12, ease: "power1.in" }, off);
             else tl.set(cap, { autoAlpha: 0 }, c.end);
             c.words.forEach(([, s], j) => tl.set(spans[j], { className: "cap-w on" }, s));
           });
