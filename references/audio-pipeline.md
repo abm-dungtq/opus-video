@@ -113,6 +113,30 @@ node $OV/scripts/timing.mjs --project .
 - `verify-arrangement.mjs` so từng đoạn của output với nguồn bằng tương quan chéo, lệch quá 2 ms là `FAIL`. Con số này chỉ chứng minh mối ghép chính xác tới mẫu. Phách có rơi đúng lưới không thì xem dòng `maxDriftMs` (đo phách của output so với lưới đích, trên 20 ms là `WARN`).
 - Nhạc outro: `eleven.mjs music --plan outro-plan.json --outro` ghi `assets/bgm/outro.mp3`. Gateway không có op thêm bed hay đổi `file` của bed (`set_music` chỉ có `gain|start|end`). Muốn dùng: thêm thẻ `<audio>` bed thứ hai vào `index.html`, chạy `manifest-import.mjs --project . --force`, rồi `update_music` đặt `start` và `fade_in` để outro chồng dưới đuôi nhạc chính.
 
+## 3d. SFX theo anchor (`cues.mjs`)
+
+Event trong `project.json` có thể mang `anchor`: SFX bám theo một mốc thay vì một số giây cố định, nên vẫn đúng chỗ sau khi đổi lịch cảnh (`beat-fit`, `resize_shot`). Anchor có đúng một trong bốn dạng:
+
+| Dạng | Ví dụ | Mốc |
+|---|---|---|
+| Từ trong một shot | `{"word":"bùng nổ","shot":"s2"}` | onset của cụm đó (lần đầu) trong lời của shot |
+| Từ lần thứ n | `{"word":"nhanh","nth":2,"shot":"s4"}` | lần thứ 2 cụm đó được nói trong lời của shot s4 |
+| Beat | `{"beat":16}` | `beat0 + 16·beatLen`, cùng lưới với `B()` |
+| Giây tuyệt đối | `{"abs":12.5}` | 12,5 s |
+
+Anchor theo từ luôn cần `shot`: cụm từ chỉ được tìm trong lời của shot đó. `lead` (giây, ≥ 0) là quãng im lặng ở đầu file SFX, để tiếng vang đúng mốc. `cues.mjs` luôn đo lại `lead` từ file (cùng cách `sfx-sync.mjs`, có cache) và ghi vào anchor; giá trị đã lưu chỉ dùng khi file không còn.
+
+```bash
+node $OV/scripts/cues.mjs add --project . --sound assets/sfx/hit.mp3 --shot s2 --word "bùng nổ" --apply
+node $OV/scripts/cues.mjs place --project . --apply   # sau mỗi lần đổi lịch
+node $OV/scripts/cues.mjs check --project .           # CUES OK / CUES FAIL
+```
+
+- Mọi lệnh ghi đi qua gateway với actor `timing`. Không có `--apply` thì chỉ in. `place` bỏ qua event `FAIL`, vẫn đặt lại các event khác, và thoát mã 1.
+- Sau `beat-fit.mjs --apply`: chạy `cues.mjs place --apply` (nếu có anchor) và `recipe-pack.mjs --project .`, vì derive vừa ghi lại `PLAN.md`.
+- `check` báo `FAIL` khi anchor không còn tìm thấy (cụm từ đã bị sửa khỏi lời, shot đã xoá) hay mốc nằm sau cuối video (`beat-fit --tight` rút ngắn video), `WARN` khi event lệch mốc quá một khung, hay khi shot/câu đã ghim beat (`cut_beat`, `at_beat`) lệch khỏi beat đó (chạy lại `beat-fit.mjs --apply`). `check-preflight --stage final` chạy `check` cho mọi dự án có anchor hay beat pin.
+- Kéo tay một SFX có anchor (`move_event` không kèm `keep_anchor`) là bỏ anchor: event giữ số giây mới.
+
 ## 4. Mix
 
 | Lớp | Mức mục tiêu |

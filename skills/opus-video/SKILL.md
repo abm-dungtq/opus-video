@@ -17,7 +17,7 @@ Skill điều phối: biến một ý tưởng thành MP4 hoàn chỉnh. Skill n
 |---|---|---|
 | `dao-dien` đạo diễn đầy đủ (mặc định) | "làm video", "explainer", "quảng cáo" | ov-setup → ov-brief → ov-direction → ov-script → ov-audio → ov-build → ov-deliver |
 | `nhanh` theo mẫu | "làm nhanh", "theo mẫu", "giống video này" | ov-setup → ov-brief → ov-cases → ov-script → ov-audio → ov-build (vẫn giữ cổng animatic) → ov-deliver |
-| `tu-nhac` từ nhạc hoặc footage | "từ bài nhạc", "theo beat", "clip quay sẵn" | ov-setup → ov-brief → ov-audio (đo beat-grid trước) hoặc ov-footage → ov-direction → ov-script → ov-build → ov-deliver |
+| `tu-nhac` từ nhạc hoặc footage | "từ bài nhạc", "theo beat", "clip quay sẵn" | ov-setup → ov-brief → ov-audio (đo beat-grid trước) hoặc ov-footage → ov-direction → ov-script → ov-build (trước `make-demo --animatic`: `beat-fit.mjs --project . --tight`, xem bảng rồi `--apply`) → ov-deliver |
 | `timeline` sửa dự án đã có | "sửa video", "mở studio", "đổi shot" | ov-studio (nhập dự án nếu chưa có `project.json`) → lệnh gateway → ov-audio (chỉ câu thoại đã đổi) → ov-deliver |
 
 - Khi không rõ, hỏi đúng một câu: người dùng muốn hướng nào trong bốn hướng trên.

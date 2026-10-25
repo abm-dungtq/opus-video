@@ -589,3 +589,43 @@ test("add_shot joins the scene of the shot before it; remove_shot leaves its sce
   assert.deepEqual(removed.next.scenes, [{ id: "c2", label: "Kết", shots: ["s2", "s3"] }]);
   assert.match(removed.receipt.join("; "), /bỏ cảnh c1 vì không còn shot/);
 });
+
+test("pin_beat writes then removes a shot's cut_beat and a line's at_beat; the first shot and bad beats are refused", () => {
+  const m = load(FIXTURE);
+  const a = applyOps(m, [{ op: "pin_beat", target: "shot", id: "s2", beat: 8 }, { op: "pin_beat", target: "line", id: "vo-01", beat: 6 }]);
+  assert.equal(a.next.shots[1].cut_beat, 8);
+  assert.equal(a.next.lines[0].at_beat, 6);
+  assert.equal(a.next.shots[1].start, m.shots[1].start, "pin_beat moves nothing");
+  assert.deepEqual(a.receipt, ["s2: ghim beat 8", "vo-01: ghim beat 6"]);
+  const b = applyOps(a.next, [{ op: "pin_beat", target: "shot", id: "s2", beat: null }]);
+  assert.equal("cut_beat" in b.next.shots[1], false);
+  assert.deepEqual(b.receipt, ["s2: bỏ ghim beat"]);
+  assert.throws(() => applyOps(m, [{ op: "pin_beat", target: "shot", id: "s1", beat: 2 }]), /shot đầu/);
+  assert.throws(() => applyOps(m, [{ op: "pin_beat", target: "shot", id: "s2", beat: -1 }]), /số nguyên ≥ 0/);
+  assert.throws(() => applyOps(m, [{ op: "pin_beat", target: "scene", id: "s2", beat: 1 }]), /target/);
+});
+
+test("move_event drops the anchor unless keep_anchor; keep_anchor takes a new anchor", () => {
+  const m = { ...load(FIXTURE), events: [{ id: "sfx-1", shot: "s2", offset: 0.5, label: "x", studio: true, anchor: { beat: 6 } }] };
+  const dropped = applyOps(m, [{ op: "move_event", id: "sfx-1", start: 4 }]);
+  assert.equal("anchor" in dropped.next.events[0], false);
+  assert.match(dropped.receipt[0], /\(bỏ anchor\)$/);
+  const kept = applyOps(m, [{ op: "move_event", id: "sfx-1", start: 4, keep_anchor: true }]);
+  assert.deepEqual(kept.next.events[0].anchor, { beat: 6 });
+  const updated = applyOps(m, [{ op: "move_event", id: "sfx-1", start: 4, keep_anchor: true, anchor: { beat: 6, lead: 0.05 } }]);
+  assert.deepEqual(updated.next.events[0].anchor, { beat: 6, lead: 0.05 });
+  assert.equal(updated.next.events[0].offset, 1.5);
+});
+
+test("add_event with an anchor is a studio event; undo removes it", () => withProject((dir) => {
+  mkdirSync(join(dir, "assets", "sfx"), { recursive: true });
+  writeFileSync(join(dir, "assets", "sfx", "pop.mp3"), "pop");
+  const anchor = { word: "mã nguồn", shot: "s2", lead: 0 };
+  const r = patch(dir, { actor: "timing", base: 1, ops: [{ op: "add_event", start: 3, sound: "assets/sfx/pop.mp3", anchor }] });
+  assert.equal(r.code, EXIT.ok, r.error);
+  const e = load(dir).events.find((x) => x.sound === "assets/sfx/pop.mp3");
+  assert.deepEqual(e.anchor, anchor);
+  assert.equal(e.studio, true);
+  assert.equal(undo(dir, { base: r.version }).code, EXIT.ok);
+  assert.equal((load(dir).events ?? []).some((x) => x.sound === "assets/sfx/pop.mp3"), false);
+}));

@@ -53,6 +53,8 @@
 //     its FAIL lines (sound outside ITU-R BT.1359-1 −90…+185 ms) block, its WARN lines warn.
 //     word-sync.mjs measures each "chữ: <cụm>" row against the spoken word the same way: FAIL
 //     (off by more than 250 ms, or never spoken) blocks, WARN warns.
+//     A project.json with an anchored event or a beat pin also runs cues.mjs check: its FAIL lines
+//     (anchor that no longer resolves) block, its WARN lines (event drifted from its anchor) warn.
 // Style axis (data/styles, styles.mjs), both stages: BRIEF.md `style_profile:` must name a style
 //   (id or alias) and resolve with its "## style_layers" against the "## Cảnh" rows (optional Loại
 //   column). FAIL in a project that is not legacy (BRIEF has direction: or brief_version: 2), WARN
@@ -89,6 +91,8 @@ import { resolveProject } from "./styles.mjs";
 import { audioHash, pictureFiles, pictureHash } from "./render-final.mjs";
 import { checkWords } from "./word-sync.mjs";
 import { checkBalance } from "./mix-balance.mjs";
+import { checkCues } from "./cues.mjs";
+import { load as loadManifest } from "./manifest.mjs";
 
 // make-demo needs the 9:16 source named, else hyperframes renders the 16:9 index.html. The default
 // source is the edition reframe.mjs derives next to the project; a project that still keeps its own
@@ -407,6 +411,15 @@ export function checkCreative({ dir, plan, brief, stage, errors, warnings, data 
     if (s) {
       if (s.missing) warnings.push(EVENTS_MISSING);
       else { errors.push(...s.errors); warnings.push(...s.warnings); }
+    }
+    // SFX anchored to a word, beat or second (cues.mjs), and beat pins: checked when project.json has them.
+    const pm = existsSync(join(dir, "project.json")) ? loadManifest(dir) : null;
+    if (pm && ((pm.events ?? []).some((e) => e.anchor) || pm.shots.some((x) => x.cut_beat != null) || pm.lines.some((l) => l.at_beat != null))) {
+      try {
+        const c = checkCues(dir, pm);
+        errors.push(...c.fails.map((x) => `cues: ${x}`));
+        warnings.push(...c.warns.map((x) => `cues: ${x}`));
+      } catch (e) { errors.push(`cues: ${e.message}`); }
     }
     let w;
     try { w = words({ dir }); } catch (e) { errors.push(`word-sync: ${e.message}`); }

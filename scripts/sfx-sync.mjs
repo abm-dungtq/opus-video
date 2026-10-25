@@ -123,8 +123,8 @@ export function measureLead(file, run = spawnSync) {
   return { lead, max_db: max };
 }
 
-// Cached leadings keyed by file sha256; one ffmpeg measurement per distinct file content.
-function leadCache(dir, run) {
+// Cached leadings keyed by file sha256; one ffmpeg measurement per distinct file content (cues.mjs uses it too).
+export function leadCache(dir, run) {
   const path = join(dir, ONSET_CACHE);
   let cache = {};
   if (existsSync(path)) {

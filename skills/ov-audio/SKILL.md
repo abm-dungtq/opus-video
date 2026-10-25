@@ -24,6 +24,8 @@ Chỉ bắt đầu khi `check-viet-pro.mjs --project .` đã PASS ở bước 2 
 - Composition từ skeleton: có giọng thì chạy `node $OV/scripts/timing.mjs --project .` để ghi khối TIMING từ `words.json`; sửa giọng xong chỉ chạy lại lệnh này. Dự án đã có `project.json` (xem `ov-studio`): `timing.mjs` lấy khung shot từ manifest qua `gateway.mjs derive`, và đổi thời lượng shot phải đi qua `gateway.mjs patch`, không sửa tay số giây trong PLAN.md hay HTML.
 - Hướng `don-dap` hoặc nhóm `story-music`: đo nhịp `node $OV/scripts/beat-grid.mjs assets/bgm/bgm.mp3 --write` rồi chạy lại `timing.mjs`. `UNSTABLE` thì không dùng `B()`; nhạc chậm bị đọc gấp đôi tempo thì thêm `--max-bpm 100`.
 - Nhạc theo composition plan (drop phải rơi đúng phách): `eleven.mjs music --plan <plan.json> --out assets/bgm/raw/bgm-raw.mp3`, đo `beat-grid.mjs --write` trên bản thô, viết `assets/bgm/music-arrangement.json`, rồi `node $OV/scripts/arrange-music.mjs --project .` và `node $OV/scripts/verify-arrangement.mjs --project .` (phải `VERIFY PASS`). Chi tiết ở mục 3c của `audio-pipeline.md`.
+- Lịch cảnh theo beat (dự án có `project.json` và lưới beat): `node $OV/scripts/beat-fit.mjs --project . --tight` in bảng, `--apply` ghi qua gateway (hoàn tác bằng `gateway.mjs undo`). Ghim một cắt cảnh hay một câu vào beat bằng op `pin_beat`.
+- SFX theo anchor: `node $OV/scripts/cues.mjs add --project . --sound <file> --shot s2 --word "<cụm>" --apply`, sau khi đổi lịch thì `cues.mjs place --project . --apply`, kiểm bằng `cues.mjs check`. Chi tiết ở mục 3d của `audio-pipeline.md`.
 - Đo mix: `node $OV/scripts/mix-balance.mjs --project .`, đích nhạc thấp hơn giọng 4–7 dB lúc có lời. `audio-mix` tự giảm nhạc nền có `data-fx-carve` theo giọng.
 
 ## Theo hướng vận hành

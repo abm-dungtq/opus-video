@@ -127,15 +127,18 @@ export function beatsFile(dir, music = null) {
   return files[0] ?? null;
 }
 
-// Beat grid from beatsFile(dir, music). Returns { grid: { beat0, beatLen, kick, drops } | null,
-// warnings }; an unreadable file is a warning and leaves the default (unmeasured) grid.
+// Beat grid from beatsFile(dir, music). Returns { grid: { beat0, beatLen, kick, drops, maxDriftMs? }
+// | null, warnings }; an unreadable file is a warning and leaves the default (unmeasured) grid.
+// maxDriftMs (beat-grid.mjs) is for beat-fit.mjs and cues.mjs; it never enters the TIMING block.
 export function readBeats(dir, music = null) {
   const file = beatsFile(dir, music);
   if (!file) return { grid: null, warnings: [] };
   try {
     const b = JSON.parse(readFileSync(file, "utf8"));
     if (!Number.isFinite(b?.beat0) || !Number.isFinite(b?.beatLen) || b.beatLen < 0) throw new Error("thiếu beat0/beatLen");
-    return { grid: { beat0: b.beat0, beatLen: b.beatLen, kick: Array.isArray(b.kick) ? b.kick : [], drops: Array.isArray(b.drops) ? b.drops : [] }, warnings: [] };
+    const grid = { beat0: b.beat0, beatLen: b.beatLen, kick: Array.isArray(b.kick) ? b.kick : [], drops: Array.isArray(b.drops) ? b.drops : [] };
+    if (Number.isFinite(b.maxDriftMs)) grid.maxDriftMs = b.maxDriftMs;
+    return { grid, warnings: [] };
   } catch (e) {
     return { grid: null, warnings: [`${file} không dùng được (${e.message}); giữ nhịp mặc định`] };
   }
@@ -188,7 +191,8 @@ export function buildTiming({ dir, html = "index.html", music = null, scenes: gi
     lines.push(`TIMING ${s.sid} ${s.start.toFixed(3)}–${s.end.toFixed(3)} words=${n}`);
     if (s.spoken && !n) warnings.push(`${s.sid} không có từ nào trong words.json`);
   }
-  const grid = beats.grid ?? { beat0: DEFAULTS.beat0, beatLen: DEFAULTS.beatLen, kick: DEFAULTS.kick, drops: DEFAULTS.drops };
+  const { beat0, beatLen, kick, drops } = beats.grid ?? DEFAULTS;
+  const grid = { beat0, beatLen, kick, drops };
   return { timing: { fps, duration: r3(duration), scenes: out, ...grid }, lines, warnings };
 }
 
