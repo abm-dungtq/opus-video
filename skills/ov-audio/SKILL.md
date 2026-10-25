@@ -17,6 +17,7 @@ Chỉ bắt đầu khi `check-viet-pro.mjs --project .` đã PASS ở bước 2 
   ```
   Lệnh này ghi `audio_meta.json` và `audio_engine_meta.json`. **Không xoá sidecar**, vì `fetch-sfx` cần nó để giữ giọng. Sau đó vẫn chạy `sync-durations` và `fetch-sfx` của workflow như bình thường.
 - **Dựng tay** (general-video, mặc định): voice làm trước: `node $OV/scripts/eleven.mjs tts --text-file script/01.txt --out assets/voice/01.mp3` (sinh kèm `01.mp3.words.json`).
+- Giọng thu thật hoặc lời nói trong clip (không phải TTS): `node $OV/scripts/eleven.mjs align --audio assets/voice/02.wav --text-file script/02.txt` ghi `02.wav.words.json` cùng dạng với TTS. Qua cổng viet-pro như `tts`; exit 3 (`ALIGN_UNAVAILABLE`) khi gói không có forced alignment. Chi tiết ở mục 1c của `audio-pipeline.md`.
 - Chỉnh mốc storyboard theo thời lượng giọng thật. Frame dài đúng bằng voice, nên frame cuối (CTA) phải cộng thêm khoảng 1 giây giữ hình trước khi assemble.
 - SFX: chạy `hyperframes media-use resolve --type sfx …` trước, nếu không có thì dùng `eleven.mjs sfx`.
 - Nhạc nền: `eleven.mjs music`. Nếu exit 3 (`MUSIC_UNAVAILABLE`) thì dùng `media-use resolve --type bgm`.
@@ -38,7 +39,7 @@ Chỉ bắt đầu khi `check-viet-pro.mjs --project .` đã PASS ở bước 2 
 | File | Dùng khi |
 |---|---|
 | `$OV/references/audio-pipeline.md` | Bước 5: voice, SFX, nhạc nền, mix, bản quyền |
-| `$OV/scripts/eleven.mjs` | `doctor`, `voice-info`, `models`, `tts`, `sfx`, `music`, `probe-models`, `audio-meta`; `tts`/`audio-meta` qua cổng viet-pro (`scripts/voice-gate.mjs`, exit 4); đạo diễn Studio của tập series chỉ chạy `sfx`, `music` (lệnh khác exit 5) |
+| `$OV/scripts/eleven.mjs` | `doctor`, `voice-info`, `models`, `tts`, `align`, `sfx`, `music`, `probe-models`, `audio-meta`; `tts`/`align`/`audio-meta` qua cổng viet-pro (`scripts/voice-gate.mjs`, exit 4); đạo diễn Studio của tập series chỉ chạy `sfx`, `music` (lệnh khác exit 5) |
 | `$OV/scripts/timing.mjs` | Mốc TIMING từ PLAN.md hoặc `project.json` và `words.json` (cú pháp ở `--help`) |
 | `$OV/scripts/beat-grid.mjs` | Nhịp nhạc: BPM, BEAT0, `beats` đo tới mẫu, `maxDriftMs`, kick, drop; `--write` ghi `<nhạc>.beats.json` khi ổn định |
 | `$OV/scripts/arrange-music.mjs` | Ghép nguyên ô nhịp từ nhạc thô sang phách đích theo `music-arrangement.json`, ra WAV và `beats.json` (mục 3c) |

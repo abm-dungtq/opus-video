@@ -32,6 +32,8 @@ Giao cho người dùng: đường dẫn MP4 (render bằng `render-final.mjs`),
 
 Cần bản đăng theo từng nơi thì xuất từ bản final bằng `node $OV/scripts/export.mjs --project ./ --input renders/<name>.mp4 --target <zalo|youtube|tiktok|facebook>` (nhiều nơi thì cách nhau bằng dấu phẩy). Script chạy lại cổng final, ghi `<name>-<target>.mp4` cạnh file nguồn và lấy thumbnail `<name>-thumb.jpg` từ khung demo đã duyệt; exit 5 là cổng chặn hoặc demo chưa duyệt.
 
+Cần gấp một bản 9:16 hay 1:1 từ file đã render mà chưa có bản re-layout: `node $OV/scripts/reframe.mjs --quick --video renders/<name>.mp4 --ratio 9x16` (nền mờ của chính video) hoặc `--ratio 1x1` (crop giữa). Đây là **bản tạm, không phải bản giao**: lệnh in WARN, chữ và hình không được bố trí lại cho khung mới. Bản giao 9:16 và 1:1 vẫn làm bằng `reframe.mjs <project> --ratio` rồi render qua `render-final.mjs`.
+
 Sửa sau bản final: ghi góp ý vào `REVISIONS.md` theo `$OV/references/revisions.md`, quay lại `ov-build` (hoặc `ov-studio` khi dự án có `project.json`), rồi render lại qua cổng.
 
 ## Tham chiếu

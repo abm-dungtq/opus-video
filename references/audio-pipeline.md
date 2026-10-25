@@ -20,6 +20,28 @@ node $OV/scripts/eleven.mjs tts --text-file script/01.txt --out assets/voice/01.
 - **Không** dùng TTS của `media-use` cho tiếng Việt, vì nó ghim cứng `eleven_multilingual_v2`, model không có tiếng Việt.
 - So sánh giọng hoặc model: `eleven.mjs probe-models --text-file x.txt --models eleven_v4,eleven_v3` (không qua cổng; file luôn ghi vào `$TMPDIR/ov-probe/`, không dùng làm voice thật), rồi đưa file cho người dùng nghe. Agent không tự chấm chất lượng giọng.
 
+## 1c. Giọng thu thật: forced alignment
+
+Giọng không phải TTS (người dùng tự thu, lời nói trong clip) cũng cần `.words.json` để `W()`, karaoke, word-sync và `beat-fit` chạy được. ElevenLabs forced alignment cho mốc từng từ khi biết trước chữ.
+
+1. Chép audio vào `assets/voice/` (ví dụ `assets/voice/02.wav`).
+2. Viết lời đúng như người đọc vào `script/02.txt`, qua viet-pro như mọi lời đọc khác (`ov-script`).
+3. Chạy:
+
+```bash
+node $OV/scripts/eleven.mjs align --audio assets/voice/02.wav --text-file script/02.txt
+```
+
+   - Lệnh qua cổng viet-pro như `tts`: chặn thì exit 4, chưa gửi request nào.
+   - Kết quả ghi vào `assets/voice/02.wav.words.json`, cùng dạng với TTS (`[{text, start, end}]`). File đã có thì phải thêm `--force`, không thì exit 2. `--out` đổi chỗ ghi.
+   - Qua cổng thì lệnh ghi stamp `02.wav.gate.json` như `tts`, để karaoke, `line-gate` và `check-viet-pro --stage delivery` nhận giọng này là đã qua cổng.
+   - Từ được tách giống giọng TTS. Số từ khác số chữ trong `script/02.txt` (tách theo khoảng trắng) thì có `WARN align words=<n> khác chữ nguồn <m>`; karaoke cũng sẽ báo lệch.
+   - In `ALIGN <file> words=<n> loss=<loss>`. `loss` trên 1 thì có thêm `WARN align loss cao`: chữ không khớp audio, kiểm lại chữ trước khi dùng.
+   - Gói ElevenLabs không có forced alignment (401, 402, 403) thì in `ALIGN_UNAVAILABLE` và exit 3.
+4. Dự án có `project.json` thì đặt file cho câu thoại qua gateway, op `set_line_audio` (`{"op":"set_line_audio","id":"vo-02","file":"assets/voice/02.wav","duration":<giây>}`), không sửa tay HTML.
+
+Đạo diễn Studio của tập series không chạy được `align` (exit 5), giống `tts`.
+
 ## 1b. Cầu nối HyperFrames (`audio-meta`)
 
 Bước audio (`audio.mjs generate`) của các workflow HyperFrames ghim cứng `eleven_multilingual_v2`, model không có tiếng Việt. Vì vậy **bỏ qua** bước đó và chạy:

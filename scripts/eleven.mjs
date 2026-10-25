@@ -11,10 +11,13 @@
 //     --plan: ElevenLabs composition plan (global styles + sections with duration_ms); the
 //     sections are a request, not a contract, so arrange the result with arrange-music.mjs.
 //     --outro: default --out assets/bgm/outro.mp3 (a second, calm bed under the ending).
+//   node eleven.mjs align --audio f.mp3 --text-file <project>/script/NN.txt [--project dir] [--out f.words.json] [--force] [--lang vi] [--skip-viet-pro-gate]
+//     forced alignment for a voice that is not TTS (a real recording, a clip): writes <audio>.words.json
+//     in the TTS shape [{text,start,end}]. The text goes through the viet-pro gate like tts.
 //   node eleven.mjs probe-models --text-file path [--models a,b,c]   (writes to $TMPDIR/ov-probe)
 //   node eleven.mjs audio-meta --script SCRIPT.md [--hyperframes .] [--project dir] [--bgm assets/bgm/x.mp3 --bgm-volume 0.2] [--reuse] [--skip-viet-pro-gate]
 //
-// viet-pro gate (tts, audio-meta): when BRIEF.md `language:` is Vietnamese (or missing), voice is
+// viet-pro gate (tts, align, audio-meta): when BRIEF.md `language:` is Vietnamese (or missing), voice is
 // generated only if check-viet-pro.mjs passes for the project AND the voiced text is the gated
 // text — tts takes only --text-file <project>/script/NN.txt (no --text), and every SCRIPT.md
 // frame must equal script/NN.txt (whitespace-insensitive). Project: --project, else the parent
@@ -42,10 +45,11 @@
 // The key is never printed. Exit codes: 0 ok, 1 error, 2 usage, 3 music unavailable on plan,
 // 4 viet-pro gate blocked, 5 refused to the Studio director of a series episode (director-guard.mjs:
 // it runs only sfx and music; voices go through Studio's series tools behind a consent card).
+// align also exits 2 when its output exists without --force and 3 when forced alignment is not on the plan.
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join, dirname, resolve, basename } from "node:path";
+import { join, dirname, resolve, basename, extname } from "node:path";
 import { spawnSync } from "node:child_process";
 import { maybeHelp } from "./cli-help.mjs";
 import { parseScript, writeStamp, stampMatches } from "./script-md.mjs";
@@ -127,11 +131,12 @@ class HttpError extends Error {
   }
 }
 
-async function call(path, { method = "GET", body, binary = false } = {}) {
+// form: a FormData sent as multipart (fetch sets the boundary, so no Content-Type here).
+async function call(path, { method = "GET", body, form, binary = false } = {}) {
   const res = await fetch(API + path, {
     method,
     headers: { "xi-api-key": key(), ...(body ? { "Content-Type": "application/json" } : {}) },
-    body: body ? JSON.stringify(body) : undefined,
+    body: form ?? (body ? JSON.stringify(body) : undefined),
   });
   if (!res.ok) throw new HttpError(res.status, await res.text());
   return binary ? Buffer.from(await res.arrayBuffer()) : res.json();
@@ -291,6 +296,50 @@ const commands = {
       lang,
     });
     if (!g.skipped) writeStamp(out, { text, script: textFile && `script/${basename(textFile)}`, override: g.override });
+  },
+
+  async align() {
+    const audio = resolve(need("audio"));
+    const textFile = resolve(need("text-file"));
+    if (!existsSync(audio)) die(`không thấy ${audio}`, 2);
+    const lang = args.lang || "vi";
+    const project = resolve(args.project || (basename(dirname(textFile)) === "script" ? dirname(dirname(textFile)) : "."));
+    const g = gate({ project, textFiles: [textFile], inline: false, skip: !!args["skip-viet-pro-gate"], voiceLang: lang });
+    const text = g.texts?.[0] ?? readFileSync(textFile, "utf8").trim();
+    const out = resolve(args.out || `${audio}.words.json`);
+    if (existsSync(out) && !args.force) die(`${out} đã có; thêm --force để ghi đè`, 2);
+    const form = new FormData();
+    const mime = { ".mp3": "audio/mpeg", ".wav": "audio/wav", ".m4a": "audio/mp4", ".aac": "audio/aac", ".flac": "audio/flac", ".ogg": "audio/ogg" }[extname(audio).toLowerCase()];
+    form.append("file", new Blob([readFileSync(audio)], mime ? { type: mime } : {}), basename(audio));
+    form.append("text", text);
+    let data;
+    try {
+      data = await call("/v1/forced-alignment", { method: "POST", form });
+    } catch (err) {
+      if ([401, 402, 403].includes(err.status)) {
+        console.log("ALIGN_UNAVAILABLE");
+        console.error(err.message);
+        process.exit(3);
+      }
+      throw err;
+    }
+    // Words split like the TTS words (toWords over characters) when that gives one word per token of
+    // the text, as karaoke splits line.text; else the API's words[], trimmed; WARN when neither matches.
+    const tokens = text.split(/\s+/).filter(Boolean).length;
+    const chars = (data.characters ?? []).filter((c) => Number.isFinite(c?.start) && Number.isFinite(c?.end));
+    const fromChars = toWords({ characters: chars.map((c) => c.text), character_start_times_seconds: chars.map((c) => c.start), character_end_times_seconds: chars.map((c) => c.end) });
+    const fromWords = (Array.isArray(data.words) ? data.words : [])
+      .map((w) => ({ text: String(w?.text ?? "").trim(), start: Number(w?.start), end: Number(w?.end) }))
+      .filter((w) => w.text && Number.isFinite(w.start) && Number.isFinite(w.end))
+      .map((w) => ({ text: w.text, start: +w.start.toFixed(3), end: +w.end.toFixed(3) }));
+    const words = fromChars.length === tokens ? fromChars : fromWords.length === tokens ? fromWords : fromWords.length ? fromWords : fromChars;
+    if (!words.length) die("forced alignment không trả từ nào");
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, JSON.stringify(words, null, 2));
+    if (!g.skipped) writeStamp(audio, { text, script: `script/${basename(textFile)}`, override: g.override });
+    if (words.length !== tokens) console.log(`WARN align words=${words.length} khác chữ nguồn ${tokens}`);
+    console.log(`ALIGN ${out} words=${words.length} loss=${data.loss ?? "?"}`);
+    if (Number(data.loss) > 1) console.log("WARN align loss cao, kiểm lại chữ và audio");
   },
 
   async sfx() {
