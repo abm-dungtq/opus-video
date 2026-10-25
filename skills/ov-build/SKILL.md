@@ -70,7 +70,7 @@ Chép mục "Sàn chất lượng", "Chống slideshow" và "Kỷ luật GSAP" c
 | `$OV/references/engine-selection.md` | Bước 4 và 6: chọn engine, xử lý 16:9 / 9:16 |
 | `$OV/references/plan-demo.md` | Bước 4b, 6b, 7: mẫu `PLAN.md`, chụp và duyệt demo, `DEMO.md`, render bản cuối |
 | `$OV/references/edit-method.md` | Bước 3 và 6: chức năng câu → hình, sàn chất lượng, GSAP, SFX |
-| `$OV/references/motion-craft.md` | Bước 6 và 6b: mức hiệu ứng theo `energy`, 10 nguyên tắc, bộ kỹ thuật của skeleton, danh sách kiểm từng cảnh |
+| `$OV/references/motion-craft.md` | Bước 6 và 6b: mức hiệu ứng theo `energy`, 10 nguyên tắc, bộ kỹ thuật của skeleton, danh sách kiểm từng cảnh; mục 7: giới hạn renderer (khung đen khi quá nhiều gradient, blur, clip-path), phản ứng theo kick, drop, silent stop và cắt cảnh theo beat |
 | `$OV/scripts/check-preflight.mjs` | Bước 4b (`--stage plan`) và 6b (`--stage final`): cổng plan + demo + duyệt; cổng sáng tạo (Ý đồ sáng tạo, blueprint/rule có thật, seam mỗi beat, beat không lời, animatic không đứng yên, RECIPES.md) |
 | `$OV/scripts/recipe-pack.mjs` | Bước 6 (và 1b): gom blueprint/rule/seam theo PLAN.md hoặc theo hướng thành `build/RECIPES.md` |
 | `$OV/scripts/make-demo.mjs` | Bước 6b: chụp khung hình demo theo `PLAN.md`, ghi `DEMO.md`; `--animatic` render clip nháp toàn bộ + contact sheet (bắt buộc với dự án có `direction:`); `--from-video` cắt từ bản nháp người dùng đã xem |

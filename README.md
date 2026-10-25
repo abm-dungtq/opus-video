@@ -50,6 +50,10 @@ Các video dưới đây do opus-video dựng. Bấm vào ảnh để mở file 
 
 ## Có gì mới
 
+### v2.7.0: tích hợp motion-video
+
+(Điền khi phát hành.)
+
 ### v2.6.0 (2026-10-24): HyperFrames 0.8.192
 
 - **Ghim HyperFrames 0.8.192.** Dự án mới (`new-project.sh`) ghim `hyperframes@0.8.192`; `setup-check` đòi CLI ≥ 0.8.192. Lint, check, render, preview nền và bản 1:1 đã chạy thử trên bản mới.

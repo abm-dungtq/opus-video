@@ -20,6 +20,16 @@ node $OV/scripts/eleven.mjs tts --text-file script/01.txt --out assets/voice/01.
 - **Không** dùng TTS của `media-use` cho tiếng Việt, vì nó ghim cứng `eleven_multilingual_v2`, model không có tiếng Việt.
 - So sánh giọng hoặc model: `eleven.mjs probe-models --text-file x.txt --models eleven_v4,eleven_v3` (không qua cổng; file luôn ghi vào `$TMPDIR/ov-probe/`, không dùng làm voice thật), rồi đưa file cho người dùng nghe. Agent không tự chấm chất lượng giọng.
 
+## 1d. Giọng Gemini và `--tempo` (tuỳ chọn)
+
+- `voice_provider: gemini` trong `BRIEF.md` (hoặc `--provider gemini`) cho `eleven.mjs tts` và `audio-meta`:
+  - qua cổng viet-pro trước, như ElevenLabs;
+  - Gemini TTS (`scripts/gemini-tts.mjs`, khoá `GEMINI_API_KEY`) trả PCM 24 kHz, đổi sang mp3 44,1 kHz 128k;
+  - Gemini không trả mốc từ, nên words lấy bằng forced alignment của ElevenLabs (mục 1c): vẫn cần `ELEVENLABS_API_KEY` và tốn credit ElevenLabs;
+  - model: `--model`, `gemini_tts_model` trong BRIEF, mặc định `gemini-3.8-flash-tts`; giọng: `--voice`, `gemini_voice` trong BRIEF, mặc định `Kore` (stamp ghi cả model và giọng, `--reuse` lồng lại câu đổi giọng). `--speed` không áp cho Gemini; dùng `--tempo`. Chưa kiểm Gemini live; người dùng tự nghe giọng tiếng Việt trước khi dùng.
+- `--tempo x` (0,8–1,25, mọi provider): ffmpeg `atempo` trên file mp3, mọi `start`/`end` trong words chia cho x.
+- Stamp `.gate.json` ghi `provider` (khi khác elevenlabs), `model` (gemini) và `tempo` (khi khác 1). `--reuse` chỉ dùng lại câu có stamp cùng provider, tempo và model.
+
 ## 1c. Giọng thu thật: forced alignment
 
 Giọng không phải TTS (người dùng tự thu, lời nói trong clip) cũng cần `.words.json` để `W()`, karaoke, word-sync và `beat-fit` chạy được. ElevenLabs forced alignment cho mốc từng từ khi biết trước chữ.

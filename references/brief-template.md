@@ -19,6 +19,11 @@ language: vi
 voice_source: <tts | clip>   # clip: lời nói lấy từ clip của người dùng, cổng viet-pro lint phụ đề + chữ trên hình
 voice_id: eGSd0uV8dNQnZuEEX9lu
 tts_model: eleven_v4
+voice_provider: <elevenlabs | gemini>   # tuỳ chọn, mặc định elevenlabs; gemini: giọng Gemini TTS, words vẫn qua forced alignment của ElevenLabs (cần cả hai khoá)
+gemini_tts_model: <tên model>   # tuỳ chọn, chỉ khi voice_provider: gemini; mặc định gemini-3.8-flash-tts
+gemini_voice: <tên giọng Gemini>   # tuỳ chọn, chỉ khi voice_provider: gemini; mặc định Kore
+karaoke: <on | off>   # tuỳ chọn: on thì lúc dựng thêm data-karaoke vào thẻ html (references/karaoke-va-mascot.md); bật trước animatic
+signature: <tên hiện ở góc phải dưới>   # tuỳ chọn: bỏ hidden của #sig trong skeleton và ghi tên này vào #sig-txt
 brief_version: 2   # dự án mới: bật cổng sáng tạo (bước 1b); dự án cũ không có dòng này
 # ↓ make-pitch.mjs choose ghi (bước 1b); không gõ tay
 direction: <A1..A8>

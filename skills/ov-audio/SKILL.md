@@ -18,6 +18,8 @@ Chỉ bắt đầu khi `check-viet-pro.mjs --project .` đã PASS ở bước 2 
   Lệnh này ghi `audio_meta.json` và `audio_engine_meta.json`. **Không xoá sidecar**, vì `fetch-sfx` cần nó để giữ giọng. Sau đó vẫn chạy `sync-durations` và `fetch-sfx` của workflow như bình thường.
 - **Dựng tay** (general-video, mặc định): voice làm trước: `node $OV/scripts/eleven.mjs tts --text-file script/01.txt --out assets/voice/01.mp3` (sinh kèm `01.mp3.words.json`).
 - Giọng thu thật hoặc lời nói trong clip (không phải TTS): `node $OV/scripts/eleven.mjs align --audio assets/voice/02.wav --text-file script/02.txt` ghi `02.wav.words.json` cùng dạng với TTS. Qua cổng viet-pro như `tts`; exit 3 (`ALIGN_UNAVAILABLE`) khi gói không có forced alignment. Chi tiết ở mục 1c của `audio-pipeline.md`.
+- Giọng Gemini (tuỳ chọn): `voice_provider: gemini` trong `BRIEF.md` hoặc `--provider gemini` cho `tts` và `audio-meta`. Cần `GEMINI_API_KEY`; words vẫn lấy bằng forced alignment của ElevenLabs nên vẫn cần `ELEVENLABS_API_KEY` và tốn credit ElevenLabs. Model: `--model` hoặc `gemini_tts_model`, mặc định `gemini-3.8-flash-tts` (chưa kiểm live); giọng `--voice` hoặc `gemini_voice`, mặc định `Kore`. Cổng viet-pro chạy trước như ElevenLabs.
+- `--tempo 0.8–1.25` (mọi provider): đổi tốc độ giọng sau khi tạo bằng ffmpeg `atempo`, mốc words chia theo. Stamp ghi provider, model, tempo; `--reuse` tạo lại câu có stamp làm theo cách khác.
 - Chỉnh mốc storyboard theo thời lượng giọng thật. Frame dài đúng bằng voice, nên frame cuối (CTA) phải cộng thêm khoảng 1 giây giữ hình trước khi assemble.
 - SFX: chạy `hyperframes media-use resolve --type sfx …` trước, nếu không có thì dùng `eleven.mjs sfx`.
 - Nhạc nền: `eleven.mjs music`. Nếu exit 3 (`MUSIC_UNAVAILABLE`) thì dùng `media-use resolve --type bgm`.

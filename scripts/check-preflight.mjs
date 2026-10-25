@@ -532,6 +532,18 @@ export function checkRevisions(text, { sheets = false } = {}) {
   return warnings;
 }
 
+// Director review (references/dao-dien-va-thi-cong.md): with build/DIRECTION.md, the highest
+// build/REVIEW-<n>.md must open with "Review <n>: ship". WARN only: the user still approves the animatic.
+export function reviewWarnings(dir) {
+  const build = join(dir, "build");
+  if (!existsSync(join(build, "DIRECTION.md"))) return [];
+  const reviews = readdirSync(build).map((f) => ({ f, n: Number(f.match(/^REVIEW-(\d+)\.md$/)?.[1]) })).filter((r) => r.n > 0).sort((a, b) => b.n - a.n);
+  const last = reviews[0];
+  const first = last ? readFileSync(join(build, last.f), "utf8").split(/\r?\n/).find((l) => l.trim()) ?? "" : "";
+  if (last && /^Review \d+: ship\b/.test(first.trim())) return [];
+  return [`đạo diễn chưa kết luận ship (build/${last ? last.f : "REVIEW-<n>.md"})`];
+}
+
 export function check({ project = ".", stage = "plan", sync = checkSync, words = checkWords, balance = checkBalance, legacyMtime = false } = {}) {
   const dir = resolve(project);
   const errors = [], warnings = [];
@@ -590,6 +602,7 @@ export function check({ project = ".", stage = "plan", sync = checkSync, words =
       const sheets = Boolean(out.creative) && existsSync(demoMd) && /^\s*[-*]?\s*scene_sheets(?:_9x16)?:\s*\S/im.test(readFileSync(demoMd, "utf8"));
       warnings.push(...checkRevisions(readFileSync(revisions, "utf8"), { sheets }));
     }
+    warnings.push(...reviewWarnings(dir));
     if (existsSync(join(dir, "index.html"))) {
       try {
         const b = balance({ dir });

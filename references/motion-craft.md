@@ -95,3 +95,31 @@ ffmpeg -v error -y -ss <giây bắt đầu cảnh> -t <độ dài cảnh> -i dem
 Một sheet cho thấy cả lối vào, các đoạn giữ, lối ra và chỗ trao sang cảnh sau. Nhìn vào đó biết được chuyển động có gối lên nhau không, có vượt đích rồi lắng không, có quãng nào chết không. Lối vào nhanh thì cắt thêm một sheet cho giây đầu của cảnh với `fps=18`. Xem sheet rồi sửa. Chỉ render lại khi biên đạo đã đổi.
 
 Khi người dùng xin sửa, mục `Vị trí` trong `REVISIONS.md` ghi kèm sheet của cảnh đó, ví dụ `cảnh 3 (demo/scenes/sheet-s3.jpg)` (xem `revisions.md`).
+
+## 7. Giới hạn renderer và phản ứng theo beat
+
+### Giới hạn renderer
+
+- Hơn khoảng 40 phần tử có `radial-gradient`, `filter: blur()` hay `clip-path` trên hình cùng lúc dễ cho ra khung đen khi render. Texture (chấm halftone, hạt, vệt, nét graffiti) thì bake thành PNG trong `assets/images/` rồi dùng làm `background-image` hay `mask-image`.
+- Filter SVG (tách kênh RGB, méo) chỉ gắn trong lúc hiệu ứng chạy: `tl.set(el, { filter: "url(#rgb)" }, t)` rồi trả về `none` sau vài khung.
+- Lớp phủ kín khung mà nặng (halftone wipe) thì bật tắt bằng `visibility`, rẻ hơn `opacity: 0`.
+- `index.html` dài quá 300 dòng (không tính `<style>`) thì lint báo `composition_file_too_large`. Đó chỉ là cảnh báo; tách cảnh sang `compositions/` khi file khó sửa.
+
+### Phản ứng theo beat
+
+Chỉ dùng khi đã đo lưới (`beat-grid.mjs --write`, `T.beatLen > 0`). Mọi mốc lấy bằng `B(n)`, không ghi số giây.
+
+| Nhạc | Hình | Trong skeleton |
+|---|---|---|
+| Kick (phách mạnh trong `T.kick`) | squash nhỏ (scale 1 → 1,03 → 1, dưới 0,2 s) hay nhịp sáng nền | khối "beat reactions" pulse sân khấu; part `mascot` nhún trên kick |
+| Drop (`T.drops`) | flash hoặc slam, rung camera ngắn, đổi cảnh | `flash(B(n), 0.8)` cho mỗi drop |
+| Silent stop (một phách lặng trước drop) | giữ hình, không chuyển động mới; câu hô đặt ở đây | không có lớp tự động: để trống quãng đó |
+
+- Không cho mọi phần tử nhún theo mọi phách. Một hay hai phần tử phản ứng là đủ; phần còn lại đứng để mắt có chỗ nghỉ.
+- Chữ cần đọc không rung theo beat.
+
+### Cắt cảnh theo beat
+
+Dự án có `project.json` và lưới beat: `node $OV/scripts/beat-fit.mjs --project . --tight` đặt mỗi cắt cảnh ở phách đầu tiên cách từ cuối của cảnh trước ít nhất 0,12 s, cùng lưới với `B()`. Xem bảng rồi `--apply` (hoàn tác bằng `gateway.mjs undo`). Một cắt hay một câu cần rơi đúng phách nào thì ghim bằng op `pin_beat`. Đổi lịch xong chạy `cues.mjs place` để SFX theo anchor đi theo.
+
+Nguồn: `references/composition-contract.md` (Renderer limits) và `references/audio-and-beat-sync.md` của skill motion-video, AgentKit v1.3.0 (MIT), viết lại cho `B()`, `T.kick`, `T.drops` của opus-video.

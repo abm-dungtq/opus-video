@@ -26,6 +26,15 @@ Skill điều phối: biến một ý tưởng thành MP4 hoàn chỉnh. Skill n
 - Hướng `nhanh` chỉ tiết kiệm phần chọn hướng (một case thay cho 3 styleframe) và phải ghi `creative_override: nhanh theo case <id>` vào `BRIEF.md` (xem `ov-cases`).
 - Trong hướng `dao-dien`, `ov-cases` chạy bên trong `ov-build` (bước storyboard, tra case một lần mỗi dự án).
 
+## Vai trò và chế độ tiết kiệm
+
+- Hướng `dao-dien` và `tu-nhac` mặc định chia vai:
+  - `ov-director` (Opus, chỉ đọc) viết hướng dựng theo từng cảnh sau khi lời đã qua viet-pro, và duyệt gu trên contact sheet của animatic (`Review <n>: revise | ship`);
+  - `ov-executor` (Sonnet) chạy âm thanh, dựng và animatic theo `build/DIRECTION.md`;
+  - phiên chính ghi `build/DIRECTION.md`, `build/REVIEW-<n>.md` và kiểm kết quả.
+- `--poor` hoặc "tiết kiệm": một phiên làm hết, không subagent, hướng ngắn mỗi cảnh một dòng, một vòng duyệt. Không bỏ cổng nào.
+- Chi tiết: `$OV/references/dao-dien-va-thi-cong.md`. Đạo diễn của Motion Studio là đường riêng, không đổi.
+
 ## Bốn cổng
 
 **Bốn cổng không được bỏ:** **hướng đạo diễn người dùng chọn bằng mắt** (bước 1b, `ov-direction`) → kịch bản viet-pro (bước 2, `ov-script`) → **PLAN.md** (bước 4b, `ov-build`) → **clip nháp (animatic) đã duyệt** (bước 6b, `ov-build`). Bản giao cuối chỉ được render bằng `render-final.mjs`, script này chặn (exit 5) khi thiếu plan, thiếu demo, demo chưa được duyệt, hoặc (dự án có `direction:`) thiếu animatic, animatic đứng yên kiểu slideshow, thiếu `build/RECIPES.md`. Dự án cũ (BRIEF không có `direction:` và `brief_version: 2`) chỉ nhận một dòng WARN và đi theo cổng cũ.

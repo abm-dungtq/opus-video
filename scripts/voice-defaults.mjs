@@ -4,7 +4,7 @@ export const DEFAULT_VOICE = "eGSd0uV8dNQnZuEEX9lu";
 export const DEFAULT_TTS_MODEL = "eleven_v4";
 
 // BRIEF value without an inline "# comment"; empty or a "<placeholder>" counts as unset.
-const briefValue = (v) => {
+export const briefValue = (v) => {
   const s = String(v ?? "").replace(/\s+#.*$/, "").trim();
   return s && !s.startsWith("<") ? s : "";
 };
