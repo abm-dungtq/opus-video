@@ -28,6 +28,8 @@ Kết quả đạt khi exit 0 và in ra `tier`, `tts model`, `voice`. Script t�
 - Tuỳ chọn: dòng `TYPESAFE_API_KEY=...` trong cùng file bật bước xếp hạng case bằng Jev ở bước 3. Thiếu thì bước 3 tự dùng `find-cases`, không cần hỏi người dùng.
 - Đổi giọng hoặc model theo dự án: dùng cờ `--voice` / `--model`, hoặc đặt `voice_id` / `tts_model` trong `BRIEF.md` rồi truyền vào lệnh.
 
+Tuỳ chọn, chỉ khi dự án cần ảnh hay clip AI (nhân vật, khung đầu, cảnh chuyển động): `node $OV/scripts/gflow.mjs doctor` kiểm tra gflow-cli (Google Flow: Nano Banana, Veo, Omni Flash) đã cài và đã đăng nhập. Thiếu thì cài `uv tool install gflow-cli` rồi `uv tool run --from gflow-cli playwright install chromium`; đăng nhập một lần bằng `gflow auth login --browser chrome --profile <tên>`, người dùng phải tự đăng nhập trong cửa sổ Chrome tới khi trang làm việc của Flow hiện ra (điều khiển từ xa được, đặt `GFLOW_CLI_AUTH_LOGIN_TIMEOUT=1800` nếu cần thêm thời gian). Không cho hai công cụ tự động cùng điều khiển một tài khoản Google.
+
 Mặc định: voice `eGSd0uV8dNQnZuEEX9lu`, TTS `eleven_v4` (có tiếng Việt), music `music_v2_5` (`--plan`: `music_v1`), SFX `eleven_text_to_sound_v2`.
 
 Xong bước này thì quay về chuỗi của hướng vận hành (skill `opus-video`), thường là `ov-brief`.
