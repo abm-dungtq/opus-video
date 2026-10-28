@@ -59,7 +59,7 @@
 //   (id or alias) and resolve with its "## style_layers" against the "## Cảnh" rows (optional Loại
 //   column). FAIL in a project that is not legacy (BRIEF has direction: or brief_version: 2), WARN
 //   in an older one; the resolver's warnings are WARN lines. No style_profile: is a WARN only when
-//   the creative gate is on (no creative_override).
+//   the creative gate is on (no creative_override) and BRIEF has no lemo_ref: (look from its STYLE.md).
 // Mix balance, final stage, every project with index.html: mix-balance.mjs measures how far the
 //   music sits under the voice in the audio-mix rebuild (PASS 4–7 dB). Its FAIL blocks; older
 //   projects only WARN (mix-balance softens them); a measurement that cannot run is a WARN.
@@ -437,7 +437,8 @@ export function checkStyle({ dir, brief, errors, warnings, resolveFn = resolvePr
   const fm = frontmatter(brief);
   const id = String(fm.style_profile || "").trim();
   if (!id || PLACEHOLDER.test(id)) {
-    if (!isLegacy(fm) && !fm.creative_override) warnings.push("BRIEF.md has no style_profile: (make-pitch.mjs choose writes it; ids in data/styles/index.json) — the look falls back to the direction's style keyword");
+    // lemo_ref (lemo-pick.mjs choose): the look comes from that lemo-opuscar STYLE.md, not a profile.
+    if (!isLegacy(fm) && !fm.creative_override && !String(fm.lemo_ref || "").trim()) warnings.push("BRIEF.md has no style_profile: (make-pitch.mjs choose writes it; ids in data/styles/index.json) — the look falls back to the direction's style keyword");
     return null;
   }
   try {
