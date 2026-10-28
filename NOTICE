@@ -27,7 +27,9 @@ MIT License (see third_party/lemo-opuscar/LICENSE): the lemo-watercolor and lemo
 style profiles (data/styles/), adapted from its style guides, and the scene templates in
 templates/lemo/, written against its watercolor and glass-product engines. scripts/lemo.mjs
 copies those engines from that commit into a user's project with the licence and a CREDITS file;
-the repository does not redistribute them.
+the repository does not redistribute them. scripts/lemo-pick.mjs reads every style's
+style.json and STYLE.md from that commit (fetched by lemo.mjs, not redistributed) to rank the
+styles for a brief. Lemo-Opuscar is by LemoLab; its demo films are licensed CC BY 4.0.
 
 scripts/lemo.mjs also copies three.js (https://threejs.org, MIT License, see
 third_party/three/LICENSE) from the npm package into a user's project for three.js styles.

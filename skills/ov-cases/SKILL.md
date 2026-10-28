@@ -11,7 +11,7 @@ description: "Tra corpus case video làm bằng Opus 5.5 của opus-video: chu�
 
 Tra case gần nhất (**một lần mỗi dự án**, không chạy lại theo từng cảnh):
 
-- **Chuẩn hoá brief:** tự viết `BRIEF.case-query.json` trong thư mục dự án, bằng **tiếng Anh**, chỉ lấy thông tin có trong brief của người dùng, **không bịa**. Trường nào brief không nói thì ghi `"not stated"`. `aspect` lấy đúng từ `BRIEF.md`.
+- **Chuẩn hoá brief:** tự viết `BRIEF.case-query.json` trong thư mục dự án (đã viết ở bước 1b để chọn phong cách lemo thì dùng lại), bằng **tiếng Anh**, chỉ lấy thông tin có trong brief của người dùng, **không bịa**. Trường nào brief không nói thì ghi `"not stated"`. `aspect` lấy đúng từ `BRIEF.md`.
   ```json
   {"video_type":"…","purpose":"…","topic":"…","industry":"…","aspect":"16:9|9:16|both",
    "duration_s":30,"tone":"…","key_visuals":"…","narration":"…","source_material":"…"}
@@ -50,7 +50,7 @@ Người dùng nói "làm nhanh", "theo mẫu", "giống video này" hoặc đư
    node $OV/scripts/case-template.mjs --project . --case <id>
    ```
    Script ghi `build/TEMPLATE.md`, gồm prompt gốc nguyên văn, tác giả, link, license, chủ đề và khổ hình của brief, cùng checklist chuyển thể. Nếu `BRIEF.md` chưa có `creative_override` thì script thêm `creative_override: nhanh theo case <id>`. Exit 2 nghĩa là id sai hoặc case đã bị upstream gỡ, khi đó chọn case khác. `WARN prompt không đầy đủ` nghĩa là case chỉ có một phần prompt; mẫu vẫn được ghi, phần thiếu lấy từ brief.
-3. Ghi `case_search:` vào `BRIEF.md`. Không chạy `make-pitch` (bước 1b). Phong cách, hình chủ đạo và chuyển cảnh lấy từ `build/TEMPLATE.md` và thẻ kỹ thuật của case.
+3. Ghi `case_search:` vào `BRIEF.md`. Không chạy `make-pitch` (bước 1b). Người dùng muốn một phong cách lemo-opuscar cho bản làm nhanh thì chạy `node $OV/scripts/lemo-pick.mjs rank --brief-json BRIEF.case-query.json --limit 3 --stats` với cùng file brief, đưa họ 2–3 kết quả kèm lý do, rồi ghi lựa chọn bằng `lemo-pick.mjs choose` (chi tiết ở `ov-direction`). Phong cách, hình chủ đạo và chuyển cảnh lấy từ `build/TEMPLATE.md` và thẻ kỹ thuật của case.
 4. Đi tiếp `ov-script` (viet-pro vẫn đủ (a)–(e)), `ov-audio`, `ov-build`. Ở `ov-build` vẫn viết PLAN.md, vẫn chạy `make-demo.mjs --animatic` và chờ người dùng duyệt clip nháp, rồi `ov-deliver`. Ở chặng final, `check-preflight` bỏ qua các kiểm tra hướng sáng tạo nhưng vẫn đòi animatic mới hơn PLAN.md và có chuyển động.
 
 Case bị upstream gỡ (`upstream_removed`) bị ẩn khỏi `find-cases` và `rerank-cases`; chỉ thêm `--include-removed` khi người dùng hỏi đúng case đó.
@@ -64,6 +64,7 @@ Case bị upstream gỡ (`upstream_removed`) bị ẩn khỏi `find-cases` và `
 | `$OV/scripts/rerank-cases.mjs` | Bước 3 (tuỳ chọn, cần `TYPESAFE_API_KEY`): Jev xếp hạng khoảng 930 case có prompt dùng được (≥ 40 ký tự) theo brief JSON; thiếu key hoặc lỗi API thì tự trả kết quả `find-cases` (`--stats` cho biết lý do) |
 | `$OV/scripts/case-features.mjs` | Gắn nhãn cố định cho từng case vào `data/case-features.jsonl` (khổ hình, thể loại, chủ đề, độ chi tiết). **Chạy lại mỗi khi `data/cases.jsonl` thay đổi** (chỉ gắn nhãn dòng mới/đổi, khoảng 0,07 USD cho cả corpus) |
 | `data/exemplars.md` | 17 prompt mẫu nguyên văn, có nguồn. Chỉ mở khi cần đọc prompt đầy đủ |
+| `$OV/scripts/lemo-pick.mjs` | Hướng nhanh (tuỳ chọn): Jev chọn 2–3 phong cách lemo-opuscar theo cùng `BRIEF.case-query.json`; thiếu key hay lỗi thì xếp theo từ khoá |
 | `$OV/scripts/case-template.mjs` | Hướng nhanh: ghi `build/TEMPLATE.md` từ một case và đặt `creative_override` |
 | `data/SOURCES.md` | Nguồn, commit và license của corpus; lệnh rebuild |
 | `$OV/scripts/corpus-stats.mjs` | Thống kê lại corpus khi cập nhật dữ liệu nguồn |

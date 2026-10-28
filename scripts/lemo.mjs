@@ -8,7 +8,8 @@
 //   node lemo.mjs add --project <dir> --style <slug> [--force]
 //   node lemo.mjs remove --project <dir>
 //   node lemo.mjs --help | -h
-// fetch   partial, sparse clone of the pinned commit (only the files the catalog names) into
+// fetch   partial, sparse clone of the pinned commit (the files the catalog names, plus every
+//         style's style.json and STYLE.md for lemo-pick.mjs) into
 //         $LEMO_OPUSCAR_HOME/<sha> (default ~/.cache/opus-video/lemo-opuscar), and `npm pack` of
 //         three@<version> into $LEMO_OPUSCAR_HOME/three-<version>. An existing clone is checked,
 //         never reset; a style added to the catalog later is checked out on the next fetch.
@@ -43,6 +44,9 @@ export const MARK = {
 export const cacheHome = (env = process.env) => env.LEMO_OPUSCAR_HOME || join(homedir(), ".cache", "opus-video", "lemo-opuscar");
 export const repoDir = (home, cat) => join(home, cat.sha);
 export const threeDir = (home, cat) => join(home, `three-${cat.three}`, "package");
+
+// The library data every style has, for lemo-pick.mjs (styles/<slug>/style.json and STYLE.md).
+export const LIBRARY_GLOBS = ["styles/*/style.json", "styles/*/STYLE.md"];
 
 // Every repo path the catalog needs, for the sparse checkout.
 export function sparsePaths(cat) {
@@ -129,7 +133,7 @@ function fetchCache(cat, home, { out, err }) {
   }
   const head = git("rev-parse", "-q", "--verify", "HEAD").stdout?.trim();
   if (head && head !== cat.sha) { err(`lemo: ${dir} is at ${head}, catalog pins ${cat.sha}; remove that directory and fetch again\n`); return 4; }
-  let r = git("sparse-checkout", "set", "--no-cone", ...sparsePaths(cat).map((p) => `/${p}`));
+  let r = git("sparse-checkout", "set", "--no-cone", ...[...sparsePaths(cat), ...LIBRARY_GLOBS].map((p) => `/${p}`));
   if (r.status !== 0) { err(`lemo: sparse-checkout failed: ${r.stderr}`); return 4; }
   if (!head) {
     out(`lemo: fetching ${cat.repo} @ ${cat.sha.slice(0, 7)}\n`);
