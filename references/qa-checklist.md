@@ -50,7 +50,7 @@ mkdir -p qa && for T in 1 4 7 10 13; do ffmpeg -v error -y -ss $T -i renders/f.m
    - 16:9: `hyperframes check --frame-check --caption-zone "x0=0;y0=.82;x1=1;y1=1;severity=error;$Z"`
    - 9:16: `hyperframes check --frame-check`
    - `--at-transitions` chỉ để chẩn đoán (báo nhầm khi chữ trượt qua mask).
-3. `node $OV/scripts/video-lint.mjs --hyperframes .` exit 0 (lowercase, chữ nhỏ, vùng UI che 9:16).
+3. `node $OV/scripts/video-lint.mjs --project .` exit 0 (lowercase, chữ nhỏ, vùng UI che 9:16).
 4. Render `renders/<name>-vN.mp4`.
 5. `node $OV/scripts/judge.mjs check --video renders/<name>-vN.mp4 --hyperframes . --out qc/vN-check.json`.
    - Mỗi issue hard: mở frame trong `qc/vN-check_frames/` rồi mới quyết. Ở 540p, Gemini hay đọc nhầm dấu (ơ→đ) và chữ đang trượt qua mask, nên phải kiểm lại trên frame gốc.

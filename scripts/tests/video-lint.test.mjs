@@ -50,3 +50,21 @@ test("HEDGE_LABEL: only WARN (exit 0) without voice_source: clip", async () => {
     assert.ok(JSON.parse(r.stdout).filter((f) => f.code === "HEDGE_LABEL").every((f) => f.severity === "WARN"));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("--project <dir> works like the other scripts; --hyperframes is still accepted", () => {
+  const viaProject = run("--project", badFixture, "--skip-runtime", "--json");
+  const viaOld = run("--hyperframes", badFixture, "--skip-runtime", "--json");
+  assert.equal(viaProject.status, 1, viaProject.stderr);
+  assert.deepEqual(JSON.parse(viaProject.stdout), JSON.parse(viaOld.stdout));
+  const both = run("--project", badFixture, "--hyperframes", badFixture, "--skip-runtime", "--json");
+  assert.equal(both.status, 1, both.stderr);
+  const other = run("--project", badFixture, "--hyperframes", hedgeFixture, "--skip-runtime");
+  assert.equal(other.status, 2);
+  assert.match(other.stderr, /--project and --hyperframes name different folders/);
+  const none = run("--skip-runtime");
+  assert.equal(none.status, 2);
+  assert.match(none.stderr, /missing --project <dir>/);
+  const empty = run("--project");
+  assert.equal(empty.status, 2);
+  assert.match(empty.stderr, /--project needs a directory/);
+});
