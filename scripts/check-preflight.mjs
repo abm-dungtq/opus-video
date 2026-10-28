@@ -85,7 +85,7 @@ import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
 import { loadDirections, classifySeams, tokenExists, upstream, wordBudget } from "./directions.mjs";
-import { measureMotion, motionVerdict, QUICK_MODE } from "./qc-mp4.mjs";
+import { measureMotion, motionVerdict, motionStep, QUICK_MODE } from "./qc-mp4.mjs";
 import { checkSync, parseEventsBody, isLegacy } from "./sfx-sync.mjs";
 import { resolveProject } from "./styles.mjs";
 import { audioHash, pictureFiles, pictureHash } from "./render-final.mjs";
@@ -310,7 +310,7 @@ function checkAnimatic({ dir, fm, out, errors, warnings, motion, probe, legacyMt
     else if (key === "animatic_9x16" && (bad = notPortrait(probe, animPath, anim, rerun))) errors.push(bad);
     else {
       let m;
-      try { m = motion(animPath); } catch (e) { errors.push(`cannot measure motion of ${anim}: ${e.message}`); }
+      try { m = motion(animPath, undefined, { step: motionStep(fm) }); } catch (e) { errors.push(`cannot measure motion of ${anim}: ${e.message}`); }
       if (m !== undefined) {
         const v = motionVerdict(m, fm);
         out[key === "animatic" ? "motion" : "motion_9x16"] = { ...m, level: v.level };
