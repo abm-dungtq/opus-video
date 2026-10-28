@@ -3,7 +3,8 @@
 // (check-preflight --stage final: PLAN.md + demo frames + approval in DEMO.md), checks that ffmpeg
 // and ffprobe run, then `npx hyperframes render --quality delivery <your args>` in the project
 // directory, then swaps the sound for the audio-mix (ffmpeg) mix of the composition (data-fx-carve
-// beds ducked under their voice, loudness-normalized to -14 LUFS / -1.5 dBTP) and writes the
+// beds ducked under their voice, brought to -14 LUFS under -1.5 dBTP, with a limiter when the peaks
+// would cap the gain) and writes the
 // sidecar <output>.render.json {composition, visual_hash, audio_hash, mode, mixer, source,
 // source_sha256 (of that MP4), created}.
 //   node render-final.mjs [--project .] [--legacy-mtime] -- [hyperframes render args, e.g. -c compositions/main-9x16.html --output renders/x-9x16.mp4]

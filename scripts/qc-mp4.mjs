@@ -12,7 +12,8 @@
 //              last 0.2s; dark backgrounds can trigger it, extract the frame and look
 //   FREEZE     WARN each still stretch of 2s or more (freezedetect n=0.003 d=2)
 //   SILENCE    WARN each silence of 1.5s or more (silencedetect -50dB d=1.5) · FAIL whole file silent
-//   LOUDNESS   WARN integrated loudness (ebur128) outside [-16, -12] LUFS
+//   LOUDNESS   WARN integrated loudness (ebur128) outside [-16, -12] LUFS (audio-mix LOUDNORM.low/high;
+//              audio-mix aims the mix at -14 inside that range)
 //   TRUE_PEAK  WARN above -1 dBFS · FAIL above 0 dBFS
 //   BITRATE    WARN above 12 Mbit/s (not compressed yet, run export.mjs)
 //   MOTION     frame-to-frame change (signalstats YDIF at 360px wide, 30 fps): `still` = share of
@@ -38,10 +39,11 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
+import { LOUDNORM } from "./audio-mix.mjs";
 
 export const LIMITS = {
   blackStart: 0.1, blackTail: 0.2, freezeMin: 2, silenceMin: 1.5, silentFileSlack: 0.25,
-  durationTol: 0.1, loudLow: -16, loudHigh: -12, peakWarn: -1, peakFail: 0, bitrateMax: 12e6,
+  durationTol: 0.1, loudLow: LOUDNORM.low, loudHigh: LOUDNORM.high, peakWarn: -1, peakFail: 0, bitrateMax: 12e6,
   stillYdif: 0.5,
   motionFail: { default: { still: 0.6, peak: 1.5 }, em: { still: 0.75, peak: 1.0 } },
   motionWarn: { default: { still: 0.45, peak: 2.0 }, em: { still: 0.6, peak: 1.2 } },
