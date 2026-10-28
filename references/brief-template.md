@@ -12,6 +12,8 @@ workflow: <faceless-explainer | product-launch-video | music-to-video | motion-g
 engine: <hyperframes | remotion | raw-canvas>
 engine_reason: <1 câu: vì sao chọn engine này>
 lemo_style: <watercolor | glass-product>   # tuỳ chọn: lớp lemo-canvas dưới composition (references/lemo-canvas.md); bỏ dòng này khi không dùng
+lemo_ref: <slug lemo-opuscar>   # tuỳ chọn: phong cách dựng theo ngữ pháp STYLE.md, không có lớp canvas; lemo-pick.mjs choose ghi, không đi cùng lemo_style
+lemo_search: <jev | keyword (lý do)>   # lemo-pick.mjs choose ghi: phong cách lemo được chọn bằng Jev hay theo từ khoá
 aspect: <16:9 | 9:16 | both>
 duration_s: <số giây>
 fps: <30 | 60>

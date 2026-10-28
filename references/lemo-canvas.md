@@ -13,6 +13,19 @@ Dùng lớp này khi brief cần chất liệu mà GSAP và DOM không làm đư
 
 Danh mục và commit lemo được ghim nằm trong `data/lemo/styles.json`. `node $OV/scripts/lemo.mjs list` liệt kê chúng.
 
+## Chọn phong cách theo brief (`lemo-pick.mjs`)
+
+Thư viện ở commit đã ghim có 59 phong cách; gallery: https://lemomo-ai.github.io/lemo-opuscar/. Bước 1b (`ov-direction`) dùng `lemo-pick.mjs` để gợi ý 2–3 phong cách:
+
+```bash
+node $OV/scripts/lemo-pick.mjs rank --brief-json BRIEF.case-query.json --limit 3 --stats
+node $OV/scripts/lemo-pick.mjs choose --project . --style <slug> --search "<lemo_search>"
+```
+
+- `rank` đọc `styles/<slug>/style.json` (tên, nhóm, công dụng, câu tóm tắt phim mẫu) và phần mở đầu của `STYLE.md` (câu dẫn và mục 1). Có `TYPESAFE_API_KEY` thì Jev chấm từng phong cách từ 0 đến 4 trong một lượt: công dụng và giọng của phong cách có hợp mục đích, chủ đề, người xem của brief không, và hình của nó có chở được hình chủ đạo của brief không. Điểm bằng nhau thì xếp theo từ khoá. Không có key hay Jev lỗi thì xếp theo từ khoá: từ của brief có trong công dụng (×3), tên và nhóm (×2), câu phim mẫu và phần mở đầu `STYLE.md` (×1).
+- `--library <dir>` đọc một bản thư viện khác, ví dụ cache của Motion Studio (`~/.cache/motion-studio/lemo-opuscar/<sha>`).
+- `choose` ghi `lemo_style: <slug>` khi phong cách có lớp canvas (bảng trên), ghi `lemo_ref: <slug>` khi phong cách chỉ dựng theo ngữ pháp `STYLE.md`. `lemo_style` chỉ dành cho lớp canvas vì `make-pitch`, `lemo.mjs` và Motion Studio đọc nó theo nghĩa đó. Lệnh cũng ghi `lemo_search:` (`jev` hoặc `keyword (<lý do>)`) và thêm một dòng ghi công vào `assets/CREDITS.md`.
+
 ## Thêm lớp vào dự án
 
 ```bash
@@ -20,7 +33,7 @@ node $OV/scripts/lemo.mjs fetch                                   # một lần 
 node $OV/scripts/lemo.mjs add --project . --style watercolor
 ```
 
-`fetch` lấy đúng những file danh mục cần từ commit đã ghim (khoảng 0,5 MB) và gói three.js, rồi đặt chúng vào `~/.cache/opus-video/lemo-opuscar` (đổi chỗ bằng `LEMO_OPUSCAR_HOME`). Cache có sẵn thì lệnh chỉ kiểm commit, không reset.
+`fetch` lấy đúng những file danh mục cần từ commit đã ghim, cùng `style.json` và `STYLE.md` của mọi phong cách cho `lemo-pick.mjs` (tổng khoảng 2 MB) và gói three.js, rồi đặt chúng vào `~/.cache/opus-video/lemo-opuscar` (đổi chỗ bằng `LEMO_OPUSCAR_HOME`). Cache có sẵn thì lệnh chỉ kiểm commit, không reset.
 
 `add` cần `index.html` có bốn dấu của skeleton (`composition.mjs init` từ v2.4.0 đã có sẵn):
 
@@ -71,6 +84,10 @@ Vì vậy với 3D trên GPU, tiêu chí là PSNR từ 50 dB trở lên giữa h
 ## Khổ dọc
 
 Canvas 2D lấy cỡ từ `data-width` và `data-height` của root, còn scene 3D đọc cỡ khi chạy. Tuy vậy scene vẫn được vẽ cho bố cục ngang. `reframe.mjs` in `WARN lemo` khi dự án có lớp này. Bản 9:16 cần scene riêng, và phải xem lại từng shot trước khi giao.
+
+## Giấy phép và ghi công
+
+lemo-opuscar là của LemoLab: mã và tài liệu phong cách theo MIT (`third_party/lemo-opuscar/LICENSE`), phim mẫu theo CC BY 4.0. `lemo.mjs add` chép `LICENSE-lemo-opuscar` và `CREDITS` vào `assets/lemo/`; `lemo-pick.mjs choose` thêm dòng ghi công vào `assets/CREDITS.md`. Dùng lại khung hay đoạn phim mẫu thì ghi công LemoLab và link phim theo CC BY 4.0.
 
 ## Thêm một phong cách lemo khác
 

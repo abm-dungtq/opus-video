@@ -1,6 +1,6 @@
 ---
 name: ov-direction
-description: "Bước 1b của opus-video: pitch sáng tạo gồm 3 styleframe dựng bằng nội dung thật của người dùng (make-pitch.mjs init/render/choose), người dùng chọn hướng đạo diễn bằng mắt, rồi ghi direction, energy, palette, word_budget và style_profile vào BRIEF.md. Bắt buộc với dự án mới (brief_version: 2) trong hướng dao-dien và tu-nhac. Không dùng cho hướng nhanh theo mẫu (ov-cases), cho footage chỉ cắt gọn (ov-footage) hay để viết kịch bản (ov-script)."
+description: "Bước 1b của opus-video: gợi ý 2–3 phong cách lemo-opuscar bằng Jev (lemo-pick.mjs), pitch sáng tạo gồm 3 styleframe dựng bằng nội dung thật của người dùng (make-pitch.mjs init/render/choose), người dùng chọn hướng đạo diễn bằng mắt, rồi ghi direction, energy, palette, word_budget và style_profile vào BRIEF.md. Bắt buộc với dự án mới (brief_version: 2) trong hướng dao-dien và tu-nhac. Không dùng cho hướng nhanh theo mẫu (ov-cases), cho footage chỉ cắt gọn (ov-footage) hay để viết kịch bản (ov-script)."
 ---
 
 # ov-direction: pitch 3 styleframe, chọn hướng và style
@@ -8,6 +8,21 @@ description: "Bước 1b của opus-video: pitch sáng tạo gồm 3 styleframe 
 `$OV` là thư mục gốc plugin opus-video, nơi có `scripts/` và `references/`: Claude Code `${CLAUDE_PLUGIN_ROOT}` (cài tại chỗ: `~/.claude/skills/opus-video`), Codex `~/.agents/skills/opus-video`, Antigravity `~/.gemini/config/skills/opus-video` (CLI: `~/.gemini/antigravity-cli/skills/opus-video`); tức thư mục chứa `skills/` và `scripts/` của plugin. Mọi lệnh là `node $OV/scripts/<x>.mjs` (PowerShell: thay `$OV` bằng đường dẫn đầy đủ).
 
 ## Bước 1b: pitch sáng tạo
+
+**Gợi ý phong cách lemo-opuscar (trước `init`, một lần mỗi dự án).** [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) của LemoLab có 59 phong cách phim dựng bằng code (mã MIT, phim mẫu CC BY 4.0). Jev chọn 2–3 phong cách hợp brief:
+
+- Viết `BRIEF.case-query.json` (brief tiếng Anh, đúng khuôn ở `ov-cases`; bước 3 dùng lại file này), rồi chạy:
+  ```bash
+  node $OV/scripts/lemo-pick.mjs rank --brief-json BRIEF.case-query.json --limit 3 --stats
+  ```
+  Script tự đọc `TYPESAFE_API_KEY` (không source/cat/echo file key). Có key thì Jev chấm cả 59 phong cách trong một lượt, mất khoảng 1 giây, chưa tới 0,01 USD. Không có key, API lỗi hay hết giờ thì script tự xếp theo từ khoá và vẫn exit 0. Có key mà Jev lỗi thì stderr có dòng `lemo-pick: Jev unavailable (…)`; báo người dùng nếu là 401. Exit 4 là chưa có thư viện: chạy `node $OV/scripts/lemo.mjs fetch` (cần mạng, một lần mỗi máy) rồi chạy lại.
+- Mỗi kết quả có `lý do` và một nhãn. **lớp canvas** nghĩa là `lemo.mjs add` vẽ được engine của phong cách đó dưới composition. **theo ngữ pháp** nghĩa là dựng bằng GSAP, DOM hoặc canvas của dự án theo `STYLE.md` của phong cách. Dòng `> note: weak matches` nghĩa là không phong cách nào sát brief; khi đó nói rõ với người dùng và đề nghị bỏ qua.
+- Gửi người dùng 2–3 phong cách, mỗi phong cách kèm tên, lý do bằng tiếng Việt và link phim mẫu ở gallery https://lemomo-ai.github.io/lemo-opuscar/. Hỏi một câu: chọn phong cách nào, hay không dùng. Người dùng nói chạy không dừng thì lấy hạng 1.
+- Người dùng chọn thì ghi lựa chọn bằng lệnh, không gõ tay. Giá trị `--search` chép nguyên trường `lemo_search` của dòng `--stats`, ví dụ `jev` hoặc `keyword (no TYPESAFE_API_KEY)`:
+  ```bash
+  node $OV/scripts/lemo-pick.mjs choose --project . --style <slug> --search "<lemo_search>"
+  ```
+  Phong cách lớp canvas được ghi thành `lemo_style: <slug>`, nên `make-pitch init` tự dùng nó cho hướng táo bạo. Phong cách theo ngữ pháp được ghi thành `lemo_ref: <slug>`; khi viết styleframe táo bạo, đọc `STYLE.md` mà lệnh in ra và dựng theo ngữ pháp đó. Cả hai trường hợp đều ghi `lemo_search:` và thêm một dòng ghi công LemoLab vào `assets/CREDITS.md`. Chỉ học ngữ pháp hình của phong cách, không chép câu chuyện, cảnh hay chữ ký của phim mẫu.
 
 **3 styleframe, người dùng chọn bằng mắt (BẮT BUỘC với dự án mới: BRIEF có `brief_version: 2`).** Danh mục 8 hướng đạo diễn và 5 nhóm từ khoá ở `$OV/references/creative-directions.md` (sinh từ `data/directions.json`; mọi token là tên có thật trong HyperFrames, `directions.mjs check` kiểm).
 
@@ -28,6 +43,8 @@ Sau bước này: viết kịch bản theo hướng đã chọn (`ov-script`), v
 | `$OV/references/creative-directions.md` | Bước 1b: 8 hướng đạo diễn, 2 núm, 5 nhóm từ khoá đổi được, từ vựng chuyển cảnh (sinh từ `data/directions.json`) |
 | `$OV/scripts/directions.mjs` | Bước 0/1b: `check` (token có thật trong HyperFrames, cũng chạy trong setup-check), `pick` (3 hướng tương phản), `compat` (cảnh báo phối sai), `doc --write` |
 | `$OV/scripts/make-pitch.mjs` | Bước 1b: `init` (3 project styleframe + STYLEFRAME.md + RECIPES.md; `--lemo` đặt một style lemo-canvas cho hướng táo bạo), `render` (3 clip, sheet.jpg, PITCH.md menu số; exit 4 khi styleframe FAIL MOTION), `choose` (ghi BRIEF, exit 3 khi phối sai) |
+| `$OV/scripts/lemo-pick.mjs` | Bước 1b: `rank` (Jev xếp hạng 59 phong cách lemo-opuscar theo brief, thiếu key hay lỗi thì xếp theo từ khoá), `choose` (ghi `lemo_style` hoặc `lemo_ref`, `lemo_search` và ghi công) |
+| `$OV/references/lemo-canvas.md` | Lớp canvas lemo, cách chọn phong cách, giấy phép và ghi công |
 | `$OV/scripts/recipe-pack.mjs` | Bước 1b (và 6): gom blueprint/rule/seam theo hướng thành `RECIPES.md` |
 | `$OV/references/style-system.md` | Bước 1b và 4b: 64 style, `style_profile`, `## style_layers`, luật resolve theo cảnh (`styles.mjs`) |
 | `$OV/scripts/styles.mjs` | `find`, `show`, `suggest --direction`, `resolve --project` (cú pháp ở `--help`) |

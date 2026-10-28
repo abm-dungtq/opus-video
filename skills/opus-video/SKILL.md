@@ -49,7 +49,7 @@ Skill điều phối: biến một ý tưởng thành MP4 hoàn chỉnh. Skill n
 |---|---|
 | 0 kiểm tra cài đặt, thiết lập key | `ov-setup` |
 | 1 brief tối thiểu | `ov-brief` |
-| 1b pitch 3 styleframe, chọn hướng và style | `ov-direction` |
+| 1b gợi ý phong cách lemo-opuscar (Jev), pitch 3 styleframe, chọn hướng và style | `ov-direction` |
 | 2 kịch bản qua cổng viet-pro | `ov-script` |
 | 3 storyboard (tra case ở `ov-cases`), 4 engine, 4b PLAN.md, 6 dựng, 6b animatic, 7 render nháp | `ov-build` |
 | 5 giọng, SFX, nhạc, TIMING, mix | `ov-audio` |
@@ -81,4 +81,5 @@ Mỗi dự án có một thư mục riêng:
 - `judge.mjs` gửi video 540p lên Gemini qua agy (đã được đồng ý 2026-10-08).
 - `scripts/cut.mjs` phỏng theo ý tưởng của open-edit (Apache-2.0); giữ `NOTICE` và `third_party/open-edit/LICENSE` khi phân phối.
 - `data/styles/`, skeleton composition và thuật toán beat-grid, reframe, resolve style phỏng theo motion-video của AgentKit (MIT); giữ `NOTICE` và `third_party/agentkit-motion-video/LICENSE`.
+- Phong cách lemo-opuscar (`lemo.mjs`, `lemo-pick.mjs`, `references/lemo-canvas.md`) là của LemoLab: mã MIT, phim mẫu CC BY 4.0. Giữ `NOTICE` và `third_party/lemo-opuscar/LICENSE`; mỗi dự án dùng phong cách đó có một dòng ghi công trong `assets/CREDITS.md` (`lemo-pick.mjs choose` tự thêm). Chỉ học ngữ pháp hình, không chép câu chuyện, cảnh hay chữ ký của phim mẫu.
 - Prompt trong corpus (`data/`) thuộc về tác giả gốc. Chỉ dùng để học cấu trúc, và luôn kèm link khi trích.

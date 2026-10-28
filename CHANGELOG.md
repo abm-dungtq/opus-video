@@ -2,7 +2,13 @@
 
 ## Unreleased
 
-Nothing yet.
+### Added
+- `scripts/lemo-pick.mjs rank --brief-json BRIEF.case-query.json [--limit 3] [--library <dir>] [--json] [--stats]`: ranks the 59 styles of the pinned [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) library (LemoLab; code MIT, demo films CC BY 4.0) for a brief from each `styles/<slug>/style.json` and the opening of its `STYLE.md`. With `TYPESAFE_API_KEY`, Jev scores every style 0–4 in one request (about 28k input tokens, under 1 s); without a key, or on an HTTP error, timeout or bad payload, it falls back to keyword order and exits 0 (one stderr line when a key was set). Each result has a Vietnamese reason and says whether it is a canvas layer (`lemo.mjs add`) or built from `STYLE.md`. `--stats` gives `lemo_search` for BRIEF.md.
+- `lemo-pick.mjs choose --project <dir> --style <slug> [--search <label>]`: writes `lemo_style:` for a canvas-layer style or `lemo_ref:` for a grammar-only one, plus `lemo_search:`, and adds one LemoLab credit line to `assets/CREDITS.md`.
+- `ov-direction` suggests 2–3 lemo-opuscar styles before `make-pitch init`; `ov-cases` offers the same in quick mode with the same `BRIEF.case-query.json`. `brief-template.md` documents `lemo_ref` and `lemo_search`; `lemo-canvas.md` covers choosing, licences and credit.
+
+### Changed
+- `lemo.mjs fetch` also checks out `styles/*/style.json` and `styles/*/STYLE.md` (`LIBRARY_GLOBS`), about 2 MB in all. An existing cache picks them up on the next fetch.
 
 ## v2.7.1 (2026-10-25): sửa nhạc theo plan và karaoke
 

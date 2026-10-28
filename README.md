@@ -247,7 +247,7 @@ Every script answers `--help` and uses only Node built-ins.
 | Area | Scripts |
 |---|---|
 | Setup | `setup-check.mjs`, `skill-paths.mjs` |
-| Direction | `make-pitch.mjs` (init, render, choose), `directions.mjs`, `styles.mjs`, `lemo.mjs`, `brand.mjs` |
+| Direction | `make-pitch.mjs` (init, render, choose), `directions.mjs`, `styles.mjs`, `lemo.mjs`, `lemo-pick.mjs`, `brand.mjs` |
 | Script and sources | `check-viet-pro.mjs`, `voice-gate.mjs`, `source-ingest.mjs`, `poi-fetch.mjs`, `find-cases.mjs`, `rerank-cases.mjs`, `case-template.mjs` |
 | Sound | `eleven.mjs` (doctor, tts, sfx, music, align, audio-meta), `beat-grid.mjs`, `arrange-music.mjs`, `verify-arrangement.mjs`, `audio-mix.mjs`, `mix-balance.mjs` |
 | Build | `composition.mjs`, `timing.mjs`, `recipe-pack.mjs`, `beat-fit.mjs`, `cues.mjs`, `reframe.mjs` |
@@ -291,6 +291,6 @@ Code and documentation are MIT (see `LICENSE`). Third-party material is credited
 
 - The case corpus in `data/` comes from two MIT-licensed repositories. Each prompt belongs to its original author and every row credits the author with a link. Source videos are not redistributed.
 - Style profiles, the composition skeleton, motion principles, beat and reframe algorithms, music arrangement, beat-fit, cues, karaoke and the director/executor roles adapt the motion-video skill of AgentKit (MIT, © 2026 BestAgentKits).
-- The two lemo styles adapt [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) (MIT). `lemo.mjs` copies its engines and three.js (MIT) into your project with their licences; this repository does not redistribute them.
+- The two lemo styles adapt [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) (MIT). `lemo.mjs` copies its engines and three.js (MIT) into your project with their licences; this repository does not redistribute them. `lemo-pick.mjs` ranks all 59 lemo-opuscar styles for a brief (with Jev when a key is set). Lemo-opuscar is by LemoLab; its demo films are CC BY 4.0.
 - `third_party/hyperframes-skills/` is an unchanged copy of HyperFrames v0.8.184 skills (Apache-2.0).
 - `scripts/cut.mjs` adapts ideas from [open-edit](https://github.com/veedstudio/open-edit) (Apache-2.0, © VEED LIMITED).

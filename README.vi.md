@@ -247,7 +247,7 @@ Script nào cũng có `--help` và chỉ dùng thư viện có sẵn của Node.
 | Nhóm | Script |
 |---|---|
 | Cài đặt | `setup-check.mjs`, `skill-paths.mjs` |
-| Chọn hướng | `make-pitch.mjs` (init, render, choose), `directions.mjs`, `styles.mjs`, `lemo.mjs`, `brand.mjs` |
+| Chọn hướng | `make-pitch.mjs` (init, render, choose), `directions.mjs`, `styles.mjs`, `lemo.mjs`, `lemo-pick.mjs`, `brand.mjs` |
 | Kịch bản và nguồn | `check-viet-pro.mjs`, `voice-gate.mjs`, `source-ingest.mjs`, `poi-fetch.mjs`, `find-cases.mjs`, `rerank-cases.mjs`, `case-template.mjs` |
 | Âm thanh | `eleven.mjs` (doctor, tts, sfx, music, align, audio-meta), `beat-grid.mjs`, `arrange-music.mjs`, `verify-arrangement.mjs`, `audio-mix.mjs`, `mix-balance.mjs` |
 | Dựng | `composition.mjs`, `timing.mjs`, `recipe-pack.mjs`, `beat-fit.mjs`, `cues.mjs`, `reframe.mjs` |
@@ -291,6 +291,6 @@ Mã nguồn và tài liệu dùng giấy phép MIT (xem `LICENSE`). Phần lấy
 
 - Corpus case mẫu trong `data/` lấy từ hai repo giấy phép MIT. Prompt thuộc về tác giả gốc, dòng nào cũng ghi tác giả kèm link. Repo không phân phối lại video gốc.
 - Hồ sơ phong cách, skeleton composition, nguyên tắc chuyển động, thuật toán phách và reframe, ghép nhạc, beat-fit, cues, karaoke và vai đạo diễn/thi công phỏng theo skill motion-video của AgentKit (MIT, © 2026 BestAgentKits).
-- Hai phong cách lemo phỏng theo [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) (MIT). `lemo.mjs` chép engine của nó và three.js (MIT) vào dự án của bạn kèm giấy phép; repo này không phân phối lại chúng.
+- Hai phong cách lemo phỏng theo [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) (MIT). `lemo.mjs` chép engine của nó và three.js (MIT) vào dự án của bạn kèm giấy phép; repo này không phân phối lại chúng. `lemo-pick.mjs` xếp hạng cả 59 phong cách lemo-opuscar theo brief (dùng Jev khi có key). lemo-opuscar là của LemoLab; phim mẫu theo CC BY 4.0.
 - `third_party/hyperframes-skills/` là bản sao nguyên vẹn bộ skill của HyperFrames v0.8.184 (Apache-2.0).
 - `scripts/cut.mjs` phỏng theo ý tưởng của [open-edit](https://github.com/veedstudio/open-edit) (Apache-2.0, © VEED LIMITED).
