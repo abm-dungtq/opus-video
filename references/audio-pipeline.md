@@ -103,12 +103,13 @@ node $OV/scripts/eleven.mjs music --prompt "calm curious ambient, 100 BPM, light
 - Nếu script exit 3 và in `MUSIC_UNAVAILABLE`, chuyển sang:
   `hyperframes media-use resolve --type bgm --intent "<mood>" --project .`
 - Ghi BPM vào prompt để storyboard bám beat được, rồi đo nhịp thật của file (mục 3b).
-- File nhạc và SFX do `eleven.mjs music` và `eleven.mjs sfx` sinh ra đã được cắt im lặng ở đầu và cuối (chừa 0,05 giây) và chuẩn hóa về -12,5 LUFS, đỉnh -1,5 dBTP. Lệnh in một dòng `NORMALIZE … lufs_in=… lufs_out=… trimmed_head=… trimmed_tail=…`. Thêm `--no-normalize` khi cần giữ nguyên file của API. Chuẩn hóa lỗi thì file vẫn giữ như API trả về, lệnh in `WARN normalize: …` và vẫn thoát 0.
+- File nhạc và SFX do `eleven.mjs music` và `eleven.mjs sfx` sinh ra đã được cắt im lặng ở đầu và cuối (chừa 0,05 giây) và chuẩn hóa về -12,5 LUFS, đỉnh -1,5 dBTP. Riêng `sfx` còn cắt cả đoạn dạo nhỏ trước cú đánh: đầu file được cắt tới lúc tiếng vượt (đỉnh của file − 20 dB), đúng mốc `sfx-sync.mjs` dùng để đo lúc nghe thấy tiếng, và 0,05 giây giữ lại được fade in. Trước đây một tiếng trống ElevenLabs có 0,67 giây rền ở −30 dBFS trước cú đánh −2,5 dBFS lọt qua ngưỡng −50 dBFS, nên `check-preflight --stage final` báo FAIL SYNC +668 ms và phải bù bằng `data-media-start`. Lệnh in một dòng `NORMALIZE … lufs_in=… lufs_out=… trimmed_head=… trimmed_tail=…`, rồi dòng `sfx → <file> (<n> bytes; API <m> bytes)` với `<n>` là kích thước file trên đĩa sau chuẩn hoá. Thêm `--no-normalize` khi cần giữ nguyên file của API. Chuẩn hóa lỗi thì file vẫn giữ như API trả về, lệnh in `WARN normalize: …` và vẫn thoát 0.
 - File tải về hoặc lấy từ catalog thì chuẩn hóa bằng tay trước khi đặt vào composition:
   ```bash
   node $OV/scripts/normalize-bed.mjs --in assets/bgm/bgm.mp3            # ghi đè tại chỗ
-  node $OV/scripts/normalize-bed.mjs --in tai-ve.mp3 --out assets/sfx/x.mp3 [--lufs -12.5] [--tp -1.5] [--silence-db -50] [--keep-head 0.05]
+  node $OV/scripts/normalize-bed.mjs --in tai-ve.mp3 --out assets/sfx/x.mp3 [--lufs -12.5] [--tp -1.5] [--silence-db -50] [--keep-head 0.05] [--onset-db -20]
   ```
+  `--onset-db -20` cắt đầu một SFX tới cú đánh như `eleven.mjs sfx` làm; dùng nó để sửa một SFX cũ còn đoạn dạo nhỏ ở đầu thay cho `data-media-start`.
   Cắt im lặng làm `sfx-sync.mjs` đo đầu tiếng chính xác hơn. Mức trộn cuối vẫn do `data-volume` và `audio-mix.mjs` quyết định.
 
 ## 3b. Đo nhịp nhạc (`beat-grid.mjs`)
