@@ -12,8 +12,8 @@
 // image: no --ref runs `gflow image t2i`, any --ref runs `gflow image i2i` (local paths, uploaded by
 // gflow). Flow images cost no credits. video: `gflow video i2v`; Veo spends Flow credits, so the
 // command refuses without --spend (exit 2). --count > 1 writes <out>-1.png … into the out directory.
-// --upscale replaces the 720p clip at --out with Flow's free 1080p export (no extra credits; needs a
-// gflow-cli that has `video i2v --upscale`). If the export fails gflow keeps the 720p clip and exits 0;
+// --upscale replaces the 720p clip at --out with Flow's free 1080p export (no extra credits; needs gflow
+// installed from gflow-studio, whose `video i2v` has `--upscale`). If the export fails gflow keeps the 720p clip and exits 0;
 // the warning is printed and written to the ledger.
 //
 // Rules: nothing here retries. One call is one gflow run; a failed or timed-out run is reported with
