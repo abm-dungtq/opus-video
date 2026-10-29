@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { auditF1, hitAt, recallAt, main, measure, postId, statusOf, table } from "../jev-eval.mjs";
+import { auditF1, hitAt, recallAt, main, measure, postId, statusOf, table, thresholdOf } from "../jev-eval.mjs";
 
 // Jev giả: mọi câu score trả 4 khi phần instructions chứa GOLD, còn lại 1; noul trả 0.1.
 const jev = (calls = { n: 0 }) => async (url, init) => {
@@ -56,6 +56,21 @@ test("statusOf: tụt khi mốc − nay vượt ngưỡng; lỗi, bỏ qua và c
   assert.equal(statusOf({ now: null, error: "HTTP 500" }, { now: 0.6 }), "lỗi");
   assert.equal(statusOf({ skipped: true }, { now: 0.6 }), "bỏ qua");
   assert.equal(statusOf({ now: 0.5 }, { now: 0.6 }, 0.2), "ổn");
+});
+
+test("ngưỡng mặc định max(0,03; 1/n): một mục đổi kết quả không thành tụt, hai mục thì tụt", () => {
+  assert.equal(thresholdOf({ n: 16 }, null), 1 / 16);
+  assert.equal(thresholdOf({ n: 100 }, null), 0.03);
+  assert.equal(thresholdOf({}, { n: 20 }), 0.05);
+  assert.equal(thresholdOf({ n: 16 }, null, 0.01), 0.01);
+  assert.equal(statusOf({ n: 16, now: 11 / 16 }, { n: 16, now: 12 / 16 }), "ổn");
+  assert.equal(statusOf({ n: 16, now: 10 / 16 }, { n: 16, now: 12 / 16 }), "tụt");
+  assert.equal(statusOf({ n: 16, now: 13 / 16 }, { n: 16, now: 12 / 16 }), "ổn");
+  // suggest làm tròn tới 0,001: 10/21 → 0,476 và 11/21 → 0,524 lệch 0,048 > 1/21 nhưng vẫn là một mục.
+  assert.equal(statusOf({ n: 21, now: 0.476 }, { n: 21, now: 0.524 }), "ổn");
+  assert.equal(statusOf({ n: 21, now: 0.429 }, { n: 21, now: 0.524 }), "tụt");
+  // --threshold đặt ngưỡng chung, bỏ qua n.
+  assert.equal(statusOf({ n: 16, now: 11 / 16 }, { n: 16, now: 12 / 16 }, 0.03), "tụt");
 });
 
 test("measure: Jev kéo case đúng lên top 5; không-Jev giữ thứ tự find-cases", async () => {

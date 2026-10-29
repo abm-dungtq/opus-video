@@ -1,7 +1,6 @@
 {
   "at": "2026-10-29T01:24:49.846Z",
   "model": "jev-latest",
-  "threshold": 0.03,
   "modules": {
     "rerank-single": {
       "metric": "hit@5",

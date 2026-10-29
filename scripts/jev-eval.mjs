@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // jev-eval.mjs — đo chất lượng model Jev (jev-latest) ở mọi chỗ gọi Jev của opus-video, cộng gợi ý
 // hướng của Motion Studio, so với mốc đã lưu. Một lệnh, người dùng tự chạy; không tự đổi model.
-//   node jev-eval.mjs [--only audit,rerank-single,rerank-composite,lemo,suggest] [--threshold 0.03]
+//   node jev-eval.mjs [--only audit,rerank-single,rerank-composite,lemo,suggest] [--threshold <số>]
 //                     [--max-usd 0.5] [--baseline] [--estimate] [--studio <dir>] [--library <dir>]
 //   node jev-eval.mjs --help | -h
 // Năm bộ đo (bộ vàng do người dùng duyệt nằm trong data/jev-eval/):
@@ -19,7 +19,8 @@
 // Trước khi gọi Jev: in chi phí ước tính từng bộ (số ký tự request / 4, × 1,2; suggest lấy từ mốc,
 // không có mốc thì 0,05 USD) và dừng nếu tổng vượt --max-usd (mặc định 0,5). --estimate chỉ in ước tính.
 // Bảng kết quả: bộ đo | chỉ số | mốc | nay | không-Jev | trạng thái (ổn · tụt · tăng · chưa có mốc · lỗi ·
-// bỏ qua). "tụt" khi mốc − nay > --threshold (mặc định 0,03). Báo cáo JSON ghi vào
+// bỏ qua). "tụt" khi mốc − nay vượt ngưỡng của bộ đo: mặc định max(0,03; 1/n), để một mục đổi kết quả
+// không thành tụt; --threshold đặt một ngưỡng chung. Báo cáo JSON ghi vào
 // data/jev-eval/reports/jev-eval-<YYYYMMDD-HHMMSS>.json (không commit). --baseline ghi
 // data/jev-eval/baseline.json từ lượt này, chỉ khi mọi bộ đo chạy trọn.
 // Không tự ghim model, không tự chuyển phương án: kết quả để người dùng quyết.
@@ -77,14 +78,26 @@ export function auditF1(rows, warnings) {
   return tp + fp + fn ? (2 * tp) / (2 * tp + fp + fn) : 1;
 }
 
+// Ngưỡng của một bộ đo: --threshold nếu có, không thì max(0,03; 1/n), vì với n mục một mục đổi kết quả
+// đã lệch 1/n (16 brief → 0,0625).
+export function thresholdOf(m, base, threshold = null) {
+  if (threshold !== null && threshold !== undefined) return threshold;
+  const n = m?.n ?? base?.n;
+  return n > 0 ? Math.max(THRESHOLD, 1 / n) : THRESHOLD;
+}
+
+// suggest-eval ghi hit3 theo % với một chữ số thập phân, nên điểm lệch tới 0,001 do làm tròn.
+const ROUNDING = 0.001;
+
 // Trạng thái một bộ đo so với mốc.
-export function statusOf(m, base, threshold = THRESHOLD) {
+export function statusOf(m, base, threshold = null) {
   if (m.skipped) return "bỏ qua";
   if (m.error) return "lỗi";
   if (!base || typeof base.now !== "number") return "chưa có mốc";
   const d = m.now - base.now;
-  if (d < -threshold) return "tụt";
-  if (d > threshold) return "tăng";
+  const t = thresholdOf(m, base, threshold) + ROUNDING;
+  if (d < -t) return "tụt";
+  if (d > t) return "tăng";
   return "ổn";
 }
 
@@ -210,7 +223,7 @@ export async function measure({ only = MODULES, sets, pools, features, studio, a
 
 const pct = (x) => (typeof x === "number" ? x.toFixed(2) : "-");
 
-export function table(modules, baseline, threshold = THRESHOLD) {
+export function table(modules, baseline, threshold = null) {
   const lines = ["bộ đo | chỉ số | mốc | nay | không-Jev | trạng thái"];
   for (const id of MODULES) {
     const m = modules[id];
@@ -223,7 +236,7 @@ export function table(modules, baseline, threshold = THRESHOLD) {
 }
 
 function parseArgs(argv) {
-  const o = { only: MODULES, threshold: THRESHOLD, maxUsd: MAX_USD, baseline: false, estimate: false };
+  const o = { only: MODULES, threshold: null, maxUsd: MAX_USD, baseline: false, estimate: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i], v = argv[i + 1];
     if (a === "--baseline") o.baseline = true;
@@ -236,7 +249,7 @@ function parseArgs(argv) {
     else throw new Error(`không hiểu đối số ${a}`);
   }
   if (!o.only.length || o.only.some((m) => !MODULES.includes(m))) throw new Error(`--only nhận: ${MODULES.join(",")}`);
-  if (!(o.threshold >= 0) || !(o.maxUsd > 0)) throw new Error("--threshold và --max-usd cần một số dương");
+  if (!(o.threshold === null || o.threshold >= 0) || !(o.maxUsd > 0)) throw new Error("--threshold và --max-usd cần một số dương");
   return o;
 }
 
@@ -272,7 +285,8 @@ export async function main(argv = process.argv.slice(2), { out = (s) => process.
   if (res.ms > TARGET_MS) out(`cảnh báo: lượt đo mất ${(res.ms / 60000).toFixed(1)} phút, quá mục tiêu 10 phút\n`);
 
   const statuses = Object.fromEntries(Object.entries(res.modules).map(([id, m]) => [id, statusOf(m, baseline?.modules?.[id], o.threshold)]));
-  const report = { at: new Date().toISOString(), model: MODEL, threshold: o.threshold, ms: res.ms, usd: r3(usd * 1000) / 1000, estimate_usd: est, baseline_at: baseline?.at ?? null, statuses, modules: res.modules };
+  const thresholds = Object.fromEntries(Object.entries(res.modules).map(([id, m]) => [id, r3(thresholdOf(m, baseline?.modules?.[id], o.threshold))]));
+  const report = { at: new Date().toISOString(), model: MODEL, thresholds, ms: res.ms, usd: r3(usd * 1000) / 1000, estimate_usd: est, baseline_at: baseline?.at ?? null, statuses, modules: res.modules };
   mkdirSync(join(dataDir, "reports"), { recursive: true });
   const file = join(dataDir, "reports", `jev-eval-${stamp()}.json`);
   writeFileSync(file, JSON.stringify(report, null, 2) + "\n");
@@ -283,7 +297,7 @@ export async function main(argv = process.argv.slice(2), { out = (s) => process.
     if (errored) out("không ghi mốc: có bộ đo lỗi\n");
     else {
       const modules = Object.fromEntries(Object.entries(res.modules).filter(([, m]) => !m.skipped).map(([id, m]) => [id, { metric: m.metric, n: m.n, now: m.now, no_jev: m.no_jev, usd: m.usd ?? null }]));
-      writeFileSync(baseFile, JSON.stringify({ at: report.at, model: MODEL, threshold: o.threshold, modules: { ...(baseline?.modules ?? {}), ...modules } }, null, 2) + "\n");
+      writeFileSync(baseFile, JSON.stringify({ at: report.at, model: MODEL, modules: { ...(baseline?.modules ?? {}), ...modules } }, null, 2) + "\n");
       out(`đã ghi mốc: ${baseFile}\n`);
     }
   }

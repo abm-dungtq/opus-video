@@ -32,13 +32,15 @@ bộ đo | chỉ số | mốc | nay | không-Jev | trạng thái
 rerank-composite | hit@5 n=16 | 0.88 | 0.88 | 0.56 | ổn
 ```
 
-Trạng thái: `ổn` (lệch không quá ngưỡng), `tụt` (mốc − nay > `--threshold`, mặc định 0,03), `tăng`, `chưa có mốc`, `lỗi` (Jev hỏng giữa chừng, thiếu thư viện…), `bỏ qua`.
+Trạng thái: `ổn` (lệch không quá ngưỡng), `tụt` (mốc − nay vượt ngưỡng), `tăng`, `chưa có mốc`, `lỗi` (Jev hỏng giữa chừng, thiếu thư viện…), `bỏ qua`.
+
+Ngưỡng mặc định tính riêng cho từng bộ đo: max(0,03; 1/n), với n là số mục của bộ vàng. Với n mục, một mục đổi kết quả đã làm chỉ số lệch 1/n, nên ngưỡng này cho phép đúng một mục đổi mà không báo tụt; hai mục cùng trượt thì báo tụt. Hiện tại: rerank 16 brief → 0,0625; lemo 20 brief → 0,05; suggest 21 mục → 0,048; audit 24 câu → 0,042. Ngưỡng cộng thêm 0,001 vì suggest-eval làm tròn điểm tới 0,1 %. `--threshold <số>` đặt một ngưỡng chung cho mọi bộ đo. Báo cáo JSON ghi ngưỡng đã dùng ở `thresholds`.
 
 Mỗi lượt ghi một báo cáo JSON vào `data/jev-eval/reports/jev-eval-<YYYYMMDD-HHMMSS>.json` (không commit), gồm top từng brief để xem brief nào trượt. `--baseline` ghi `data/jev-eval/baseline.json` và chỉ ghi khi không bộ đo nào lỗi. Dùng `--only` để đo một phần; mốc của các bộ không đo được giữ nguyên.
 
 Mã thoát: 0 không tụt · 1 có bộ đo tụt · 2 sai đối số hoặc ước tính vượt trần · 3 không có key · 4 có bộ đo lỗi.
 
-**Nhiễu.** Jev không cho kết quả y hệt giữa hai lượt. Với 16 brief, một brief đổi kết quả làm hit@5 lệch 0,0625, lớn hơn ngưỡng mặc định 0,03. Trước khi kết luận model tụt, chạy lại bộ đó (`--only rerank-single`) và xem `items` trong báo cáo.
+**Nhiễu.** Jev không cho kết quả y hệt giữa hai lượt: hai lượt liên tiếp cho rerank-single 0,69 rồi 0,75, tức một brief đổi kết quả. Ngưỡng mặc định đã chừa đúng một mục như vậy. Khi một bộ đo báo tụt, chạy lại bộ đó (`--only rerank-single`) và xem `items` trong báo cáo trước khi kết luận model tụt.
 
 ## Cổng test offline bằng `ak`
 
