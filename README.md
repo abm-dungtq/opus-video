@@ -185,6 +185,7 @@ All scripts live in `scripts/`, import only Node built-ins, and print their usag
 | Delivery | `render-final.mjs`, `captions-from-transcript.mjs`, `export.mjs` |
 | Timeline | `gateway.mjs` (`patch`, `undo`, `redo`, `log`, `show`, `derive`), `manifest-import.mjs`, `studio.mjs` |
 | Footage | `cut.mjs` (`probe`, `apply-edl`) |
+| Jev quality | `jev-eval.mjs`, `jev-audit-eval.mjs` |
 
 Longer guides, in Vietnamese: [introduction](docs/gioi-thieu.md), [agent install guide](docs/cai-dat-agent.md), [in-depth guide](docs/huong-dan-chuyen-sau.md), [prompt library](docs/thu-vien-prompt/README.md). Release notes are in [CHANGELOG.md](CHANGELOG.md).
 
@@ -227,6 +228,8 @@ node --test "<opus-video>/scripts/tests/*.test.mjs"
 ```
 
 Keep the quotes so Node expands the glob. A few tests use a real project; point them at yours with `OPUS_VIDEO_SMOKE_DIR` and `OPUS_VIDEO_ABM_DIR`.
+
+To measure the Jev model itself, run `node <opus-video>/scripts/jev-eval.mjs` with a key. It scores the case rerank (single and composite), lemo-pick, the script audit and Motion Studio's suggestions against gold sets you approved, prints a table of baseline, now, no-Jev and status, and exits 1 when a score dropped. A full run costs about 0.10 USD. `.agentkit/test-impact.json` lets `ak test optimize --base origin/main` pick the offline Jev tests when Jev files change. See [references/jev-eval.md](references/jev-eval.md) (Vietnamese).
 
 | Symptom | Fix |
 |---|---|

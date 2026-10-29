@@ -1,0 +1,42 @@
+{
+  "at": "2026-10-29T01:24:49.846Z",
+  "model": "jev-latest",
+  "threshold": 0.03,
+  "modules": {
+    "rerank-single": {
+      "metric": "hit@5",
+      "n": 16,
+      "now": 0.75,
+      "no_jev": 0.5625,
+      "usd": 0.012348000000000001
+    },
+    "audit": {
+      "metric": "F1",
+      "n": 24,
+      "now": 0.9473684210526315,
+      "no_jev": null,
+      "usd": 0.000727
+    },
+    "lemo": {
+      "metric": "recall@3",
+      "n": 20,
+      "now": 0.7666666666666667,
+      "no_jev": 0.6083333333333333,
+      "usd": 0.023391
+    },
+    "rerank-composite": {
+      "metric": "hit@5",
+      "n": 16,
+      "now": 0.875,
+      "no_jev": 0.5625,
+      "usd": 0.031526
+    },
+    "suggest": {
+      "metric": "hit@3",
+      "n": 21,
+      "now": 0.524,
+      "no_jev": 0.667,
+      "usd": 0.033324
+    }
+  }
+}
