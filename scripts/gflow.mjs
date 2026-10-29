@@ -7,11 +7,14 @@
 //                        [--model nano2] [--count 1-4] [--profile p] [--project dir] [--flow-project name]
 //   node gflow.mjs video --start a.png [--end b.png] --prompt-file f.txt --out assets/gen/x.mp4 --spend
 //                        [--model veo-lite] [--duration 4|6|8|10] [--aspect 9:16] [--resolution 360p|720p]
-//                        [--profile p] [--project dir] [--flow-project name]
+//                        [--upscale] [--profile p] [--project dir] [--flow-project name]
 //
 // image: no --ref runs `gflow image t2i`, any --ref runs `gflow image i2i` (local paths, uploaded by
 // gflow). Flow images cost no credits. video: `gflow video i2v`; Veo spends Flow credits, so the
 // command refuses without --spend (exit 2). --count > 1 writes <out>-1.png … into the out directory.
+// --upscale replaces the 720p clip at --out with Flow's free 1080p export (no extra credits; needs a
+// gflow-cli that has `video i2v --upscale`). If the export fails gflow keeps the 720p clip and exits 0;
+// the warning is printed and written to the ledger.
 //
 // Rules: nothing here retries. One call is one gflow run; a failed or timed-out run is reported with
 // gflow's own exit code and never sent again, because a run Flow accepted may already have billed.
@@ -28,12 +31,15 @@
 // scratch project per run and the Flow account fills with junk projects.
 //
 // On macOS gflow's headed Chrome is kept hidden during a run (an-chrome-gflow.js, needs Accessibility
-// permission for the terminal); GFLOW_SHOW=1 shows it. Runs on a busy profile wait up to 600 s.
+// permission for the terminal); GFLOW_SHOW=1 shows it. With GFLOW_CLI_WINDOW_MODE=background gflow
+// already runs a background-only Chrome that cannot take focus, so the hider is skipped: its loop
+// re-activates the front app four times a second, which closes menus and the Vietnamese IME. Runs on a busy profile wait up to 600 s.
 //
 // GFLOW_BIN overrides the gflow executable (tests use a fake).
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -52,7 +58,7 @@ export function parseArgs(argv) {
     const a = argv[i];
     if (!a.startsWith("--")) { (o._ ??= []).push(a); continue; }
     const k = a.slice(2);
-    if (k === "spend" || k === "json") { o[k] = true; continue; }
+    if (k === "spend" || k === "json" || k === "upscale") { o[k] = true; continue; }
     const v = argv[++i];
     if (v === undefined) fail(`thiếu giá trị cho --${k}`);
     if (k === "ref") o.ref.push(v); else o[k] = v;
@@ -86,6 +92,7 @@ export function videoArgs(o, prompt) {
   if (o.end) args.push("--end-frame", o.end);
   if (o.duration !== undefined) args.push("--duration", String(o.duration));
   if (o.resolution) args.push("--resolution", o.resolution);
+  if (o.upscale) args.push("--upscale");
   if (o.profile) args.push("--profile", o.profile);
   return args;
 }
@@ -177,8 +184,25 @@ function lookupOrCreate(name, profile) {
 
 // gflow needs a headed Chrome; on macOS keep it hidden and give focus back (an-chrome-gflow.js).
 // GFLOW_SHOW=1 leaves it visible, e.g. to watch a run.
+// gflow's own precedence for GFLOW_CLI_WINDOW_MODE: the environment, then ./.env, then <home>/.env.
+export function gflowWindowMode(env = process.env, cwd = process.cwd()) {
+  if (env.GFLOW_CLI_WINDOW_MODE) return env.GFLOW_CLI_WINDOW_MODE.trim().toLowerCase();
+  const home = env.GFLOW_CLI_HOME || join(homedir(), "Library", "Application Support", "gflow-cli");
+  for (const f of [join(cwd, ".env"), join(home, ".env")]) {
+    if (!existsSync(f)) continue;
+    const m = readFileSync(f, "utf8").match(/^\s*GFLOW_CLI_WINDOW_MODE\s*=\s*["']?([\w-]+)/m);
+    if (m) return m[1].toLowerCase();
+  }
+  return "offscreen";
+}
+
+export function needsChromeHider(platform = process.platform, env = process.env, cwd = process.cwd()) {
+  if (platform !== "darwin" || env.GFLOW_SHOW === "1" || env.GFLOW_BIN) return false;
+  return gflowWindowMode(env, cwd) !== "background";
+}
+
 function hideChrome() {
-  if (process.platform !== "darwin" || process.env.GFLOW_SHOW === "1" || process.env.GFLOW_BIN) return null;
+  if (!needsChromeHider()) return null;
   const script = join(dirname(fileURLToPath(import.meta.url)), "an-chrome-gflow.js");
   return spawn("osascript", ["-l", "JavaScript", script, String(process.pid)], { stdio: "ignore" });
 }
@@ -223,7 +247,9 @@ function generate(kind, o) {
     if (/project.*(not.?found|404|deleted|permission|does not exist)/i.test(tail)) console.error(`gflow.mjs: có thể dự án Flow "${flowName}" (${flowId}) đã bị xoá trên web. Dùng --flow-project <tên-khác>, hoặc xoá khoá "${o.profile ?? "default"}:${flowName}" trong assets/gen/gflow-projects.json để tạo mới.`);
     fail(`gflow thoát mã ${r.status}; không tự gửi lại${r.status === 23 ? " (Flow đổi giao diện: cập nhật bằng `gflow update`)" : ""}`, r.status ?? 1);
   }
-  ledger(project, { id, status: "ok", exit: 0, files: files.map((f) => ({ path: f, sha: sha(readFileSync(f)), bytes: statSync(f).size })) });
+  const upscale = o.upscale ? pickJson(r.stdout, (j) => (j.upscaled || j.upscale_warning ? { upscaled: j.upscaled, upscale_warning: j.upscale_warning } : null)) : null;
+  if (upscale?.upscale_warning) console.error(`gflow.mjs: ${upscale.upscale_warning}`);
+  ledger(project, { id, status: "ok", exit: 0, ...upscale, files: files.map((f) => ({ path: f, sha: sha(readFileSync(f)), bytes: statSync(f).size })) });
   for (const f of files) console.log(f);
 }
 

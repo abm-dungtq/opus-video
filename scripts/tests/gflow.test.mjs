@@ -5,7 +5,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { imageArgs, videoArgs } from "../gflow.mjs";
+import { gflowWindowMode, imageArgs, needsChromeHider, videoArgs } from "../gflow.mjs";
 
 const GFLOW = fileURLToPath(new URL("../gflow.mjs", import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), "ov-gflow-"));
@@ -28,6 +28,7 @@ const code = Number(process.env.FAKE_EXIT ?? 0);
 if (code === 0 && a.includes("-o")) writeFileSync(a[a.indexOf("-o") + 1], "img");
 if (code === 0 && a.includes("--out")) { const d = a[a.indexOf("--out") + 1]; writeFileSync(d + "/m_1.png", "a"); writeFileSync(d + "/m_2.png", "b"); }
 if (code !== 0) console.error("selector drift");
+if (code === 0 && a.includes("--upscale")) console.log(JSON.stringify(process.env.FAKE_UPSCALE_WARN ? { status: "ok", upscale_warning: process.env.FAKE_UPSCALE_WARN } : { status: "ok", upscaled: "1080p" }, null, 2));
 process.exit(code);
 `);
 chmodSync(fake, 0o755);
@@ -57,6 +58,20 @@ test("videoArgs allows 10 s only on omni-flash", () => {
   assert.throws(() => videoArgs({ ...o, duration: "10" }, "p"), /duration/);
   assert.ok(videoArgs({ ...o, model: "omni-flash", duration: "10" }, "p").includes("10"));
   assert.ok(videoArgs({ ...o, end: "e.png" }, "p").includes("--end-frame"));
+});
+
+test("--upscale reaches gflow and its outcome lands in the ledger", () => {
+  assert.ok(!videoArgs({ ref: [], start: "s.png", out: "v.mp4" }, "p").includes("--upscale"));
+  const out = join(dir, "assets/gen/clip.mp4");
+  const args = ["video", "--start", join(dir, "ref.png"), "--prompt-file", join(dir, "p.txt"), "--out", out, "--spend", "--upscale"];
+  const ok = run(args);
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.ok(ok.calls[0].includes("--upscale"));
+  assert.equal(ledgerRows().at(-1).upscaled, "1080p");
+  const warned = run(args, { FAKE_UPSCALE_WARN: "upscale to 1080p failed; the 720p clip was kept" });
+  assert.equal(warned.status, 0, warned.stderr);
+  assert.match(warned.stderr, /720p clip was kept/);
+  assert.match(ledgerRows().at(-1).upscale_warning, /720p clip was kept/);
 });
 
 test("image run writes the file and two ledger rows", () => {
@@ -123,4 +138,21 @@ test("invalid arguments fail before any Flow project is touched", () => {
   const r = run(["image", "--prompt-file", join(dir, "p.txt"), "--out", join(dir, "c.png"), "--aspect", "2:1"]);
   assert.equal(r.status, 2);
   assert.equal(r.all.length, 0);
+});
+
+test("the Chrome hider is skipped when gflow runs a background-only Chrome", () => {
+  const home = mkdtempSync(join(dir, "home-"));
+  const cwd = mkdtempSync(join(dir, "cwd-"));
+  const env = { GFLOW_CLI_HOME: home };
+  assert.equal(gflowWindowMode(env, cwd), "offscreen");
+  assert.equal(needsChromeHider("darwin", env, cwd), true);
+  writeFileSync(join(home, ".env"), "# gflow\nGFLOW_CLI_WINDOW_MODE=background\n");
+  assert.equal(gflowWindowMode(env, cwd), "background");
+  assert.equal(needsChromeHider("darwin", env, cwd), false);
+  // gflow's precedence: ./.env beats <home>/.env, the environment beats both
+  writeFileSync(join(cwd, ".env"), "GFLOW_CLI_WINDOW_MODE=offscreen\n");
+  assert.equal(needsChromeHider("darwin", env, cwd), true);
+  assert.equal(needsChromeHider("darwin", { ...env, GFLOW_CLI_WINDOW_MODE: " Background " }, cwd), false);
+  assert.equal(needsChromeHider("win32", { GFLOW_CLI_HOME: home }, cwd), false);
+  assert.equal(needsChromeHider("darwin", { ...env, GFLOW_SHOW: "1" }, cwd), false);
 });
