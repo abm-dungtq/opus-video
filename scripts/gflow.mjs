@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // gflow.mjs — Google Flow (Nano Banana images, Veo / Omni Flash clips) for opus-video, through
-// gflow-cli, the abm-dungtq fork (`uv tool install "git+https://github.com/abm-dungtq/gflow-cli.git@main"`; it adds video --upscale). Node >= 22, no deps.
+// gflow-studio, the abm-dungtq edition of gflow-cli (`uv tool install "git+https://github.com/abm-dungtq/gflow-studio.git@main"`; it adds video --upscale). Node >= 22, no deps.
 //
 //   node gflow.mjs doctor [--profile p]
 //   node gflow.mjs image --prompt-file f.txt --out assets/gen/x.png [--ref a.png ...] [--aspect 9:16]
@@ -233,7 +233,7 @@ function generate(kind, o) {
   const env = { GFLOW_CLI_LEASE_WAIT_SECONDS: "600", ...process.env };
   const r = spawnSync(BIN, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, env });
   hider?.kill();
-  if (r.error) { ledger(project, { id, status: "failed", exit: null, error: r.error.message }); fail(`không chạy được ${BIN}: ${r.error.message}. Cài: uv tool install \"git+https://github.com/abm-dungtq/gflow-cli.git@main\"`, 1); }
+  if (r.error) { ledger(project, { id, status: "failed", exit: null, error: r.error.message }); fail(`không chạy được ${BIN}: ${r.error.message}. Cài: uv tool install \"git+https://github.com/abm-dungtq/gflow-studio.git@main\"`, 1); }
   const files = r.status === 0 ? collect(o, before, kind) : [];
   if (r.status === 0 && !files.length) {
     ledger(project, { id, status: "failed", exit: 0, error: "gflow báo xong nhưng không có file" });
@@ -255,7 +255,7 @@ function generate(kind, o) {
 
 function doctor(o) {
   const v = spawnSync(BIN, ["--version"], { encoding: "utf8" });
-  if (v.error || v.status !== 0) fail('chưa cài gflow-cli: uv tool install "git+https://github.com/abm-dungtq/gflow-cli.git@main" && uvx --from "git+https://github.com/abm-dungtq/gflow-cli.git@main" playwright install chromium', 1);
+  if (v.error || v.status !== 0) fail('chưa cài gflow (gflow-studio): uv tool install "git+https://github.com/abm-dungtq/gflow-studio.git@main" && uvx --from "git+https://github.com/abm-dungtq/gflow-studio.git@main" playwright install chromium', 1);
   console.log(`OK   ${v.stdout.trim()}`);
   const a = spawnSync(BIN, ["auth", "status", ...(o.profile ? ["--profile", o.profile] : [])], { encoding: "utf8" });
   // gflow mixes structlog JSON lines into its output; keep only the human-readable ones.
