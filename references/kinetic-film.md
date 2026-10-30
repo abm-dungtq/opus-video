@@ -36,7 +36,7 @@ Bảng beat là bản thiết kế của phim. Nó nằm trong `STORYBOARD.md`, 
 | 12 | 15 | 66 | bg | `so-lon` | riser kết |
 | 16 | 24 | OPUS VIDEO | bg | `the-logo` | nhạc dừng |
 
-Trong `PLAN.md`, cột "Blueprint/Rule" của mỗi cảnh ghi tên công thức (`chu-dap`, `gach-bo`…). Như vậy người dựng biết khối JS nào cần viết, và người duyệt so được bảng với ảnh tĩnh.
+Trong `PLAN.md`, tên công thức (`chu-dap`, `gach-bo`…) ghi ở đầu cột "Hình / hiệu ứng" của mỗi cảnh. Cột "Blueprint/Rule" chỉ ghi blueprint/rule có thật trong `hyperframes-animation` mà công thức dựa lên (`kinetic-beat-slam`, `kinetic-type-beats`…), vì `check-preflight` chặn mọi tên không có ở đó. Như vậy người dựng biết khối JS nào cần viết, và người duyệt so được bảng với ảnh tĩnh.
 
 ## Ánh xạ cụm câu sang công thức
 
