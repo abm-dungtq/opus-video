@@ -26,7 +26,7 @@ Phim chữ chạy theo beat nhạc 160–175 BPM: chữ khổng lồ đập vào
 <!-- each big word sits in its own full-frame slot: <div id="s-no" class="slot layer"><div id="w-no" class="word">NỔ</div></div> -->
 ```
 
-CSS cần có: `.word { display: inline-block; white-space: nowrap }` (để `fitWord` đo đúng bề rộng chữ, không phải khung chứa) và `.ch { display: inline-block }` (để chữ cái rơi được). `fitWord` đo font đã tải: bọc phần dựng timeline trong một hàm và gọi nó sau `Promise.all([document.fonts.load('900 100px "Archivo"', "CHỮ"), …]).then(dung, dung)`, gán `window.__timelines["main"]` ở cuối hàm đó.
+CSS cần có: `.word { display: inline-block; white-space: nowrap }` (để `fitWord` đo đúng bề rộng chữ, không phải khung chứa), `.ch { display: inline-block }` (để chữ cái rơi được) và mọi phần tử trong `#fx` ẩn sẵn (`position: absolute; opacity: 0`, `.bar` thêm `transform: scaleX(0)`), nếu không vạch chéo `.slash` hiện suốt phim. `fitWord` đo font đã tải: bọc phần dựng timeline trong một hàm và gọi nó sau `Promise.all([document.fonts.load('900 100px "Archivo"', "CHỮ"), …]).then(dung, dung)`, gán `window.__timelines["main"]` ở cuối hàm đó.
 
 ## Hàm dùng chung
 
@@ -69,15 +69,15 @@ const kick = (slot, t, sign = 1) => tl.to(slot, { xPercent: 130 * sign, rotation
 Một chữ đập vào giữa khung bằng `slam`, các chữ cái rơi lần lượt, sau đó trôi 4–6 %/s tới khi rời khung. Biến thể xếp chồng: chữ nhỏ ở trên đáp trước, chữ lớn đập sau nửa beat. Beat danh nghĩa: 1 mỗi chữ.
 
 ```js
-const chuDap = (sel, slot, n, len = 1, kicker, { peak = 1.1, drop = -120, rate = 0.05 } = {}) => {
+const chuDap = (sel, slot, n, len = 1, kicker, { peak = 1.1, drop = -120, rate = 0.05, hook = false } = {}) => {
   const el = $(sel);
   splitChars(el), fitWord(el, (0.88 * W_FRAME) / peak);
   tl.set(slot, { autoAlpha: 1 }, Math.max(0, B(n) - 0.22));
   if (kicker) slam(kicker, B(n), { soft: true, d: 0.1 });
   const at = B(kicker ? n + 0.5 : n), chars = $$(".ch", el);
-  slam(el, at);
-  tl.set(chars, { yPercent: drop }, Math.max(0, at - 0.22));
-  tl.fromTo(chars, { yPercent: drop }, { yPercent: 0, duration: 0.18, ease: "expo.out", stagger: 0.02, immediateRender: false }, at);
+  if (hook) bump(el, at, { s: 1.06 }); // the hook shows from frame 0, so it gets no slam
+  else slam(el, at), tl.set(chars, { yPercent: drop }, Math.max(0, at - 0.22));
+  if (!hook) tl.fromTo(chars, { yPercent: drop }, { yPercent: 0, duration: 0.18, ease: "expo.out", stagger: 0.02, immediateRender: false }, at);
   shake("#cam", at, { amp: 10, n: 5, seed: 7 + Math.round(n * 2) });
   drift(slot, at, B(n + len), rate); // on the slot, so it never fights slam's scale on the word
   kick(slot, B(n + len), n % 2 ? -1 : 1);
@@ -85,15 +85,15 @@ const chuDap = (sel, slot, n, len = 1, kicker, { peak = 1.1, drop = -120, rate =
 chuDap("#w-dung", "#s-dung", 0, 4); // kicker variant: chuDap("#w-video", "#s-video", 4, 4, "#k-mot")
 ```
 
-Chữ hook ở beat 0 phải thấy từ khung 0: để slot và chữ hiện sẵn trong CSS và không `slam` nó (slam luôn bắt đầu từ alpha 0). Kiểm: ảnh tĩnh ở `B(n) + 0.3` cho thấy chữ đã đáp, ở `B(n + len) + 0.1` chữ đã đi; `qc-mp4` không có hold > 0,6 s trong khoảng `B(n)`…`B(n + len)`.
+Chữ hook ở beat 0 phải thấy từ khung 0: để slot và chữ hiện sẵn trong CSS và gọi với `{ hook: true }`, vì `slam` luôn bắt đầu từ alpha 0. Kiểm: ảnh tĩnh ở `B(n) + 0.3` cho thấy chữ đã đáp, ở `B(n + len) + 0.1` chữ đã đi; `qc-mp4` không có hold > 0,6 s trong khoảng `B(n)`…`B(n + len)`.
 
 ### `chuoi-cat`
 
-Chuỗi cú cắt tăng tốc 1, 1, 1, ½, ½, ¼ beat rồi chớp trắng; mỗi cú đổi nền. Dùng ngay trước drop. Beat danh nghĩa: 4–6.
+Chuỗi cú cắt tăng tốc 1, 1, 1, ½, ½, ¼ beat rồi chớp trắng; mỗi cú đổi nền. Dùng ngay trước drop. Beat danh nghĩa: 4–6. Tổng `steps` phải bằng số beat từ `n0` tới drop, để chớp trắng rơi đúng drop.
 
 ```js
-const chuoiCat = (words, n0) => {
-  const steps = [1, 1, 1, 0.5, 0.5, 0.25], grounds = ["var(--bg)", "var(--accent)", "var(--paper)"];
+const chuoiCat = (words, n0, steps = [1, 1, 1, 0.5, 0.5, 0.25]) => {
+  const grounds = ["var(--bg)", "var(--accent)", "var(--paper)"];
   let n = n0;
   words.forEach((sel, i) => {
     const step = steps[Math.min(i, steps.length - 1)];
@@ -106,14 +106,14 @@ const chuoiCat = (words, n0) => {
   flash(B(n), 0.9);
   return n; // the drop beat
 };
-chuoiCat(["#c1", "#c2", "#c3", "#c4", "#c5", "#c6"], 24);
+chuoiCat(["#c1", "#c2", "#c3", "#c4", "#c5", "#c6"], 22, [1.5, 1.5, 1, 1, 0.5, 0.5]); // 6 beats, drop at 28
 ```
 
 Kiểm: ảnh tĩnh ở mỗi `B(n)` của chuỗi có nền khác ảnh trước; khung ở beat trả về là chớp trắng.
 
 ### `gach-bo`
 
-"KHÔNG" đập ở +1 beat; chữ viền (outline) được tô đầy ở +1,5 beat; hình mô phỏng thứ cũ (một thanh timeline, một lưới ô) vỡ hoặc tắt ở +2 beat; kết bằng tắt kiểu TV, ép thành vạch rồi thành điểm. Beat danh nghĩa: 3–4 mỗi mục.
+"KHÔNG" đập ở +1 beat; chữ viền (outline) được tô đầy ở +1,5 beat; hình mô phỏng thứ cũ (một thanh timeline, một lưới ô) vỡ hoặc tắt ở +2 beat; kết bằng tắt kiểu TV, ép thành vạch rồi thành điểm. Beat danh nghĩa: 3–4 mỗi mục. Cảnh dài hơn 4 beat thì giãn mốc (vỡ ở +3, vạch gạch ngang ở +4, tắt TV kết ở +6) và để `drift` chạy trên slot suốt cảnh, nếu không đoạn sau cú vỡ đứng yên quá 0,6 s.
 
 ```js
 const gachBo = (n, no, word, mock) => {
@@ -244,10 +244,10 @@ const theLogo = (n, logo, tagline) => {
   if (end - B(n) > 4) console.warn(`[the-logo] ${(end - B(n)).toFixed(2)} s > 4 s: phần trước 4 s cuối phải trôi ≥ 4 %/s`);
   flipGround(B(n), "var(--bg)");
   tl.fromTo("#fx .bar", { scaleX: 0 }, { scaleX: 1, duration: 0.12, ease: "expo.out", immediateRender: false }, B(n));
-  tl.fromTo("#fx .slash", { xPercent: -150 }, { xPercent: 150, duration: 0.25, ease: "expo.inOut", immediateRender: false }, B(n));
+  tl.fromTo("#fx .slash", { xPercent: -150, autoAlpha: 0.85 }, { xPercent: 1700, duration: 0.25, ease: "expo.inOut", immediateRender: false }, B(n)).set("#fx .slash", { autoAlpha: 0 }, B(n) + 0.26);
   flash(B(n), 0.7);
   shake("#cam", B(n), { amp: 18 });
-  tl.from($$(".part", $(logo)), { autoAlpha: 0, scale: 0.6, duration: 0.3, ease: "back.out(2)", stagger: T.beatLen / 2 }, B(n + 1));
+  tl.fromTo($$(".part", $(logo)), { autoAlpha: 0, scale: 0.6 }, { autoAlpha: 1, scale: 1, duration: 0.3, ease: "back.out(2)", stagger: T.beatLen / 2 }, B(n + 1));
   tl.fromTo(tagline, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.6, ease: "power2.out" }, B(n + 4));
   settleCam("#cam", B(n), end, 0.03);
   tl.fromTo("#fx .shine", { xPercent: -120 }, { xPercent: 120, duration: end - B(n + 2), ease: "none", immediateRender: false }, B(n + 2));
