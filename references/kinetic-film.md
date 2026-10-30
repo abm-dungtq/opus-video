@@ -105,6 +105,13 @@ Số đo hiệu chỉnh (2026-10-30): chữ Archivo 360 px phóng 2 %/s bị tí
 3. Chữ không vượt 88 % bề ngang khung, và không nhỏ hơn 200 px.
 4. Chạy `qc-mp4` trên bản nháp. Dòng `MOTION` ghi đoạn đứng dài nhất và trung vị chuyển động. Nếu nó FAIL, tìm đoạn đó trong bảng beat và thêm chuyển động liên tục, đừng hạ ngưỡng.
 
+## Trường hợp biên khi dựng
+
+- **Chữ Việt dài khi viết hoa.** "KHÔNG CẦN TIMELINE" ở 500 px tràn khung 1920. Gọi `fitWord` cho mọi chữ lớn; nếu nó cảnh báo dưới 200 px, tách cụm thành hai beat. Dấu mũ và dấu nặng làm chữ cao hơn: để `line-height` ≥ 1,05 và chừa 8 % phía trên.
+- **Khổ 9:16.** Cỡ chữ tính theo `--W`, không theo 1920. Xếp cặp chữ trên dưới thay vì trái phải trong khối `html[data-ratio="9x16"]` (xem `references/engine-selection.md`). `whip` trục dọc dài hơn: đổi ±1800 thành ±2600.
+- **Hình do AI vẽ.** Xem ở 100 % để tìm logo thương hiệu thật hoặc chữ rác lọt vào, trước khi đưa vào `tranh-day`.
+- **Số liệu.** Không bịa. `so-lon` chỉ dùng con số người dùng đưa hoặc in ra từ nguồn (ví dụ `styles.mjs validate` in số style profile).
+
 ## Ghi nguồn cảm hứng
 
 Ngữ pháp của style này học từ cách dựng phim chữ kinetic nhịp nhanh, trong đó có skill scenario-kinetic-film của Scenario; opus-video không dùng mã hay văn bản của skill đó.

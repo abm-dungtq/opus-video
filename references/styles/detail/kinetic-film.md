@@ -12,19 +12,21 @@ Phim chữ chạy theo beat nhạc 160–175 BPM: chữ khổng lồ đập vào
 
 ## Fonts
 
-- **Archivo** variable (weight 800–900, width 62–125) cho chữ lớn. Đủ dấu tiếng Việt, giấy phép OFL. Tải từ Google Fonts vào `assets/fonts/` giống cách làm với Be Vietnam Pro trong `references/engine-selection.md`. Trục width là một phần của chuyển động (kéo giãn, ép, lấp bề ngang).
-- **Be Vietnam Pro** 600–700 cho caption và mọi dòng tiếng Việt nhỏ; **JetBrains Mono** 500 cho nhãn và bộ đếm.
-- Không dùng font thiếu dấu: trước khi dựng, thử mỗi font bằng chuỗi `Ánh nắng ơ ư đ ễ ạ ỹ` trong một snapshot.
+**Archivo** variable (weight 800–900, width 62–125; đủ dấu tiếng Việt, OFL; tải từ Google Fonts vào `assets/fonts/` như Be Vietnam Pro trong `references/engine-selection.md`) cho chữ lớn; trục width là một phần của chuyển động. **Be Vietnam Pro** 600–700 cho caption và dòng tiếng Việt nhỏ, **JetBrains Mono** 500 cho nhãn và bộ đếm. Không dùng font thiếu dấu: thử mỗi font bằng chuỗi `Ánh nắng ơ ư đ ễ ạ ỹ` trong một snapshot.
 
 ## Layers (sau ra trước)
 
 `#ground` (màu nền, đổi theo cụm) → `#cam` (wrapper camera: đẩy 4–6 %, nghiêng 0,5–1° mỗi block, lia, rung) → các cảnh → `#fx` (vạch tốc độ, vòng, chớp) → caption → `#flash`. Trong skeleton: `#bg` đổi thành `#ground`, `#cam` bọc `#stage` bên trong `#pulse`, `#fx` nằm ngay sau `#pulse`:
 
 ```html
+<svg width="0" height="0" style="position:absolute"><filter id="smear"><feGaussianBlur id="smear-b" stdDeviation="0 0"/></filter></svg>
 <div id="ground" class="layer"></div>
 <div id="pulse" class="layer"><div id="cam" class="layer" style="perspective:1400px"><div id="stage" class="layer">…</div></div></div>
 <div id="fx" class="layer"><i class="ring"></i><i class="bar"></i><i class="slash"></i><i class="shine"></i></div>
+<!-- each big word sits in its own full-frame slot: <div id="s-no" class="slot layer"><div id="w-no" class="word">NỔ</div></div> -->
 ```
+
+CSS cần có: `.word { display: inline-block; white-space: nowrap }` (để `fitWord` đo đúng bề rộng chữ, không phải khung chứa) và `.ch { display: inline-block }` (để chữ cái rơi được). `fitWord` đo font đã tải: bọc phần dựng timeline trong một hàm và gọi nó sau `Promise.all([document.fonts.load('900 100px "Archivo"', "CHỮ"), …]).then(dung, dung)`, gán `window.__timelines["main"]` ở cuối hàm đó.
 
 ## Hàm dùng chung
 
@@ -32,26 +34,32 @@ Dán khối này sau phần `animation vocabulary` của skeleton (`templates/co
 
 ```js
 const W_FRAME = document.documentElement.clientWidth || 1920;
-// fitWord: measured once at build time; the word never exceeds 88% of the frame width
+// fitWord: measured once fonts are loaded; pass maxW = 0.88 * W_FRAME / peak, peak = the largest scale after landing
 const fitWord = (el, maxW = 0.88 * W_FRAME) => {
   const e = typeof el === "string" ? $(el) : el, size = parseFloat(getComputedStyle(e).fontSize), w = e.getBoundingClientRect().width;
-  const fit = w > maxW ? Math.floor((size * maxW) / w) : size;
-  e.style.fontSize = `${fit}px`;
+  const fit = w > maxW ? Math.floor((size * maxW) / w) : size; e.style.fontSize = `${fit}px`;
   if (fit < 200) console.warn(`[fitWord] ${e.textContent} ${fit}px: tách cụm`);
   return fit;
 };
-// splitChars: one .ch span per letter (counters for xuyen-chu: add .ch-o by hand)
-const splitChars = (el) => { el.innerHTML = Array.from(el.textContent).map((c) => (c === " " ? " " : `<span class="ch">${c}</span>`)).join(""); };
+// splitChars: one .ch span per grapheme (NFC first, so a tone mark never gets its own span); add .ch-o by hand for xuyen-chu
+const seg = new Intl.Segmenter("vi", { granularity: "grapheme" });
+const splitChars = (el) => { el.innerHTML = Array.from(seg.segment(el.textContent.normalize("NFC")), (g) => g.segment).map((c) => (c === " " ? " " : `<span class="ch">${c}</span>`)).join(""); };
 // drift: a landed word grows at `rate` per second (4-6 %/s; slower reads as still in qc-mp4), from scale `from`
 const drift = (el, t0, t1, rate = 0.05, from = 1) => tl.fromTo(el, { scale: from }, { scale: from * (1 + Math.min(0.06, Math.max(0.04, rate)) * Math.max(0.1, t1 - t0)), duration: Math.max(0.1, t1 - t0), ease: "none", immediateRender: false }, t0);
-// whip: the camera flies off-axis with a skew smear; alternate dir between "x" and "y"
+// whip: the camera flies off-axis with a skew smear and a directional blur (#smear); alternate dir between "x" and "y"
 const whip = (t, dir = "x", sign = 1, d = 0.22, skew = dir === "x" ? "skewX" : "skewY") => {
+  const sd = (v) => (dir === "x" ? `${v} 0` : `0 ${v}`);
+  tl.set("#cam", { filter: "url(#smear)" }, t - d / 2).set("#cam", { filter: "none" }, t + d / 2);
+  tl.fromTo("#smear-b", { attr: { stdDeviation: sd(0) } }, { attr: { stdDeviation: sd(60) }, duration: d / 2, ease: "expo.in", immediateRender: false }, t - d / 2);
+  tl.fromTo("#smear-b", { attr: { stdDeviation: sd(60) } }, { attr: { stdDeviation: sd(0) }, duration: d / 2, ease: "expo.out", immediateRender: false }, t);
   tl.to("#cam", { [dir]: -1800 * sign, [skew]: 20 * sign, duration: d / 2, ease: "expo.in" }, t - d / 2);
   tl.fromTo("#cam", { [dir]: 1800 * sign, [skew]: -20 * sign }, { [dir]: 0, [skew]: 0, duration: d / 2, ease: "expo.out", immediateRender: false }, t);
 };
 // flipGround: hard ground change on a downbeat; type follows the ground
 const INK_ON = { "var(--bg)": "var(--ink)", "var(--accent)": "var(--paper-ink)", "var(--paper)": "var(--paper-ink)" };
 const flipGround = (t, color) => tl.set("#ground", { backgroundColor: color }, t).set("#cam", { color: INK_ON[color] || "var(--ink)" }, t);
+// kick: the next word knocks the old slot off-axis on the beat, then it is gone (words never pile up)
+const kick = (slot, t, sign = 1) => tl.to(slot, { xPercent: 130 * sign, rotation: 14 * sign, duration: 0.14, ease: "expo.in", immediateRender: false }, t - 0.1).set(slot, { autoAlpha: 0 }, t + 0.04);
 ```
 
 ## Công thức
@@ -61,21 +69,23 @@ const flipGround = (t, color) => tl.set("#ground", { backgroundColor: color }, t
 Một chữ đập vào giữa khung bằng `slam`, các chữ cái rơi lần lượt, sau đó trôi 4–6 %/s tới khi rời khung. Biến thể xếp chồng: chữ nhỏ ở trên đáp trước, chữ lớn đập sau nửa beat. Beat danh nghĩa: 1 mỗi chữ.
 
 ```js
-const chuDap = (sel, n, len = 1, kicker) => {
+const chuDap = (sel, slot, n, len = 1, kicker, { peak = 1.1, drop = -120, rate = 0.05 } = {}) => {
   const el = $(sel);
-  splitChars(el), fitWord(el);
-  if (kicker) slam(kicker, B(n), { soft: true });
-  const at = B(kicker ? n + 0.5 : n);
+  splitChars(el), fitWord(el, (0.88 * W_FRAME) / peak);
+  tl.set(slot, { autoAlpha: 1 }, Math.max(0, B(n) - 0.22));
+  if (kicker) slam(kicker, B(n), { soft: true, d: 0.1 });
+  const at = B(kicker ? n + 0.5 : n), chars = $$(".ch", el);
   slam(el, at);
-  tl.from($$(".ch", el), { yPercent: -120, autoAlpha: 0, duration: 0.18, ease: "expo.out", stagger: 0.02 }, at);
-  shake("#cam", at, { amp: 10, n: 5 });
-  drift(el, at + 0.6, B(n + len)); // after slam's elastic settle
+  tl.set(chars, { yPercent: drop }, Math.max(0, at - 0.22));
+  tl.fromTo(chars, { yPercent: drop }, { yPercent: 0, duration: 0.18, ease: "expo.out", stagger: 0.02, immediateRender: false }, at);
+  shake("#cam", at, { amp: 10, n: 5, seed: 7 + Math.round(n * 2) });
+  drift(slot, at, B(n + len), rate); // on the slot, so it never fights slam's scale on the word
+  kick(slot, B(n + len), n % 2 ? -1 : 1);
 };
-chuDap("#w-dung", 0, 4);
-chuDap("#w-video", 4, 4, "#k-mot");
+chuDap("#w-dung", "#s-dung", 0, 4); // kicker variant: chuDap("#w-video", "#s-video", 4, 4, "#k-mot")
 ```
 
-Kiểm: ảnh tĩnh ở `B(n) + 0.3` cho thấy chữ đã đáp; `qc-mp4` không có hold > 0,6 s trong khoảng `B(n)`…`B(n + len)`.
+Chữ hook ở beat 0 phải thấy từ khung 0: để slot và chữ hiện sẵn trong CSS và không `slam` nó (slam luôn bắt đầu từ alpha 0). Kiểm: ảnh tĩnh ở `B(n) + 0.3` cho thấy chữ đã đáp, ở `B(n + len) + 0.1` chữ đã đi; `qc-mp4` không có hold > 0,6 s trong khoảng `B(n)`…`B(n + len)`.
 
 ### `chuoi-cat`
 
@@ -111,8 +121,7 @@ const gachBo = (n, no, word, mock) => {
   drift(mock, B(n), B(n + 2));
   slam(no, B(n + 1));
   tl.fromTo(word, { color: "transparent", webkitTextStroke: "4px currentColor" }, { color: "var(--hot)", duration: 0.12, ease: "none" }, B(n + 1.5));
-  const r = rng(n);
-  tl.to($$(".cell", $(mock)), { y: () => 200 + r() * 200, rotation: () => (r() - 0.5) * 60, autoAlpha: 0, duration: 0.3, ease: "power2.in", stagger: 0.015 }, B(n + 2));
+  const r = rng(n); tl.to($$(".cell", $(mock)), { y: () => 200 + r() * 200, rotation: () => (r() - 0.5) * 60, autoAlpha: 0, duration: 0.3, ease: "power2.in", stagger: 0.015 }, B(n + 2));
   // TV switch-off: squash to a line, then to a point
   tl.to(`${no}, ${word}`, { scaleY: 0.02, duration: 0.12, ease: "expo.in" }, B(n + 3) - 0.24).to(`${no}, ${word}`, { scaleX: 0, duration: 0.12, ease: "expo.in" }, B(n + 3) - 0.12);
 };
@@ -148,11 +157,8 @@ const tenNoi = (n, sel, sub, depth = 8) => {
   const el = $(sel);
   fitWord(el);
   for (let i = 1; i <= depth; i++) {
-    const c = el.cloneNode(true);
-    c.removeAttribute("id");
-    c.classList.add("extrude");
-    gsap.set(c, { x: i * 3, y: i * 3, zIndex: -i, color: "var(--hot)", opacity: 1 - i / (depth + 2) });
-    el.parentNode.insertBefore(c, el);
+    const c = Object.assign(el.cloneNode(true), { id: "", className: `${el.className} extrude` });
+    gsap.set(c, { x: i * 3, y: i * 3, zIndex: -i, color: "var(--hot)", opacity: 1 - i / (depth + 2) }), el.parentNode.insertBefore(c, el);
   }
   tl.fromTo(el.parentNode, { z: -2400, autoAlpha: 0, transformPerspective: 1200 }, { z: 0, autoAlpha: 1, duration: T.beatLen, ease: "expo.out" }, B(n));
   tl.fromTo("#fx .shine", { xPercent: -120 }, { xPercent: 120, duration: 2 * T.beatLen, ease: "power2.inOut", immediateRender: false }, B(n + 2));
@@ -177,8 +183,7 @@ const tranhDay = (n, img, words, detail) => {
     slam(w, B(n + 1 + i * 2), { soft: true });
     bump("#cam", B(n + 1 + i * 2), { s: 1.06 }); // punch-in
   });
-  // hard cut to a close-up detail on a beat
-  tl.set(img, { xPercent: detail.x, yPercent: detail.y }, B(n + 6));
+  tl.set(img, { xPercent: detail.x, yPercent: detail.y }, B(n + 6)); // hard cut to a close-up detail
   drift(img, B(n + 6), B(n + 8), 0.06, 2.4);
 };
 tranhDay(40, "#pic", ["#p1", "#p2"], { x: -18, y: 10 });
@@ -252,9 +257,4 @@ theLogo(60, "#logo", "#tagline");
 
 Kiểm: `T.duration - B(n) ≤ 4`; dòng `MOTION` của `qc-mp4` không tính đoạn này vào cổng; nhạc tắt đúng `B(n)` (xem dạng sóng trong `mix-balance.mjs`).
 
-## Trường hợp biên
-
-- **Chữ Việt dài khi viết hoa.** "KHÔNG CẦN TIMELINE" ở 500 px tràn khung 1920. Gọi `fitWord` cho mọi chữ lớn; nếu nó cảnh báo dưới 200 px, tách cụm thành hai beat. Dấu mũ và dấu nặng làm chữ cao hơn: để `line-height` ≥ 1,05 và chừa 8 % phía trên.
-- **Khổ 9:16.** Cỡ chữ tính theo `--W`, không theo 1920. Xếp cặp chữ trên dưới thay vì trái phải trong khối `html[data-ratio="9x16"]` (xem `references/engine-selection.md`). `whip` trục dọc dài hơn: đổi ±1800 thành ±2600.
-- **Hình do AI vẽ.** Xem ở 100 % để tìm logo thương hiệu thật hoặc chữ rác lọt vào, trước khi đưa vào `tranh-day`.
-- **Số liệu.** Không bịa. `so-lon` chỉ dùng con số người dùng đưa hoặc in ra từ nguồn (ví dụ `styles.mjs validate` in số style profile).
+Trường hợp biên (chữ Việt dài, 9:16, hình AI, số liệu): `references/kinetic-film.md`.
