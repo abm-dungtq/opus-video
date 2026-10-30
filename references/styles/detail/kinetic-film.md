@@ -1,0 +1,260 @@
+# Style: kinetic film (chữ nổ theo beat)
+
+Phim chữ chạy theo beat nhạc 160–175 BPM: chữ khổng lồ đập vào mỗi beat, máy lia vụt giữa các câu, nền đổi màu theo cụm và không khung nào đứng yên trước thẻ logo. Chọn style này cho teaser, phim ra mắt và đoạn cắt mạng xã hội. Phương pháp viết chữ và xếp bảng beat nằm ở `references/kinetic-film.md`.
+
+## Tokens
+
+```css
+--bg: #0b1020; --ink: #f3eee3; --accent: #ffc21a; --hot: #ff8a1f;
+--paper: #f3eee3; --paper-ink: #14120e;
+```
+
+`node $OV/scripts/styles.mjs css kinetic-film` in ra cùng khối này. Ba nền: `--bg` tối, `--accent` vàng, `--paper` sáng. Chữ theo nền: `--ink` trên nền tối, `--paper-ink` trên nền sáng và nền accent. `--hot` chỉ tô chữ quan trọng nhất của cụm.
+
+## Fonts
+
+- **Archivo** variable (weight 800–900, width 62–125) cho chữ lớn. Đủ dấu tiếng Việt, giấy phép OFL. Tải từ Google Fonts vào `assets/fonts/` giống cách làm với Be Vietnam Pro trong `references/engine-selection.md`. Trục width là một phần của chuyển động (kéo giãn, ép, lấp bề ngang).
+- **Be Vietnam Pro** 600–700 cho caption và mọi dòng tiếng Việt nhỏ.
+- **JetBrains Mono** 500 cho nhãn và bộ đếm.
+- Không dùng font thiếu dấu: trước khi dựng, thử mỗi font bằng chuỗi `Ánh nắng ơ ư đ ễ ạ ỹ` trong một snapshot.
+
+## Layers (sau ra trước)
+
+`#ground` (màu nền, đổi theo cụm) → `#cam` (wrapper camera: đẩy 4–6 %, nghiêng 0,5–1° mỗi block, lia, rung) → các cảnh → `#fx` (vạch tốc độ, vòng, chớp) → caption → `#flash`.
+
+## Hàm dùng chung
+
+Dán khối này sau phần `animation vocabulary` của skeleton (`templates/composition/index-skeleton.html`). Nó dùng `tl`, `$`, `B`, `slam`, `settleCam` có sẵn. Mọi cảnh nằm trong `#cam`, nên tween trên `#cam` di chuyển cả khung. Thời điểm luôn viết bằng `B(n)`; ở bản có giọng, làm tròn `W()` về beat gần nhất trước.
+
+```js
+const W_FRAME = document.documentElement.clientWidth || 1920;
+// fitWord: measured once at build time; the word never exceeds 88% of the frame width
+const fitWord = (el, maxW = 0.88 * W_FRAME) => {
+  const e = typeof el === "string" ? $(el) : el;
+  const size = parseFloat(getComputedStyle(e).fontSize);
+  const w = e.getBoundingClientRect().width;
+  const fit = w > maxW ? Math.floor((size * maxW) / w) : size;
+  e.style.fontSize = `${fit}px`;
+  if (fit < 200) console.warn(`[fitWord] ${e.textContent} ${fit}px: tách cụm`);
+  return fit;
+};
+// drift: a landed word keeps growing 4-6% across its hold (slower reads as still in qc-mp4)
+const drift = (el, t0, t1, pct = 0.05) => settleCam(el, t0, t1, Math.min(0.06, Math.max(0.04, pct)));
+// whip: the camera flies off-axis with a skew smear; alternate dir between "x" and "y"
+const whip = (t, dir = "x", sign = 1, d = 0.22) => {
+  const skew = dir === "x" ? "skewX" : "skewY";
+  tl.to("#cam", { [dir]: -1800 * sign, [skew]: 20 * sign, duration: d / 2, ease: "expo.in" }, t - d / 2);
+  tl.fromTo("#cam", { [dir]: 1800 * sign, [skew]: -20 * sign }, { [dir]: 0, [skew]: 0, duration: d / 2, ease: "expo.out", immediateRender: false }, t);
+};
+// flipGround: hard ground change on a downbeat; type follows the ground
+const INK_ON = { "var(--bg)": "var(--ink)", "var(--accent)": "var(--paper-ink)", "var(--paper)": "var(--paper-ink)" };
+const flipGround = (t, color) => {
+  tl.set("#ground", { backgroundColor: color }, t);
+  tl.set("#cam", { color: INK_ON[color] || "var(--ink)" }, t);
+};
+```
+
+## Công thức
+
+### `chu-dap`
+
+Một chữ đập vào giữa khung bằng `slam`, các chữ cái rơi lần lượt, sau đó trôi 4–6 %/s tới khi rời khung. Biến thể xếp chồng: chữ nhỏ ở trên đáp trước, chữ lớn đập sau nửa beat. Beat danh nghĩa: 1 mỗi chữ.
+
+```js
+const chuDap = (sel, n, len = 1, kicker) => {
+  const el = $(sel);
+  fitWord(el);
+  if (kicker) slam(kicker, B(n), { soft: true });
+  const at = B(kicker ? n + 0.5 : n);
+  slam(el, at);
+  tl.from($$(".ch", el), { yPercent: -120, autoAlpha: 0, duration: 0.18, ease: "expo.out", stagger: 0.02 }, at);
+  shake("#cam", at, { amp: 10, n: 5 });
+  drift(el, at + 0.2, B(n + len));
+};
+chuDap("#w-dung", 0, 4);
+chuDap("#w-video", 4, 4, "#k-mot");
+```
+
+Kiểm: ảnh tĩnh ở `B(n) + 0.3` cho thấy chữ đã đáp; `qc-mp4` không có hold > 0,6 s trong khoảng `B(n)`…`B(n + len)`.
+
+### `chuoi-cat`
+
+Chuỗi cú cắt tăng tốc 1, 1, 1, ½, ½, ¼ beat rồi chớp trắng; mỗi cú đổi nền. Dùng ngay trước drop. Beat danh nghĩa: 4–6.
+
+```js
+const chuoiCat = (words, n0) => {
+  const steps = [1, 1, 1, 0.5, 0.5, 0.25];
+  const grounds = ["var(--bg)", "var(--accent)", "var(--paper)"];
+  let n = n0;
+  words.forEach((sel, i) => {
+    const step = steps[Math.min(i, steps.length - 1)];
+    flipGround(B(n), grounds[i % 3]);
+    tl.set(sel, { autoAlpha: 1, scale: 1 }, B(n));
+    tl.to(sel, { scale: 1.06, duration: step * T.beatLen, ease: "none" }, B(n));
+    tl.set(sel, { autoAlpha: 0 }, B(n + step));
+    n += step;
+  });
+  flash(B(n), 0.9);
+  return n; // the drop beat
+};
+chuoiCat(["#c1", "#c2", "#c3", "#c4", "#c5", "#c6"], 24);
+```
+
+Kiểm: ảnh tĩnh ở mỗi `B(n)` của chuỗi có nền khác ảnh trước; khung ở beat trả về là chớp trắng.
+
+### `gach-bo`
+
+"KHÔNG" đập ở +1 beat; chữ viền (outline) được tô đầy ở +1,5 beat; hình mô phỏng thứ cũ (một thanh timeline, một lưới ô) vỡ hoặc tắt ở +2 beat; kết bằng tắt kiểu TV, ép thành vạch rồi thành điểm. Beat danh nghĩa: 3–4 mỗi mục.
+
+```js
+const gachBo = (n, no, word, mock) => {
+  tl.fromTo(mock, { autoAlpha: 1, scale: 1 }, { scale: 1.05, duration: 2 * T.beatLen, ease: "none" }, B(n));
+  slam(no, B(n + 1));
+  tl.fromTo(word, { color: "transparent", webkitTextStroke: "4px currentColor" }, { color: "var(--hot)", duration: 0.12, ease: "none" }, B(n + 1.5));
+  const r = rng(n);
+  tl.to($$(".cell", $(mock)), { y: () => 200 + r() * 200, rotation: () => (r() - 0.5) * 60, autoAlpha: 0, duration: 0.3, ease: "power2.in", stagger: 0.015 }, B(n + 2));
+  // TV switch-off: squash to a line, then to a point
+  tl.to(`${no}, ${word}`, { scaleY: 0.02, duration: 0.12, ease: "expo.in" }, B(n + 3) - 0.24);
+  tl.to(`${no}, ${word}`, { scaleX: 0, duration: 0.12, ease: "expo.in" }, B(n + 3) - 0.12);
+};
+gachBo(8, "#no", "#w-timeline", "#mock-timeline");
+```
+
+Độ lệch của từng ô lấy từ `rng(seed)`, không từ `Math.random`, để mọi lần render giống nhau. Kiểm: ảnh tĩnh ở `B(n + 2)` thấy chữ đã tô đầy; ở `B(n + 3) - 0.1` chỉ còn một vạch.
+
+### `so-lon`
+
+Một con số khổng lồ quay bằng `odo`, nhãn nhỏ JetBrains Mono, một vòng lan ra. Số phải do người dùng hoặc nguồn cung cấp, không bịa. Beat danh nghĩa: 3.
+
+```js
+const soLon = (n, sel, label) => {
+  tl.set(sel, { autoAlpha: 1 }, B(n));
+  odo(sel, B(n), { d: 2 * T.beatLen });
+  bump(sel, B(n + 2), { s: 1.1 });
+  tl.fromTo("#fx .ring", { scale: 0.2, autoAlpha: 0.9 }, { scale: 3, autoAlpha: 0, duration: 0.6, ease: "expo.out" }, B(n + 2));
+  typeIn(label, B(n + 1));
+  drift(sel, B(n + 2), B(n + 3), 0.06);
+};
+soLon(12, "#n-styles", "#n-label"); // <span class="odo" data-value="66"></span>
+```
+
+Kiểm: ảnh tĩnh ở `B(n + 2)` đọc đúng con số trong nguồn; vòng chỉ xuất hiện ở beat đó.
+
+### `ten-noi`
+
+Tên sản phẩm bay ra từ chiều sâu, 6–10 bản sao lệch làm khối nổi, quét sáng một lần; dòng phụ gõ bằng `typeIn`. Beat danh nghĩa: 6–8.
+
+```js
+const tenNoi = (n, sel, sub, depth = 8) => {
+  const el = $(sel);
+  fitWord(el);
+  for (let i = 1; i <= depth; i++) {
+    const c = el.cloneNode(true);
+    c.removeAttribute("id");
+    c.classList.add("extrude");
+    gsap.set(c, { x: i * 3, y: i * 3, zIndex: -i, color: "var(--hot)", opacity: 1 - i / (depth + 2) });
+    el.parentNode.insertBefore(c, el);
+  }
+  tl.fromTo(el.parentNode, { z: -2400, autoAlpha: 0 }, { z: 0, autoAlpha: 1, duration: T.beatLen, ease: "expo.out" }, B(n));
+  tl.fromTo(".shine", { xPercent: -120 }, { xPercent: 120, duration: 2 * T.beatLen, ease: "power2.inOut" }, B(n + 2));
+  typeIn(sub, B(n + 4));
+  drift(el.parentNode, B(n + 1), B(n + 8), 0.05);
+};
+tenNoi(32, "#t-name", "#t-sub");
+```
+
+Kiểm: ảnh tĩnh ở `B(n + 1)` thấy khối nổi; dòng phụ đọc trọn ở `B(n + 6)`.
+
+### `tranh-day`
+
+Tranh phủ khung, tối đi bằng lớp tint 0,25–0,4; máy đẩy và lia; mỗi chữ đè lên là một cú punch-in, có một cú cắt cận vào chi tiết trên beat. Tranh rộng ít nhất 2048 px. Beat danh nghĩa: 6–8.
+
+```js
+const tranhDay = (n, img, words, detail) => {
+  tl.set(img, { autoAlpha: 1 }, B(n));
+  tl.fromTo(img, { scale: 1.05, xPercent: -2 }, { scale: 1.12, xPercent: 2, duration: 8 * T.beatLen, ease: "none" }, B(n));
+  tl.set(".tint", { opacity: 0.32 }, B(n));
+  words.forEach((w, i) => {
+    slam(w, B(n + 1 + i * 2), { soft: true });
+    bump("#cam", B(n + 1 + i * 2), { s: 1.06 }); // punch-in
+  });
+  // hard cut to a close-up detail on a beat
+  tl.set(img, { scale: 2.4, xPercent: detail.x, yPercent: detail.y }, B(n + 6));
+  drift(img, B(n + 6), B(n + 8), 0.06);
+};
+tranhDay(40, "#pic", ["#p1", "#p2"], { x: -18, y: 10 });
+```
+
+Kiểm: chữ đọc được trên tranh ở mọi beat có chữ (tint đủ tối); ảnh tĩnh ở `B(n + 6)` là cú cận.
+
+### `chuoi-diem`
+
+Ba chữ đặt xa nhau trong một thế giới; máy chạy theo một sao chổi sáng từ điểm này sang điểm kia; mỗi điểm đáp kèm vòng; cuối cùng lùi ra thấy cả chuỗi. Beat danh nghĩa: 10–12.
+
+```js
+const chuoiDiem = (n, pts) => {
+  // pts: [{ sel, x, y }] in world px inside #world; the camera centres on each in turn
+  pts.forEach((p, i) => {
+    const t = B(n + i * 3);
+    tl.to("#world", { x: -p.x, y: -p.y, duration: 2 * T.beatLen, ease: "power3.inOut" }, t - 2 * T.beatLen);
+    tl.to(".comet", { x: p.x, y: p.y, duration: 2 * T.beatLen, ease: "power3.inOut" }, t - 2 * T.beatLen);
+    slam(p.sel, t);
+    tl.fromTo("#fx .ring", { scale: 0.2, autoAlpha: 0.8 }, { scale: 2.5, autoAlpha: 0, duration: 0.5, ease: "expo.out" }, t);
+  });
+  // pull back to show the whole chain
+  tl.to("#world", { x: 0, y: 0, scale: 0.42, duration: 2 * T.beatLen, ease: "expo.inOut" }, B(n + 9));
+  settleCam("#world", B(n + 11), B(n + 12), 0.04);
+};
+chuoiDiem(48, [{ sel: "#d1", x: 0, y: 0 }, { sel: "#d2", x: 2600, y: -900 }, { sel: "#d3", x: 5200, y: 400 }]);
+```
+
+Kiểm: ảnh tĩnh ở `B(n)`, `B(n + 3)`, `B(n + 6)` mỗi ảnh có đúng một chữ ở giữa; ở `B(n + 11)` thấy cả ba.
+
+### `xuyen-chu`
+
+Máy lao vào lòng một chữ có lỗ (O, D, A, B, P, R, 0) cho tới khi lòng chữ thành khung tiếp theo. Beat danh nghĩa: 1.
+
+```js
+const xuyenChu = (n, letter, next) => {
+  // transformOrigin = the centre of the counter, measured once at build time
+  const r = $(letter).getBoundingClientRect(), c = $("#cam").getBoundingClientRect();
+  const ox = r.left - c.left + r.width / 2, oy = r.top - c.top + r.height * 0.52;
+  tl.to("#cam", { scale: 40, transformOrigin: `${ox}px ${oy}px`, duration: T.beatLen, ease: "expo.in" }, B(n) - T.beatLen);
+  tl.set("#cam", { scale: 1, transformOrigin: "50% 50%" }, B(n));
+  tl.set(next, { autoAlpha: 1 }, B(n));
+  tl.from(next, { scale: 0.6, duration: 0.3, ease: "expo.out" }, B(n));
+};
+xuyenChu(20, "#w-opus .ch-o", "#scene-next");
+```
+
+Kiểm: khung ngay trước `B(n)` toàn màu nền bên trong lòng chữ (không lộ mép chữ).
+
+### `the-logo`
+
+Gói trong 4 giây cuối (`tail_s: 4` của `motion_gate`). Vạch sáng, nét chéo và cú đánh trên beat 1; logo hiện từng phần; tagline mờ vào, chỗ duy nhất trong phim được fade; máy đẩy chậm và quét sáng tới hết. Nhạc dừng ở beat 1. Beat danh nghĩa: 8–11.
+
+```js
+const theLogo = (n, logo, tagline) => {
+  const end = T.duration;
+  if (end - B(n) > 4) console.warn(`[the-logo] ${(end - B(n)).toFixed(2)} s > 4 s: phần trước 4 s cuối phải trôi ≥ 4 %/s`);
+  flipGround(B(n), "var(--bg)");
+  tl.fromTo("#fx .bar", { scaleX: 0 }, { scaleX: 1, duration: 0.12, ease: "expo.out" }, B(n));
+  tl.fromTo("#fx .slash", { xPercent: -150 }, { xPercent: 150, duration: 0.25, ease: "expo.inOut" }, B(n));
+  flash(B(n), 0.7);
+  shake("#cam", B(n), { amp: 18 });
+  tl.from($$(".part", $(logo)), { autoAlpha: 0, scale: 0.6, duration: 0.3, ease: "back.out(2)", stagger: T.beatLen / 2 }, B(n + 1));
+  tl.fromTo(tagline, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.6, ease: "power2.out" }, B(n + 4));
+  settleCam("#cam", B(n), end, 0.03);
+  tl.fromTo(".shine", { xPercent: -120 }, { xPercent: 120, duration: end - B(n + 2), ease: "none" }, B(n + 2));
+};
+theLogo(60, "#logo", "#tagline");
+```
+
+Kiểm: `T.duration - B(n) ≤ 4`; dòng `MOTION` của `qc-mp4` không tính đoạn này vào cổng; nhạc tắt đúng `B(n)` (xem dạng sóng trong `mix-balance.mjs`).
+
+## Trường hợp biên
+
+- **Chữ Việt dài khi viết hoa.** "KHÔNG CẦN TIMELINE" ở 500 px tràn khung 1920. Gọi `fitWord` cho mọi chữ lớn; nếu nó cảnh báo dưới 200 px, tách cụm thành hai beat. Dấu mũ và dấu nặng làm chữ cao hơn: để `line-height` ≥ 1,05 và chừa 8 % phía trên.
+- **Khổ 9:16.** Cỡ chữ tính theo `--W`, không theo 1920. Xếp cặp chữ trên dưới thay vì trái phải trong khối `html[data-ratio="9x16"]` (xem `references/engine-selection.md`). `whip` trục dọc dài hơn: đổi ±1800 thành ±2600.
+- **Hình do AI vẽ.** Xem ở 100 % để tìm logo thương hiệu thật hoặc chữ rác lọt vào, trước khi đưa vào `tranh-day`.
+- **Số liệu.** Không bịa. `so-lon` chỉ dùng con số người dùng đưa hoặc in ra từ nguồn (ví dụ `styles.mjs validate` in số style profile).

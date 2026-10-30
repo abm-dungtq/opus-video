@@ -172,6 +172,7 @@
     "athletic-impact",
     "extreme-energy"
   ],
+  "detail": "references/styles/detail/kinetic-film.md",
   "motion_gate": {
     "max_hold_s": 0.6,
     "tail_s": 4

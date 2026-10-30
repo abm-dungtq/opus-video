@@ -23,7 +23,7 @@ Không đọc cả thư mục `data/styles/`. Đọc theo thứ tự:
 
 1. `data/styles/index.json`: mỗi dòng một style (`id, ten_vi, name, family, aliases, energy, best_for, summary, mo_ta_vi, depth, engine`). Đủ để chọn. `engine` là `hyperframes` với hầu hết style; `lemo-canvas` nghĩa là hình vẽ bằng engine lemo trên một canvas dưới DOM.
 2. Đúng một profile `data/styles/<id>.json` cho style nền, thêm một profile cho mỗi lớp mượn thật sự dùng.
-3. `references/styles/detail/<id>.md` khi `depth` là `reference` (hiện có `glass-keynote`, `comic-multiverse`, `cinematic-product-launch`): token, lớp, thành phần và trường hợp biên từ một bản đã làm xong.
+3. `references/styles/detail/<id>.md` khi `depth` là `reference` (hiện có `glass-keynote`, `comic-multiverse`, `cinematic-product-launch`, `kinetic-film`): token, lớp, thành phần và trường hợp biên từ một bản đã làm xong.
 4. Style có `engine: lemo-canvas`: đọc thêm `references/lemo-canvas.md`. Profile có trường `lemo: { style, kind }` trỏ tới danh mục `data/lemo/styles.json`; `styles.mjs show` in lệnh `lemo.mjs add` cần chạy, và `resolve --project` cảnh báo khi `index.html` chưa có lớp đó.
 
 Lệnh tra cứu:

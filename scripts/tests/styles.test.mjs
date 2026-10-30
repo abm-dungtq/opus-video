@@ -38,7 +38,7 @@ test("every profile has a Vietnamese name and description; validate passes; inde
   assert.deepEqual(Object.keys(rows[0]), ["id", "ten_vi", "name", "family", "aliases", "energy", "best_for", "summary", "mo_ta_vi", "depth", "engine"]);
   assert.deepEqual(rows.map((r) => r.id), [...rows.map((r) => r.id)].sort());
   assert.equal(text.trim().split("\n").length, Object.keys(profiles).length + 2, "one line per style plus the brackets");
-  assert.deepEqual(rows.filter((r) => r.depth === "reference").map((r) => r.id), ["cinematic-product-launch", "comic-multiverse", "glass-keynote"]);
+  assert.deepEqual(rows.filter((r) => r.depth === "reference").map((r) => r.id), ["cinematic-product-launch", "comic-multiverse", "glass-keynote", "kinetic-film"]);
 });
 
 test("validate reports broken profiles and a stale index", () => {
