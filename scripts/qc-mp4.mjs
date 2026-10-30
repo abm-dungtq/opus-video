@@ -23,6 +23,10 @@
 //              and peak < 1.5 (em: ≥ 75% and < 1.0); WARN when still ≥ 45% or peak < 2.0 (em: ≥ 60%
 //              or < 1.2). Otherwise WARN at the FAIL line only. Fix by building beats with
 //              continuous motion (build/RECIPES.md).
+//              Style hold gate: when BRIEF style_profile declares motion_gate, FAIL if the longest
+//              run of still frames (YDIF < 0.5 at 30 fps) outside the last tail_s seconds exceeds
+//              max_hold_s. Calibration 2026-10-30: a 1 s flat hold measures 29 frames; type drifting
+//              2 %/s counts 22/59 frames still, 5 %/s none.
 // --project <dir>  read <dir>/BRIEF.md frontmatter (aspect, duration_s, direction, energy).
 // --draft          the file is a draft (make-demo --animatic, 540 px short edge): ASPECT only
 //                  compares the ratio, not the exact size.
@@ -38,6 +42,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
+import { motionGate } from "./styles.mjs";
 
 export const LIMITS = {
   blackStart: 0.1, blackTail: 0.2, freezeMin: 2, silenceMin: 1.5, silentFileSlack: 0.25,
@@ -46,17 +51,34 @@ export const LIMITS = {
   motionFail: { default: { still: 0.6, peak: 1.5 }, em: { still: 0.75, peak: 1.0 } },
   motionWarn: { default: { still: 0.45, peak: 2.0 }, em: { still: 0.6, peak: 1.2 } },
 };
-export const MOTION_VF = "scale=360:-2,fps=30,signalstats,metadata=print:key=lavfi.signalstats.YDIF";
+export const MOTION_FPS = 30;
+export const MOTION_VF = `scale=360:-2,fps=${MOTION_FPS},signalstats,metadata=print:key=lavfi.signalstats.YDIF`;
 export const SIZES = { "16:9": [1920, 1080], "9:16": [1080, 1920] };
 
-// metadata=print lines "lavfi.signalstats.YDIF=0.12" → { frames, still, ratio, peak } (first frame
-// has no previous frame and is skipped; peak = 90th percentile YDIF); null when nothing printed.
+// metadata=print lines "lavfi.signalstats.YDIF=0.12" → { frames, still, ratio, peak, median, holds }
+// (first frame has no previous frame and is skipped; peak = 90th percentile YDIF; holds = every run
+// of consecutive still frames as { start, frames }); null when nothing printed.
 export function parseMotion(stderr) {
   const v = [...String(stderr).matchAll(/lavfi\.signalstats\.YDIF=(-?\d+(?:\.\d+)?)/g)].map((m) => Number(m[1])).slice(1);
   if (!v.length) return null;
   const still = v.filter((x) => x < LIMITS.stillYdif).length;
   const sorted = [...v].sort((a, b) => a - b);
-  return { frames: v.length, still, ratio: still / v.length, peak: sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.9))] };
+  const holds = [];
+  let run = null;
+  v.forEach((x, i) => {
+    if (x < LIMITS.stillYdif) { if (run) run.frames++; else holds.push((run = { start: i, frames: 1 })); }
+    else run = null;
+  });
+  return { frames: v.length, still, ratio: still / v.length, peak: sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.9))], median: sorted[Math.floor(sorted.length / 2)], holds };
+}
+
+// Longest still run in seconds, ignoring the last `tailS` seconds (end cards may rest there).
+export function longestHold(motion, tailS = 0) {
+  if (!motion || !Array.isArray(motion.holds) || !motion.holds.length) return 0;
+  const limit = motion.frames - Math.round(tailS * MOTION_FPS);
+  let best = 0;
+  for (const h of motion.holds) best = Math.max(best, Math.max(0, Math.min(h.start + h.frames, limit) - h.start));
+  return best / MOTION_FPS;
 }
 
 // → { level: PASS|WARN|FAIL, detail } for a motion measurement and BRIEF frontmatter (or null).
@@ -65,13 +87,21 @@ export const QUICK_MODE = /^nhanh theo case\s+(\S+)/i;
 
 export function motionVerdict(motion, brief) {
   if (!motion) return { level: "WARN", detail: "không đo được chuyển động (signalstats)" };
+  const styleId = brief && brief.style_profile ? String(brief.style_profile).trim() : "";
+  const gate = styleId ? motionGate(styleId) : null;
+  const hasHolds = Array.isArray(motion.holds);
+  if (gate && hasHolds) {
+    const hold = longestHold(motion, gate.tail_s);
+    if (hold > gate.max_hold_s) return { level: "FAIL", detail: `đoạn đứng yên dài nhất ${hold.toFixed(2)} s, quá ${gate.max_hold_s} s của style ${styleId} (không tính ${gate.tail_s} s cuối) — thêm chuyển động liên tục: chữ trôi 4–6 %/s, máy đẩy nhẹ, lia vụt (references/styles/detail/kinetic-film.md)` };
+  }
   const quick = !!(brief && QUICK_MODE.test(String(brief.creative_override || "").trim()));
   const creative = quick || !!(brief && brief.direction && !brief.creative_override);
   const key = brief && String(brief.energy || "").trim() === "em" ? "em" : "default";
   const fail = LIMITS.motionFail[key], warn = LIMITS.motionWarn[key];
   const pct = (x) => `${Math.round(x * 100)}%`;
   const peak = Number(motion.peak) || 0;
-  const detail = `${pct(motion.ratio)} khung gần như đứng yên (${motion.still}/${motion.frames}), đỉnh chuyển động ${peak.toFixed(2)}; ngưỡng ${creative ? `FAIL ≥${pct(fail.still)} và đỉnh <${fail.peak}, WARN ≥${pct(warn.still)} hoặc đỉnh <${warn.peak}` : `WARN ≥${pct(fail.still)} và đỉnh <${fail.peak} (chưa có direction)`}`;
+  const holdNote = hasHolds ? `; đứng dài nhất ${longestHold(motion, gate ? gate.tail_s : 0).toFixed(2)} s, trung vị ${Number(motion.median).toFixed(2)}` : "";
+  const detail = `${pct(motion.ratio)} khung gần như đứng yên (${motion.still}/${motion.frames}), đỉnh chuyển động ${peak.toFixed(2)}; ngưỡng ${creative ? `FAIL ≥${pct(fail.still)} và đỉnh <${fail.peak}, WARN ≥${pct(warn.still)} hoặc đỉnh <${warn.peak}` : `WARN ≥${pct(fail.still)} và đỉnh <${fail.peak} (chưa có direction)`}${holdNote}`;
   if (motion.ratio >= fail.still && peak < fail.peak) return { level: creative ? "FAIL" : "WARN", detail: `${detail} — trông như slideshow, dựng lại beat có chuyển động liền mạch (build/RECIPES.md)` };
   if (creative && (motion.ratio >= warn.still || peak < warn.peak)) return { level: "WARN", detail };
   return { level: "PASS", detail };

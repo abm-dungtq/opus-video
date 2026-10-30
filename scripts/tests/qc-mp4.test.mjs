@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseBlack, parseFreeze, parseSilence, parseEbur, evaluate, summarize } from "../qc-mp4.mjs";
+import { parseBlack, parseFreeze, parseSilence, parseEbur, parseMotion, longestHold, motionVerdict, measureMotion, evaluate, summarize } from "../qc-mp4.mjs";
 
 const CLI = fileURLToPath(new URL("../qc-mp4.mjs", import.meta.url));
 
@@ -205,5 +205,45 @@ test("CLI: --project without BRIEF.md exits 2", { skip: !hasFfmpeg && "ffmpeg no
     const f = join(d, "a.mp4");
     ff(["-f", "lavfi", "-i", "testsrc=d=1", f]);
     assert.equal(cli([f, "--project", d]).status, 2);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+const ydif = (xs) => xs.map((x) => `[Parsed_metadata_3 @ 0x1] lavfi.signalstats.YDIF=${x}`).join("\n");
+
+test("parseMotion records every still run and the median", () => {
+  const m = parseMotion(ydif([9, ...Array(10).fill(2), ...Array(20).fill(0.1), ...Array(10).fill(2)]));
+  assert.deepEqual(m.holds, [{ start: 10, frames: 20 }]);
+  assert.equal(typeof m.median, "number");
+});
+
+test("longestHold measures seconds at 30 fps and ignores the tail", () => {
+  const m = { frames: 40, holds: [{ start: 30, frames: 10 }] };
+  assert.ok(Math.abs(longestHold(m, 0) - 10 / 30) < 1e-9);
+  assert.ok(Math.abs(longestHold(m, 0.2) - 4 / 30) < 1e-9);
+});
+
+test("motionVerdict fails a long hold only for a style with a motion gate", () => {
+  const m = { frames: 300, still: 30, ratio: 0.1, peak: 3, median: 2, holds: [{ start: 10, frames: 30 }] };
+  const v = motionVerdict(m, { style_profile: "kinetic-film" });
+  assert.equal(v.level, "FAIL");
+  assert.match(v.detail, /đoạn đứng yên dài nhất 1\.00 s/);
+  assert.notEqual(motionVerdict({ ...m, holds: [{ start: 10, frames: 15 }] }, { style_profile: "kinetic-film" }).level, "FAIL");
+  const long = { frames: 300, still: 60, ratio: 0.2, peak: 3, median: 2, holds: [{ start: 0, frames: 300 }] };
+  assert.equal(motionVerdict(long, { style_profile: "glass-keynote", direction: "A1" }).level, motionVerdict(long, { direction: "A1" }).level);
+});
+
+test("hold gate on real video: 1 s flat hold fails kinetic-film, 0.4 s passes", { skip: !hasFfmpeg && "ffmpeg not found" }, () => {
+  const d = mkdtempSync(join(tmpdir(), "qc-mp4-hold-"));
+  const make = (f, hold, total) => ff(["-filter_complex", `testsrc2=s=640x360:r=30:d=3,rotate=a=t*2[a];color=c=0x203040:s=640x360:r=30:d=${hold}[b];testsrc2=s=640x360:r=30:d=5,rotate=a=t*2[c];[a][b][c]concat=n=3:v=1:a=0,format=yuv420p`, "-c:v", "libx264", "-t", String(total), f]);
+  try {
+    const bad = join(d, "kf-hold.mp4");
+    make(bad, 1, 9);
+    const m = measureMotion(bad);
+    const frames = longestHold(m, 0) * 30;
+    assert.ok(frames >= 27 && frames <= 31, `longest hold ${frames} frames`);
+    assert.equal(motionVerdict(m, { style_profile: "kinetic-film" }).level, "FAIL");
+    const ok = join(d, "kf-short.mp4");
+    make(ok, 0.4, 8.4);
+    assert.notEqual(motionVerdict(measureMotion(ok), { style_profile: "kinetic-film" }).level, "FAIL");
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
