@@ -32,7 +32,7 @@ description: "Bước 1b của opus-video: gợi ý 2–3 phong cách lemo-opusc
 - **Ghi lựa chọn:** người dùng trả lời `2` hoặc `2, chuyển cảnh: lao-xuyen-tam, nhịp: em`. Chạy `node $OV/scripts/make-pitch.mjs choose --project . --pick 2 [--transition lao-xuyen-tam] [--energy em] [--style …] [--visual …] [--effect …] [--sfx …] [--palette …]`. Exit **3** = phối không hợp: hỏi người dùng **một lần** kèm lý do; họ vẫn giữ thì chạy lại với `--accept-warnings`. Script ghi vào `BRIEF.md`: `direction`, `direction_swaps`, `energy`, `palette`, `word_budget`, `music_only_s`, `creative_selection`, `styleframe` và mục `## creative_direction`.
 - **Chạy không dừng:** chỉ khi người dùng nói rõ, dùng `choose --auto` (hướng 1, ghi `creative_selection: auto`) và vẫn gửi PITCH.md trong báo cáo cuối.
 - Styleframe được chọn là **cảnh mở đầu** của video thật (dựng tiếp ở bước 6, `ov-build`), không phải đồ bỏ đi.
-- **Style** (trục thứ hai, độc lập với hướng): `choose` ghi `style_profile:` theo styleframe đã chọn; đổi bằng `--style-profile <id|alias>`, tìm bằng `styles.mjs find "<từ khoá>"`. Chỉ đọc `data/styles/index.json` và đúng một profile. Phối style theo cảnh: `$OV/references/style-system.md`.
+- **Style** (trục thứ hai, độc lập với hướng): `choose` ghi `style_profile:` theo styleframe đã chọn; đổi bằng `--style-profile <id|alias>`, tìm bằng `styles.mjs find "<từ khoá>"`. Chỉ đọc `data/styles/index.json` và đúng một profile. Phối style theo cảnh: `$OV/references/style-system.md`. Brief là teaser hoặc phim ra mắt nhịp nhanh theo nhạc thì thử `kinetic-film` (chữ nổ theo beat, 160–175 BPM): đọc `$OV/references/kinetic-film.md` trước khi viết kịch bản.
 
 Sau bước này: viết kịch bản theo hướng đã chọn (`ov-script`), vì kịch bản viết **sau** khi đã có hướng.
 
@@ -46,6 +46,6 @@ Sau bước này: viết kịch bản theo hướng đã chọn (`ov-script`), v
 | `$OV/scripts/lemo-pick.mjs` | Bước 1b: `rank` (Jev xếp hạng 59 phong cách lemo-opuscar theo brief, thiếu key hay lỗi thì xếp theo từ khoá), `choose` (ghi `lemo_style` hoặc `lemo_ref`, `lemo_search` và ghi công) |
 | `$OV/references/lemo-canvas.md` | Lớp canvas lemo, cách chọn phong cách, giấy phép và ghi công |
 | `$OV/scripts/recipe-pack.mjs` | Bước 1b (và 6): gom blueprint/rule/seam theo hướng thành `RECIPES.md` |
-| `$OV/references/style-system.md` | Bước 1b và 4b: 64 style, `style_profile`, `## style_layers`, luật resolve theo cảnh (`styles.mjs`) |
+| `$OV/references/style-system.md` | Bước 1b và 4b: 66 style, `style_profile`, `## style_layers`, luật resolve theo cảnh (`styles.mjs`) |
 | `$OV/scripts/styles.mjs` | `find`, `show`, `suggest --direction`, `resolve --project` (cú pháp ở `--help`) |
 | `$OV/scripts/brand.mjs` | `make-pitch` tự đọc brand kit (màu, font, logo, hướng bị cấm) |
