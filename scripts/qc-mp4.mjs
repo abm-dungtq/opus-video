@@ -92,7 +92,7 @@ export function motionVerdict(motion, brief) {
   const hasHolds = Array.isArray(motion.holds);
   if (gate && hasHolds) {
     const hold = longestHold(motion, gate.tail_s);
-    if (hold > gate.max_hold_s) return { level: "FAIL", detail: `đoạn đứng yên dài nhất ${hold.toFixed(2)} s, quá ${gate.max_hold_s} s của style ${styleId} (không tính ${gate.tail_s} s cuối) — thêm chuyển động liên tục: chữ trôi 4–6 %/s, máy đẩy nhẹ, lia vụt (references/styles/detail/kinetic-film.md)` };
+    if (hold > gate.max_hold_s) return { level: "FAIL", detail: `đoạn đứng yên dài nhất ${hold.toFixed(2)} s, quá ${gate.max_hold_s} s của style ${styleId} (không tính ${gate.tail_s} s cuối) — thêm chuyển động liên tục: chữ trôi 4–6 %/s, máy đẩy nhẹ, lia vụt (công thức trong references/styles/detail/)` };
   }
   const quick = !!(brief && QUICK_MODE.test(String(brief.creative_override || "").trim()));
   const creative = quick || !!(brief && brief.direction && !brief.creative_override);

@@ -167,15 +167,14 @@ export function lookup(name, profiles) {
   throw new StyleError(`unknown style "${name}"; nearest: ${near.join(", ") || "none"}`, 2);
 }
 
-// motion_gate of a style (id or alias) → { max_hold_s, tail_s }; null when the style is unknown or has none.
+// motion_gate of a style (id or alias) → { max_hold_s, tail_s }; null when the style is unknown or has
+// none. A broken styles folder throws: a gate must not switch off silently.
 export function motionGate(name, profiles) {
-  try {
-    const all = profiles || loadProfiles();
-    const g = all[lookup(name, all)].motion_gate;
-    return g ? { max_hold_s: g.max_hold_s, tail_s: g.tail_s } : null;
-  } catch {
-    return null;
-  }
+  const all = profiles || loadProfiles();
+  let id;
+  try { id = lookup(name, all); } catch { return null; }
+  const g = all[id].motion_gate;
+  return g ? { max_hold_s: g.max_hold_s, tail_s: g.tail_s } : null;
 }
 
 export function buildIndex(profiles) {

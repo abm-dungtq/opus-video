@@ -313,7 +313,7 @@ function checkAnimatic({ dir, fm, out, errors, warnings, motion, probe, legacyMt
       try { m = motion(animPath); } catch (e) { errors.push(`cannot measure motion of ${anim}: ${e.message}`); }
       if (m !== undefined) {
         const v = motionVerdict(m, fm);
-        out[key === "animatic" ? "motion" : "motion_9x16"] = { ...m, level: v.level };
+        out[key === "animatic" ? "motion" : "motion_9x16"] = { ...m, holds: undefined, level: v.level }; // holds can run to hundreds of runs
         if (v.level === "FAIL") errors.push(`animatic ${anim}: ${v.detail}`);
         else if (v.level === "WARN") warnings.push(`animatic ${anim}: ${v.detail}`);
       }

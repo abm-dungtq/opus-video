@@ -5,8 +5,7 @@ Phim chữ chạy theo beat nhạc 160–175 BPM: chữ khổng lồ đập vào
 ## Tokens
 
 ```css
---bg: #0b1020; --ink: #f3eee3; --accent: #ffc21a; --hot: #ff8a1f;
---paper: #f3eee3; --paper-ink: #14120e;
+--bg: #0b1020; --ink: #f3eee3; --accent: #ffc21a; --hot: #ff8a1f; --paper: #f3eee3; --paper-ink: #14120e;
 ```
 
 `node $OV/scripts/styles.mjs css kinetic-film` in ra cùng khối này. Ba nền: `--bg` tối, `--accent` vàng, `--paper` sáng. Chữ theo nền: `--ink` trên nền tối, `--paper-ink` trên nền sáng và nền accent. `--hot` chỉ tô chữ quan trọng nhất của cụm.
@@ -14,44 +13,45 @@ Phim chữ chạy theo beat nhạc 160–175 BPM: chữ khổng lồ đập vào
 ## Fonts
 
 - **Archivo** variable (weight 800–900, width 62–125) cho chữ lớn. Đủ dấu tiếng Việt, giấy phép OFL. Tải từ Google Fonts vào `assets/fonts/` giống cách làm với Be Vietnam Pro trong `references/engine-selection.md`. Trục width là một phần của chuyển động (kéo giãn, ép, lấp bề ngang).
-- **Be Vietnam Pro** 600–700 cho caption và mọi dòng tiếng Việt nhỏ.
-- **JetBrains Mono** 500 cho nhãn và bộ đếm.
+- **Be Vietnam Pro** 600–700 cho caption và mọi dòng tiếng Việt nhỏ; **JetBrains Mono** 500 cho nhãn và bộ đếm.
 - Không dùng font thiếu dấu: trước khi dựng, thử mỗi font bằng chuỗi `Ánh nắng ơ ư đ ễ ạ ỹ` trong một snapshot.
 
 ## Layers (sau ra trước)
 
-`#ground` (màu nền, đổi theo cụm) → `#cam` (wrapper camera: đẩy 4–6 %, nghiêng 0,5–1° mỗi block, lia, rung) → các cảnh → `#fx` (vạch tốc độ, vòng, chớp) → caption → `#flash`.
+`#ground` (màu nền, đổi theo cụm) → `#cam` (wrapper camera: đẩy 4–6 %, nghiêng 0,5–1° mỗi block, lia, rung) → các cảnh → `#fx` (vạch tốc độ, vòng, chớp) → caption → `#flash`. Trong skeleton: `#bg` đổi thành `#ground`, `#cam` bọc `#stage` bên trong `#pulse`, `#fx` nằm ngay sau `#pulse`:
+
+```html
+<div id="ground" class="layer"></div>
+<div id="pulse" class="layer"><div id="cam" class="layer" style="perspective:1400px"><div id="stage" class="layer">…</div></div></div>
+<div id="fx" class="layer"><i class="ring"></i><i class="bar"></i><i class="slash"></i><i class="shine"></i></div>
+```
 
 ## Hàm dùng chung
 
-Dán khối này sau phần `animation vocabulary` của skeleton (`templates/composition/index-skeleton.html`). Nó dùng `tl`, `$`, `B`, `slam`, `settleCam` có sẵn. Mọi cảnh nằm trong `#cam`, nên tween trên `#cam` di chuyển cả khung. Thời điểm luôn viết bằng `B(n)`; ở bản có giọng, làm tròn `W()` về beat gần nhất trước.
+Dán khối này sau phần `animation vocabulary` của skeleton (`templates/composition/index-skeleton.html`). Nó dùng `tl`, `$`, `$$`, `B`, `slam`, `settleCam` có sẵn. Tween trên phần tử chung (`#fx`, `#cam`) dùng `immediateRender: false`, như `flash`, để không hiện từ khung 0. Mọi cảnh nằm trong `#cam`, nên tween trên `#cam` di chuyển cả khung. Thời điểm luôn viết bằng `B(n)`; ở bản có giọng, làm tròn `W()` về beat gần nhất trước.
 
 ```js
 const W_FRAME = document.documentElement.clientWidth || 1920;
 // fitWord: measured once at build time; the word never exceeds 88% of the frame width
 const fitWord = (el, maxW = 0.88 * W_FRAME) => {
-  const e = typeof el === "string" ? $(el) : el;
-  const size = parseFloat(getComputedStyle(e).fontSize);
-  const w = e.getBoundingClientRect().width;
+  const e = typeof el === "string" ? $(el) : el, size = parseFloat(getComputedStyle(e).fontSize), w = e.getBoundingClientRect().width;
   const fit = w > maxW ? Math.floor((size * maxW) / w) : size;
   e.style.fontSize = `${fit}px`;
   if (fit < 200) console.warn(`[fitWord] ${e.textContent} ${fit}px: tách cụm`);
   return fit;
 };
-// drift: a landed word keeps growing 4-6% across its hold (slower reads as still in qc-mp4)
-const drift = (el, t0, t1, pct = 0.05) => settleCam(el, t0, t1, Math.min(0.06, Math.max(0.04, pct)));
+// splitChars: one .ch span per letter (counters for xuyen-chu: add .ch-o by hand)
+const splitChars = (el) => { el.innerHTML = Array.from(el.textContent).map((c) => (c === " " ? " " : `<span class="ch">${c}</span>`)).join(""); };
+// drift: a landed word grows at `rate` per second (4-6 %/s; slower reads as still in qc-mp4), from scale `from`
+const drift = (el, t0, t1, rate = 0.05, from = 1) => tl.fromTo(el, { scale: from }, { scale: from * (1 + Math.min(0.06, Math.max(0.04, rate)) * Math.max(0.1, t1 - t0)), duration: Math.max(0.1, t1 - t0), ease: "none", immediateRender: false }, t0);
 // whip: the camera flies off-axis with a skew smear; alternate dir between "x" and "y"
-const whip = (t, dir = "x", sign = 1, d = 0.22) => {
-  const skew = dir === "x" ? "skewX" : "skewY";
+const whip = (t, dir = "x", sign = 1, d = 0.22, skew = dir === "x" ? "skewX" : "skewY") => {
   tl.to("#cam", { [dir]: -1800 * sign, [skew]: 20 * sign, duration: d / 2, ease: "expo.in" }, t - d / 2);
   tl.fromTo("#cam", { [dir]: 1800 * sign, [skew]: -20 * sign }, { [dir]: 0, [skew]: 0, duration: d / 2, ease: "expo.out", immediateRender: false }, t);
 };
 // flipGround: hard ground change on a downbeat; type follows the ground
 const INK_ON = { "var(--bg)": "var(--ink)", "var(--accent)": "var(--paper-ink)", "var(--paper)": "var(--paper-ink)" };
-const flipGround = (t, color) => {
-  tl.set("#ground", { backgroundColor: color }, t);
-  tl.set("#cam", { color: INK_ON[color] || "var(--ink)" }, t);
-};
+const flipGround = (t, color) => tl.set("#ground", { backgroundColor: color }, t).set("#cam", { color: INK_ON[color] || "var(--ink)" }, t);
 ```
 
 ## Công thức
@@ -63,13 +63,13 @@ Một chữ đập vào giữa khung bằng `slam`, các chữ cái rơi lần l
 ```js
 const chuDap = (sel, n, len = 1, kicker) => {
   const el = $(sel);
-  fitWord(el);
+  splitChars(el), fitWord(el);
   if (kicker) slam(kicker, B(n), { soft: true });
   const at = B(kicker ? n + 0.5 : n);
   slam(el, at);
   tl.from($$(".ch", el), { yPercent: -120, autoAlpha: 0, duration: 0.18, ease: "expo.out", stagger: 0.02 }, at);
   shake("#cam", at, { amp: 10, n: 5 });
-  drift(el, at + 0.2, B(n + len));
+  drift(el, at + 0.6, B(n + len)); // after slam's elastic settle
 };
 chuDap("#w-dung", 0, 4);
 chuDap("#w-video", 4, 4, "#k-mot");
@@ -83,8 +83,7 @@ Chuỗi cú cắt tăng tốc 1, 1, 1, ½, ½, ¼ beat rồi chớp trắng; m�
 
 ```js
 const chuoiCat = (words, n0) => {
-  const steps = [1, 1, 1, 0.5, 0.5, 0.25];
-  const grounds = ["var(--bg)", "var(--accent)", "var(--paper)"];
+  const steps = [1, 1, 1, 0.5, 0.5, 0.25], grounds = ["var(--bg)", "var(--accent)", "var(--paper)"];
   let n = n0;
   words.forEach((sel, i) => {
     const step = steps[Math.min(i, steps.length - 1)];
@@ -108,14 +107,14 @@ Kiểm: ảnh tĩnh ở mỗi `B(n)` của chuỗi có nền khác ảnh trướ
 
 ```js
 const gachBo = (n, no, word, mock) => {
-  tl.fromTo(mock, { autoAlpha: 1, scale: 1 }, { scale: 1.05, duration: 2 * T.beatLen, ease: "none" }, B(n));
+  tl.set(mock, { autoAlpha: 1 }, B(n));
+  drift(mock, B(n), B(n + 2));
   slam(no, B(n + 1));
   tl.fromTo(word, { color: "transparent", webkitTextStroke: "4px currentColor" }, { color: "var(--hot)", duration: 0.12, ease: "none" }, B(n + 1.5));
   const r = rng(n);
   tl.to($$(".cell", $(mock)), { y: () => 200 + r() * 200, rotation: () => (r() - 0.5) * 60, autoAlpha: 0, duration: 0.3, ease: "power2.in", stagger: 0.015 }, B(n + 2));
   // TV switch-off: squash to a line, then to a point
-  tl.to(`${no}, ${word}`, { scaleY: 0.02, duration: 0.12, ease: "expo.in" }, B(n + 3) - 0.24);
-  tl.to(`${no}, ${word}`, { scaleX: 0, duration: 0.12, ease: "expo.in" }, B(n + 3) - 0.12);
+  tl.to(`${no}, ${word}`, { scaleY: 0.02, duration: 0.12, ease: "expo.in" }, B(n + 3) - 0.24).to(`${no}, ${word}`, { scaleX: 0, duration: 0.12, ease: "expo.in" }, B(n + 3) - 0.12);
 };
 gachBo(8, "#no", "#w-timeline", "#mock-timeline");
 ```
@@ -131,9 +130,9 @@ const soLon = (n, sel, label) => {
   tl.set(sel, { autoAlpha: 1 }, B(n));
   odo(sel, B(n), { d: 2 * T.beatLen });
   bump(sel, B(n + 2), { s: 1.1 });
-  tl.fromTo("#fx .ring", { scale: 0.2, autoAlpha: 0.9 }, { scale: 3, autoAlpha: 0, duration: 0.6, ease: "expo.out" }, B(n + 2));
+  tl.fromTo("#fx .ring", { scale: 0.2, autoAlpha: 0.9 }, { scale: 3, autoAlpha: 0, duration: 0.6, ease: "expo.out", immediateRender: false }, B(n + 2));
   typeIn(label, B(n + 1));
-  drift(sel, B(n + 2), B(n + 3), 0.06);
+  drift(sel, B(n + 2) + 0.4, B(n + 3), 0.06); // after the bump
 };
 soLon(12, "#n-styles", "#n-label"); // <span class="odo" data-value="66"></span>
 ```
@@ -155,8 +154,8 @@ const tenNoi = (n, sel, sub, depth = 8) => {
     gsap.set(c, { x: i * 3, y: i * 3, zIndex: -i, color: "var(--hot)", opacity: 1 - i / (depth + 2) });
     el.parentNode.insertBefore(c, el);
   }
-  tl.fromTo(el.parentNode, { z: -2400, autoAlpha: 0 }, { z: 0, autoAlpha: 1, duration: T.beatLen, ease: "expo.out" }, B(n));
-  tl.fromTo(".shine", { xPercent: -120 }, { xPercent: 120, duration: 2 * T.beatLen, ease: "power2.inOut" }, B(n + 2));
+  tl.fromTo(el.parentNode, { z: -2400, autoAlpha: 0, transformPerspective: 1200 }, { z: 0, autoAlpha: 1, duration: T.beatLen, ease: "expo.out" }, B(n));
+  tl.fromTo("#fx .shine", { xPercent: -120 }, { xPercent: 120, duration: 2 * T.beatLen, ease: "power2.inOut", immediateRender: false }, B(n + 2));
   typeIn(sub, B(n + 4));
   drift(el.parentNode, B(n + 1), B(n + 8), 0.05);
 };
@@ -172,15 +171,15 @@ Tranh phủ khung, tối đi bằng lớp tint 0,25–0,4; máy đẩy và lia; 
 ```js
 const tranhDay = (n, img, words, detail) => {
   tl.set(img, { autoAlpha: 1 }, B(n));
-  tl.fromTo(img, { scale: 1.05, xPercent: -2 }, { scale: 1.12, xPercent: 2, duration: 8 * T.beatLen, ease: "none" }, B(n));
+  tl.fromTo(img, { scale: 1.05, xPercent: -2 }, { scale: 1.12, xPercent: 2, duration: 6 * T.beatLen, ease: "none" }, B(n));
   tl.set(".tint", { opacity: 0.32 }, B(n));
   words.forEach((w, i) => {
     slam(w, B(n + 1 + i * 2), { soft: true });
     bump("#cam", B(n + 1 + i * 2), { s: 1.06 }); // punch-in
   });
   // hard cut to a close-up detail on a beat
-  tl.set(img, { scale: 2.4, xPercent: detail.x, yPercent: detail.y }, B(n + 6));
-  drift(img, B(n + 6), B(n + 8), 0.06);
+  tl.set(img, { xPercent: detail.x, yPercent: detail.y }, B(n + 6));
+  drift(img, B(n + 6), B(n + 8), 0.06, 2.4);
 };
 tranhDay(40, "#pic", ["#p1", "#p2"], { x: -18, y: 10 });
 ```
@@ -199,11 +198,11 @@ const chuoiDiem = (n, pts) => {
     tl.to("#world", { x: -p.x, y: -p.y, duration: 2 * T.beatLen, ease: "power3.inOut" }, t - 2 * T.beatLen);
     tl.to(".comet", { x: p.x, y: p.y, duration: 2 * T.beatLen, ease: "power3.inOut" }, t - 2 * T.beatLen);
     slam(p.sel, t);
-    tl.fromTo("#fx .ring", { scale: 0.2, autoAlpha: 0.8 }, { scale: 2.5, autoAlpha: 0, duration: 0.5, ease: "expo.out" }, t);
+    tl.fromTo("#fx .ring", { scale: 0.2, autoAlpha: 0.8 }, { scale: 2.5, autoAlpha: 0, duration: 0.5, ease: "expo.out", immediateRender: false }, t);
   });
   // pull back to show the whole chain
   tl.to("#world", { x: 0, y: 0, scale: 0.42, duration: 2 * T.beatLen, ease: "expo.inOut" }, B(n + 9));
-  settleCam("#world", B(n + 11), B(n + 12), 0.04);
+  drift("#world", B(n + 11), B(n + 12), 0.05, 0.42);
 };
 chuoiDiem(48, [{ sel: "#d1", x: 0, y: 0 }, { sel: "#d2", x: 2600, y: -900 }, { sel: "#d3", x: 5200, y: 400 }]);
 ```
@@ -216,13 +215,14 @@ Máy lao vào lòng một chữ có lỗ (O, D, A, B, P, R, 0) cho tới khi lò
 
 ```js
 const xuyenChu = (n, letter, next) => {
-  // transformOrigin = the centre of the counter, measured once at build time
-  const r = $(letter).getBoundingClientRect(), c = $("#cam").getBoundingClientRect();
-  const ox = r.left - c.left + r.width / 2, oy = r.top - c.top + r.height * 0.52;
+  // transformOrigin = the counter's centre in layout px (offsets ignore tweened transforms)
+  const el = $(letter);
+  if (!el) throw new Error(`xuyen-chu: ${letter} not found (splitChars, then add .ch-o)`);
+  let ox = el.offsetWidth / 2, oy = el.offsetHeight * 0.52;
+  for (let e = el; e && e.id !== "cam"; e = e.offsetParent) { ox += e.offsetLeft; oy += e.offsetTop; }
   tl.to("#cam", { scale: 40, transformOrigin: `${ox}px ${oy}px`, duration: T.beatLen, ease: "expo.in" }, B(n) - T.beatLen);
   tl.set("#cam", { scale: 1, transformOrigin: "50% 50%" }, B(n));
-  tl.set(next, { autoAlpha: 1 }, B(n));
-  tl.from(next, { scale: 0.6, duration: 0.3, ease: "expo.out" }, B(n));
+  tl.fromTo(next, { autoAlpha: 1, scale: 0.6 }, { scale: 1, duration: 0.3, ease: "expo.out", immediateRender: false }, B(n));
 };
 xuyenChu(20, "#w-opus .ch-o", "#scene-next");
 ```
@@ -231,21 +231,21 @@ Kiểm: khung ngay trước `B(n)` toàn màu nền bên trong lòng chữ (khô
 
 ### `the-logo`
 
-Gói trong 4 giây cuối (`tail_s: 4` của `motion_gate`). Vạch sáng, nét chéo và cú đánh trên beat 1; logo hiện từng phần; tagline mờ vào, chỗ duy nhất trong phim được fade; máy đẩy chậm và quét sáng tới hết. Nhạc dừng ở beat 1. Beat danh nghĩa: 8–11.
+Gói trong 4 giây cuối (`tail_s: 4` của `motion_gate`). Vạch sáng, nét chéo và cú đánh trên beat 1; logo hiện từng phần; tagline mờ vào, chỗ duy nhất trong phim được fade; máy đẩy chậm và quét sáng tới hết. Nhạc dừng ở beat 1. Beat danh nghĩa: 8–10 (≤ 4 s ở 160 BPM).
 
 ```js
 const theLogo = (n, logo, tagline) => {
   const end = T.duration;
   if (end - B(n) > 4) console.warn(`[the-logo] ${(end - B(n)).toFixed(2)} s > 4 s: phần trước 4 s cuối phải trôi ≥ 4 %/s`);
   flipGround(B(n), "var(--bg)");
-  tl.fromTo("#fx .bar", { scaleX: 0 }, { scaleX: 1, duration: 0.12, ease: "expo.out" }, B(n));
-  tl.fromTo("#fx .slash", { xPercent: -150 }, { xPercent: 150, duration: 0.25, ease: "expo.inOut" }, B(n));
+  tl.fromTo("#fx .bar", { scaleX: 0 }, { scaleX: 1, duration: 0.12, ease: "expo.out", immediateRender: false }, B(n));
+  tl.fromTo("#fx .slash", { xPercent: -150 }, { xPercent: 150, duration: 0.25, ease: "expo.inOut", immediateRender: false }, B(n));
   flash(B(n), 0.7);
   shake("#cam", B(n), { amp: 18 });
   tl.from($$(".part", $(logo)), { autoAlpha: 0, scale: 0.6, duration: 0.3, ease: "back.out(2)", stagger: T.beatLen / 2 }, B(n + 1));
   tl.fromTo(tagline, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.6, ease: "power2.out" }, B(n + 4));
   settleCam("#cam", B(n), end, 0.03);
-  tl.fromTo(".shine", { xPercent: -120 }, { xPercent: 120, duration: end - B(n + 2), ease: "none" }, B(n + 2));
+  tl.fromTo("#fx .shine", { xPercent: -120 }, { xPercent: 120, duration: end - B(n + 2), ease: "none", immediateRender: false }, B(n + 2));
 };
 theLogo(60, "#logo", "#tagline");
 ```

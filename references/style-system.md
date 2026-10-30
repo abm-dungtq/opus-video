@@ -1,11 +1,11 @@
-# Hệ style với 64 profile, chọn theo từng cảnh
+# Hệ style với 66 profile, chọn theo từng cảnh
 
 Một video của opus-video có hai trục chọn độc lập:
 
 | Trục | Quyết định | Nguồn | Ghi vào BRIEF |
 |---|---|---|---|
 | **Hướng** (A1–A8) | Cách kể bằng hình: khối biến hình, khung lệnh, máy quay lướt, bản đồ… Blueprint, rule, seam, luật chống slideshow | `data/directions.json`, `references/creative-directions.md` | `direction:` |
-| **Style** (64 profile) | Giao diện: màu, chữ, bố cục, chất liệu, texture, camera, chuyển cảnh, nhịp, phản ứng theo beat, UI, sơ đồ, nhân vật, caption, âm thanh | `data/styles/<id>.json`, `data/styles/index.json` | `style_profile:` và `## style_layers` |
+| **Style** (66 profile) | Giao diện: màu, chữ, bố cục, chất liệu, texture, camera, chuyển cảnh, nhịp, phản ứng theo beat, UI, sơ đồ, nhân vật, caption, âm thanh | `data/styles/<id>.json`, `data/styles/index.json` | `style_profile:` và `## style_layers` |
 
 Cùng hướng A2 (gõ lệnh, máy bung kết quả) có thể mặc `precision-dark-product` (nền gần đen, viền mảnh) hoặc `terminal-ops` (cả khung là terminal). Đổi style không đổi cách kể; đổi hướng không đổi bảng màu.
 

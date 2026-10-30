@@ -60,7 +60,7 @@ Thay đổi lớn nhất của phim (nền đổi sang accent lần đầu, tran
 
 1. Đo nhạc bằng `beat-grid.mjs` (`ov-audio`). Lệnh trả `beat0`, `beatLen` và vị trí drop.
 2. Chọn beat bắt đầu phim sao cho drop rơi đúng beat đã định trong bảng. Nếu drop ở beat 64 mà bảng muốn tên sản phẩm ở beat 32, cắt nhạc vào từ beat 32.
-3. Chạy `beat-fit.mjs --project . --tight` như hướng `tu-nhac`, đọc bảng nó in, rồi chạy lại với `--apply`.
+3. Chạy `beat-fit.mjs --project .` (bản có giọng thêm `--tight`, như hướng `tu-nhac`), đọc bảng nó in, rồi chạy lại với `--apply`.
 
 Trước drop là `chuoi-cat` và một riser. Sau drop có vòng lan và vạch tốc độ, và chỉ ở drop mới có.
 
@@ -72,7 +72,7 @@ Trước drop là `chuoi-cat` và một riser. Sau drop có vòng lan và vạch
 | Đoạn đứng dài nhất, ngoài 4 s cuối | ≤ 0,6 s | `qc-mp4` MOTION, cổng `motion_gate` của style |
 | Số cú cắt mỗi 10 s | 9–13 | đếm trong bảng beat |
 
-Cổng `motion_gate` của profile là `{ max_hold_s: 0.6, tail_s: 4 }`: `qc-mp4` báo FAIL khi có một đoạn khung đứng yên (YDIF < 0,5 ở 30 fps, bề ngang 360 px) dài quá 0,6 s trước 4 giây cuối. Bốn giây cuối dành cho thẻ logo.
+Cổng `motion_gate` của profile là `{ max_hold_s: 0.6, tail_s: 4 }`: `qc-mp4` báo FAIL khi có một đoạn khung đứng yên (YDIF < 0,5 ở 30 fps, bề ngang 360 px) dài quá 0,6 s trước 4 giây cuối. Bốn giây cuối dành cho thẻ logo. Cổng đọc `style_profile` nền và áp cho cả video, kể cả cảnh mượn lớp style khác.
 
 Số đo hiệu chỉnh (2026-10-30): chữ Archivo 360 px phóng 2 %/s bị tính là đứng ở 22/59 khung; phóng 5 %/s thì không khung nào bị tính. Vì vậy chữ đã đáp phải tiếp tục trôi 4–6 %/s (công thức `drift`) hoặc trượt khoảng 70 px/s. Chữ đáp xong rồi đứng im là lỗi thường gặp nhất của style này.
 
