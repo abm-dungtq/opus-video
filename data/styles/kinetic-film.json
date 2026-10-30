@@ -1,0 +1,179 @@
+{
+  "id": "kinetic-film",
+  "name": "Kinetic Film",
+  "ten_vi": "Chữ nổ theo beat",
+  "mo_ta_vi": "Chữ khổng lồ đập theo từng phách nhạc nhanh, máy lia vụt giữa các câu, nền đổi màu và không khung nào đứng yên.",
+  "family": "aesthetic",
+  "aliases": [
+    "kinetic film",
+    "kinetic teaser",
+    "beat type teaser",
+    "chu no theo beat"
+  ],
+  "summary": "Beat-locked kinetic type at 160-175 BPM; huge words every beat, whip pans, ground flips, a hard drop.",
+  "energy": 5,
+  "best_for": [
+    "launch-teaser",
+    "game-teaser",
+    "social-cut",
+    "brand-promo"
+  ],
+  "character": "The music is the clock: every beat brings one new thing (a word, a ground colour, a cut, a hit). Words fill the frame width, keep drifting after they land, and leave by a camera move, never a fade. Only the closing logo card may rest.",
+  "dimensions": {
+    "palette": {
+      "mode": "mixed",
+      "colors": {
+        "bg": "#0b1020",
+        "ink": "#f3eee3",
+        "accent": "#ffc21a",
+        "hot": "#ff8a1f",
+        "paper": "#f3eee3",
+        "paperInk": "#14120e"
+      },
+      "rule": "Three grounds: dark bg, brand accent, light paper. Flip the ground on every phrase change; type follows the ground (ink on dark, paperInk on light and accent). Accent colours only the word that matters."
+    },
+    "typography": [
+      "Archivo variable, weight 800-900, uppercase, 300-600 px on a 1920 frame; width axis 62-125 is part of the motion (stretch, squeeze, fill a width)",
+      "Measure every word once while visible and scale it to at most 88% of the frame width; if it must shrink below 200 px, split the phrase",
+      "JetBrains Mono 500 for small labels and counters",
+      "Be Vietnam Pro 600-700 for captions and any small Vietnamese line"
+    ],
+    "layout": [
+      "One idea centred per beat; big type stays clear of the caption band",
+      "Stacked pairs: a small kicker over a big word, or a big word sliding in beside a small one half a beat later",
+      "A picture, when used, fills the frame and is darkened (tint 0.25-0.4) under its words"
+    ],
+    "material": [
+      "Flat type; optional 3D extrusion built from 6-10 offset copies in a darker accent",
+      "Outline-only words for something not yet true, filled on the beat it becomes true"
+    ],
+    "texture": [
+      "Light baked grain PNG at 4-6%",
+      "Speed lines and a ring only on the drop and the title"
+    ],
+    "camera": [
+      "A camera wrapper always moves: 4-6% push and 0.5-1 deg roll across each block",
+      "Whip pans between shots, alternating horizontal and vertical, 0.18-0.25 s with a directional blur smear",
+      "Zoom through the hole of a letter (O, D, A, B, P, R, 0) into the next block",
+      "Small shake and scale bump on hits"
+    ],
+    "transitions": [
+      "whip pan with directional blur smear",
+      "zoom through a letter counter",
+      "collapse to a point, the next element grows from it",
+      "TV switch-off squash to a line then a point",
+      "hard ground flip on a downbeat"
+    ],
+    "pacing": {
+      "bpm": [
+        160,
+        175
+      ],
+      "rhythm": "Beat-locked: one new element every beat or half beat; runs of cuts accelerate 1, 1, 1, 1/2, 1/2, 1/4 beat then a flash. With a voice-over, words still land on the nearest beat to their spoken onset."
+    },
+    "beat_response": [
+      "Every downbeat brings a word, a ground flip or a cut",
+      "Landed words keep scaling 4-6% per second or sliding about 70 px/s (slower drift measures as still in qc-mp4)",
+      "Big hits: flash, shake, scale bump; ring and speed lines only on the drop"
+    ],
+    "ui_choreography": [
+      "UI appears only as a quick mock that a word strikes out (a timeline, a tile grid, a server rack), then dies on the next beat"
+    ],
+    "diagrams": [
+      "Numbers as one giant figure rolling on a slot reel, one every 3 beats",
+      "Input to output as three words far apart in one world, the camera riding a glowing comet between them"
+    ],
+    "character_motion": [
+      "No mascot; letters tumble in one by one, stretch on the width axis and squash on hits"
+    ],
+    "captions": [
+      "Optional karaoke line top left, Be Vietnam Pro 700 34 px; switch to ink colour on light grounds; drop it when the big type already shows the same words"
+    ],
+    "sound": [
+      "Instrumental drum and bass, phonk or breakbeat at 160-175 BPM with a clear drop; music stops dead on the logo hit",
+      "Every cut has a sound: hit on beats, whoosh on whips, riser into the drop, key clicks for typed text; hits sit above the music"
+    ]
+  },
+  "scene_types": {
+    "prefer": [
+      "hook",
+      "title",
+      "stats",
+      "montage",
+      "cta",
+      "outro"
+    ],
+    "avoid": [
+      "ui-demo",
+      "terminal",
+      "code",
+      "diagram"
+    ]
+  },
+  "signature_moves": [
+    {
+      "name": "Một chữ một phách",
+      "technique": "each beat or half beat brings one new word filling the frame width, landing with a slam and then drifting",
+      "numbers": {
+        "words_per_beat": [
+          1,
+          2
+        ],
+        "type_px": [
+          300,
+          600
+        ],
+        "drift_pct_per_s": [
+          4,
+          6
+        ]
+      },
+      "check": "contact sheet at beat times shows a different word or ground on each beat"
+    },
+    {
+      "name": "Lia vụt",
+      "technique": "whip pan of the camera wrapper with directional blur between shots, alternating axes",
+      "numbers": {
+        "duration_s": [
+          0.18,
+          0.25
+        ]
+      },
+      "check": "the last frame before each cut is still blurred"
+    },
+    {
+      "name": "Không khung nào đứng",
+      "technique": "camera drift, sliding type, ghost rows or particles keep every frame moving until the logo card",
+      "numbers": {
+        "max_hold_s": 0.6
+      },
+      "check": "qc-mp4 MOTION reports no hold above motion_gate.max_hold_s before the tail"
+    },
+    "Ground flips dark, accent, paper on phrase changes"
+  ],
+  "strengths": [
+    "Highest energy per second",
+    "Needs almost no assets beyond music and words",
+    "Rebrands by changing three colours"
+  ],
+  "constraints": [
+    "No still stretch longer than 0.6 s before the logo card",
+    "Every entrance timed with B(n) beats, never typed seconds",
+    "On-screen numbers come from the user or the source, never invented",
+    "No fades except the small lines of the logo card"
+  ],
+  "avoid": [
+    "Crossfades and slide-up-and-fade",
+    "More than two words on screen at once outside the logo card",
+    "Long sentences: split any phrase that would shrink type below 200 px"
+  ],
+  "pairs_well_with": [
+    "kinetic-typography",
+    "athletic-impact",
+    "extreme-energy"
+  ],
+  "motion_gate": {
+    "max_hold_s": 0.6,
+    "tail_s": 4
+  }
+}
