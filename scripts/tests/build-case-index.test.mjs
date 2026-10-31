@@ -40,3 +40,12 @@ test("rebuild without --yihui-commit exits 2", () => {
   assert.equal(r.status, 2);
   assert.match(r.stderr, /--yihui-commit/);
 });
+
+test("data/cases.jsonl matches the upstream commits recorded in data/SOURCES.md", () => {
+  const sources = readFileSync(fileURLToPath(new URL("../../data/SOURCES.md", import.meta.url)), "utf8");
+  const commit = (repo) => sources.match(new RegExp(`${repo}\\s*\\|\\s*([0-9a-f]{7,})`))?.[1];
+  const want = { y: commit("yihui-dev/awesome-opus5-5-videos"), c: commit("chuspeeism/awesome-opus-5-5-videos") };
+  assert.ok(want.y && want.c, "SOURCES.md names both commits");
+  const rows = readFileSync(fileURLToPath(new URL("../../data/cases.jsonl", import.meta.url)), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  for (const r of rows.filter((x) => !x.upstream_removed)) assert.ok(r.source.endsWith(`@${want[r.id[0]]}`), `${r.id} from ${r.source}`);
+});

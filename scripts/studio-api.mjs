@@ -32,7 +32,7 @@ export const SCRIPTS = join(OV, "scripts");
 export const DIRECTIONS_FILE = join(OV, "data/directions.json");
 
 // The skills the director uses, in the order Studio lists them in its prompt.
-export const SKILLS = Object.freeze(["ov-studio", "ov-build", "ov-script", "ov-audio", "ov-deliver"]);
+export const SKILLS = Object.freeze(["ov-studio", "ov-cases", "ov-build", "ov-script", "ov-audio", "ov-deliver"]);
 // Scripts Studio runs as `node <path> …`: each value is an absolute path to a .mjs file. `choose`
 // is the direction gate (it writes direction: into BRIEF.md): Studio replaces {project} and {pick}
 // in args and runs `node <file> ...args`. suggest prints three directions (one per tier) and their

@@ -11,7 +11,7 @@ description: "Bước 1b của opus-video: gợi ý 2–3 phong cách lemo-opusc
 
 **Gợi ý phong cách lemo-opuscar (trước `init`, một lần mỗi dự án).** [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) của LemoLab có 59 phong cách phim dựng bằng code (mã MIT, phim mẫu CC BY 4.0). Jev chọn 2–3 phong cách hợp brief:
 
-- Viết `BRIEF.case-query.json` (brief tiếng Anh, đúng khuôn ở `ov-cases`; bước 3 dùng lại file này), rồi chạy:
+- Dùng `BRIEF.case-query.json` đã viết ở bước gợi ý case (`ov-cases`); chưa có thì viết theo khuôn ở đó và chạy `rerank-cases.mjs --suggest --project .` trước. Rồi chạy:
   ```bash
   node $OV/scripts/lemo-pick.mjs rank --brief-json BRIEF.case-query.json --limit 3 --stats
   ```

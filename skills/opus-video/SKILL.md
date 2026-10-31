@@ -15,16 +15,16 @@ Skill điều phối: biến một ý tưởng thành MP4 hoàn chỉnh. Skill n
 
 | Hướng | Người dùng nói | Chuỗi skill |
 |---|---|---|
-| `dao-dien` đạo diễn đầy đủ (mặc định) | "làm video", "explainer", "quảng cáo" | ov-setup → ov-brief → ov-direction → ov-script → ov-audio → ov-build → ov-deliver |
-| `nhanh` theo mẫu | "làm nhanh", "theo mẫu", "giống video này" | ov-setup → ov-brief → ov-cases → ov-script → ov-audio → ov-build (vẫn giữ cổng animatic) → ov-deliver |
-| `tu-nhac` từ nhạc hoặc footage | "từ bài nhạc", "theo beat", "clip quay sẵn" | ov-setup → ov-brief → ov-audio (đo beat-grid trước) hoặc ov-footage → ov-direction → ov-script → ov-build (trước `make-demo --animatic`: `beat-fit.mjs --project . --tight`, xem bảng rồi `--apply`) → ov-deliver |
+| `dao-dien` đạo diễn đầy đủ (mặc định) | "làm video", "explainer", "quảng cáo" | ov-setup → ov-brief → **gợi ý case** (`ov-cases`) → ov-direction → ov-script → ov-audio → ov-build → ov-deliver |
+| `nhanh` theo mẫu | "làm nhanh", "theo mẫu", "giống video này" | ov-setup → ov-brief → **gợi ý case** → ov-cases (chọn một case) → ov-script → ov-audio → ov-build (vẫn giữ cổng animatic) → ov-deliver |
+| `tu-nhac` từ nhạc hoặc footage | "từ bài nhạc", "theo beat", "clip quay sẵn" | ov-setup → ov-brief → **gợi ý case** → ov-audio (đo beat-grid trước) hoặc ov-footage → ov-direction → ov-script → ov-build (trước `make-demo --animatic`: `beat-fit.mjs --project . --tight`, xem bảng rồi `--apply`) → ov-deliver |
 | `timeline` sửa dự án đã có | "sửa video", "mở studio", "đổi shot" | ov-studio (nhập dự án nếu chưa có `project.json`) → lệnh gateway → ov-audio (chỉ câu thoại đã đổi) → ov-deliver |
 
 - Khi không rõ, hỏi đúng một câu: người dùng muốn hướng nào trong bốn hướng trên.
 - Người dùng muốn làm trên giao diện web ("làm trong studio", "không dùng terminal"): mở Motion Studio (`ov-studio`). Ở đó họ bấm Dự án mới, nạp footage, giao việc cho đạo diễn AI; đạo diễn vẫn đi theo một trong bốn hướng trên và hỏi chọn hướng, duyệt animatic bằng thẻ `studio_ask`.
 - Ở mọi hướng, chữ tiếng Việt (lời đọc, chữ trên hình, caption) vẫn qua `ov-script`, và `render-final.mjs` vẫn giữ mọi cổng của nó.
 - Hướng `nhanh` chỉ tiết kiệm phần chọn hướng (một case thay cho 3 styleframe) và phải ghi `creative_override: nhanh theo case <id>` vào `BRIEF.md` (xem `ov-cases`).
-- Trong hướng `dao-dien`, `ov-cases` chạy bên trong `ov-build` (bước storyboard, tra case một lần mỗi dự án).
+- **Gợi ý case** (mọi hướng làm video mới, ngay sau brief, trước khi chọn hướng): viết `BRIEF.case-query.json` rồi chạy `rerank-cases.mjs --suggest --project .` (chi tiết ở `ov-cases`). Jev phân tích brief, chọn 2–3 case trong thư viện mẫu Opus 5.5; script in sẵn một khối tiếng Việt (link, một dòng, vì sao) và ghi `CASES.md`. **Gửi nguyên khối đó cho người dùng**, kể cả dòng `⚠ Jev không chạy` nếu có, rồi mới sang bước sau. Bước storyboard (`ov-build`) dùng lại `CASES.md`, không tra lại.
 
 ## Vai trò và chế độ tiết kiệm
 

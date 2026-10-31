@@ -1,15 +1,31 @@
 ---
 name: ov-cases
-description: "Tra corpus case video làm bằng Opus 5.5 của opus-video: chuẩn hoá brief sang JSON tiếng Anh, xếp hạng bằng Jev (rerank-cases.mjs) hoặc find-cases.mjs, đọc 2–3 case và chọn thẻ kỹ thuật trong pattern-library; kèm hướng vận hành nhanh/theo mẫu (một case thay cho 3 styleframe). Dùng ở bước 3 (storyboard, một lần mỗi dự án) hoặc khi người dùng nói làm nhanh, theo mẫu, giống video này. Không dùng để chọn hướng bằng styleframe (ov-direction), viết storyboard/PLAN (ov-build) hay đọc thẳng data/cases.jsonl."
+description: "Gợi ý và tra corpus case video làm bằng Opus 5.5 của opus-video: chuẩn hoá brief sang JSON tiếng Anh, Jev xếp hạng (rerank-cases.mjs --suggest) rồi gửi người dùng 2–3 case kèm lý do, đọc case và chọn thẻ kỹ thuật trong pattern-library; kèm hướng vận hành nhanh/theo mẫu (một case thay cho 3 styleframe). Dùng ngay sau ov-brief ở mọi hướng làm video mới (một lần mỗi dự án), ở bước storyboard khi chưa có CASES.md, hoặc khi người dùng nói làm nhanh, theo mẫu, giống video này. Không dùng để chọn hướng bằng styleframe (ov-direction), viết storyboard/PLAN (ov-build) hay đọc thẳng data/cases.jsonl."
 ---
 
 # ov-cases: tra case và hướng nhanh theo mẫu
 
 `$OV` là thư mục gốc plugin opus-video, nơi có `scripts/` và `references/`: Claude Code `${CLAUDE_PLUGIN_ROOT}` (cài tại chỗ: `~/.claude/skills/opus-video`), Codex `~/.agents/skills/opus-video`, Antigravity `~/.gemini/config/skills/opus-video` (CLI: `~/.gemini/antigravity-cli/skills/opus-video`); tức thư mục chứa `skills/` và `scripts/` của plugin. Mọi lệnh là `node $OV/scripts/<x>.mjs` (PowerShell: thay `$OV` bằng đường dẫn đầy đủ).
 
+## Gợi ý case (ngay sau brief, mọi hướng làm video mới)
+
+Một lần mỗi dự án, trước `ov-direction` (hay trước khi chọn case ở hướng `nhanh`):
+
+1. Viết `BRIEF.case-query.json` theo khuôn ở mục dưới.
+2. Chạy:
+   ```bash
+   node $OV/scripts/rerank-cases.mjs --suggest --project . --category <motion|explainer|3d|interactive|product|story-music> --keyword <từ khoá tiếng Anh>
+   ```
+   Script đọc `BRIEF.case-query.json` và `aspect` trong đó, cho Jev chấm cả corpus (`--pool all`, khoảng 2 giây, khoảng 0,04 USD), bỏ dòng trùng cùng một bài đăng, giữ 3 case (`--limit` để đổi), in một khối tiếng Việt (id, tác giả, link, một dòng mô tả, `Vì sao:` theo điểm loại video/chủ đề/phong cách), ghi khối đó vào `CASES.md` và ghi `case_search:`, `case_refs:` vào `BRIEF.md`. Exit 2 là chưa có `BRIEF.case-query.json`.
+3. **Gửi nguyên khối in ra cho người dùng**, kèm một câu: các case này để tham khảo cấu trúc và nhịp, họ có thể nói "giống case 2" hoặc bỏ qua. Không tự tóm tắt lại thành một dòng, không bỏ dòng `>`.
+4. Khối mở đầu bằng `⚠ Jev không chạy (…)` nghĩa là không có key, key sai (HTTP 401), hết giờ hay lỗi mạng: danh sách chỉ xếp theo từ khoá. Vẫn gửi khối cho người dùng và nói rõ lý do; 401 hay thiếu key thì chỉ họ tới `ov-setup`.
+5. Trong Motion Studio, đạo diễn (`MOTION_STUDIO_RUNNER=cli`) không được ghi `BRIEF.md`, nên script chỉ ghi `CASES.md`; đạo diễn chép nguyên khối vào biên nhận `studio_request_done` của yêu cầu đầu tiên của dự án mới (hoặc vào thẻ `studio_ask` nếu đang hỏi người dùng).
+
+`check-preflight` báo WARN khi dự án `brief_version: 2` chưa có `case_search:` lẫn `CASES.md`.
+
 ## Tra case (bước 3, trước khi viết STORYBOARD.md)
 
-Tra case gần nhất (**một lần mỗi dự án**, không chạy lại theo từng cảnh):
+Đã có `CASES.md` thì đọc các case trong đó, không tra lại. Chưa có thì tra như dưới (**một lần mỗi dự án**, không chạy lại theo từng cảnh):
 
 - **Chuẩn hoá brief:** tự viết `BRIEF.case-query.json` trong thư mục dự án (đã viết ở bước 1b để chọn phong cách lemo thì dùng lại), bằng **tiếng Anh**, chỉ lấy thông tin có trong brief của người dùng, **không bịa**. Trường nào brief không nói thì ghi `"not stated"`. `aspect` lấy đúng từ `BRIEF.md`.
   ```json
@@ -21,7 +37,7 @@ Tra case gần nhất (**một lần mỗi dự án**, không chạy lại theo 
   node $OV/scripts/rerank-cases.mjs --brief-json BRIEF.case-query.json --aspect <16:9|9:16|both> --pool all --limit 5 --stats \
        --category <motion|explainer|3d|interactive|product|story-music> --keyword <từ khoá tiếng Anh>
   ```
-  - Luôn kèm `--category`/`--keyword`: không có key, API lỗi hay hết giờ thì script **tự lặng lẽ trả kết quả của `find-cases`** với đúng các cờ đó.
+  - Luôn kèm `--category`/`--keyword`: không có key, API lỗi hay hết giờ thì script trả kết quả của `find-cases` với đúng các cờ đó (ở chế độ thường thiếu key thì không có cảnh báo; `--suggest` luôn báo).
   - Nhận biết: dòng `###` có `· jev 0.xx (kind · topic · style /4; …)` là Jev đã xếp hạng. Không có `jev` là đang ở fallback `find-cases` (script đã tự tra lại chỉ theo category nếu từ khoá không ra gì).
   - `--stats` in một dòng JSON ra stderr có trường `case_search`: chép nguyên giá trị đó vào `BRIEF.md`, ví dụ `case_search: jev` hoặc `case_search: find-cases (no TYPESAFE_API_KEY)` / `find-cases (HTTP 401)` / `find-cases (request failed: TimeoutError)`.
   - Có key mà Jev lỗi (401, hết giờ…) thì stderr luôn có một dòng `rerank-cases: Jev unavailable (…)`, kể cả khi không có `--stats`. Không dừng quy trình, cứ dùng kết quả `find-cases`; báo người dùng nếu là 401 (key sai/hết hạn).
@@ -61,7 +77,7 @@ Case bị upstream gỡ (`upstream_removed`) bị ẩn khỏi `find-cases` và `
 |---|---|
 | `$OV/references/pattern-library.md` | Bước 3: công thức theo 8 nhóm video |
 | `$OV/scripts/find-cases.mjs` | Bước 3: tra 1003 case trong `data/cases.jsonl` (105 case upstream đã gỡ bị ẩn). Tra bằng script, không đọc file trực tiếp |
-| `$OV/scripts/rerank-cases.mjs` | Bước 3 (tuỳ chọn, cần `TYPESAFE_API_KEY`): Jev xếp hạng khoảng 930 case có prompt dùng được (≥ 40 ký tự) theo brief JSON; thiếu key hoặc lỗi API thì tự trả kết quả `find-cases` (`--stats` cho biết lý do) |
+| `$OV/scripts/rerank-cases.mjs` | Sau brief: `--suggest --project .` in khối gợi ý cho người dùng và ghi `CASES.md`. Bước 3 (tuỳ chọn, cần `TYPESAFE_API_KEY`): Jev xếp hạng khoảng 930 case có prompt dùng được (≥ 40 ký tự) theo brief JSON; thiếu key hoặc lỗi API thì tự trả kết quả `find-cases` (`--stats` cho biết lý do) |
 | `$OV/scripts/case-features.mjs` | Gắn nhãn cố định cho từng case vào `data/case-features.jsonl` (khổ hình, thể loại, chủ đề, độ chi tiết). **Chạy lại mỗi khi `data/cases.jsonl` thay đổi** (chỉ gắn nhãn dòng mới/đổi, khoảng 0,07 USD cho cả corpus) |
 | `data/exemplars.md` | 17 prompt mẫu nguyên văn, có nguồn. Chỉ mở khi cần đọc prompt đầy đủ |
 | `$OV/scripts/lemo-pick.mjs` | Hướng nhanh (tuỳ chọn): Jev chọn 2–3 phong cách lemo-opuscar theo cùng `BRIEF.case-query.json`; thiếu key hay lỗi thì xếp theo từ khoá |

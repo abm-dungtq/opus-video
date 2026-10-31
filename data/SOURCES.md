@@ -6,7 +6,7 @@
 | https://github.com/chuspeeism/awesome-opus-5-5-videos | 028bc52 | MIT | 300 case (`id` bắt đầu bằng `c:`) |
 | https://github.com/abm-dungtq/viet-pro-codex | 2902c19 (v5.6.1) | MIT (Humanizer: xem THIRD_PARTY_NOTICES) | quy trình kịch bản (`references/script-workflow.md`) |
 
-Ngày lấy: 2026-10-16. Case `upstream_removed: true` là case có ở bản 7562902 nhưng upstream đã gỡ (không làm từ một prompt Opus 5.5 đơn thuần); giữ lại với dữ liệu cũ, `find-cases` và `rerank-cases` ẩn chúng trừ khi thêm `--include-removed`. Prompt thuộc về tác giả gốc (`author`, `url` trong từng dòng). Video gốc chỉ đặt link, không phân phối lại.
+Ngày lấy: 2026-10-16. Kiểm lại 2026-10-31: `main` của cả hai repo vẫn ở 92aee2f và 028bc52, rebuild theo lệnh dưới ra file giống hệt (ADDED 0 · KEPT 703 · REMOVED 105 · TOTAL 1108). Case `upstream_removed: true` là case có ở bản 7562902 nhưng upstream đã gỡ (không làm từ một prompt Opus 5.5 đơn thuần); giữ lại với dữ liệu cũ, `find-cases` và `rerank-cases` ẩn chúng trừ khi thêm `--include-removed`. Prompt thuộc về tác giả gốc (`author`, `url` trong từng dòng). Video gốc chỉ đặt link, không phân phối lại.
 
 Rebuild `cases.jsonl`: clone hai repo vào một thư mục trống, checkout đúng commit, không chạy gì bên trong bản clone. Chạy thử ra file tạm, đọc dòng `ADDED · KEPT · REMOVED · TOTAL`, đúng thì mới chép đè:
 

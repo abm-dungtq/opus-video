@@ -9,7 +9,7 @@ description: "Phần dựng của opus-video: bước 3 STORYBOARD.md, bước 4
 
 ## 3. Storyboard
 
-Viết `STORYBOARD.md` từ bảng của viet-pro và hướng đã chọn, cộng thêm khối `<structure>` trong brief: BPM, beat, mỗi beat một hành động, cột blueprint/rule, cột seam nối sang beat sau, cột SFX (ưu tiên bảng SFX của hướng). Trước khi viết, tra case gần nhất bằng skill `ov-cases` (một lần mỗi dự án). Đọc `references/edit-method.md` trước khi viết STORYBOARD (`$OV/references/edit-method.md`).
+Viết `STORYBOARD.md` từ bảng của viet-pro và hướng đã chọn, cộng thêm khối `<structure>` trong brief: BPM, beat, mỗi beat một hành động, cột blueprint/rule, cột seam nối sang beat sau, cột SFX (ưu tiên bảng SFX của hướng). Trước khi viết, đọc 2–3 case trong `CASES.md` (bước gợi ý case sau brief); chưa có `CASES.md` thì chạy bước đó bằng skill `ov-cases` (một lần mỗi dự án). Đọc `references/edit-method.md` trước khi viết STORYBOARD (`$OV/references/edit-method.md`).
 
 ## 4. Engine
 

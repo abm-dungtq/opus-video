@@ -24,19 +24,30 @@
 // --stats prints one JSON line on stderr incl. "case_search": "jev" | "find-cases (<reason>)"
 //   (reason: no TYPESAFE_API_KEY | HTTP 401 | request failed: TimeoutError | …) for BRIEF.md.
 // Notes ("> note:" lines, composite mode): weak matches · weak style fit · no vertical (9:16) case.
+// --suggest [--project .]: the step that SHOWS the user cases at the start of a new video. Reads
+//   <project>/BRIEF.case-query.json (unless --brief-json) and its aspect, ranks the whole pool
+//   (--pool all), drops a second row of the same post (both datasets list some posts), keeps the
+//   top --limit (default 3) and prints a Vietnamese block (id, link, one line, "Vì sao") for the
+//   agent to paste to the user unchanged. Writes it to <project>/CASES.md and `case_search:` +
+//   `case_refs:` into BRIEF.md (not under the Studio director, which may not write BRIEF.md).
+//   Unlike the plain mode, a fallback is never silent here: no key, HTTP error or timeout puts a
+//   "⚠ Jev không chạy (…)" line at the top of the block and on stderr. Exit 2 without a brief JSON.
 // Node built-ins only.
 // Brief: pass the agent-normalised ENGLISH brief (see SKILL.md step 3) as JSON:
 //   {"video_type","purpose","topic","industry","aspect":"16:9|9:16|both","duration_s","tone",
 //    "key_visuals","narration","source_material"} — fill only from the user's brief, never invent.
 // Credentials: $TYPESAFE_API_KEY, else ~/.config/opus-video/.env. Never printed.
 
-import { readFileSync, existsSync, realpathSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, realpathSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { API_URL, MODEL, loadKey, post } from "./jev-client.mjs";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { loadFeatures } from "./case-features.mjs";
 import { rerankComposite, WEIGHTS } from "./rerank-composite.mjs";
+import { setFrontmatter } from "./make-pitch.mjs";
+import { underDirector } from "./director-guard.mjs";
 
 export { API_URL, MODEL, loadKey };
 const FIND = fileURLToPath(new URL("./find-cases.mjs", import.meta.url));
@@ -161,7 +172,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (!a.startsWith("--")) continue;
     const k = a.slice(2);
-    if (["full-only", "json", "stats", "include-removed"].includes(k)) o[k] = true;
+    if (["full-only", "json", "stats", "include-removed", "suggest"].includes(k)) o[k] = true;
     else if (k === "keyword") o.keywords.push(String(argv[++i] ?? "").toLowerCase());
     else o[k] = argv[++i];
   }
@@ -185,12 +196,81 @@ export function fallbackWarning(out, { hasKey, hasBrief }) {
   return `rerank-cases: Jev unavailable (${out.error || "unknown error"}); showing find-cases order. Record case_search: ${caseSearchLabel(out)}`;
 }
 
+// ---- --suggest: the block shown to the user -----------------------------------------------------
+
+export const SUGGEST_FILE = "CASES.md";
+export const QUERY_FILE = "BRIEF.case-query.json";
+
+// Both datasets list some posts (y:… and c:… with one URL): keep the first, best-ranked row.
+export function dedupeByUrl(rows) {
+  const seen = new Set();
+  return rows.filter((r) => { const k = r.url || r.id; if (seen.has(k)) return false; seen.add(k); return true; });
+}
+
+const fit = (x) => (x >= 3 ? "khớp" : x >= 2 ? "gần" : "khác");
+// One Vietnamese line from Jev's scores (composite: kind/topic/style 0–4; single: usefulness 0–4).
+export function whyOf(r) {
+  const j = r.jev;
+  if (!j) return "khớp từ khoá/category (Jev chưa chấm)";
+  if (j.kind_fit !== undefined) {
+    return `loại video ${fit(j.kind_fit)} (${j.kind_fit}/4), chủ đề ${fit(j.topic_fit)} (${j.topic_fit}/4), phong cách hình ${fit(j.style_fit)} (${j.style_fit}/4)` +
+      (r.has_full_prompt ? ", có prompt đầy đủ để mượn cấu trúc" : ", prompt chỉ có một phần");
+  }
+  return `Jev chấm độ hữu ích ${j.score}/4` + (r.has_full_prompt ? ", có prompt đầy đủ" : ", prompt chỉ có một phần");
+}
+
+const NOTE_VI = [
+  [/^weak matches/, "Thư viện không có mẫu sát brief này: chỉ mượn cấu trúc và kỹ thuật, không bám chủ đề."],
+  [/^weak style fit/, "Không case nào cùng phong cách hình với brief: mượn cấu trúc và nhịp, phong cách lấy từ brief."],
+  [/^no vertical/, "Không có case dọc 9:16 trong top: tự lo vùng an toàn 9:16."],
+];
+export const noteVi = (n) => (NOTE_VI.find(([re]) => re.test(n))?.[1] ?? n);
+
+const oneLine = (r, n = 140) => clip(String(r.title || r.prompt || "").replace(/\s+/g, " ").trim(), n);
+
+// The markdown block the agent pastes to the user. out = rerank()/rerankComposite() result.
+export function suggestBlock(out, { limit = 3 } = {}) {
+  const rows = dedupeByUrl(out.results).slice(0, limit);
+  const lines = ["## Gợi ý case từ thư viện mẫu Opus 5.5", ""];
+  if (!out.reranked) lines.push(`> ⚠ Jev không chạy (${out.error || "không rõ lý do"}): danh sách dưới đây chỉ xếp theo từ khoá (find-cases), chưa phân tích brief.`, "");
+  for (const n of out.notes || []) lines.push(`> ${noteVi(n)}`, "");
+  rows.forEach((r, i) => {
+    lines.push(`${i + 1}. **${r.id}** · @${r.author} · ${r.category}: ${oneLine(r)}`);
+    lines.push(`   Vì sao: ${whyOf(r)}.`);
+    lines.push(`   ${r.url}`);
+  });
+  if (!rows.length) lines.push("Không tìm thấy case nào.");
+  lines.push("", `case_search: ${caseSearchLabel(out)}`);
+  return { text: lines.join("\n") + "\n", ids: rows.map((r) => r.id) };
+}
+
+// Writes CASES.md and (outside the Studio director) case_search/case_refs into BRIEF.md.
+export function recordSuggestion(dir, block, out, { director = underDirector() } = {}) {
+  writeFileSync(join(dir, SUGGEST_FILE), block.text);
+  const brief = join(dir, "BRIEF.md");
+  if (director || !existsSync(brief)) return { brief: false };
+  writeFileSync(brief, setFrontmatter(readFileSync(brief, "utf8"), { case_search: caseSearchLabel(out), case_refs: block.ids.join(", ") || undefined }));
+  return { brief: true };
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   if (wantsHelp(argv)) { process.stdout.write(helpText(import.meta.url)); process.exit(0); }
   const o = parseArgs(argv);
+  const suggest = o.suggest !== undefined;
+  const dir = resolve(o.project || ".");
+  if (suggest) {
+    if (!o["brief-json"] && !o.brief && !o["brief-file"]) {
+      const q = join(dir, QUERY_FILE);
+      if (!existsSync(q)) { console.error(`rerank-cases --suggest: ${q} not found; write the English brief JSON first (skill ov-cases)`); process.exit(2); }
+      o["brief-json"] = q;
+    }
+    o.pool = "all";
+    if (o.limit === 5) o.limit = 3;
+  }
   const brief = readBrief(o);
-  const limit = Number(o.limit);
+  if (suggest && !o.aspect && brief && typeof brief === "object" && ["16:9", "9:16", "both"].includes(brief.aspect)) o.aspect = brief.aspect;
+  const limit = suggest ? Number(o.limit) * 3 : Number(o.limit);
   const candidates = buildPool({ category: o.category, keywords: o.keywords, tag: o.tag, fullOnly: o["full-only"], includeRemoved: o["include-removed"], pool: o.pool === "all" ? "all" : Number(o.pool) });
   const detailWeight = o["detail-weight"] === undefined ? 0.5 : Number(o["detail-weight"]);
   const features = loadFeatures();
@@ -202,10 +282,19 @@ async function main() {
   if (!brief) out = { results: candidates.slice(0, limit), reranked: false, error: "no --brief", calls: 0 };
   else if (mode === "composite") out = await rerankComposite({ brief, candidates, features, limit, apiKey, aspect: o.aspect, weights, shortlist: Number(o.shortlist || 0), pair: Number(o.pair || 0) });
   else out = await rerank({ brief: typeof brief === "string" ? brief : JSON.stringify(brief), candidates, limit, apiKey, detailWeight });
-  const warn = fallbackWarning(out, { hasKey: !!apiKey, hasBrief: !!brief });
+  const warn = suggest && !out.reranked
+    ? `rerank-cases: Jev unavailable (${out.error || "unknown error"}); showing find-cases order`
+    : fallbackWarning(out, { hasKey: !!apiKey, hasBrief: !!brief });
   if (warn) console.error(warn);
   if (o.stats) console.error(JSON.stringify({ case_search: caseSearchLabel(out), mode, reranked: out.reranked, error: out.error, pool: candidates.length, calls: out.calls, ms: out.ms, usage: out.usage, model: out.model, brief_class: out.brief_class }));
   const max = Number(o["max-chars"]);
+  if (suggest) {
+    const block = suggestBlock(out, { limit: Number(o.limit) });
+    const rec = recordSuggestion(dir, block, out);
+    process.stdout.write(block.text);
+    console.error(`rerank-cases: wrote ${SUGGEST_FILE}${rec.brief ? " and case_search/case_refs in BRIEF.md" : ""}; show the block above to the user as is`);
+    return;
+  }
   if (o.json) {
     console.log(JSON.stringify(out.results.map((r) => ({ ...r, prompt: clip(r.prompt, max) })), null, 2));
     for (const n of out.notes || []) console.error(`note: ${n}`);
