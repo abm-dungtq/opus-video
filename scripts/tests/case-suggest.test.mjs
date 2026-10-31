@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dedupeByUrl, whyOf, noteVi, suggestBlock, recordSuggestion, SUGGEST_FILE } from "../rerank-cases.mjs";
 import { caseSuggestCheck } from "../check-preflight.mjs";
+import { briefFingerprint, casesStale } from "../case-fingerprint.mjs";
 import { init } from "../make-pitch.mjs";
 import { loadDirections } from "../directions.mjs";
 
@@ -60,7 +61,7 @@ test("recordSuggestion writes CASES.md and BRIEF fields; under the Studio direct
     const b = suggestBlock(out);
     assert.deepEqual(recordSuggestion(d, b, out, { director: true }), { brief: false });
     assert.equal(readFileSync(join(d, "BRIEF.md"), "utf8"), brief);
-    assert.equal(readFileSync(join(d, SUGGEST_FILE), "utf8"), b.text);
+    assert.equal(readFileSync(join(d, SUGGEST_FILE), "utf8"), `${b.text}brief_fingerprint: ${briefFingerprint(d)}\n`);
     recordSuggestion(d, b, out, { director: false });
     const fm = readFileSync(join(d, "BRIEF.md"), "utf8");
     assert.match(fm, /^case_search: jev$/m);
@@ -118,6 +119,31 @@ test("CLI --suggest with an invalid BRIEF.case-query.json ranks from BRIEF.md; w
     assert.match(r.stderr, /is not valid JSON; ranking from BRIEF\.md/);
     assert.doesNotMatch(r.stdout, /no --brief/);
     assert.ok(existsSync(join(d, "CASES.md")));
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("CASES.md records the brief it was ranked for; a changed topic, aspect, body or query makes it stale", () => {
+  const d = tmp();
+  try {
+    const brief = "---\nbrief_version: 3\ntopic: cà phê phin\naspect: 9:16\n---\n# Brief\nVideo dạy pha cà phê phin.\n";
+    writeFileSync(join(d, "BRIEF.md"), brief);
+    writeFileSync(join(d, "BRIEF.case-query.json"), JSON.stringify(QUERY));
+    assert.equal(casesStale(d), false, "no CASES.md: nothing stale");
+    const out = { reranked: true, results: [row("y:a", "u1", composite(3, 3, 3))] };
+    recordSuggestion(d, suggestBlock(out), out, { director: false });
+    assert.equal(casesStale(d), false, "the BRIEF fields the suggestion writes do not count");
+    writeFileSync(join(d, "BRIEF.md"), readFileSync(join(d, "BRIEF.md"), "utf8").replace("---\n# Brief", "direction: pick-1\ncase_pick: y:a\n---\n# Brief"));
+    assert.equal(casesStale(d), false, "later pipeline fields do not count either");
+    for (const [from, to] of [["topic: cà phê phin", "topic: trà sữa"], ["aspect: 9:16", "aspect: 16:9"], ["pha cà phê phin", "pha trà"]]) {
+      const keep = readFileSync(join(d, "BRIEF.md"), "utf8");
+      writeFileSync(join(d, "BRIEF.md"), keep.replace(from, to));
+      assert.equal(casesStale(d), true, `${from} → ${to}`);
+      writeFileSync(join(d, "BRIEF.md"), keep);
+    }
+    writeFileSync(join(d, "BRIEF.case-query.json"), JSON.stringify({ ...QUERY, topic: "milk tea" }));
+    assert.equal(casesStale(d), true, "a new query file");
+    writeFileSync(join(d, "CASES.md"), "## Gợi ý case\n\ncase_search: jev\n");
+    assert.equal(casesStale(d), false, "an older CASES.md without the line is kept");
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 

@@ -7,6 +7,7 @@
 - `rerank-cases.mjs --suggest` with an invalid `BRIEF.case-query.json` ranks from BRIEF.md instead, or exits 2 and writes nothing when there is no BRIEF.md. It used to write an unranked CASES.md, which opened the pitch gate.
 - The topic floor also applies after the `--pair` tournament.
 - An empty suggestion clears the old `case_refs:` in BRIEF.md.
+- `CASES.md` ends with `brief_fingerprint:` (`case-fingerprint.mjs`: the query file, the BRIEF.md body, topic and aspect). `studio-api.mjs` exports `casesStale(dir)`, so Motion Studio ranks again once the brief changed instead of showing cases for the old brief. A CASES.md without the line is never stale.
 - When Jev did not run and no keyword or category was given, a case's reason no longer claims it matched one.
 
 ### Added

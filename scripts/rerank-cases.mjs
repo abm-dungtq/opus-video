@@ -41,6 +41,7 @@
 //    "key_visuals","narration","source_material"} — fill only from the user's brief, never invent.
 // Credentials: $TYPESAFE_API_KEY, else ~/.config/opus-video/.env. Never printed.
 
+import { CASES_FILE, QUERY_FILE, fingerprintLine } from "./case-fingerprint.mjs";
 import { readFileSync, writeFileSync, existsSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -201,8 +202,8 @@ export function fallbackWarning(out, { hasKey, hasBrief }) {
 
 // ---- --suggest: the block shown to the user -----------------------------------------------------
 
-export const SUGGEST_FILE = "CASES.md";
-export const QUERY_FILE = "BRIEF.case-query.json";
+export const SUGGEST_FILE = CASES_FILE;
+export { QUERY_FILE };
 
 // Both datasets list some posts (y:… and c:… with one URL): keep the first, best-ranked row.
 export function dedupeByUrl(rows) {
@@ -255,7 +256,8 @@ export function suggestBlock(out, { limit = 3, filtered = true } = {}) {
 
 // Writes CASES.md and (outside the Studio director and --cases-only) case_search/case_refs into BRIEF.md.
 export function recordSuggestion(dir, block, out, { director = underDirector() } = {}) {
-  writeFileSync(join(dir, SUGGEST_FILE), block.text);
+  // The last line records the brief it was ranked for (case-fingerprint.mjs); stdout shows the block without it.
+  writeFileSync(join(dir, SUGGEST_FILE), `${block.text}${fingerprintLine(dir)}\n`);
   const brief = join(dir, "BRIEF.md");
   if (director || !existsSync(brief)) return { brief: false };
   writeFileSync(brief, setFrontmatter(readFileSync(brief, "utf8"), { case_search: caseSearchLabel(out), case_refs: block.ids.join(", ") || null }));
