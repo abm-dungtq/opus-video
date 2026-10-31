@@ -5,6 +5,10 @@
 // --previous keeps every y: case that upstream removed, with its old fields and
 // `upstream_removed: true` (find-cases / rerank-cases hide those unless --include-removed).
 // Prints ADDED n · KEPT n · REMOVED n · TOTAL n (ADDED/KEPT/REMOVED count y: ids against --previous).
+// Demo links per case: demo_url = the video to watch (yihui: the Skillry page with the original and
+// a live remake, else null and the X post in `url` is the demo; chuspeeism: the first video
+// attached in the repo), repo_url = the case's page in the repo at the synced commit, poster_url
+// (yihui only).
 
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -34,6 +38,9 @@ export function buildCases({ yihui, chus, previous = [], yihuiCommit, chusCommit
     has_full_prompt: !v.prompt_partial,
     prompt_len: (v.prompt ?? "").length,
     added: v.added ?? "",
+    demo_url: v.skillry_url ?? null,
+    repo_url: `https://github.com/yihui-dev/awesome-opus5-5-videos/blob/${yihuiCommit}/prompts/${v.slug}.md`,
+    poster_url: v.poster_url ?? null,
   }));
   const freshIds = new Set(fresh.map((r) => r.id));
   const oldY = previous.filter((r) => r.id.startsWith("y:"));
@@ -42,8 +49,9 @@ export function buildCases({ yihui, chus, previous = [], yihuiCommit, chusCommit
   const c = chus.map((x) => {
     const hidden = String(x.prompt ?? "").startsWith(HIDDEN);
     const prompt = hidden ? x.summary ?? "" : x.prompt ?? "";
+    const num = String(x.sourceUrl).match(/(\d+)\D*$/)?.[1];
     return {
-      id: `c:${String(x.sourceUrl).match(/(\d+)\D*$/)?.[1] ?? x.title}`,
+      id: `c:${num ?? x.title}`,
       source: `chuspeeism/awesome-opus-5-5-videos@${chusCommit}`,
       license: "MIT",
       url: x.sourceUrl,
@@ -55,6 +63,9 @@ export function buildCases({ yihui, chus, previous = [], yihuiCommit, chusCommit
       has_full_prompt: !hidden,
       prompt_len: prompt.length,
       added: String(x.sourcePublishedAt ?? "").slice(0, 10),
+      demo_url: x.githubVideos?.[0] ?? null,
+      repo_url: num ? `https://github.com/chuspeeism/awesome-opus-5-5-videos/blob/${chusCommit}/cases/${num}.md` : null,
+      poster_url: null,
     };
   });
   const rows = [...fresh, ...removed, ...c].sort((a, b) => a.id.localeCompare(b.id));

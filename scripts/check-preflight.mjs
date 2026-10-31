@@ -544,6 +544,21 @@ export function reviewWarnings(dir) {
   return [`đạo diễn chưa kết luận ship (build/${last ? last.f : "REVIEW-<n>.md"})`];
 }
 
+// Case suggestion (skill ov-cases), both stages: a project whose BRIEF.md has no `case_search:`
+// and that has no CASES.md never showed the user cases from the library. FAIL from
+// brief_version: 3 (briefs written since the step exists; make-pitch init refuses too), WARN for
+// brief_version: 2 so older projects still render. Legacy briefs are not checked.
+export const CASE_SUGGEST_VERSION = 3;
+export const CASE_SUGGEST_FIX = "chạy node $OV/scripts/rerank-cases.mjs --suggest --project . (đọc BRIEF.case-query.json, chưa có thì đọc BRIEF.md) rồi gửi nguyên khối in ra cho người dùng (skill ov-cases)";
+export const hasCaseSuggestion = (dir, fm) => Boolean(String(fm.case_search ?? "").trim()) || existsSync(join(dir, "CASES.md"));
+export function caseSuggestCheck({ dir, brief }) {
+  const fm = frontmatter(brief);
+  const v = Number(fm.brief_version);
+  if (!(v >= 2) || hasCaseSuggestion(dir, fm)) return null;
+  const msg = `chưa gợi ý case mẫu cho người dùng (BRIEF.md không có case_search:, không có CASES.md): ${CASE_SUGGEST_FIX}`;
+  return { level: v >= CASE_SUGGEST_VERSION ? "FAIL" : "WARN", msg };
+}
+
 export function check({ project = ".", stage = "plan", sync = checkSync, words = checkWords, balance = checkBalance, legacyMtime = false } = {}) {
   const dir = resolve(project);
   const errors = [], warnings = [];
@@ -568,6 +583,8 @@ export function check({ project = ".", stage = "plan", sync = checkSync, words =
   if (legacyMtime && stage === "final") warnings.push(LEGACY_MTIME_WARN);
   out.creative = checkCreative({ dir, plan, brief, stage, errors, warnings, sync, words, legacyMtime });
   out.style = checkStyle({ dir, brief, errors, warnings });
+  const caseCheck = caseSuggestCheck({ dir, brief });
+  if (caseCheck) (caseCheck.level === "FAIL" ? errors : warnings).push(caseCheck.msg);
   warnings.push(...holdWarnings(parseTable(plan.sections[SECTIONS.scenes])));
   warnings.push(...beatWarnings(plan));
 

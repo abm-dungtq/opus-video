@@ -4,7 +4,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const script = fileURLToPath(new URL("../find-cases.mjs", import.meta.url));
-const run = (...args) => execFileSync("node", [script, ...args], { encoding: "utf8" });
+const run = (...args) => execFileSync("node", [script, ...args], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 
 test("filters by category", () => {
   const rows = JSON.parse(run("--category", "3d", "--limit", "10", "--json"));

@@ -44,7 +44,8 @@
 //   an energy mismatch and on a swapped style keyword); and a "## creative_direction" body
 //   section. --auto = option 1, recorded as auto (only when the user asked to run without stopping).
 // Exit: 0 ok · 1 render/init failed or ffmpeg/ffprobe missing · 2 bad usage · 3 compat warnings to confirm · 4 a styleframe
-//   fails MOTION (render; PITCH.md is still written), rebuild it.
+//   fails MOTION (render; PITCH.md is still written), rebuild it · 6 init on a brief_version: 3 brief
+//   whose user has not seen the case suggestion yet (no case_search:, no CASES.md; skill ov-cases).
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, realpathSync, rmSync } from "node:fs";
 import { join, resolve, relative } from "node:path";
@@ -59,7 +60,7 @@ import { SKELETON, sizeSkeleton } from "./composition.mjs";
 import { OV_DIR } from "./skill-paths.mjs";
 import { buildRecipes } from "./recipe-pack.mjs";
 import { findBrand, validateBrand, brandAbs } from "./brand.mjs";
-import { PLACEHOLDER } from "./check-preflight.mjs";
+import { PLACEHOLDER, CASE_SUGGEST_VERSION, CASE_SUGGEST_FIX, hasCaseSuggestion } from "./check-preflight.mjs";
 import { DEFAULT_VOICE, DEFAULT_TTS_MODEL } from "./voice-defaults.mjs";
 import { contactSheet, winArgs } from "./make-demo.mjs";
 import { measureMotion, motionVerdict } from "./qc-mp4.mjs";
@@ -225,6 +226,9 @@ export function init(o, data, up = upstream()) {
   if (!up.anim || !up.faceless || !up.creative) return { code: 1, msg: "make-pitch: HyperFrames recipes (hyperframes-animation, hyperframes-creative, faceless-explainer) not found: third_party/hyperframes-skills is missing from the plugin; reinstall opus-video" };
   const briefPath = join(project, "BRIEF.md");
   const briefFm = existsSync(briefPath) ? frontmatter(readFileSync(briefPath, "utf8")) : {};
+  if (Number(briefFm.brief_version) >= CASE_SUGGEST_VERSION && !hasCaseSuggestion(project, briefFm)) {
+    return { code: 6, msg: `make-pitch: người dùng chưa thấy gợi ý case (brief_version: ${briefFm.brief_version}, không có case_search: hay CASES.md). Trước khi chọn hướng, ${CASE_SUGGEST_FIX}` };
+  }
   const pitch = join(project, "pitch");
   mkdirSync(pitch, { recursive: true });
   // Keep the scaffold hash of styleframes that already exist, so render can still spot an unwritten one.

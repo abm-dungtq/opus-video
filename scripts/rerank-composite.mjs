@@ -50,6 +50,16 @@ export const ASPECT_FIT = {
 // Best style_fit (0–4) among the shown results below this → "weak style fit" note. Note only:
 // ranking is unchanged (conservative). 2 = "partly similar" on the STYLE_FIT scale.
 export const WEAK_STYLE = 2;
+// Topic floor: when some case shares the brief's topic (topic_fit >= TOPIC_FLOOR.match), a case
+// Jev calls unrelated (topic_fit < TOPIC_FLOOR.off) ranks below every case that is not, however well
+// its kind and style fit: a paper-collage "what is Claude Code" explainer must not lead a phin-coffee
+// brief over two coffee cases. With no topic match in the pool the composite order stands.
+export const TOPIC_FLOOR = { off: 1, match: 2 };
+export function byComposite(scored) {
+  const floor = scored.some((x) => x.t >= TOPIC_FLOOR.match);
+  const off = (x) => (floor && x.t < TOPIC_FLOOR.off ? 1 : 0);
+  return [...scored].sort((a, b) => off(a) - off(b) || b.final - a.final || a.i - b.i);
+}
 export const NO_MATCH = { final: 0.50 }; // best composite below this → "weak matches" note (round 2: flagged 3 of the 4 briefs I judged weakest, 1 false alarm)
 const SNIPPET = 500;
 export const CHUNK = 100; // questions per request
@@ -221,8 +231,8 @@ export async function rerankComposite({ brief, candidates, features, limit = 5, 
     }
     const s = await scoreFits(brief, pool.map((x) => x.r), features, { apiKey, fetchImpl, concurrency });
     calls += s.calls; usage = addUsage(usage, s.usage);
-    let scored = combine({ candidates: pool.map((x) => x.r), features, fits: s.fits, cls, aspect, weights })
-      .map((x, k) => ({ ...x, i: pool[k].i })).sort((a, b) => b.final - a.final || a.i - b.i);
+    let scored = byComposite(combine({ candidates: pool.map((x) => x.r), features, fits: s.fits, cls, aspect, weights })
+      .map((x, k) => ({ ...x, i: pool[k].i })));
     if (pair > 1) {
       const t = await tournament(brief, scored.slice(0, pair), features, { apiKey, fetchImpl });
       calls += t.calls; usage = addUsage(usage, t.usage);

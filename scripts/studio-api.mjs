@@ -32,7 +32,7 @@ export const SCRIPTS = join(OV, "scripts");
 export const DIRECTIONS_FILE = join(OV, "data/directions.json");
 
 // The skills the director uses, in the order Studio lists them in its prompt.
-export const SKILLS = Object.freeze(["ov-studio", "ov-build", "ov-script", "ov-audio", "ov-deliver"]);
+export const SKILLS = Object.freeze(["ov-studio", "ov-cases", "ov-build", "ov-script", "ov-audio", "ov-deliver"]);
 // Scripts Studio runs as `node <path> …`: each value is an absolute path to a .mjs file. `choose`
 // is the direction gate (it writes direction: into BRIEF.md): Studio replaces {project} and {pick}
 // in args and runs `node <file> ...args`. suggest prints three directions (one per tier) and their
@@ -64,6 +64,10 @@ export const COMMANDS = Object.freeze({
   captions: script("captions-from-words.mjs"),
   platform: vietPro ? join(vietPro, "scripts", "check-platform.mjs") : null,
   suggest: Object.freeze({ file: script("suggest.mjs"), args: Object.freeze(["--project", "{project}", "--json"]) }),
+  // Case suggestion (skill ov-cases): ranks the corpus for the brief and writes only CASES.md (the
+  // block to show; it also satisfies the case suggestion gate), never BRIEF.md; exit 0 even when Jev
+  // fails (the block says so).
+  suggestCases: Object.freeze({ file: script("rerank-cases.mjs"), args: Object.freeze(["--suggest", "--cases-only", "--project", "{project}"]), output: "CASES.md" }),
   choose: Object.freeze({ file: script("make-pitch.mjs"), args: Object.freeze(["choose", "--project", "{project}", "--pick", "{pick}", "--accept-warnings"]) }),
   pitchInit: Object.freeze({ file: script("make-pitch.mjs"), args: Object.freeze(["init", "--project", "{project}", "--topic", "{topic}",
     "--aspect", "{aspect}", "--category", "{category}", "--energy", "{energy}", "--directions", "{directions}"]) }),
