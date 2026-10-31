@@ -25,13 +25,14 @@
 //   (reason: no TYPESAFE_API_KEY | HTTP 401 | request failed: TimeoutError | …) for BRIEF.md.
 // Notes ("> note:" lines, composite mode): weak matches · weak style fit · no vertical (9:16) case.
 // --suggest [--project .]: the step that SHOWS the user cases at the start of a new video. Reads
-//   <project>/BRIEF.case-query.json (unless --brief-json) and its aspect, ranks the whole pool
+//   <project>/BRIEF.case-query.json (unless --brief-json) and its aspect; without that file, the
+//   text of BRIEF.md and its frontmatter aspect (Motion Studio runs it this way). Ranks the whole pool
 //   (--pool all), drops a second row of the same post (both datasets list some posts), keeps the
 //   top --limit (default 3) and prints a Vietnamese block (id, link, one line, "Vì sao") for the
 //   agent to paste to the user unchanged. Writes it to <project>/CASES.md and `case_search:` +
 //   `case_refs:` into BRIEF.md (not under the Studio director, which may not write BRIEF.md).
 //   Unlike the plain mode, a fallback is never silent here: no key, HTTP error or timeout puts a
-//   "⚠ Jev không chạy (…)" line at the top of the block and on stderr. Exit 2 without a brief JSON.
+//   "⚠ Jev không chạy (…)" line at the top of the block and on stderr. Exit 2 with neither file.
 // Node built-ins only.
 // Brief: pass the agent-normalised ENGLISH brief (see SKILL.md step 3) as JSON:
 //   {"video_type","purpose","topic","industry","aspect":"16:9|9:16|both","duration_s","tone",
@@ -261,9 +262,14 @@ async function main() {
   const dir = resolve(o.project || ".");
   if (suggest) {
     if (!o["brief-json"] && !o.brief && !o["brief-file"]) {
-      const q = join(dir, QUERY_FILE);
-      if (!existsSync(q)) { console.error(`rerank-cases --suggest: ${q} not found; write the English brief JSON first (skill ov-cases)`); process.exit(2); }
-      o["brief-json"] = q;
+      const q = join(dir, QUERY_FILE), b = join(dir, "BRIEF.md");
+      if (existsSync(q)) o["brief-json"] = q;
+      else if (existsSync(b)) {
+        o["brief-file"] = b;
+        const a = (readFileSync(b, "utf8").match(/^aspect:\s*["']?(16:9|9:16|both)\b/m) || [])[1];
+        if (a && !o.aspect) o.aspect = a;
+        console.error(`rerank-cases --suggest: no ${QUERY_FILE}, ranking from BRIEF.md (an English ${QUERY_FILE} ranks better, skill ov-cases)`);
+      } else { console.error(`rerank-cases --suggest: neither ${q} nor ${b} found; write the brief first (skills ov-brief, ov-cases)`); process.exit(2); }
     }
     o.pool = "all";
     if (o.limit === 5) o.limit = 3;

@@ -6,7 +6,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dedupeByUrl, whyOf, noteVi, suggestBlock, recordSuggestion, SUGGEST_FILE } from "../rerank-cases.mjs";
-import { caseSuggestWarning } from "../check-preflight.mjs";
+import { caseSuggestCheck } from "../check-preflight.mjs";
+import { init } from "../make-pitch.mjs";
+import { loadDirections } from "../directions.mjs";
 
 const script = fileURLToPath(new URL("../rerank-cases.mjs", import.meta.url));
 const row = (id, url, jev = null, extra = {}) => ({ id, url, author: "a", category: "explainer", tags: [], title: "", prompt: `prompt of ${id}`, has_full_prompt: true, jev, ...extra });
@@ -77,22 +79,43 @@ test("CLI --suggest without a key: block with the Jev warning, CASES.md and BRIE
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 
-test("CLI --suggest without BRIEF.case-query.json exits 2 and names the file", () => {
+test("CLI --suggest without BRIEF.case-query.json ranks from BRIEF.md; with neither file exits 2", () => {
   const d = tmp();
   try {
-    const r = spawnSync("node", [script, "--suggest", "--project", d], { encoding: "utf8", env: { ...process.env, TYPESAFE_API_KEY: "" } });
+    const env = { ...process.env, TYPESAFE_API_KEY: "", HOME: d, MOTION_STUDIO_RUNNER: "", OPUS_STUDIO_RUNNER: "" };
+    let r = spawnSync("node", [script, "--suggest", "--project", d], { encoding: "utf8", env });
     assert.equal(r.status, 2);
-    assert.match(r.stderr, /BRIEF\.case-query\.json not found/);
+    assert.match(r.stderr, /neither .*BRIEF\.case-query\.json nor .*BRIEF\.md/);
+    writeFileSync(join(d, "BRIEF.md"), "---\nbrief_version: 3\naspect: 9:16\ntopic: cà phê phin\n---\n# Brief\nVideo dạy pha cà phê phin.\n");
+    r = spawnSync("node", [script, "--suggest", "--project", d, "--stats"], { encoding: "utf8", env });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stderr, /ranking from BRIEF\.md/);
+    assert.match(r.stdout, /^## Gợi ý case/);
+    assert.ok(existsSync(join(d, "CASES.md")));
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 
-test("preflight warns when a new project never showed case suggestions", () => {
+test("preflight: FAIL for brief_version 3, WARN for 2, nothing for legacy or once suggested", () => {
   const d = tmp();
   try {
-    assert.match(caseSuggestWarning({ dir: d, brief: "---\nbrief_version: 2\n---\n" }), /rerank-cases\.mjs --suggest/);
-    assert.equal(caseSuggestWarning({ dir: d, brief: "---\nbrief_version: 2\ncase_search: jev\n---\n" }), null);
-    assert.equal(caseSuggestWarning({ dir: d, brief: "---\naspect: 16:9\n---\n" }), null, "legacy briefs are left alone");
+    const v3 = caseSuggestCheck({ dir: d, brief: "---\nbrief_version: 3\n---\n" });
+    assert.equal(v3.level, "FAIL");
+    assert.match(v3.msg, /rerank-cases\.mjs --suggest/);
+    assert.equal(caseSuggestCheck({ dir: d, brief: "---\nbrief_version: 2\n---\n" }).level, "WARN");
+    assert.equal(caseSuggestCheck({ dir: d, brief: "---\nbrief_version: 3\ncase_search: jev\n---\n" }), null);
+    assert.equal(caseSuggestCheck({ dir: d, brief: "---\naspect: 16:9\n---\n" }), null, "legacy briefs are left alone");
     writeFileSync(join(d, "CASES.md"), "x");
-    assert.equal(caseSuggestWarning({ dir: d, brief: "---\nbrief_version: 2\n---\n" }), null, "CASES.md from the Studio director counts");
+    assert.equal(caseSuggestCheck({ dir: d, brief: "---\nbrief_version: 3\n---\n" }), null, "CASES.md from the Studio director counts");
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("make-pitch init refuses a brief_version 3 brief before the case suggestion (exit 6)", () => {
+  const d = tmp();
+  try {
+    writeFileSync(join(d, "BRIEF.md"), "---\nbrief_version: 3\naspect: 16:9\n---\n# Brief\n");
+    const r = init({ project: d, topic: "cà phê phin", aspect: "16:9" }, loadDirections(), { anim: "x", faceless: "x", creative: "x" });
+    assert.equal(r.code, 6);
+    assert.match(r.msg, /rerank-cases\.mjs --suggest/);
+    assert.ok(!existsSync(join(d, "pitch")), "nothing scaffolded");
   } finally { rmSync(d, { recursive: true, force: true }); }
 });

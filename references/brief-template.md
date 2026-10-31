@@ -26,7 +26,7 @@ gemini_tts_model: <tên model>   # tuỳ chọn, chỉ khi voice_provider: gemin
 gemini_voice: <tên giọng Gemini>   # tuỳ chọn, chỉ khi voice_provider: gemini; mặc định Kore
 karaoke: <on | off>   # tuỳ chọn: on thì lúc dựng thêm data-karaoke vào thẻ html (references/karaoke-va-mascot.md); bật trước animatic
 signature: <tên hiện ở góc phải dưới>   # tuỳ chọn: bỏ hidden của #sig trong skeleton và ghi tên này vào #sig-txt
-brief_version: 2   # dự án mới: bật cổng sáng tạo (bước 1b); dự án cũ không có dòng này
+brief_version: 3   # dự án mới: bật cổng sáng tạo (bước 1b) và cổng gợi ý case (ov-cases); 2 là dự án trước cổng gợi ý case; dự án cũ không có dòng này
 # ↓ make-pitch.mjs choose ghi (bước 1b); không gõ tay
 direction: <A1..A8>
 direction_swaps: <none | transition=lao-xuyen-tam; style=…>
@@ -94,7 +94,9 @@ duration_s: 15
 fps: 30
 voice_id: eGSd0uV8dNQnZuEEX9lu
 tts_model: eleven_v4
-brief_version: 2
+brief_version: 3
+case_search: jev
+case_refs: y:ror-fly-880547, y:sarut0bisasuke-069973
 direction: A6
 direction_swaps: transition=lao-xuyen-tam
 energy: vua

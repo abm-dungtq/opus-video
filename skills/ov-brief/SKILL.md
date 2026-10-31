@@ -18,7 +18,7 @@ description: "Bước 1 của opus-video: viết BRIEF.md tối thiểu (chủ �
 node $OV/scripts/brand.mjs check
 ```
 
-- Dự án mới có `brief_version: 2` trong frontmatter: bước 1b (`ov-direction`) là bắt buộc, trừ khi brief có `creative_override`: chế độ nhanh ghi `creative_override: nhanh theo case <id>` (`ov-cases`, vẫn phải qua animatic), dự án chỉ có footage ghi lý do ≥10 ký tự.
+- Dự án mới có `brief_version: 3` trong frontmatter (bản 2 là dự án trước cổng gợi ý case, vẫn được nhận): bước 1b (`ov-direction`) là bắt buộc, trừ khi brief có `creative_override`: chế độ nhanh ghi `creative_override: nhanh theo case <id>` (`ov-cases`, vẫn phải qua animatic), dự án chỉ có footage ghi lý do ≥10 ký tự.
 - Footage quay thật hay clip làm trục: thêm thông tin clip vào brief rồi sang `ov-footage`.
 
 Xong brief thì **gợi ý case** cho người dùng (skill `ov-cases`, mục Gợi ý case: `BRIEF.case-query.json` → `rerank-cases.mjs --suggest --project .` → gửi nguyên khối in ra), rồi đi tiếp theo chuỗi của hướng vận hành (skill `opus-video`): `ov-direction` (đạo diễn), `ov-cases` (nhanh), `ov-audio` hoặc `ov-footage` (từ nhạc/footage).

@@ -64,6 +64,9 @@ export const COMMANDS = Object.freeze({
   captions: script("captions-from-words.mjs"),
   platform: vietPro ? join(vietPro, "scripts", "check-platform.mjs") : null,
   suggest: Object.freeze({ file: script("suggest.mjs"), args: Object.freeze(["--project", "{project}", "--json"]) }),
+  // Case suggestion (skill ov-cases): ranks the corpus for the brief, writes CASES.md (the block to
+  // show) and case_search/case_refs into BRIEF.md, exit 0 even when Jev fails (the block says so).
+  suggestCases: Object.freeze({ file: script("rerank-cases.mjs"), args: Object.freeze(["--suggest", "--project", "{project}"]), output: "CASES.md" }),
   choose: Object.freeze({ file: script("make-pitch.mjs"), args: Object.freeze(["choose", "--project", "{project}", "--pick", "{pick}", "--accept-warnings"]) }),
   pitchInit: Object.freeze({ file: script("make-pitch.mjs"), args: Object.freeze(["init", "--project", "{project}", "--topic", "{topic}",
     "--aspect", "{aspect}", "--category", "{category}", "--energy", "{energy}", "--directions", "{directions}"]) }),
