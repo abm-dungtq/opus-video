@@ -5,7 +5,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { gflowWindowMode, imageArgs, needsChromeHider, videoArgs } from "../gflow.mjs";
+import { imageArgs, videoArgs } from "../gflow.mjs";
 
 const GFLOW = fileURLToPath(new URL("../gflow.mjs", import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), "ov-gflow-"));
@@ -138,21 +138,4 @@ test("invalid arguments fail before any Flow project is touched", () => {
   const r = run(["image", "--prompt-file", join(dir, "p.txt"), "--out", join(dir, "c.png"), "--aspect", "2:1"]);
   assert.equal(r.status, 2);
   assert.equal(r.all.length, 0);
-});
-
-test("the Chrome hider is skipped when gflow runs a background-only Chrome", () => {
-  const home = mkdtempSync(join(dir, "home-"));
-  const cwd = mkdtempSync(join(dir, "cwd-"));
-  const env = { GFLOW_CLI_HOME: home };
-  assert.equal(gflowWindowMode(env, cwd), "offscreen");
-  assert.equal(needsChromeHider("darwin", env, cwd), true);
-  writeFileSync(join(home, ".env"), "# gflow\nGFLOW_CLI_WINDOW_MODE=background\n");
-  assert.equal(gflowWindowMode(env, cwd), "background");
-  assert.equal(needsChromeHider("darwin", env, cwd), false);
-  // gflow's precedence: ./.env beats <home>/.env, the environment beats both
-  writeFileSync(join(cwd, ".env"), "GFLOW_CLI_WINDOW_MODE=offscreen\n");
-  assert.equal(needsChromeHider("darwin", env, cwd), true);
-  assert.equal(needsChromeHider("darwin", { ...env, GFLOW_CLI_WINDOW_MODE: " Background " }, cwd), false);
-  assert.equal(needsChromeHider("win32", { GFLOW_CLI_HOME: home }, cwd), false);
-  assert.equal(needsChromeHider("darwin", { ...env, GFLOW_SHOW: "1" }, cwd), false);
 });

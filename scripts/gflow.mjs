@@ -30,18 +30,14 @@
 // gflow makes a fresh
 // scratch project per run and the Flow account fills with junk projects.
 //
-// On macOS gflow's headed Chrome is kept hidden during a run (an-chrome-gflow.js, needs Accessibility
-// permission for the terminal); GFLOW_SHOW=1 shows it. With GFLOW_CLI_WINDOW_MODE=background gflow
-// already runs a background-only Chrome that cannot take focus, so the hider is skipped: its loop
-// re-activates the front app four times a second, which closes menus and the Vietnamese IME. Runs on a busy profile wait up to 600 s.
+// gflow keeps its own Chrome out of the way (minimized, or headless with GFLOW_CLI_HEADLESS=true).
+// Runs on a busy profile wait up to 600 s.
 //
 // GFLOW_BIN overrides the gflow executable (tests use a fake).
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { basename, dirname, extname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 const BIN = process.env.GFLOW_BIN || "gflow";
 const IMAGE_MODELS = ["nano2", "nano2.1", "nano-pro", "nano2-lite", "imagen4"];
@@ -182,31 +178,6 @@ function lookupOrCreate(name, profile) {
   return id;
 }
 
-// gflow needs a headed Chrome; on macOS keep it hidden and give focus back (an-chrome-gflow.js).
-// GFLOW_SHOW=1 leaves it visible, e.g. to watch a run.
-// gflow's own precedence for GFLOW_CLI_WINDOW_MODE: the environment, then ./.env, then <home>/.env.
-export function gflowWindowMode(env = process.env, cwd = process.cwd()) {
-  if (env.GFLOW_CLI_WINDOW_MODE) return env.GFLOW_CLI_WINDOW_MODE.trim().toLowerCase();
-  const home = env.GFLOW_CLI_HOME || join(homedir(), "Library", "Application Support", "gflow-cli");
-  for (const f of [join(cwd, ".env"), join(home, ".env")]) {
-    if (!existsSync(f)) continue;
-    const m = readFileSync(f, "utf8").match(/^\s*GFLOW_CLI_WINDOW_MODE\s*=\s*["']?([\w-]+)/m);
-    if (m) return m[1].toLowerCase();
-  }
-  return "offscreen";
-}
-
-export function needsChromeHider(platform = process.platform, env = process.env, cwd = process.cwd()) {
-  if (platform !== "darwin" || env.GFLOW_SHOW === "1" || env.GFLOW_BIN) return false;
-  return gflowWindowMode(env, cwd) !== "background";
-}
-
-function hideChrome() {
-  if (!needsChromeHider()) return null;
-  const script = join(dirname(fileURLToPath(import.meta.url)), "an-chrome-gflow.js");
-  return spawn("osascript", ["-l", "JavaScript", script, String(process.pid)], { stdio: "ignore" });
-}
-
 function generate(kind, o) {
   if (!o.out) fail("cần --out");
   const prompt = readPrompt(o);
@@ -228,11 +199,9 @@ function generate(kind, o) {
   const base = { id, kind, model: args[args.indexOf("--model") + 1], flow_project: flowId, out: o.out, prompt_sha: sha(Buffer.from(prompt)), refs: frames.map((p) => ({ path: p, sha: sha(readFileSync(p)) })) };
   ledger(project, { ...base, status: "sent" });
   console.error(`gflow.mjs: chạy ${BIN} ${args[0]} ${args[1]} (${base.model}), lần đầu có thể mất 30–90 giây…`);
-  const hider = hideChrome();
   // a second run on the same profile waits its turn instead of failing with exit 11
   const env = { GFLOW_CLI_LEASE_WAIT_SECONDS: "600", ...process.env };
   const r = spawnSync(BIN, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, env });
-  hider?.kill();
   if (r.error) { ledger(project, { id, status: "failed", exit: null, error: r.error.message }); fail(`không chạy được ${BIN}: ${r.error.message}. Cài: uv tool install \"git+https://github.com/abm-dungtq/gflow-studio.git@main\"`, 1); }
   const files = r.status === 0 ? collect(o, before, kind) : [];
   if (r.status === 0 && !files.length) {
