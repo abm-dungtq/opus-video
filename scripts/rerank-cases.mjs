@@ -227,6 +227,9 @@ const NOTE_VI = [
 ];
 export const noteVi = (n) => (NOTE_VI.find(([re]) => re.test(n))?.[1] ?? n);
 
+// The video to watch: the repo's demo (Skillry page with original + remake, or the video attached in
+// the repo), else the original post, which carries the video.
+export const demoOf = (r) => r.demo_url || r.url;
 const oneLine = (r, n = 140) => clip(String(r.title || r.prompt || "").replace(/\s+/g, " ").trim(), n);
 
 // The markdown block the agent pastes to the user. out = rerank()/rerankComposite() result.
@@ -238,9 +241,11 @@ export function suggestBlock(out, { limit = 3 } = {}) {
   rows.forEach((r, i) => {
     lines.push(`${i + 1}. **${r.id}** · @${r.author} · ${r.category}: ${oneLine(r)}`);
     lines.push(`   Vì sao: ${whyOf(r)}.`);
+    lines.push(`   Video demo: ${demoOf(r)}`);
     lines.push(`   ${r.url}`);
   });
   if (!rows.length) lines.push("Không tìm thấy case nào.");
+  lines.push("", "Chọn một case (ví dụ \"case 2\") để mình viết prompt chuyển thể cho video của bạn, hoặc bỏ qua.");
   lines.push("", `case_search: ${caseSearchLabel(out)}`);
   return { text: lines.join("\n") + "\n", ids: rows.map((r) => r.id) };
 }

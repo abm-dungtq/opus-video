@@ -33,7 +33,10 @@ test("suggestBlock: Jev result lists the top cases with link and reason, case_se
   const b = suggestBlock(out, { limit: 3 });
   assert.deepEqual(b.ids, ["y:a", "y:b", "y:c"]);
   assert.match(b.text, /^## Gợi ý case/);
-  assert.match(b.text, /1\. \*\*y:a\*\*.*\n   Vì sao: .*\n   https:\/\/x\.com\/1/);
+  assert.match(b.text, /1\. \*\*y:a\*\*.*\n   Vì sao: .*\n   Video demo: https:\/\/x\.com\/1\n   https:\/\/x\.com\/1/, "no demo_url: the post is the demo");
+  const d = suggestBlock({ reranked: true, results: [row("y:z", "https://x.com/9", composite(3, 3, 3), { demo_url: "https://skillry.dev/ai-videos/opus-5-5/z" })] });
+  assert.match(d.text, /Video demo: https:\/\/skillry\.dev\/ai-videos\/opus-5-5\/z/);
+  assert.match(b.text, /Chọn một case/);
   assert.match(b.text, /> Không có case dọc 9:16/);
   assert.doesNotMatch(b.text, /Jev không chạy/);
   assert.match(b.text, /case_search: jev\n$/);
