@@ -104,6 +104,25 @@ test("--show refuses placeholders (exit 3), then prints demo, links, why and the
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 
+test("an adapted prompt that keeps the case's own ## headings is read whole, by --show and on a rewrite", () => {
+  const d = setup();
+  const file = join(d, "cases.jsonl");
+  try {
+    run({ project: d, id: "y:full", file, log: () => {} });
+    const f = join(d, "build", "TEMPLATE.md");
+    const why = "Case này là một logo sting ngắn, nhịp nhanh, chữ đậm: giống video ra mắt ABM của bạn. Giữ nhịp và kiểu chữ.";
+    const adapted = "## Stack\nHTML + GSAP, 9:16.\n\n## Scene 1\nThe ABM logo slams in with bold type and the line from BRIEF.md.\n\n## Scene 2\nEnd card.";
+    writeFileSync(f, readFileSync(f, "utf8")
+      .replace(/(## Vì sao dùng prompt này\n\n)\(agent viết[^\n]*/, `$1${why}`)
+      .replace(/(## Prompt chuyển thể\n\n)\(agent viết[^\n]*/, `$1${adapted}`));
+    const r = show({ project: d, file });
+    assert.equal(r.code, 0, r.error);
+    assert.ok(r.text.includes("```text\n" + adapted + "\n```"), "all scenes, not only the first heading");
+    run({ project: d, id: "y:full", file, log: () => {} });
+    assert.ok(readFileSync(f, "utf8").includes(adapted), "a rewrite keeps every scene");
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
 test("under the Studio director BRIEF.md is left alone; TEMPLATE.md is still written", () => {
   const d = setup();
   try {

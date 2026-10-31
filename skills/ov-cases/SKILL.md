@@ -23,7 +23,7 @@ Một lần mỗi dự án, trước `ov-direction` (hay trước khi chọn cas
 
 6. Người dùng chọn một case: làm mục **Sau khi người dùng chọn case** dưới đây. Họ bỏ qua thì đi tiếp, các case vẫn là tham khảo cho storyboard.
 
-**Cổng:** brief `brief_version: 3` (mặc định của dự án mới) chưa có `case_search:` lẫn `CASES.md` thì `make-pitch.mjs init` dừng với exit 6 và `check-preflight` FAIL ở cả hai stage. Dự án `brief_version: 2` chỉ nhận WARN. Motion Studio tự chạy lệnh này với `--cases-only` (`COMMANDS.suggestCases`: chỉ ghi `CASES.md`, không đụng `BRIEF.md`; `CASES.md` đủ mở cổng) và hiện `CASES.md` trên tab Đạo diễn.
+**Cổng:** brief `brief_version: 3` (mặc định của dự án mới) chưa có `case_search:` lẫn `CASES.md` thì `make-pitch.mjs init` dừng với exit 6 và `check-preflight` FAIL ở cả hai stage. Dự án `brief_version: 2` chỉ nhận WARN. Motion Studio tự chạy lệnh này với `--cases-only` (`COMMANDS.suggestCases`: chỉ ghi `CASES.md`, không đụng `BRIEF.md`; `CASES.md` đủ mở cổng) và hiện `CASES.md` trên tab Đạo diễn. Dòng cuối `brief_fingerprint:` của `CASES.md` ghi brief đã dùng để xếp hạng (`BRIEF.case-query.json`, thân BRIEF.md, `topic`, `aspect`); khi brief đổi, Studio tự xếp hạng lại. Dòng này không in ra stdout, không gửi người dùng.
 
 ## Sau khi người dùng chọn case
 

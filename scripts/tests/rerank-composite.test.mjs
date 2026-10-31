@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
   briefAspect, normAspect, compositeRequest, combine, rerankComposite, tournament, priorOf,
-  GENRE_FIT, TOPIC_FIT, STYLE_FIT, WEIGHTS, ASPECT_FIT, WEAK_STYLE, weakStyleNote, TOPIC_FLOOR, byComposite,
+  GENRE_FIT, TOPIC_FIT, STYLE_FIT, WEIGHTS, ASPECT_FIT, WEAK_STYLE, weakStyleNote, TOPIC_FLOOR, byComposite, floorTopic,
 } from "../rerank-composite.mjs";
 import { featureQuestions, parseFeatureAnswers, GENRES, NOULS, loadFeatures } from "../case-features.mjs";
 import { post, API_URL } from "../jev-client.mjs";
@@ -98,6 +98,10 @@ test("topic floor: an off-topic case with the best kind and style cannot lead to
   // A case at or above the floor keeps its composite place.
   const kept = byComposite([{ i: 0, t: TOPIC_FLOOR.off, final: 0.9 }, { i: 1, t: 3, final: 0.5 }]);
   assert.deepEqual(kept.map((x) => x.i), [0, 1]);
+  // After the pairwise tournament puts an off-topic case first, the floor still applies and keeps
+  // the tournament order within each tier.
+  const t = floorTopic([{ i: 0, t: 0.2 }, { i: 2, t: 3 }, { i: 1, t: 2.5 }]);
+  assert.deepEqual(t.map((x) => x.i), [2, 1, 0]);
 });
 
 test("weak-match and no-vertical notes", async () => {

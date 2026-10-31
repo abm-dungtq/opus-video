@@ -23,6 +23,8 @@ import { ELEVEN_REFUSED } from "./director-guard.mjs";
 
 export { load, validate, SCHEMA, FILE, SERIES_FILE, validateSeries, seriesDirOf } from "./manifest.mjs";
 export { patch, undo, redo, redoTarget, readHistory, derive, EXIT, ACTORS, OPS } from "./gateway.mjs";
+// Motion Studio ranks the cases again when CASES.md was made for another brief.
+export { casesStale } from "./case-fingerprint.mjs";
 export { enqueue, list, next, finish, cancelRequest, ask, answer, expireWaiting, STATUSES, ASK_KINDS, ASK_GATES, ID } from "./requests.mjs";
 
 export const OV = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");

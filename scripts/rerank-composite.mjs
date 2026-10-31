@@ -55,11 +55,14 @@ export const WEAK_STYLE = 2;
 // its kind and style fit: a paper-collage "what is Claude Code" explainer must not lead a phin-coffee
 // brief over two coffee cases. With no topic match in the pool the composite order stands.
 export const TOPIC_FLOOR = { off: 1, match: 2 };
-export function byComposite(scored) {
+// Stable: moves off-topic cases below the rest and keeps the given order within each tier, so it
+// also holds after the pairwise tournament reorders the top.
+export function floorTopic(scored) {
   const floor = scored.some((x) => x.t >= TOPIC_FLOOR.match);
   const off = (x) => (floor && x.t < TOPIC_FLOOR.off ? 1 : 0);
-  return [...scored].sort((a, b) => off(a) - off(b) || b.final - a.final || a.i - b.i);
+  return scored.map((x, k) => ({ x, k })).sort((a, b) => off(a.x) - off(b.x) || a.k - b.k).map((o) => o.x);
 }
+export const byComposite = (scored) => floorTopic([...scored].sort((a, b) => b.final - a.final || a.i - b.i));
 export const NO_MATCH = { final: 0.50 }; // best composite below this → "weak matches" note (round 2: flagged 3 of the 4 briefs I judged weakest, 1 false alarm)
 const SNIPPET = 500;
 export const CHUNK = 100; // questions per request
@@ -236,7 +239,7 @@ export async function rerankComposite({ brief, candidates, features, limit = 5, 
     if (pair > 1) {
       const t = await tournament(brief, scored.slice(0, pair), features, { apiKey, fetchImpl });
       calls += t.calls; usage = addUsage(usage, t.usage);
-      scored = [...t.items, ...scored.slice(pair)];
+      scored = floorTopic([...t.items, ...scored.slice(pair)]);
     }
     const top = scored.slice(0, limit);
     const notes = [];
