@@ -14,6 +14,7 @@
 - `scripts/lemo-pick.mjs rank --brief-json BRIEF.case-query.json [--limit 3] [--library <dir>] [--json] [--stats]`: ranks the 59 styles of the pinned [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) library (LemoLab; code MIT, demo films CC BY 4.0) for a brief from each `styles/<slug>/style.json` and the opening of its `STYLE.md`. With `TYPESAFE_API_KEY`, Jev scores every style 0–4 in one request (about 28k input tokens, under 1 s); without a key, or on an HTTP error, timeout or bad payload, it falls back to keyword order and exits 0 (one stderr line when a key was set). Each result has a Vietnamese reason and says whether it is a canvas layer (`lemo.mjs add`) or built from `STYLE.md`. `--stats` gives `lemo_search` for BRIEF.md.
 - `lemo-pick.mjs choose --project <dir> --style <slug> [--search <label>]`: writes `lemo_style:` for a canvas-layer style or `lemo_ref:` for a grammar-only one, plus `lemo_search:`, and adds one LemoLab credit line to `assets/CREDITS.md`.
 - `ov-direction` suggests 2–3 lemo-opuscar styles before `make-pitch init`; `ov-cases` offers the same in quick mode with the same `BRIEF.case-query.json`. `brief-template.md` documents `lemo_ref` and `lemo_search`; `lemo-canvas.md` covers choosing, licences and credit.
+- `qc-mp4` MOTION: BRIEF `motion_override: [step=2|3] [still=x] [peak=y] | <lý do ≥ 20 ký tự>` for styles drawn on twos or slow on purpose (risograph, watercolor). `step` measures YDIF across 2–3 frames (also in `check-preflight` for the animatic); `still`/`peak` may only move the WARN line between its default and the FAIL line. Without a reason the override is ignored with a note. The defaults and the FAIL line do not change. `lemo-canvas.md` explains when to use it.
 - `scripts/gflow.mjs doctor|image|video`: Google Flow images (Nano Banana 2 by default, `t2i`, or `i2i` when `--ref` is given) and image-to-video clips (Veo / Omni Flash, start and optional end frame) through gflow-cli. `video` refuses without `--spend` because Veo bills Flow credits. Nothing retries; gflow's exit code passes through (23 means Flow changed its page). Every run is written to `<project>/assets/gen/gflow-ledger.jsonl` before it starts and when it ends, with prompt and reference hashes, never the prompt text. Every run reuses one named Flow project (`--flow-project <name>`, default the project folder's name; id saved in `assets/gen/gflow-projects.json`, else found in gflow's catalog or created once) instead of gflow's per-run scratch project; a project deleted on the web is reported, not recreated. `GFLOW_BIN` overrides the executable for tests. `ov-setup` and `ov-build` say when to use it. Checked live against Flow: images land in the named project and the project count stays flat.
 
 ### Changed
@@ -21,6 +22,14 @@
 - `studio-api.mjs` `SKILLS` adds `ov-cases`, so the Motion Studio director can run the suggestion and put the block in its receipt.
 - `data/SOURCES.md`: corpus checked against upstream on 2026-10-31 (both repos unchanged at 92aee2f and 028bc52).
 - `lemo.mjs fetch` also checks out `styles/*/style.json` and `styles/*/STYLE.md` (`LIBRARY_GLOBS`), about 2 MB in all. An existing cache picks them up on the next fetch.
+- `audio-mix` (and `render-final`, which calls it) runs a true-peak limiter when the -14 LUFS gain would push the peak over -1.5 dBTP, instead of stopping short of the target. The loudness target lives in one place (`LOUDNORM` in `audio-mix.mjs`) and `qc-mp4` reads its -16…-12 LUFS range from it.
+- `video-lint.mjs --project <dir>` like the other scripts; `--hyperframes <dir>` still works, and both together must name the same folder.
+
+### Fixed
+- `make-pitch init` read only `lemo_style:` and gave a grammar-only `lemo_ref:` style a guessed style profile; every styleframe now points at that style's `STYLE.md`, PICK.json keeps `lemo_ref`, `choose` writes no `style_profile` for it, and `check-preflight` no longer warns about the missing profile.
+- `make-pitch init --directions A1` said "3 hướng"; it and PITCH.md now count the directions actually picked.
+- `make-pitch` styleframes that load `assets/fonts/*` (the lemo skeleton) got no fonts; `init` copies them from the project or the user's font folders and `render` stops with exit 2 when one is missing.
+- `eleven.mjs sfx` kept up to 0.7 s of quiet lead-in before the hit; it now trims to the onset (-20 dB, shared with `sfx-sync`) with a short fade-in. Its log reported the API's byte count for the trimmed file; it now shows both.
 
 ## v2.7.1 (2026-10-25): sửa nhạc theo plan và karaoke
 

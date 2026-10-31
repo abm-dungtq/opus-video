@@ -226,7 +226,7 @@ Liệt kê các mục tôi cần tự nghe.
 #### opus-video sẽ làm gì
 
 - `node $OV/scripts/qc-mp4.mjs <file.mp4> --project <thư mục dự án> --write-qa`: khổ hình, thời lượng, khung đen, đứng hình, khoảng lặng, loudness, true peak, bitrate. Thoát 1 khi có FAIL.
-- `video-lint.mjs --hyperframes .`, `check-preflight.mjs --stage final`, `check-viet-pro.mjs --stage delivery`.
+- `video-lint.mjs --project .`, `check-preflight.mjs --stage final`, `check-viet-pro.mjs --stage delivery`.
 - `judge.mjs check`; thoát 3 hoặc 4 thì QA bằng ảnh tĩnh và ghi "không có giám khảo video".
 - Thanh điệu tiếng Việt và giọng đọc được liệt kê là mục bạn tự nghe.
 

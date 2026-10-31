@@ -405,7 +405,7 @@ Mỗi phiên bản vN đi qua các bước trong [qa-checklist.md](../references
 
 1. `hyperframes lint` thoát 0.
 2. `hyperframes check --frame-check` (bản 16:9 thêm `--caption-zone` theo checklist).
-3. `node $OV/scripts/video-lint.mjs --hyperframes .` thoát 0.
+3. `node $OV/scripts/video-lint.mjs --project .` thoát 0.
 4. Render `renders/<name>-vN.mp4`.
 5. `node $OV/scripts/judge.mjs check --video renders/<name>-vN.mp4 --hyperframes ./ --out qc/vN-check.json`.
 6. Từ v2: `node $OV/scripts/judge.mjs pair --a renders/<name>-vN.mp4 --b renders/<name>-vN-1.mp4 --out qc/vN-vs-prev.json`.

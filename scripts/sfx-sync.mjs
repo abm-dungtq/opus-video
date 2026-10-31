@@ -35,6 +35,7 @@ import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
 import { fold, parsePlan, parseTable } from "./check-preflight.mjs";
 import { parseTracks } from "./audio-mix.mjs";
+import { SFX_ONSET_DB } from "./normalize-bed.mjs";
 
 // check-preflight.mjs imports checkSync from this file: the cycle is safe only while every use of
 // an imported binding stays inside a function (never at module level).
@@ -119,7 +120,7 @@ export function measureLead(file, run = spawnSync) {
   const m = ff("volumedetect").match(/max_volume:\s*(-?inf|-?\d+(?:\.\d+)?)\s*dB/i);
   const max = m ? Number(m[1]) : NaN;
   if (!Number.isFinite(max)) throw new Error(`file im lặng: ${file}`);
-  const lead = leadFromSilence(ff(`silencedetect=n=${(max - 20).toFixed(1)}dB:d=0.005`));
+  const lead = leadFromSilence(ff(`silencedetect=n=${(max + SFX_ONSET_DB).toFixed(1)}dB:d=0.005`));
   return { lead, max_db: max };
 }
 

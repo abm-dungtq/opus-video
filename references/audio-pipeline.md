@@ -103,12 +103,13 @@ node $OV/scripts/eleven.mjs music --prompt "calm curious ambient, 100 BPM, light
 - Nếu script exit 3 và in `MUSIC_UNAVAILABLE`, chuyển sang:
   `hyperframes media-use resolve --type bgm --intent "<mood>" --project .`
 - Ghi BPM vào prompt để storyboard bám beat được, rồi đo nhịp thật của file (mục 3b).
-- File nhạc và SFX do `eleven.mjs music` và `eleven.mjs sfx` sinh ra đã được cắt im lặng ở đầu và cuối (chừa 0,05 giây) và chuẩn hóa về -12,5 LUFS, đỉnh -1,5 dBTP. Lệnh in một dòng `NORMALIZE … lufs_in=… lufs_out=… trimmed_head=… trimmed_tail=…`. Thêm `--no-normalize` khi cần giữ nguyên file của API. Chuẩn hóa lỗi thì file vẫn giữ như API trả về, lệnh in `WARN normalize: …` và vẫn thoát 0.
+- File nhạc và SFX do `eleven.mjs music` và `eleven.mjs sfx` sinh ra đã được cắt im lặng ở đầu và cuối (chừa 0,05 giây) và chuẩn hóa về -12,5 LUFS, đỉnh -1,5 dBTP. Riêng `sfx` còn cắt cả đoạn dạo nhỏ trước cú đánh: đầu file được cắt tới lúc tiếng vượt (đỉnh của file − 20 dB), đúng mốc `sfx-sync.mjs` dùng để đo lúc nghe thấy tiếng, và 0,05 giây giữ lại được fade in. Trước đây một tiếng trống ElevenLabs có 0,67 giây rền ở −30 dBFS trước cú đánh −2,5 dBFS lọt qua ngưỡng −50 dBFS, nên `check-preflight --stage final` báo FAIL SYNC +668 ms và phải bù bằng `data-media-start`. Lệnh in một dòng `NORMALIZE … lufs_in=… lufs_out=… trimmed_head=… trimmed_tail=…`, rồi dòng `sfx → <file> (<n> bytes; API <m> bytes)` với `<n>` là kích thước file trên đĩa sau chuẩn hoá. Thêm `--no-normalize` khi cần giữ nguyên file của API. Chuẩn hóa lỗi thì file vẫn giữ như API trả về, lệnh in `WARN normalize: …` và vẫn thoát 0.
 - File tải về hoặc lấy từ catalog thì chuẩn hóa bằng tay trước khi đặt vào composition:
   ```bash
   node $OV/scripts/normalize-bed.mjs --in assets/bgm/bgm.mp3            # ghi đè tại chỗ
-  node $OV/scripts/normalize-bed.mjs --in tai-ve.mp3 --out assets/sfx/x.mp3 [--lufs -12.5] [--tp -1.5] [--silence-db -50] [--keep-head 0.05]
+  node $OV/scripts/normalize-bed.mjs --in tai-ve.mp3 --out assets/sfx/x.mp3 [--lufs -12.5] [--tp -1.5] [--silence-db -50] [--keep-head 0.05] [--onset-db -20]
   ```
+  `--onset-db -20` cắt đầu một SFX tới cú đánh như `eleven.mjs sfx` làm; dùng nó để sửa một SFX cũ còn đoạn dạo nhỏ ở đầu thay cho `data-media-start`.
   Cắt im lặng làm `sfx-sync.mjs` đo đầu tiếng chính xác hơn. Mức trộn cuối vẫn do `data-volume` và `audio-mix.mjs` quyết định.
 
 ## 3b. Đo nhịp nhạc (`beat-grid.mjs`)
@@ -196,7 +197,7 @@ node $OV/scripts/mix-balance.mjs --project . [--write-qa]
 
 - Độ giảm có đích: `4 + 2,5 × strength` dB nhạc dưới giọng (strength 0,8 cho 6 dB). Lệnh trộn thử một bản không giảm để đo mức tự nhiên, rồi tìm ngưỡng compressor bằng cách đo lại sau mỗi lần thử (tối đa 6 lần), không dùng hằng số cố định. stderr in một dòng `duck #music: natural … target … wanted … got …`.
 - Đây là xấp xỉ phần mức của carve trong HyperFrames, không tái tạo EQ nhiều dải. Trên bản render HyperFrames thật của dự án Gemini, carve không có `data-fx-chain` không làm nhạc nhỏ đi khi có lời.
-- `--loudnorm` đo bản mix bằng loudnorm, rồi nhân cả bản mix với một mức tăng cố định: `min(−14 − I đo được, −1,5 − TP đo được)` dB, áp bằng `volume`. Không có xử lý động nên khoảng cách nhạc dưới giọng mà duck đã ngắm được giữ nguyên. Khi đỉnh chặn mức tăng và bản mix thấp hơn −14 LUFS quá 0,5 LU, lệnh in `WARN LOUDNESS <I> LUFS (đỉnh giới hạn mức tăng)` kèm số đo. Bản giao khi đó nhỏ hơn −14 LUFS, và đó là lựa chọn có chủ ý. `--stems <dir>` ghi `voice.wav` và `music.wav` (mức trước loudnorm). `render-final.mjs` luôn gọi `--loudnorm`.
+- `--loudnorm` đo bản mix bằng loudnorm. Khi đỉnh còn chỗ, lệnh nhân cả bản mix với một mức tăng cố định `−14 − I đo được` dB, áp bằng `volume`; không có xử lý động nên khoảng cách nhạc dưới giọng mà duck đã ngắm được giữ nguyên. Khi đỉnh chặn mức tăng đó (bản mix sẽ thấp hơn −14 LUFS quá 0,5 LU, như giọng TTS có đỉnh −0,8 dBFS), lệnh tăng đủ mức rồi qua một limiter nhìn trước (`alimiter` trên tín hiệu lấy mẫu gấp 4 để bắt đỉnh giữa hai mẫu) đặt ở −2 dBFS, dưới trần −1,5 dBTP 0,5 dB. Limiter chỉ chạm vài đỉnh (phụ âm bật, cú SFX) nên cân bằng nhạc dưới giọng gần như giữ nguyên. Limiter cũng lấy bớt loudness, nên lệnh đo lại bản ra và chỉnh mức tăng, tối đa 3 lượt và không quá 6 dB trên mức tĩnh. Lệnh in một dòng `limiter: …` kèm số đo, và chỉ in `WARN LOUDNESS` khi kết quả vẫn ngoài −16…−12 LUFS. Đó cũng là khoảng mà `qc-mp4` LOUDNESS chấp nhận: cả hai đọc chung hằng `LOUDNORM` trong `audio-mix.mjs` (đích −14, khoảng −16…−12, trần −1,5 dBTP dưới ngưỡng WARN −1 của `qc-mp4` TRUE_PEAK). Bản thử thuỷ màu 15 giây: bản mix −17,2 LUFS, đỉnh −2,1 dBTP; trước đây chỉ tăng được 0,6 dB (−16,6 LUFS, WARN ở `qc-mp4`), giờ ra −14,2 LUFS, đỉnh −2,0 dBTP. `--stems <dir>` ghi `voice.wav` và `music.wav` (mức trước loudnorm). `render-final.mjs` luôn gọi `--loudnorm`.
 
 ### Kết quả hiệu chỉnh (2026-10-15, bản sao trong `/tmp`)
 

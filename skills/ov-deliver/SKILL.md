@@ -15,7 +15,7 @@ description: "Phần giao của opus-video: render bản giao chỉ qua render-f
 
 ## 8. QA
 
-Mọi bản render đều chạy `node $OV/scripts/qc-mp4.mjs renders/<name>.mp4 --project ./ --write-qa` trước; còn dòng FAIL (exit 1) thì sửa rồi render lại, WARN thì xem và ghi lý do vào `QA.md`. Dòng `MOTION` FAIL (dự án có `direction:`) nghĩa là video gần như đứng yên kiểu slideshow: dựng lại các beat theo `build/RECIPES.md`, không nới ngưỡng. Chữ chốt trên hình (hàng `chữ:` trong `## Sự kiện`) phải khớp lời: `node $OV/scripts/word-sync.mjs --project ./ --write-qa` (lệch ≤ 150 ms). Sau đó làm theo `$OV/references/qa-checklist.md` § "Vòng QA tự xem video": lint + check → `video-lint.mjs` → render vN → `judge.mjs check`, từ v2 thêm `pair`. Ghi kết quả vào `QA.md`. Tối đa 3 vòng, sau đó dừng lại và báo người dùng kèm bằng chứng.
+Mọi bản render đều chạy `node $OV/scripts/qc-mp4.mjs renders/<name>.mp4 --project ./ --write-qa` trước; còn dòng FAIL (exit 1) thì sửa rồi render lại, WARN thì xem và ghi lý do vào `QA.md`. Dòng `MOTION` FAIL (dự án có `direction:`) nghĩa là video gần như đứng yên kiểu slideshow: dựng lại các beat theo `build/RECIPES.md`, không nới ngưỡng. Hình lemo vẽ theo nhịp hai khung (risograph) hoặc loang chậm (watercolor) có cách qua và `motion_override` (có lý do bắt buộc, vạch FAIL không đổi) trong `$OV/references/lemo-canvas.md`. Chữ chốt trên hình (hàng `chữ:` trong `## Sự kiện`) phải khớp lời: `node $OV/scripts/word-sync.mjs --project ./ --write-qa` (lệch ≤ 150 ms). Sau đó làm theo `$OV/references/qa-checklist.md` § "Vòng QA tự xem video": lint + check → `video-lint.mjs` → render vN → `judge.mjs check`, từ v2 thêm `pair`. Ghi kết quả vào `QA.md`. Tối đa 3 vòng, sau đó dừng lại và báo người dùng kèm bằng chứng.
 
 ## 9. Caption khi giao
 

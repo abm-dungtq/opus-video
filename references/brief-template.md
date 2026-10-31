@@ -14,6 +14,7 @@ engine_reason: <1 câu: vì sao chọn engine này>
 lemo_style: <watercolor | glass-product>   # tuỳ chọn: lớp lemo-canvas dưới composition (references/lemo-canvas.md); bỏ dòng này khi không dùng
 lemo_ref: <slug lemo-opuscar>   # tuỳ chọn: phong cách dựng theo ngữ pháp STYLE.md, không có lớp canvas; lemo-pick.mjs choose ghi, không đi cùng lemo_style
 lemo_search: <jev | keyword (lý do)>   # lemo-pick.mjs choose ghi: phong cách lemo được chọn bằng Jev hay theo từ khoá
+motion_override: <step=2 | still=0.55 | peak=1.8> | <lý do ≥ 20 ký tự>   # tuỳ chọn: thước MOTION riêng cho hình vẽ theo nhịp hai khung hoặc chậm (references/lemo-canvas.md); vạch FAIL không đổi
 aspect: <16:9 | 9:16 | both>
 duration_s: <số giây>
 fps: <30 | 60>

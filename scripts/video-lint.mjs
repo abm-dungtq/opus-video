@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // video-lint.mjs — catch what `hyperframes check` misses in a HyperFrames project.
-//   node video-lint.mjs --hyperframes <dir> [--json] [--skip-runtime]
+//   node video-lint.mjs --project <dir> [--json] [--skip-runtime]
 //   node video-lint.mjs --help
+// --project <dir>: the HyperFrames project (index.html, BRIEF.md), as in the other scripts.
+//   --hyperframes <dir> is the older name and still works; both together must name one folder.
 // Codes:
 //   LOWERCASE_TRANSFORM  ERROR  text-transform: lowercase (turns "AI" into "ai").
 //   FONT_TOO_SMALL       ERROR < 1.6% / WARN < 2.2% of the short canvas edge (px, cqw, vw).
@@ -47,11 +49,16 @@ const opts = {};
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (a === "--json" || a === "--skip-runtime") opts[a.slice(2)] = true;
-  else if (a === "--hyperframes") opts.hyperframes = argv[++i];
-  else fail(`unknown argument ${a}\nusage: node video-lint.mjs --hyperframes <dir> [--json] [--skip-runtime]  (--help for details)`);
+  else if (a === "--project" || a === "--hyperframes") {
+    const v = argv[++i];
+    if (v === undefined || v.startsWith("--")) fail(`${a} needs a directory`);
+    if (opts.dir !== undefined && resolve(opts.dir) !== resolve(v)) fail(`--project and --hyperframes name different folders (${opts.dir}, ${v})`);
+    opts.dir = v;
+  }
+  else fail(`unknown argument ${a}\nusage: node video-lint.mjs --project <dir> [--json] [--skip-runtime]  (--help for details)`);
 }
-if (!opts.hyperframes) fail("missing --hyperframes <dir>");
-const dir = resolve(opts.hyperframes);
+if (!opts.dir) fail("missing --project <dir>");
+const dir = resolve(opts.dir);
 const indexPath = join(dir, "index.html");
 if (!existsSync(indexPath)) fail(`no index.html in ${dir}`);
 
