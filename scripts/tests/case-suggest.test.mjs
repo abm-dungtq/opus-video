@@ -33,7 +33,9 @@ test("suggestBlock: Jev result lists the top cases with link and reason, case_se
   const b = suggestBlock(out, { limit: 3 });
   assert.deepEqual(b.ids, ["y:a", "y:b", "y:c"]);
   assert.match(b.text, /^## Gợi ý case/);
-  assert.match(b.text, /1\. \*\*y:a\*\*.*\n   Vì sao: .*\n   Video demo: https:\/\/x\.com\/1\n   https:\/\/x\.com\/1/, "no demo_url: the post is the demo");
+  assert.match(b.text, /1\. \*\*y:a\*\*.*\n   Vì sao: .*\n   https:\/\/x\.com\/1/, "no demo_url: only the post link, which carries the video");
+  assert.doesNotMatch(b.text, /Video demo/);
+  assert.doesNotMatch(suggestBlock({ reranked: true, results: [row("y:s", "https://x.com/5", composite(3, 3, 3), { demo_url: "https://x.com/5" })] }).text, /Video demo/, "a demo equal to the post is not repeated");
   const d = suggestBlock({ reranked: true, results: [row("y:z", "https://x.com/9", composite(3, 3, 3), { demo_url: "https://skillry.dev/ai-videos/opus-5-5/z" })] });
   assert.match(d.text, /Video demo: https:\/\/skillry\.dev\/ai-videos\/opus-5-5\/z/);
   assert.match(b.text, /Chọn một case/);
@@ -120,5 +122,23 @@ test("make-pitch init refuses a brief_version 3 brief before the case suggestion
     assert.equal(r.code, 6);
     assert.match(r.msg, /rerank-cases\.mjs --suggest/);
     assert.ok(!existsSync(join(d, "pitch")), "nothing scaffolded");
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("Studio's suggestCases command writes only CASES.md, and that alone opens the pitch gate", async () => {
+  const { COMMANDS } = await import("../studio-api.mjs");
+  const d = tmp();
+  try {
+    const brief = "---\nbrief_version: 3\naspect: 16:9\ntopic: cà phê phin\n---\n# Brief\nVideo dạy pha cà phê phin.\n";
+    writeFileSync(join(d, "BRIEF.md"), brief);
+    const { file, args } = COMMANDS.suggestCases;
+    const r = spawnSync("node", [file, ...args.map((a) => a.replaceAll("{project}", d))], {
+      encoding: "utf8", env: { ...process.env, TYPESAFE_API_KEY: "", HOME: d, MOTION_STUDIO_RUNNER: "", OPUS_STUDIO_RUNNER: "" },
+    });
+    assert.equal(r.status, 0, r.stderr);
+    assert.ok(existsSync(join(d, "CASES.md")));
+    assert.equal(readFileSync(join(d, "BRIEF.md"), "utf8"), brief, "BRIEF.md is the user's in Studio");
+    assert.equal(caseSuggestCheck({ dir: d, brief }), null);
+    assert.notEqual(init({ project: d, topic: "cà phê phin", aspect: "16:9" }, loadDirections(), { anim: "x", faceless: "x", creative: "x" }).code, 6);
   } finally { rmSync(d, { recursive: true, force: true }); }
 });

@@ -30,7 +30,9 @@
 //   (--pool all), drops a second row of the same post (both datasets list some posts), keeps the
 //   top --limit (default 3) and prints a Vietnamese block (id, link, one line, "Vì sao") for the
 //   agent to paste to the user unchanged. Writes it to <project>/CASES.md and `case_search:` +
-//   `case_refs:` into BRIEF.md (not under the Studio director, which may not write BRIEF.md).
+//   `case_refs:` into BRIEF.md (not under the Studio director, which may not write BRIEF.md, nor with
+//   --cases-only, which Motion Studio passes because BRIEF.md is written there only by the user's
+//   choices; CASES.md alone satisfies the case suggestion gate).
 //   Unlike the plain mode, a fallback is never silent here: no key, HTTP error or timeout puts a
 //   "⚠ Jev không chạy (…)" line at the top of the block and on stderr. Exit 2 with neither file.
 // Node built-ins only.
@@ -173,7 +175,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (!a.startsWith("--")) continue;
     const k = a.slice(2);
-    if (["full-only", "json", "stats", "include-removed", "suggest"].includes(k)) o[k] = true;
+    if (["full-only", "json", "stats", "include-removed", "suggest", "cases-only"].includes(k)) o[k] = true;
     else if (k === "keyword") o.keywords.push(String(argv[++i] ?? "").toLowerCase());
     else o[k] = argv[++i];
   }
@@ -227,9 +229,9 @@ const NOTE_VI = [
 ];
 export const noteVi = (n) => (NOTE_VI.find(([re]) => re.test(n))?.[1] ?? n);
 
-// The video to watch: the repo's demo (Skillry page with original + remake, or the video attached in
-// the repo), else the original post, which carries the video.
-export const demoOf = (r) => r.demo_url || r.url;
+// The demo video in the case's library (Skillry page with original + remake, or the video attached in
+// the repo), or null when there is none apart from the post itself (the post link already carries it).
+export const demoOf = (r) => (r.demo_url && r.demo_url !== r.url ? r.demo_url : null);
 const oneLine = (r, n = 140) => clip(String(r.title || r.prompt || "").replace(/\s+/g, " ").trim(), n);
 
 // The markdown block the agent pastes to the user. out = rerank()/rerankComposite() result.
@@ -241,7 +243,7 @@ export function suggestBlock(out, { limit = 3 } = {}) {
   rows.forEach((r, i) => {
     lines.push(`${i + 1}. **${r.id}** · @${r.author} · ${r.category}: ${oneLine(r)}`);
     lines.push(`   Vì sao: ${whyOf(r)}.`);
-    lines.push(`   Video demo: ${demoOf(r)}`);
+    if (demoOf(r)) lines.push(`   Video demo: ${demoOf(r)}`);
     lines.push(`   ${r.url}`);
   });
   if (!rows.length) lines.push("Không tìm thấy case nào.");
@@ -250,7 +252,7 @@ export function suggestBlock(out, { limit = 3 } = {}) {
   return { text: lines.join("\n") + "\n", ids: rows.map((r) => r.id) };
 }
 
-// Writes CASES.md and (outside the Studio director) case_search/case_refs into BRIEF.md.
+// Writes CASES.md and (outside the Studio director and --cases-only) case_search/case_refs into BRIEF.md.
 export function recordSuggestion(dir, block, out, { director = underDirector() } = {}) {
   writeFileSync(join(dir, SUGGEST_FILE), block.text);
   const brief = join(dir, "BRIEF.md");
@@ -301,7 +303,7 @@ async function main() {
   const max = Number(o["max-chars"]);
   if (suggest) {
     const block = suggestBlock(out, { limit: Number(o.limit) });
-    const rec = recordSuggestion(dir, block, out);
+    const rec = recordSuggestion(dir, block, out, o["cases-only"] ? { director: true } : undefined);
     process.stdout.write(block.text);
     console.error(`rerank-cases: wrote ${SUGGEST_FILE}${rec.brief ? " and case_search/case_refs in BRIEF.md" : ""}; show the block above to the user as is`);
     return;

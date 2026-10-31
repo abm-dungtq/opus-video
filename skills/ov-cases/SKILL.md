@@ -16,14 +16,14 @@ Một lần mỗi dự án, trước `ov-direction` (hay trước khi chọn cas
    ```bash
    node $OV/scripts/rerank-cases.mjs --suggest --project . --category <motion|explainer|3d|interactive|product|story-music> --keyword <từ khoá tiếng Anh>
    ```
-   Script đọc `BRIEF.case-query.json` và `aspect` trong đó (chưa có file này thì đọc thẳng `BRIEF.md`, kém chính xác hơn; Motion Studio chạy theo cách này), cho Jev chấm cả corpus (`--pool all`, khoảng 2 giây, khoảng 0,04 USD), bỏ dòng trùng cùng một bài đăng, giữ 3 case (`--limit` để đổi), in một khối tiếng Việt (id, tác giả, một dòng mô tả, `Vì sao:` theo điểm loại video/chủ đề/phong cách, `Video demo:` là trang demo trong repo mẫu (Skillry có bản gốc và bản làm lại) hoặc video trong repo, rồi link bài gốc), ghi khối đó vào `CASES.md` và ghi `case_search:`, `case_refs:` vào `BRIEF.md`. Exit 2 là chưa có cả `BRIEF.case-query.json` lẫn `BRIEF.md`.
+   Script đọc `BRIEF.case-query.json` và `aspect` trong đó (chưa có file này thì đọc thẳng `BRIEF.md`, kém chính xác hơn; Motion Studio chạy theo cách này), cho Jev chấm cả corpus (`--pool all`, khoảng 2 giây, khoảng 0,04 USD), bỏ dòng trùng cùng một bài đăng, giữ 3 case (`--limit` để đổi), in một khối tiếng Việt (id, tác giả, một dòng mô tả, `Vì sao:` theo điểm loại video/chủ đề/phong cách, `Video demo:` là trang demo trong repo mẫu (Skillry có bản gốc và bản làm lại) hoặc video trong repo, không có dòng này khi video chỉ nằm trong bài gốc, rồi link bài gốc). Khi trong pool có case cùng chủ đề (topic ≥ 2/4), case Jev chấm lạc chủ đề (topic < 1/4) xếp sau, dù loại video và phong cách khớp, ghi khối đó vào `CASES.md` và ghi `case_search:`, `case_refs:` vào `BRIEF.md`. Exit 2 là chưa có cả `BRIEF.case-query.json` lẫn `BRIEF.md`.
 3. **Gửi nguyên khối in ra cho người dùng** (khối đã kết bằng lời mời chọn "case 2" hoặc bỏ qua). Không tự tóm tắt lại thành một dòng, không bỏ dòng `>` hay link demo.
 4. Khối mở đầu bằng `⚠ Jev không chạy (…)` nghĩa là không có key, key sai (HTTP 401), hết giờ hay lỗi mạng: danh sách chỉ xếp theo từ khoá. Vẫn gửi khối cho người dùng và nói rõ lý do; 401 hay thiếu key thì chỉ họ tới `ov-setup`.
 5. Trong Motion Studio, đạo diễn (`MOTION_STUDIO_RUNNER=cli`) không được ghi `BRIEF.md`, nên script chỉ ghi `CASES.md`; đạo diễn chép nguyên khối vào biên nhận `studio_request_done` của yêu cầu đầu tiên của dự án mới (hoặc vào thẻ `studio_ask` nếu đang hỏi người dùng).
 
 6. Người dùng chọn một case: làm mục **Sau khi người dùng chọn case** dưới đây. Họ bỏ qua thì đi tiếp, các case vẫn là tham khảo cho storyboard.
 
-**Cổng:** brief `brief_version: 3` (mặc định của dự án mới) chưa có `case_search:` lẫn `CASES.md` thì `make-pitch.mjs init` dừng với exit 6 và `check-preflight` FAIL ở cả hai stage. Dự án `brief_version: 2` chỉ nhận WARN. Motion Studio tự chạy lệnh này (`COMMANDS.suggestCases`) và hiện `CASES.md` trên tab Đạo diễn.
+**Cổng:** brief `brief_version: 3` (mặc định của dự án mới) chưa có `case_search:` lẫn `CASES.md` thì `make-pitch.mjs init` dừng với exit 6 và `check-preflight` FAIL ở cả hai stage. Dự án `brief_version: 2` chỉ nhận WARN. Motion Studio tự chạy lệnh này với `--cases-only` (`COMMANDS.suggestCases`: chỉ ghi `CASES.md`, không đụng `BRIEF.md`; `CASES.md` đủ mở cổng) và hiện `CASES.md` trên tab Đạo diễn.
 
 ## Sau khi người dùng chọn case
 

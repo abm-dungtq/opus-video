@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
   briefAspect, normAspect, compositeRequest, combine, rerankComposite, tournament, priorOf,
-  GENRE_FIT, TOPIC_FIT, STYLE_FIT, WEIGHTS, ASPECT_FIT, WEAK_STYLE, weakStyleNote,
+  GENRE_FIT, TOPIC_FIT, STYLE_FIT, WEIGHTS, ASPECT_FIT, WEAK_STYLE, weakStyleNote, TOPIC_FLOOR, byComposite,
 } from "../rerank-composite.mjs";
 import { featureQuestions, parseFeatureAnswers, GENRES, NOULS, loadFeatures } from "../case-features.mjs";
 import { post, API_URL } from "../jev-client.mjs";
@@ -81,6 +81,23 @@ test("rerankComposite: classify + one fan-out, sorted by composite, vertical win
   assert.equal(out.results[0].jev.baseline_rank, 2);
   assert.equal(out.brief_class.aspect, "9:16");
   assert.deepEqual(out.usage, { input_tokens: 20, output_tokens: 2 });
+});
+
+test("topic floor: an off-topic case with the best kind and style cannot lead topic-matching cases", async () => {
+  // The shape seen live on a phin-coffee brief: a "what is Claude Code" collage explainer (kind 4,
+  // style 4, topic 0.21) outscored two coffee cases (topic 3.39 and 3.01) on the composite alone.
+  const fits = { N: { g: 4, t: 0.21, s: 4 }, H: { g: 2, t: 3.39, s: 1 }, V: { g: 2, t: 3.01, s: 1 } };
+  const rich = new Map([...features].map(([k, v]) => [k, { ...v, aspect: "multiple", richness: k === "n" ? 4 : 1 }]));
+  const raw = combine({ candidates: cands, features: rich, fits: cands.map((c) => fits[c.title]), cls: null, aspect: "16:9" });
+  assert.ok(raw.find((x) => x.r.id === "n").final > Math.max(...raw.filter((x) => x.r.id !== "n").map((x) => x.final)), "the composite alone puts the off-topic case first");
+  const out = await rerankComposite({ brief: { ...brief, aspect: "16:9" }, candidates: cands, features: rich, limit: 3, apiKey: "k", fetchImpl: mockApi(fits).fetchImpl });
+  assert.deepEqual(out.results.map((r) => r.id), ["h", "v", "n"]);
+  // No topic match in the pool: the composite order stands.
+  const none = byComposite([{ i: 0, t: 0.2, final: 0.9 }, { i: 1, t: 1.5, final: 0.5 }]);
+  assert.deepEqual(none.map((x) => x.i), [0, 1]);
+  // A case at or above the floor keeps its composite place.
+  const kept = byComposite([{ i: 0, t: TOPIC_FLOOR.off, final: 0.9 }, { i: 1, t: 3, final: 0.5 }]);
+  assert.deepEqual(kept.map((x) => x.i), [0, 1]);
 });
 
 test("weak-match and no-vertical notes", async () => {

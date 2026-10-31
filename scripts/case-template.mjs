@@ -23,6 +23,7 @@ import { frontmatter } from "./check-viet-pro.mjs";
 import { setFrontmatter } from "./make-pitch.mjs";
 import { QUICK_MODE } from "./qc-mp4.mjs";
 import { underDirector } from "./director-guard.mjs";
+import { demoOf } from "./rerank-cases.mjs";
 
 export const CASES = fileURLToPath(new URL("../data/cases.jsonl", import.meta.url));
 
@@ -59,8 +60,8 @@ export function sectionOf(text, name) {
   return m ? m[1].trim() : "";
 }
 const written = (body, min) => body.length >= min && !body.startsWith(PLACEHOLDER_LINE);
-// The demo video (Skillry page with the original and a live remake, or the video in the repo), else the post.
-export const demoOf = (c) => c.demo_url || c.url;
+// No separate demo: the post carries the video, so the line says so instead of repeating the link.
+const demoLine = (c) => (demoOf(c) ? `${demoOf(c)}${demoNote(c)}` : "không có trang demo riêng, video nằm trong bài gốc");
 const demoNote = (c) => (c.demo_url?.includes("skillry.dev") ? " (bản gốc và bản làm lại)" : "");
 // Jev's reason for the case in CASES.md (rerank-cases.mjs --suggest), or null.
 export function jevReason(project, id) {
@@ -81,7 +82,7 @@ export function renderTemplate(c, brief, { reason = null, keep = {} } = {}) {
 
 - Tác giả: ${c.author || "(không rõ)"}
 - Bài gốc: ${c.url}
-- Video demo: ${demoOf(c)}${demoNote(c)}
+- Video demo: ${demoLine(c)}
 - Trang mẫu trong repo: ${c.repo_url || "(không có)"}
 - License: ${c.license}
 - Nguồn dữ liệu: ${c.source}
@@ -158,7 +159,7 @@ export function show({ project, file = CASES }) {
   const text = [
     `## Case đã chọn: ${c.id} · @${c.author}`,
     "",
-    `- Video demo: ${demoOf(c)}${demoNote(c)}`,
+    `- Video demo: ${demoLine(c)}`,
     `- Bài gốc: ${c.url}`,
     ...(c.repo_url ? [`- Prompt gốc trong repo: ${c.repo_url}`] : []),
     "",
