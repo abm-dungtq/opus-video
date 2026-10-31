@@ -1,11 +1,11 @@
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { imageArgs, videoArgs } from "../gflow.mjs";
+import { castRefs, imageArgs, splitRef, videoArgs } from "../gflow.mjs";
 
 const GFLOW = fileURLToPath(new URL("../gflow.mjs", import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), "ov-gflow-"));
@@ -138,4 +138,47 @@ test("invalid arguments fail before any Flow project is touched", () => {
   const r = run(["image", "--prompt-file", join(dir, "p.txt"), "--out", join(dir, "c.png"), "--aspect", "2:1"]);
   assert.equal(r.status, 2);
   assert.equal(r.all.length, 0);
+});
+
+test("--cast adds the image of each @Name the prompt mentions and reports the rest", () => {
+  const series = join(dir, "series");
+  mkdirSync(join(series, "characters"), { recursive: true });
+  writeFileSync(join(series, "characters/ngan.png"), "ngan");
+  writeFileSync(join(series, "characters/tu.png"), "tu");
+  const cast = join(series, "cast.json");
+  writeFileSync(cast, JSON.stringify({ "Ngân": "characters/ngan.png", TuDuc: "characters/tu.png", Lai: null }));
+  const c = castRefs("@ngân rót trà cho @Lai, @Mo đứng xem, TuDuc ngồi; mail @@TuDuc", cast);
+  assert.deepEqual(c.add, [`Ngân=${join(series, "characters/ngan.png")}`]);
+  assert.equal(c.warnings.length, 3);
+  assert.match(c.warnings.join("\n"), /@Lai chưa có ảnh/);
+  assert.match(c.warnings.join("\n"), /@Mo không có trong cast/);
+  assert.match(c.warnings.join("\n"), /TuDuc được nhắc mà thiếu @/);
+  // a name the command's own --ref already carries wins over the cast
+  assert.deepEqual(castRefs("@Ngân", cast, [`Ngân=${join(dir, "ref.png")}`]).add, []);
+  assert.deepEqual(castRefs("@ngan", cast, [join(dir, "ngan.png")]).add, []);
+  assert.deepEqual(splitRef(`Ngân=${join(dir, "ref.png")}`), ["Ngân", join(dir, "ref.png")]);
+  assert.deepEqual(splitRef("a=missing.png"), [null, "a=missing.png"]);
+
+  writeFileSync(join(dir, "pc.txt"), "@Ngân và @TuDuc trong sân\n");
+  const out = join(dir, "assets/gen/cast.png");
+  const r = run(["image", "--prompt-file", join(dir, "pc.txt"), "--out", out, "--cast", cast]);
+  assert.equal(r.status, 0, r.stderr);
+  const a = r.calls[0];
+  assert.equal(a[1], "i2i");
+  assert.deepEqual(a.filter((_, i) => a[i - 1] === "--ref"), [`Ngân=${join(series, "characters/ngan.png")}`, `TuDuc=${join(series, "characters/tu.png")}`]);
+  const row = ledgerRows().at(-2);
+  assert.equal(row.cast, cast);
+  assert.deepEqual(row.refs.map((x) => x.path), [join(series, "characters/ngan.png"), join(series, "characters/tu.png")]);
+});
+
+test("a cast whose listed image is missing stops before gflow runs", () => {
+  const cast = join(dir, "bad-cast.json");
+  writeFileSync(cast, JSON.stringify({ Ngan: "nope.png" }));
+  const r = run(["image", "--prompt-file", join(dir, "p.txt"), "--out", join(dir, "assets/gen/x.png"), "--cast", cast]);
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /không tồn tại/);
+  assert.equal(r.all.length, 0);
+  const v = run(["video", "--start", join(dir, "ref.png"), "--prompt-file", join(dir, "p.txt"), "--out", join(dir, "v.mp4"), "--spend", "--cast", cast]);
+  assert.equal(v.status, 2);
+  assert.match(v.stderr, /chỉ dùng cho image/);
 });
