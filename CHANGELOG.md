@@ -10,6 +10,11 @@
 - `CASES.md` ends with `brief_fingerprint:` (`case-fingerprint.mjs`: the query file, the BRIEF.md body, topic and aspect). `studio-api.mjs` exports `casesStale(dir)`, so Motion Studio ranks again once the brief changed instead of showing cases for the old brief. A CASES.md without the line is never stale.
 - When Jev did not run and no keyword or category was given, a case's reason no longer claims it matched one.
 
+- `make-pitch init` read only `lemo_style:` and gave a grammar-only `lemo_ref:` style a guessed style profile; every styleframe now points at that style's `STYLE.md`, PICK.json keeps `lemo_ref`, `choose` writes no `style_profile` for it, and `check-preflight` no longer warns about the missing profile.
+- `make-pitch init --directions A1` said "3 hướng"; it and PITCH.md now count the directions actually picked.
+- `make-pitch` styleframes that load `assets/fonts/*` (the lemo skeleton) got no fonts; `init` copies them from the project or the user's font folders and `render` stops with exit 2 when one is missing.
+- `eleven.mjs sfx` kept up to 0.7 s of quiet lead-in before the hit; it now trims to the onset (-20 dB, shared with `sfx-sync`) with a short fade-in. Its log reported the API's byte count for the trimmed file; it now shows both.
+
 ### Added
 - `gflow.mjs image --cast series/cast.json`: the cast file `gflow run --cast` reads (name → approved image, paths relative to the file, `null` until one is approved). Each `@Name` in the prompt adds that character's image as a named `--ref` after the command's own refs, so `gflow` puts `reference image N` in its place. Names it cannot serve (`null`, not in the cast, written without `@`) are printed; a listed image that does not exist stops the run before gflow starts. `--ref name=path` passes a named reference straight through. The ledger records the cast file and every image sent. Checked against gflow 0.92.1 (gflow-studio), whose CLI exit codes and JSON are unchanged from 0.91.
 - `rerank-cases.mjs --suggest [--project .]`: the case suggestion users see at the start of a new video. Reads `BRIEF.case-query.json` and its aspect, has Jev rank the whole corpus, drops a second row of the same post, and prints a Vietnamese block of the top 3 (id, link, one line, a reason from the kind/topic/style scores). Writes it to `CASES.md` and `case_search:`/`case_refs:` into BRIEF.md (CASES.md only under the Studio director). A Jev failure, missing key included, is the first line of the block and a stderr line.
@@ -32,12 +37,6 @@
 - `lemo.mjs fetch` also checks out `styles/*/style.json` and `styles/*/STYLE.md` (`LIBRARY_GLOBS`), about 2 MB in all. An existing cache picks them up on the next fetch.
 - `audio-mix` (and `render-final`, which calls it) runs a true-peak limiter when the -14 LUFS gain would push the peak over -1.5 dBTP, instead of stopping short of the target. The loudness target lives in one place (`LOUDNORM` in `audio-mix.mjs`) and `qc-mp4` reads its -16…-12 LUFS range from it.
 - `video-lint.mjs --project <dir>` like the other scripts; `--hyperframes <dir>` still works, and both together must name the same folder.
-
-### Fixed
-- `make-pitch init` read only `lemo_style:` and gave a grammar-only `lemo_ref:` style a guessed style profile; every styleframe now points at that style's `STYLE.md`, PICK.json keeps `lemo_ref`, `choose` writes no `style_profile` for it, and `check-preflight` no longer warns about the missing profile.
-- `make-pitch init --directions A1` said "3 hướng"; it and PITCH.md now count the directions actually picked.
-- `make-pitch` styleframes that load `assets/fonts/*` (the lemo skeleton) got no fonts; `init` copies them from the project or the user's font folders and `render` stops with exit 2 when one is missing.
-- `eleven.mjs sfx` kept up to 0.7 s of quiet lead-in before the hit; it now trims to the onset (-20 dB, shared with `sfx-sync`) with a short fade-in. Its log reported the API's byte count for the trimmed file; it now shows both.
 
 ## v2.7.1 (2026-10-25): sửa nhạc theo plan và karaoke
 
