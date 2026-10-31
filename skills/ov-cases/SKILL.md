@@ -38,7 +38,7 @@ Các thư viện mẫu là thư viện prompt: case người dùng chọn phải
    - `## Vì sao dùng prompt này`: 2–4 câu tiếng Việt cho người dùng: case giống video của họ ở đâu (loại video, nhịp, cách dựng, kỹ thuật), sẽ giữ gì, đổi gì. Dựa vào dòng "Jev chấm" và prompt gốc, không khen chung chung.
    - `## Prompt chuyển thể`: viết lại prompt của case cho video này, **cùng ngôn ngữ với prompt gốc** (thường là tiếng Anh): giữ cấu trúc, nhịp, kỹ thuật, chuyển cảnh; thay chủ thể, chữ trên hình, số liệu, khổ hình và thời lượng bằng thông tin trong `BRIEF.md`. Không bịa số, tên hay trích dẫn; chỗ brief chưa có thì ghi rõ `[cần người dùng cho: …]`. Chữ tiếng Việt sẽ lên hình hay lời đọc vẫn qua `ov-script`.
    Chạy lại `case-template.mjs` cho cùng case thì hai mục đã viết được giữ.
-3. Chạy `node $OV/scripts/case-template.mjs --project . --show` và **gửi nguyên khối in ra cho người dùng**: case đã chọn, video demo, bài gốc, trang prompt trong repo, lý do, prompt chuyển thể trong khối code. Exit 3 nghĩa là một trong hai mục còn là dòng `(agent viết…)` hoặc quá ngắn; viết xong rồi chạy lại.
+3. Chạy `node $OV/scripts/case-template.mjs --project . --show` và **gửi nguyên khối in ra cho người dùng**: case đã chọn, video demo, bài gốc, trang prompt trong repo, lý do, prompt chuyển thể trong khối code. Exit 3 nghĩa là một trong hai mục còn là dòng `(agent viết…)` hoặc quá ngắn; viết xong rồi chạy lại. Trong Motion Studio, đạo diễn chép nguyên khối này vào biên nhận `studio_request_done` (script không ghi `BRIEF.md` khi chạy dưới đạo diễn).
 4. Người dùng sửa prompt thì sửa mục `## Prompt chuyển thể` rồi `--show` lại. Từ đây `ov-direction` (hướng có `--reference`), `ov-script` và `ov-build` đọc `build/TEMPLATE.md` làm mẫu.
 
 ## Tra case (bước 3, trước khi viết STORYBOARD.md)

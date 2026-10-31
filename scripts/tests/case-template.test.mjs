@@ -103,3 +103,13 @@ test("--show refuses placeholders (exit 3), then prints demo, links, why and the
     assert.equal(show({ project: d, file }).code, 3, "another case starts from the placeholders");
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
+
+test("under the Studio director BRIEF.md is left alone; TEMPLATE.md is still written", () => {
+  const d = setup();
+  try {
+    const before = readFileSync(join(d, "BRIEF.md"), "utf8");
+    assert.equal(run({ project: d, id: "y:full", file: join(d, "cases.jsonl"), director: true, log: () => {} }).code, 0);
+    assert.equal(readFileSync(join(d, "BRIEF.md"), "utf8"), before);
+    assert.ok(existsSync(join(d, "build", "TEMPLATE.md")));
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});

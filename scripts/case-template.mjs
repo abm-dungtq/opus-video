@@ -8,7 +8,8 @@
 // and an adaptation checklist. Sets `case_pick: <id>` in BRIEF.md. Quick mode (no --reference) also
 // adds `creative_override: nhanh theo case <id>` when the field is absent; --reference (dao-dien,
 // tu-nhac) keeps the case as a reference and the direction gate as it is. Writing the same case again
-// keeps what the agent already wrote in its two sections.
+// keeps what the agent already wrote in its two sections. Under the Motion Studio director BRIEF.md is
+// the user's, so nothing is written there; the director reports the pick in its receipt.
 // --show prints the block to send the user (demo video, links, why, adapted prompt) once both
 // sections are written; exit 3 while either is still the placeholder or too short.
 // Exit 2: unknown id, an upstream_removed case, no BRIEF.md, or --show without TEMPLATE.md.
@@ -21,6 +22,7 @@ import { maybeHelp } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
 import { setFrontmatter } from "./make-pitch.mjs";
 import { QUICK_MODE } from "./qc-mp4.mjs";
+import { underDirector } from "./director-guard.mjs";
 
 export const CASES = fileURLToPath(new URL("../data/cases.jsonl", import.meta.url));
 
@@ -117,7 +119,7 @@ ${quote}
 `;
 }
 
-export function run({ project, id, file = CASES, reference = false, log = console.error }) {
+export function run({ project, id, file = CASES, reference = false, director = underDirector(), log = console.error }) {
   const briefPath = join(project, "BRIEF.md");
   if (!existsSync(briefPath)) return { code: 2, error: `no BRIEF.md in ${project}` };
   const c = loadCase(id, file);
@@ -132,6 +134,7 @@ export function run({ project, id, file = CASES, reference = false, log = consol
     : {};
   mkdirSync(join(project, "build"), { recursive: true });
   writeFileSync(out, renderTemplate(c, brief, { reason: jevReason(project, id), keep }));
+  if (director) return { code: 0, out };
   const values = { case_pick: id };
   const override = frontmatter(brief).creative_override;
   if (!reference && !override) values.creative_override = `nhanh theo case ${id}`;
