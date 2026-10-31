@@ -25,6 +25,7 @@ test("whyOf turns Jev scores into a Vietnamese reason; no score says Jev did not
   assert.match(whyOf(row("y:a", "u", composite(3.2, 1.1, 2.4))), /loại video khớp \(3\.2\/4\), chủ đề khác \(1\.1\/4\), phong cách hình gần \(2\.4\/4\)/);
   assert.match(whyOf(row("y:a", "u", { score: 3, final: 3.4 }, { has_full_prompt: false })), /3\/4, prompt chỉ có một phần/);
   assert.match(whyOf(row("y:a", "u")), /Jev chưa chấm/);
+  assert.equal(whyOf(row("y:a", "u"), { filtered: false }), "Jev chưa chấm, chưa lọc theo brief", "no keyword/category given: no claim it matched one");
   assert.match(noteVi("weak style fit (best style 1.4/4 < 2): …"), /phong cách hình/);
 });
 
@@ -64,6 +65,8 @@ test("recordSuggestion writes CASES.md and BRIEF fields; under the Studio direct
     const fm = readFileSync(join(d, "BRIEF.md"), "utf8");
     assert.match(fm, /^case_search: jev$/m);
     assert.match(fm, /^case_refs: y:a$/m);
+    recordSuggestion(d, suggestBlock({ reranked: true, results: [] }), { reranked: true, results: [] }, { director: false });
+    assert.doesNotMatch(readFileSync(join(d, "BRIEF.md"), "utf8"), /^case_refs:/m, "an empty result clears the old case_refs");
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 
@@ -96,6 +99,24 @@ test("CLI --suggest without BRIEF.case-query.json ranks from BRIEF.md; with neit
     assert.equal(r.status, 0, r.stderr);
     assert.match(r.stderr, /ranking from BRIEF\.md/);
     assert.match(r.stdout, /^## Gợi ý case/);
+    assert.ok(existsSync(join(d, "CASES.md")));
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("CLI --suggest with an invalid BRIEF.case-query.json ranks from BRIEF.md; with no BRIEF.md it writes nothing (exit 2)", () => {
+  const d = tmp();
+  try {
+    const env = { ...process.env, TYPESAFE_API_KEY: "", HOME: d, MOTION_STUDIO_RUNNER: "", OPUS_STUDIO_RUNNER: "" };
+    writeFileSync(join(d, "BRIEF.case-query.json"), "{ not json");
+    let r = spawnSync("node", [script, "--suggest", "--project", d], { encoding: "utf8", env });
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /not valid JSON; nothing written/);
+    assert.ok(!existsSync(join(d, "CASES.md")), "no CASES.md, so the gate stays closed");
+    writeFileSync(join(d, "BRIEF.md"), "---\nbrief_version: 3\n---\n# Brief\nVideo dạy pha cà phê phin.\n");
+    r = spawnSync("node", [script, "--suggest", "--project", d], { encoding: "utf8", env });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stderr, /is not valid JSON; ranking from BRIEF\.md/);
+    assert.doesNotMatch(r.stdout, /no --brief/);
     assert.ok(existsSync(join(d, "CASES.md")));
   } finally { rmSync(d, { recursive: true, force: true }); }
 });

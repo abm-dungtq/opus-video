@@ -212,9 +212,10 @@ export function dedupeByUrl(rows) {
 
 const fit = (x) => (x >= 3 ? "khớp" : x >= 2 ? "gần" : "khác");
 // One Vietnamese line from Jev's scores (composite: kind/topic/style 0–4; single: usefulness 0–4).
-export function whyOf(r) {
+// filtered: the pool came from a keyword/category/tag filter (false: the corpus order, unfiltered).
+export function whyOf(r, { filtered = true } = {}) {
   const j = r.jev;
-  if (!j) return "khớp từ khoá/category (Jev chưa chấm)";
+  if (!j) return filtered ? "khớp từ khoá/category (Jev chưa chấm)" : "Jev chưa chấm, chưa lọc theo brief";
   if (j.kind_fit !== undefined) {
     return `loại video ${fit(j.kind_fit)} (${j.kind_fit}/4), chủ đề ${fit(j.topic_fit)} (${j.topic_fit}/4), phong cách hình ${fit(j.style_fit)} (${j.style_fit}/4)` +
       (r.has_full_prompt ? ", có prompt đầy đủ để mượn cấu trúc" : ", prompt chỉ có một phần");
@@ -235,14 +236,14 @@ export const demoOf = (r) => (r.demo_url && r.demo_url !== r.url ? r.demo_url : 
 const oneLine = (r, n = 140) => clip(String(r.title || r.prompt || "").replace(/\s+/g, " ").trim(), n);
 
 // The markdown block the agent pastes to the user. out = rerank()/rerankComposite() result.
-export function suggestBlock(out, { limit = 3 } = {}) {
+export function suggestBlock(out, { limit = 3, filtered = true } = {}) {
   const rows = dedupeByUrl(out.results).slice(0, limit);
   const lines = ["## Gợi ý case từ thư viện mẫu Opus 5.5", ""];
   if (!out.reranked) lines.push(`> ⚠ Jev không chạy (${out.error || "không rõ lý do"}): danh sách dưới đây chỉ xếp theo từ khoá (find-cases), chưa phân tích brief.`, "");
   for (const n of out.notes || []) lines.push(`> ${noteVi(n)}`, "");
   rows.forEach((r, i) => {
     lines.push(`${i + 1}. **${r.id}** · @${r.author} · ${r.category}: ${oneLine(r)}`);
-    lines.push(`   Vì sao: ${whyOf(r)}.`);
+    lines.push(`   Vì sao: ${whyOf(r, { filtered })}.`);
     if (demoOf(r)) lines.push(`   Video demo: ${demoOf(r)}`);
     lines.push(`   ${r.url}`);
   });
@@ -257,7 +258,7 @@ export function recordSuggestion(dir, block, out, { director = underDirector() }
   writeFileSync(join(dir, SUGGEST_FILE), block.text);
   const brief = join(dir, "BRIEF.md");
   if (director || !existsSync(brief)) return { brief: false };
-  writeFileSync(brief, setFrontmatter(readFileSync(brief, "utf8"), { case_search: caseSearchLabel(out), case_refs: block.ids.join(", ") || undefined }));
+  writeFileSync(brief, setFrontmatter(readFileSync(brief, "utf8"), { case_search: caseSearchLabel(out), case_refs: block.ids.join(", ") || null }));
   return { brief: true };
 }
 
@@ -281,7 +282,15 @@ async function main() {
     o.pool = "all";
     if (o.limit === 5) o.limit = 3;
   }
-  const brief = readBrief(o);
+  let brief = readBrief(o);
+  // --suggest never writes CASES.md without a brief: that file opens the pitch gate.
+  if (suggest && !brief) {
+    const b = join(dir, "BRIEF.md");
+    if (o["brief-json"] && existsSync(b) && readFileSync(b, "utf8").trim()) {
+      console.error(`rerank-cases --suggest: ${o["brief-json"]} is not valid JSON; ranking from BRIEF.md instead (fix ${QUERY_FILE}, skill ov-cases)`);
+      brief = readFileSync(b, "utf8").trim();
+    } else { console.error("rerank-cases --suggest: the brief is empty or not valid JSON; nothing written (skills ov-brief, ov-cases)"); process.exit(2); }
+  }
   if (suggest && !o.aspect && brief && typeof brief === "object" && ["16:9", "9:16", "both"].includes(brief.aspect)) o.aspect = brief.aspect;
   const limit = suggest ? Number(o.limit) * 3 : Number(o.limit);
   const candidates = buildPool({ category: o.category, keywords: o.keywords, tag: o.tag, fullOnly: o["full-only"], includeRemoved: o["include-removed"], pool: o.pool === "all" ? "all" : Number(o.pool) });
@@ -302,7 +311,7 @@ async function main() {
   if (o.stats) console.error(JSON.stringify({ case_search: caseSearchLabel(out), mode, reranked: out.reranked, error: out.error, pool: candidates.length, calls: out.calls, ms: out.ms, usage: out.usage, model: out.model, brief_class: out.brief_class }));
   const max = Number(o["max-chars"]);
   if (suggest) {
-    const block = suggestBlock(out, { limit: Number(o.limit) });
+    const block = suggestBlock(out, { limit: Number(o.limit), filtered: !!(o.category || o.tag || o.keywords.length) });
     const rec = recordSuggestion(dir, block, out, o["cases-only"] ? { director: true } : undefined);
     process.stdout.write(block.text);
     console.error(`rerank-cases: wrote ${SUGGEST_FILE}${rec.brief ? " and case_search/case_refs in BRIEF.md" : ""}; show the block above to the user as is`);

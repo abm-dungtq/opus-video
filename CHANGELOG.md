@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Fixed
+- `case-template.mjs`: a section of `build/TEMPLATE.md` ends only at the template's own headings, so an adapted prompt that keeps the case's `## Scene 1` style headings is read whole by `--show` and kept on a rewrite (it used to stop at the first `## ` line).
+- `rerank-cases.mjs --suggest` with an invalid `BRIEF.case-query.json` ranks from BRIEF.md instead, or exits 2 and writes nothing when there is no BRIEF.md. It used to write an unranked CASES.md, which opened the pitch gate.
+- The topic floor also applies after the `--pair` tournament.
+- An empty suggestion clears the old `case_refs:` in BRIEF.md.
+- When Jev did not run and no keyword or category was given, a case's reason no longer claims it matched one.
+
 ### Added
 - `rerank-cases.mjs --suggest [--project .]`: the case suggestion users see at the start of a new video. Reads `BRIEF.case-query.json` and its aspect, has Jev rank the whole corpus, drops a second row of the same post, and prints a Vietnamese block of the top 3 (id, link, one line, a reason from the kind/topic/style scores). Writes it to `CASES.md` and `case_search:`/`case_refs:` into BRIEF.md (CASES.md only under the Studio director). A Jev failure, missing key included, is the first line of the block and a stderr line.
 - Case suggestion gate: new briefs are `brief_version: 3`. Without `case_search:` or `CASES.md`, `make-pitch.mjs init` exits 6 and `check-preflight` fails at both stages; `brief_version: 2` projects only get a WARN.

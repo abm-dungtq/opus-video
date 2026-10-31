@@ -54,9 +54,17 @@ const PLACEHOLDER = {
   [ADAPTED]: "(agent viết: prompt của case viết lại cho video này, cùng ngôn ngữ với prompt gốc: giữ cấu trúc, nhịp, kỹ thuật và chuyển cảnh của case; thay chủ thể, chữ, số liệu, khổ hình và thời lượng bằng thông tin trong BRIEF.md; không bịa số, tên hay trích dẫn)",
 };
 
-// Body of a "## <name>" section (to the next "## " or the end), trimmed; "" when missing.
+const ORIGINAL = "Prompt gốc";
+const CHECKLIST = "Checklist chuyển thể";
+// The template's own top-level headings. A section ends only at one of these, so an adapted
+// prompt that keeps the case's "## Scene 1" style headings is read whole.
+const HEADINGS = [WHY, ADAPTED, ORIGINAL, CHECKLIST];
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const NEXT = HEADINGS.map((h) => `^## ${escRe(h)}`).join("|");
+
+// Body of a "## <name>" section (to the next template heading or the end), trimmed; "" when missing.
 export function sectionOf(text, name) {
-  const m = String(text).match(new RegExp(`^## ${name}[^\\n]*\\n([\\s\\S]*?)(?=^## |(?![\\s\\S]))`, "m"));
+  const m = String(text).match(new RegExp(`^## ${escRe(name)}[^\\n]*\\n([\\s\\S]*?)(?=${NEXT}|(?![\\s\\S]))`, "m"));
   return m ? m[1].trim() : "";
 }
 const written = (body, min) => body.length >= min && !body.startsWith(PLACEHOLDER_LINE);
@@ -104,11 +112,11 @@ ${keep[WHY] || PLACEHOLDER[WHY]}
 
 ${keep[ADAPTED] || PLACEHOLDER[ADAPTED]}
 
-## Prompt gốc (nguyên văn, thuộc về tác giả)
+## ${ORIGINAL} (nguyên văn, thuộc về tác giả)
 
 ${quote}
 
-## Checklist chuyển thể
+## ${CHECKLIST}
 
 - [ ] Viết hai mục "${WHY}" và "${ADAPTED}", rồi chạy case-template.mjs --show và gửi nguyên khối in ra cho người dùng.
 - [ ] Thay chủ thể của case bằng nội dung của người dùng trong BRIEF.md; giữ cấu trúc, nhịp và cách chuyển cảnh.
