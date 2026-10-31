@@ -4,7 +4,7 @@
 //
 //   node gflow.mjs doctor [--profile p]
 //   node gflow.mjs image --prompt-file f.txt --out assets/gen/x.png [--ref a.png ...] [--aspect 9:16]
-//                        [--model nano2] [--count 1-4] [--profile p] [--project dir] [--flow-project name]
+//                        [--model nano2] [--count 1-4] [--cast cast.json] [--profile p] [--project dir] [--flow-project name]
 //   node gflow.mjs video --start a.png [--end b.png] --prompt-file f.txt --out assets/gen/x.mp4 --spend
 //                        [--model veo-lite] [--duration 4|6|8|10] [--aspect 9:16] [--resolution 360p|720p]
 //                        [--upscale] [--profile p] [--project dir] [--flow-project name]
@@ -15,6 +15,14 @@
 // --upscale replaces the 720p clip at --out with Flow's free 1080p export (no extra credits; needs gflow
 // installed from gflow-studio, whose `video i2v` has `--upscale`). If the export fails gflow keeps the 720p clip and exits 0;
 // the warning is printed and written to the ledger.
+//
+// --ref name=path names a reference (gflow's own syntax); a plain path is named after its file stem.
+// @name in the prompt then points at that image (gflow writes "reference image N" in its place).
+// --cast reads the cast file `gflow run --cast` reads ({"Ngan": "characters/ngan.png", "Lai": null},
+// paths relative to the file): each @Name the prompt mentions adds that character's image after the
+// command's own --ref, so a recurring character only has to be written as @Name. Names the cast cannot
+// serve (null, not listed, written without @) are printed, never dropped; a listed image that does not
+// exist stops the run before gflow starts.
 //
 // Rules: nothing here retries. One call is one gflow run; a failed or timed-out run is reported with
 // gflow's own exit code and never sent again, because a run Flow accepted may already have billed.
@@ -44,6 +52,10 @@ const IMAGE_MODELS = ["nano2", "nano2.1", "nano-pro", "nano2-lite", "imagen4"];
 const VIDEO_MODELS = ["omni-flash", "veo-lite", "veo-fast", "veo-quality", "veo-lite-lp"];
 const IMAGE_ASPECTS = ["9:16", "16:9", "1:1", "4:3", "3:4"];
 const VIDEO_ASPECTS = ["9:16", "16:9"];
+
+// gflow's ref name, ^[\w-]+$ with Unicode \w, and its @mention token ("@@" is a literal @).
+const NAME = /^[\p{L}\p{M}\p{N}_-]+$/u;
+const MENTION = /(?<![@\p{L}\p{M}\p{N}_])@([\p{L}\p{M}\p{N}_-]+)(?![\p{L}\p{M}\p{N}_-])/gu;
 
 const fail = (msg, code = 2) => { console.error(`gflow.mjs: ${msg}`); process.exit(code); };
 const sha = (buf) => createHash("sha256").update(buf).digest("hex").slice(0, 16);
@@ -91,6 +103,48 @@ export function videoArgs(o, prompt) {
   if (o.upscale) args.push("--upscale");
   if (o.profile) args.push("--profile", o.profile);
   return args;
+}
+
+// --ref name=path when name is a valid ref name and path is a file, else the whole value is the path
+// (same rule as gflow's split_cli_ref).
+export function splitRef(raw) {
+  const i = raw.indexOf("="), name = raw.slice(0, i), path = raw.slice(i + 1);
+  return i > 0 && NAME.test(name) && existsSync(path) && statSync(path).isFile() ? [name, path] : [null, raw];
+}
+const refPath = (r) => splitRef(r)[1];
+const refName = (r) => { const [n, p] = splitRef(r); return n ?? basename(p, extname(p)); };
+
+// The named refs a cast file adds for the @Names in the prompt, and one warning per name it cannot serve.
+export function castRefs(prompt, file, refs = []) {
+  let data;
+  try { data = JSON.parse(readFileSync(file, "utf8")); } catch (e) { throw new Error(`--cast ${file}: không đọc được JSON (${e.message})`); }
+  if (!data || typeof data !== "object" || Array.isArray(data) || !Object.keys(data).length) throw new Error(`--cast ${file}: phải là object JSON tên → đường dẫn ảnh, ví dụ {"Ngan": "characters/ngan.png"}`);
+  const members = new Map();
+  for (const [name, raw] of Object.entries(data)) {
+    if (!NAME.test(name)) throw new Error(`--cast ${file}: tên "${name}" phải là một từ, như sau dấu @`);
+    const key = name.toLowerCase();
+    if (members.has(key)) throw new Error(`--cast ${file}: "${name}" có hai lần`);
+    if (raw === null) { members.set(key, [name, null]); continue; }
+    if (typeof raw !== "string" || !raw.trim()) throw new Error(`--cast ${file}: "${name}" phải là đường dẫn ảnh hoặc null`);
+    const image = resolve(dirname(file), raw);
+    if (!existsSync(image) || !statSync(image).isFile()) throw new Error(`--cast ${file}: ảnh của "${name}" (${raw}) không tồn tại; sửa đường dẫn hoặc ghi null tới khi có ảnh duyệt`);
+    members.set(key, [name, image]);
+  }
+  const mentioned = new Map([...prompt.matchAll(MENTION)].map((m) => [m[1].toLowerCase(), m[1]]));
+  const taken = new Set(refs.map((r) => refName(r).toLowerCase()));
+  const add = [], warnings = [];
+  for (const [key, token] of mentioned) {
+    if (taken.has(key)) continue;
+    const m = members.get(key);
+    if (!m) warnings.push(`@${token} không có trong cast; Flow sẽ tự tìm nhân vật đã lưu cùng tên`);
+    else if (!m[1]) warnings.push(`@${m[0]} chưa có ảnh duyệt trong cast (null); không gắn ảnh`);
+    else add.push(`${m[0]}=${m[1]}`);
+  }
+  for (const [key, [name]] of members) {
+    const bare = new RegExp(`(?<![@\\p{L}\\p{M}\\p{N}_])${name}(?![\\p{L}\\p{M}\\p{N}_-])`, "u");
+    if (!mentioned.has(key) && bare.test(prompt)) warnings.push(`${name} được nhắc mà thiếu @; không gắn ảnh`);
+  }
+  return { add, warnings };
 }
 
 function ledger(project, row) {
@@ -181,11 +235,18 @@ function lookupOrCreate(name, profile) {
 function generate(kind, o) {
   if (!o.out) fail("cần --out");
   const prompt = readPrompt(o);
+  if (o.cast) {
+    if (kind === "video") fail("--cast chỉ dùng cho image; clip lấy nhân vật từ ảnh khung đầu");
+    let c;
+    try { c = castRefs(prompt, o.cast, o.ref); } catch (e) { fail(e.message); }
+    for (const w of c.warnings) console.error(`gflow.mjs: ${w}`);
+    o.ref.push(...c.add);
+  }
   if (kind === "video") {
     if (!o.start) fail("cần --start (ảnh khung đầu)");
     if (!o.spend) fail("tạo video tốn credit Flow: thêm --spend khi người dùng đã đồng ý");
     checkFiles([o.start, ...(o.end ? [o.end] : [])]);
-  } else checkFiles(o.ref);
+  } else checkFiles(o.ref.map(refPath));
   let args;
   try { args = kind === "video" ? videoArgs(o, prompt) : imageArgs(o, prompt); } catch (e) { fail(e.message); }
   const project = resolve(o.project ?? ".");
@@ -194,9 +255,9 @@ function generate(kind, o) {
   args.push("--project", flowId);
   mkdirSync(dirname(resolve(o.out)), { recursive: true });
   const before = new Set(readdirSync(dirname(resolve(o.out))));
-  const frames = kind === "video" ? [o.start, o.end].filter(Boolean) : o.ref;
+  const frames = kind === "video" ? [o.start, o.end].filter(Boolean) : o.ref.map(refPath);
   const id = `${Date.now().toString(36)}-${sha(Buffer.from(prompt + o.out))}`;
-  const base = { id, kind, model: args[args.indexOf("--model") + 1], flow_project: flowId, out: o.out, prompt_sha: sha(Buffer.from(prompt)), refs: frames.map((p) => ({ path: p, sha: sha(readFileSync(p)) })) };
+  const base = { id, kind, model: args[args.indexOf("--model") + 1], flow_project: flowId, out: o.out, prompt_sha: sha(Buffer.from(prompt)), refs: frames.map((p) => ({ path: p, sha: sha(readFileSync(p)) })), ...(o.cast ? { cast: o.cast } : {}) };
   ledger(project, { ...base, status: "sent" });
   console.error(`gflow.mjs: chạy ${BIN} ${args[0]} ${args[1]} (${base.model}), lần đầu có thể mất 30–90 giây…`);
   // a second run on the same profile waits its turn instead of failing with exit 11

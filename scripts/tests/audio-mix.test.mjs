@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseTracks, buildArgs, dynamicAudio, carveKeys, isVoice, voiceIndices, keyLevelArgs, parseMeanVolume, parseLoudnorm, loudnormPass1Args, staticGain, gainArgs, decodeEntities, duckTarget, duckReduction, thresholdAt, searchDrop, CARVE_FLOOR_DB, MAX_REDUCTION_DB } from "../audio-mix.mjs";
+import { parseTracks, buildArgs, dynamicAudio, carveKeys, isVoice, voiceIndices, keyLevelArgs, parseMeanVolume, parseLoudnorm, loudnormPass1Args, staticGain, gainArgs, limitArgs, nextLimitGain, LOUDNORM, MAX_LIMIT_DB, decodeEntities, duckTarget, duckReduction, thresholdAt, searchDrop, CARVE_FLOOR_DB, MAX_REDUCTION_DB } from "../audio-mix.mjs";
 
 const CLI = fileURLToPath(new URL("../audio-mix.mjs", import.meta.url));
 const BASE = "/proj";
@@ -312,5 +312,44 @@ test("CLI: a carve bed ducks to 6 dB under the voice (strength 0.8), the mix lan
       const d = Number(spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f], { encoding: "utf8" }).stdout);
       assert.ok(Math.abs(d - 6) <= 0.02, `${f}: ${d}s`);
     }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("limiter loop: re-aims from the measured output, stops within 0.5 LU or at the cap", () => {
+  const m = { input_i: "-16.80", input_tp: "-0.80" }; // a TTS voice: static gain allows only +0.1 dB
+  assert.equal(staticGain(m).peakLimited, true);
+  assert.deepEqual(nextLimitGain(m, 2.8, { input_i: "-14.30" }), { gain: 2.8, done: true });
+  assert.deepEqual(nextLimitGain(m, 2.8, { input_i: "-14.90" }), { gain: 3.7, done: false });
+  const cap = LOUDNORM.TP + 0.8 + MAX_LIMIT_DB; // 5.3 dB
+  assert.deepEqual(nextLimitGain(m, 4.5, { input_i: "-16.00" }), { gain: cap, done: false });
+  assert.deepEqual(nextLimitGain(m, cap, { input_i: "-15.50" }), { gain: cap, done: true });
+  const a = limitArgs("/tmp/m.wav", 2.8, 15, "/tmp/o.wav");
+  assert.equal(a[a.indexOf("-af") + 1], "volume=2.8dB,aresample=192000,alimiter=limit=0.794328:attack=1:release=60:level=0:latency=1,aresample=48000,apad=whole_dur=15,atrim=end_sample=720000");
+});
+
+test("CLI: a voice whose peaks cap the static gain is limited to -14 LUFS under the -1.5 dBTP ceiling", { skip: !hasFfmpeg && "ffmpeg missing" }, () => {
+  const dir = mkdtempSync(join(tmpdir(), "amix-limit-"));
+  try {
+    // A tone with a sharp hit every 0.5 s: about -17.8 LUFS with peaks at -1.5 dBTP, so a static gain
+    // cannot lift it at all (the TTS voice of the risograph trial: -16.8 LUFS, peak -0.8 dBFS).
+    const e = "0.15*sin(2*PI*1000*t)*(0.6+0.4*sin(2*PI*3*t))+0.75*cos(2*PI*2500*t)*exp(-150*mod(t,0.5))";
+    const g = spawnSync("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", `aevalsrc='${e}|${e}':s=48000:d=6`, join(dir, "vo.wav")], { encoding: "utf8" });
+    assert.equal(g.status, 0, g.stderr);
+    const html = join(dir, "index.html");
+    writeFileSync(html, `<audio id="vo-01" src="vo.wav" data-start="0" data-duration="6"></audio>`);
+    const out = join(dir, "mix.wav");
+    const r = spawnSync("node", [CLI, "--html", html, "--duration", "6", "--out", out, "--loudnorm"], { encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stderr, /limiter: mix -1[78]\.\d+ LUFS/);
+    assert.doesNotMatch(r.stderr, /WARN/);
+    const ebu = spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-i", out, "-af", "ebur128=peak=true", "-f", "null", "-"], { encoding: "utf8" }).stderr;
+    const I = Number(ebu.match(/Integrated loudness:\s*\n\s*I:\s+(-?[\d.]+) LUFS/)?.[1]);
+    const TP = Number(ebu.match(/True peak:\s*\n\s*Peak:\s+(-?[\d.]+) dBFS/)?.[1]);
+    assert.ok(Math.abs(I - LOUDNORM.I) <= 0.6, `integrated ${I} LUFS`);
+    assert.ok(I >= LOUDNORM.low && I <= LOUDNORM.high, `integrated ${I} LUFS inside qc-mp4's range`);
+    assert.ok(TP <= LOUDNORM.TP, `true peak ${TP} dBFS`);
+    const d = Number(spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", out], { encoding: "utf8" }).stdout);
+    assert.ok(Math.abs(d - 6) <= 0.02, `${d}s`);
+    assert.deepEqual(readdirSync(dir).sort(), ["index.html", "mix.wav", "vo.wav"], "work files removed");
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

@@ -45,6 +45,10 @@
 // (TP -1.5 dBTP) by normalize-bed.mjs, which prints one NORMALIZE line. --no-normalize keeps the
 // API bytes as they are. A failed normalize keeps the file as written, prints
 // "WARN normalize: <reason>" and still exits 0, so a paid generation is never lost.
+// sfx also trims a quiet lead-in before the hit: the head cut is at (file peak − 20 dB), where
+// sfx-sync.mjs hears the sound, so no data-media-start is needed to land it on its event. The
+// "sfx → <out> (<n> bytes)" / "music → …" line gives the size of the file on disk, plus the API
+// bytes when normalize re-encoded it.
 //
 // audio-meta feeds HyperFrames workflows (faceless-explainer, product-launch-video, …) with
 // eleven_v4 Vietnamese narration instead of their own TTS step. It writes BOTH
@@ -61,7 +65,7 @@
 // align also exits 2 when its output exists without --force and 3 when forced alignment is not on the
 // plan; tts and audio-meta with gemini exit 3 the same way (ALIGN_UNAVAILABLE).
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, dirname, resolve, basename, extname } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -71,7 +75,7 @@ import { voiceGate, GATE_EXIT } from "./voice-gate.mjs";
 import { loadKey, ping } from "./jev-client.mjs";
 import { defaultVp, frontmatter } from "./check-viet-pro.mjs";
 import { DEFAULT_VOICE, DEFAULT_TTS_MODEL, pickVoice, briefValue } from "./voice-defaults.mjs";
-import { BED_DEFAULTS, writeGenerated } from "./normalize-bed.mjs";
+import { BED_DEFAULTS, SFX_ONSET_DB, writeGenerated } from "./normalize-bed.mjs";
 import { elevenRefusal, REFUSED_EXIT } from "./director-guard.mjs";
 import { synthGemini, DEFAULT_GEMINI_MODEL, DEFAULT_GEMINI_VOICE } from "./gemini-tts.mjs";
 maybeHelp(process.argv.slice(2), import.meta.url);
@@ -162,9 +166,14 @@ function writeOut(path, buf) {
   writeFileSync(path, buf);
 }
 // sfx/music output: written, then normalized to the bed level unless --no-normalize.
-function writeBed(path, buf) {
-  writeGenerated(path, buf, { normalize: !args["no-normalize"], lufs: BED_DEFAULTS.lufs, log: (s) => console.error(s), warn: (s) => console.error(s) });
+// An SFX also loses a quiet lead-in before its hit (onsetDb: the moment sfx-sync hears it), so it
+// sounds at data-start without a data-media-start. Returns the size of the file as written, which
+// the log reports (normalize re-encodes, so it differs from the API bytes).
+function writeBed(path, buf, { onsetDb } = {}) {
+  writeGenerated(path, buf, { normalize: !args["no-normalize"], lufs: BED_DEFAULTS.lufs, onsetDb, log: (s) => console.error(s), warn: (s) => console.error(s) });
+  return statSync(path).size;
 }
+const bytesNote = (size, buf) => `${size} bytes${size !== buf.length ? `; API ${buf.length} bytes` : ""}`;
 
 // Model for --plan: the sections[] composition plan is accepted by music_v1 only.
 const PLAN_MUSIC_MODEL = "music_v1";
@@ -442,8 +451,8 @@ const commands = {
         model_id: DEFAULTS.sfxModel,
       },
     });
-    writeBed(need("out"), buf);
-    console.error(`sfx → ${args.out} (${buf.length} bytes)`);
+    const size = writeBed(need("out"), buf, { onsetDb: SFX_ONSET_DB });
+    console.error(`sfx → ${args.out} (${bytesNote(size, buf)})`);
   },
 
   async music() {
@@ -462,8 +471,8 @@ const commands = {
     for (let attempt = 0; ; attempt++) {
       try {
         const buf = await call(args.plan ? "/v1/music?output_format=mp3_44100_128" : "/v1/music", { method: "POST", binary: true, body });
-        writeBed(out, buf);
-        console.error(`music → ${out} (${buf.length} bytes)`);
+        const size = writeBed(out, buf);
+        console.error(`music → ${out} (${bytesNote(size, buf)})`);
         return;
       } catch (err) {
         if ([401, 402, 403].includes(err.status)) {

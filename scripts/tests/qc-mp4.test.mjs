@@ -5,7 +5,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseBlack, parseFreeze, parseSilence, parseEbur, evaluate, summarize } from "../qc-mp4.mjs";
+import { parseBlack, parseFreeze, parseSilence, parseEbur, evaluate, summarize, LIMITS } from "../qc-mp4.mjs";
+import { LOUDNORM } from "../audio-mix.mjs";
 
 const CLI = fileURLToPath(new URL("../qc-mp4.mjs", import.meta.url));
 
@@ -206,4 +207,10 @@ test("CLI: --project without BRIEF.md exits 2", { skip: !hasFfmpeg && "ffmpeg no
     ff(["-f", "lavfi", "-i", "testsrc=d=1", f]);
     assert.equal(cli([f, "--project", d]).status, 2);
   } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("LOUDNESS range is the audio-mix contract: the mix target sits inside it", () => {
+  assert.deepEqual([LIMITS.loudLow, LIMITS.loudHigh], [LOUDNORM.low, LOUDNORM.high]);
+  assert.ok(LOUDNORM.I > LOUDNORM.low && LOUDNORM.I < LOUDNORM.high);
+  assert.ok(LOUDNORM.TP <= LIMITS.peakWarn, "the mix ceiling is under qc-mp4's TRUE_PEAK warning");
 });

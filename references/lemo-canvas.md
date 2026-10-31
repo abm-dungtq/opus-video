@@ -68,6 +68,30 @@ Với 3D, `setPixelRatio(2)` cùng `ssaa: 2` là mức giao hàng. Xem nháp nha
 - Với `glass-product`, vật thể phải là vật hư cấu: không dùng dáng sản phẩm, logo hay giao diện có thật.
 - Giữ `LICENSE-lemo-opuscar`, `LICENSE-three` và `CREDITS` trong `assets/`.
 
+## Thước MOTION với phong cách chậm hoặc in theo nhịp hai khung
+
+`qc-mp4` MOTION (và `check-preflight` khi đo animatic) so hai khung liền nhau ở bề ngang 360 px, 30 fps; khung có YDIF < 0,5 tính là đứng yên. Thước này bắt slideshow, nhưng hai ngữ pháp lemo bị nó phạt dù hình vẫn sống:
+
+- **Risograph và các phong cách in bản:** ngữ pháp là đổi theo nhịp hai khung (một bản in giữ hai khung rồi mới lệch). Ở 30 fps cứ mỗi khung thứ hai lặp lại khung trước, nên riêng nhịp này đã cho khoảng 50% khung đứng yên, vượt vạch WARN 45%. Đo trên animatic của bản thử bánh mì: 19% khung đứng yên khi so từng khung, 3% khi so cách hai khung.
+- **Watercolor:** nét cọ loang chậm trên nền giấy sáng, mỗi khung đổi rất ít. Animatic đầu của bản thử cà phê phin có 88% khung gần như đứng yên; bản giao cuối vẫn 51% (WARN) sau khi đã thêm camera bốn chặng.
+
+Cách qua mà không đổi thước:
+
+1. **Chuyển động camera liên tục** trên lớp DOM bao cả canvas: dolly hoặc pan chậm, scale 1,00 → 1,04 suốt cảnh, parallax giữa giấy, lớp màu và chữ. Mỗi khung đều đổi một chút nên không còn khung đứng yên, và nét cọ vẫn chậm.
+2. **Các bản in lệch nhau một khung** (risograph): đừng để mọi bản đổi cùng một khung. Bản vàng đổi ở khung chẵn, bản xanh ở khung lẻ, bản đỏ lệch thêm một khung nữa. Mắt vẫn thấy nhịp hai khung của từng bản, còn giữa hai khung liền nhau luôn có một bản đổi.
+3. Hạt giấy, lưới chấm hay độ lệch bản thì cho trôi theo `t` thay vì đứng yên giữa hai beat.
+
+Khi ngữ pháp đã đúng mà thước vẫn phạt, ghi vào frontmatter `BRIEF.md`:
+
+```yaml
+motion_override: step=2 | risograph in theo nhịp hai khung, mỗi bản in giữ hai khung
+```
+
+- `step=2` (hoặc `3`) cho MOTION so hai khung cách nhau 2 (hoặc 3) khung, đúng với hình vẽ theo nhịp hai hoặc ba khung. Slideshow vẫn đứng yên khi so cách hai khung, nên thước vẫn bắt được nó.
+- `still=<tỉ lệ>` và `peak=<số>` chỉ dời vạch WARN, và chỉ tới vạch FAIL (với nhịp `vua`: still 0,45…0,6, peak 1,5…2,0). Vạch FAIL (≥ 60% đứng yên và đỉnh < 1,5) không bao giờ đổi, ngưỡng mặc định cũng không đổi.
+- Lý do sau dấu `|` là bắt buộc (≥ 20 ký tự, không dùng `#`). Thiếu lý do hoặc giá trị ngoài khoảng thì override bị bỏ qua và dòng MOTION ghi rõ vì sao. Khi override có hiệu lực, lý do được in trong dòng MOTION của `QA.md`.
+- Dùng override sau khi đã thử ba cách ở trên, không thay cho chúng. Watercolor gần như đứng yên thì cần camera chứ không cần override.
+
 ## Tốc độ và tính tất định
 
 Số đo trên hai spike (MacBook, 10 giây, 300 khung, HyperFrames 0.8.144, 2026-10-20):

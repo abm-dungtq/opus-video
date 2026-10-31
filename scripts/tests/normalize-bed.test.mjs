@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BED_DEFAULTS, main, normalizeBed, writeGenerated } from "../normalize-bed.mjs";
+import { BED_DEFAULTS, SFX_ONSET_DB, main, normalizeBed, trimFilter, writeGenerated } from "../normalize-bed.mjs";
 
 const SCRIPT = fileURLToPath(new URL("../normalize-bed.mjs", import.meta.url));
 const ELEVEN = fileURLToPath(new URL("../eleven.mjs", import.meta.url));
@@ -174,7 +174,7 @@ test("eleven.mjs documents and parses --no-normalize for sfx and music", () => {
   const text = readFileSync(ELEVEN, "utf8");
   assert.match(text, /sfx {3}--text .*\[--no-normalize\]/);
   assert.match(text, /music --prompt .*\[--no-normalize\]/);
-  assert.match(text, /writeBed\(need\("out"\), buf\);\n {4}console\.error\(`sfx/);
+  assert.match(text, /writeBed\(need\("out"\), buf, \{ onsetDb: SFX_ONSET_DB \}\);\n {4}console\.error\(`sfx/);
   assert.match(text, /writeBed\(out, buf\);\n {8}console\.error\(`music/);
   // A missing key fails before any request, so this never reaches the API.
   const home = tmp();
@@ -184,4 +184,39 @@ test("eleven.mjs documents and parses --no-normalize for sfx and music", () => {
     assert.match(r.stderr, /ELEVENLABS_API_KEY not set/);
     assert.equal(existsSync(join(home, "x.mp3")), false);
   } finally { rmSync(home, { recursive: true, force: true }); }
+});
+
+// An ElevenLabs drum as the risograph trial got it: 0.67 s of a quiet rumble (-30 dBFS) before a
+// -2.5 dBFS hit. -50 dBFS silence trimming leaves the rumble, so sfx-sync heard the hit 668 ms late.
+function makeDrum(file) {
+  const rumble = "aevalsrc=0.03*sin(2*PI*90*t):s=44100:d=0.67";
+  const hit = "aevalsrc=0.75*sin(2*PI*180*t)*exp(-6*t):s=44100:d=0.8";
+  const r = spawnSync("ffmpeg", ["-hide_banner", "-v", "error", "-y", "-f", "lavfi", "-i", rumble, "-f", "lavfi", "-i", hit, "-filter_complex", "[0][1]concat=n=2:v=0:a=1", "-c:a", "libmp3lame", "-b:a", "128k", file], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+}
+
+test("onsetDb: an SFX loses the quiet lead-in before its hit, so sfx-sync hears it at once", { skip }, async () => {
+  const { measureLead } = await import("../sfx-sync.mjs");
+  const d = tmp();
+  try {
+    const src = join(d, "drum.mp3");
+    makeDrum(src);
+    assert.ok(Math.abs(measureLead(src).lead - 0.67) < 0.05, `fixture lead ${measureLead(src).lead}`);
+    const plain = normalizeBed({ input: src, output: join(d, "plain.mp3") });
+    assert.ok(plain.trimmedHead < 0.05, "silence-db alone keeps the rumble");
+    const r = normalizeBed({ input: src, output: join(d, "sfx.mp3"), onsetDb: SFX_ONSET_DB });
+    assert.ok(r.trimmedHead > 0.55 && r.trimmedHead < 0.7, `trimmed_head ${r.trimmedHead}`);
+    const lead = measureLead(join(d, "sfx.mp3")).lead;
+    assert.ok(lead < 0.1, `lead after trim ${lead} s`);
+    // The decay is kept: the tail threshold stays at silence-db.
+    assert.ok(duration(join(d, "sfx.mp3")) > 0.75, `${duration(join(d, "sfx.mp3"))} s`);
+    assert.throws(() => normalizeBed({ input: src, output: join(d, "x.mp3"), onsetDb: 3 }), /onsetDb must be a negative number/);
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("trimFilter: onset threshold on the head only, faded in; the tail keeps silence-db", () => {
+  const f = trimFilter({ silenceDb: -50, keepHead: 0.05, headDb: -22.5 });
+  assert.equal(f.head, "silenceremove=start_periods=1:start_duration=0:start_threshold=-22.5dB:start_silence=0.05:detection=peak,afade=t=in:d=0.05");
+  assert.match(f.both, /areverse,silenceremove=start_periods=1:start_duration=0:start_threshold=-50dB:start_silence=0\.05:detection=peak,areverse$/);
+  assert.equal(trimFilter({ headDb: -60 }).head, trimFilter().head, "an onset under silence-db changes nothing");
 });

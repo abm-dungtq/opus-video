@@ -12,7 +12,8 @@
 //              last 0.2s; dark backgrounds can trigger it, extract the frame and look
 //   FREEZE     WARN each still stretch of 2s or more (freezedetect n=0.003 d=2)
 //   SILENCE    WARN each silence of 1.5s or more (silencedetect -50dB d=1.5) · FAIL whole file silent
-//   LOUDNESS   WARN integrated loudness (ebur128) outside [-16, -12] LUFS
+//   LOUDNESS   WARN integrated loudness (ebur128) outside [-16, -12] LUFS (audio-mix LOUDNORM.low/high;
+//              audio-mix aims the mix at -14 inside that range)
 //   TRUE_PEAK  WARN above -1 dBFS · FAIL above 0 dBFS
 //   BITRATE    WARN above 12 Mbit/s (not compressed yet, run export.mjs)
 //   MOTION     frame-to-frame change (signalstats YDIF at 360px wide, 30 fps): `still` = share of
@@ -23,6 +24,11 @@
 //              and peak < 1.5 (em: ≥ 75% and < 1.0); WARN when still ≥ 45% or peak < 2.0 (em: ≥ 60%
 //              or < 1.2). Otherwise WARN at the FAIL line only. Fix by building beats with
 //              continuous motion (build/RECIPES.md).
+//              BRIEF `motion_override: [step=2|3] [still=x] [peak=y] | <lý do ≥ 20 ký tự>` (also
+//              read by check-preflight for the animatic): step compares frames 2 or 3 apart, for
+//              motion drawn on twos (risograph plates); still/peak move the WARN line, at most to
+//              the FAIL line, which never moves. The reason is printed in the MOTION line; an
+//              override without one (or out of range) is ignored and says so. The defaults stay.
 // --project <dir>  read <dir>/BRIEF.md frontmatter (aspect, duration_s, direction, energy).
 // --draft          the file is a draft (make-demo --animatic, 540 px short edge): ASPECT only
 //                  compares the ratio, not the exact size.
@@ -38,15 +44,43 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
+import { LOUDNORM } from "./audio-mix.mjs";
 
 export const LIMITS = {
   blackStart: 0.1, blackTail: 0.2, freezeMin: 2, silenceMin: 1.5, silentFileSlack: 0.25,
-  durationTol: 0.1, loudLow: -16, loudHigh: -12, peakWarn: -1, peakFail: 0, bitrateMax: 12e6,
+  durationTol: 0.1, loudLow: LOUDNORM.low, loudHigh: LOUDNORM.high, peakWarn: -1, peakFail: 0, bitrateMax: 12e6,
   stillYdif: 0.5,
   motionFail: { default: { still: 0.6, peak: 1.5 }, em: { still: 0.75, peak: 1.0 } },
   motionWarn: { default: { still: 0.45, peak: 2.0 }, em: { still: 0.6, peak: 1.2 } },
 };
-export const MOTION_VF = "scale=360:-2,fps=30,signalstats,metadata=print:key=lavfi.signalstats.YDIF";
+// step: compare frames `step` apart (BRIEF motion_override step=2 for animation drawn on twos).
+export const motionVf = (step = 1) => `scale=360:-2,fps=${+(30 / step).toFixed(3)},signalstats,metadata=print:key=lavfi.signalstats.YDIF`;
+export const MOTION_VF = motionVf(1);
+
+// BRIEF.md `motion_override: [step=2|3] [still=<0..1>] [peak=<n>] | <lý do, ≥ 20 ký tự>` → the MOTION
+// ruler of one project: { step, still, peak, reason } or { error } (the override is then ignored).
+// step measures across 2 or 3 frames (animation on twos: risograph plates); still/peak move the WARN
+// line only, and only up to the FAIL line, which never moves. No reason, no override.
+export const MOTION_REASON_MIN = 20;
+export function motionOverride(brief) {
+  const raw = String(brief?.motion_override || "").trim();
+  if (!raw) return null;
+  const bar = raw.indexOf("|");
+  const reason = bar < 0 ? "" : raw.slice(bar + 1).trim();
+  if (reason.length < MOTION_REASON_MIN) return { error: `motion_override cần lý do sau "|" (≥ ${MOTION_REASON_MIN} ký tự)` };
+  const key = String(brief.energy || "").trim() === "em" ? "em" : "default";
+  const fail = LIMITS.motionFail[key], warn = LIMITS.motionWarn[key];
+  const o = { step: 1, still: warn.still, peak: warn.peak, reason };
+  for (const tok of raw.slice(0, bar).trim().split(/\s+/).filter(Boolean)) {
+    const m = tok.match(/^(step|still|peak)=(\d+(?:[.,]\d+)?)$/);
+    if (!m) return { error: `motion_override: không hiểu "${tok}" (step=2|3, still=<0..1>, peak=<n>)` };
+    o[m[1]] = Number(m[2].replace(",", "."));
+  }
+  if (![1, 2, 3].includes(o.step)) return { error: `motion_override: step phải là 2 hoặc 3, có ${o.step}` };
+  if (o.still < warn.still || o.still > fail.still) return { error: `motion_override: still phải trong ${warn.still}…${fail.still} (vạch FAIL không đổi), có ${o.still}` };
+  if (o.peak > warn.peak || o.peak < fail.peak) return { error: `motion_override: peak phải trong ${fail.peak}…${warn.peak} (vạch FAIL không đổi), có ${o.peak}` };
+  return o;
+}
 export const SIZES = { "16:9": [1920, 1080], "9:16": [1080, 1920] };
 
 // metadata=print lines "lavfi.signalstats.YDIF=0.12" → { frames, still, ratio, peak } (first frame
@@ -68,10 +102,13 @@ export function motionVerdict(motion, brief) {
   const quick = !!(brief && QUICK_MODE.test(String(brief.creative_override || "").trim()));
   const creative = quick || !!(brief && brief.direction && !brief.creative_override);
   const key = brief && String(brief.energy || "").trim() === "em" ? "em" : "default";
-  const fail = LIMITS.motionFail[key], warn = LIMITS.motionWarn[key];
+  const fail = LIMITS.motionFail[key];
+  const ov = motionOverride(brief);
+  const warn = ov && !ov.error ? { still: ov.still, peak: ov.peak } : LIMITS.motionWarn[key];
   const pct = (x) => `${Math.round(x * 100)}%`;
   const peak = Number(motion.peak) || 0;
-  const detail = `${pct(motion.ratio)} khung gần như đứng yên (${motion.still}/${motion.frames}), đỉnh chuyển động ${peak.toFixed(2)}; ngưỡng ${creative ? `FAIL ≥${pct(fail.still)} và đỉnh <${fail.peak}, WARN ≥${pct(warn.still)} hoặc đỉnh <${warn.peak}` : `WARN ≥${pct(fail.still)} và đỉnh <${fail.peak} (chưa có direction)`}`;
+  const note = !ov ? "" : ov.error ? `; ${ov.error}, dùng ngưỡng mặc định` : `; motion_override${ov.step > 1 ? ` đo cách ${ov.step} khung` : ""}: ${ov.reason}`;
+  const detail = `${pct(motion.ratio)} khung gần như đứng yên (${motion.still}/${motion.frames}), đỉnh chuyển động ${peak.toFixed(2)}; ngưỡng ${creative ? `FAIL ≥${pct(fail.still)} và đỉnh <${fail.peak}, WARN ≥${pct(warn.still)} hoặc đỉnh <${warn.peak}` : `WARN ≥${pct(fail.still)} và đỉnh <${fail.peak} (chưa có direction)`}${note}`;
   if (motion.ratio >= fail.still && peak < fail.peak) return { level: creative ? "FAIL" : "WARN", detail: `${detail} — trông như slideshow, dựng lại beat có chuyển động liền mạch (build/RECIPES.md)` };
   if (creative && (motion.ratio >= warn.still || peak < warn.peak)) return { level: "WARN", detail };
   return { level: "PASS", detail };
@@ -198,7 +235,7 @@ const stamp = (d) => {
 };
 
 // Runs ffprobe + ffmpeg on `file`; throws Error with a readable message when a tool fails.
-export function measure(file, run = spawnSync) {
+export function measure(file, run = spawnSync, { step = 1 } = {}) {
   const opts = { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 };
   file = resolve(file); // absolute path: a name starting with "-" or holding ":" is not read as an option or protocol
   const probe = run("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", file], opts);
@@ -218,7 +255,7 @@ export function measure(file, run = spawnSync) {
     return String(r.stderr);
   };
   if (v) {
-    const err = ff(["-map", `0:${v.index}`, "-vf", `blackdetect=d=0.2:pix_th=0.1,freezedetect=n=0.003:d=${LIMITS.freezeMin},${MOTION_VF}`, "-an"]);
+    const err = ff(["-map", `0:${v.index}`, "-vf", `blackdetect=d=0.2:pix_th=0.1,freezedetect=n=0.003:d=${LIMITS.freezeMin},${motionVf(step)}`, "-an"]);
     metrics.black = parseBlack(err);
     metrics.freeze = parseFreeze(err, duration);
     metrics.motion = parseMotion(err);
@@ -232,12 +269,16 @@ export function measure(file, run = spawnSync) {
 }
 
 // Motion only (one ffmpeg pass) → parseMotion result; throws when ffmpeg fails.
-export function measureMotion(file, run = spawnSync) {
-  const r = run("ffmpeg", ["-hide_banner", "-nostats", "-i", resolve(file), "-an", "-vf", MOTION_VF, "-f", "null", "-"], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
+// step: frames apart (motionOverride(brief).step), 1 by default.
+export function measureMotion(file, run = spawnSync, { step = 1 } = {}) {
+  const r = run("ffmpeg", ["-hide_banner", "-nostats", "-i", resolve(file), "-an", "-vf", motionVf(step), "-f", "null", "-"], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
   if (r.error) throw new Error(`cannot run ffmpeg: ${r.error.message}`);
   if (r.status !== 0) throw new Error(`ffmpeg failed on ${file}: ${String(r.stderr).trim().split(/\r?\n/).slice(-2).join(" | ")}`);
   return parseMotion(r.stderr);
 }
+
+// Frames apart for MOTION from BRIEF frontmatter: the override's step when it is valid, else 1.
+export const motionStep = (brief) => { const o = motionOverride(brief); return o && !o.error ? o.step : 1; };
 
 export function readBrief(project) {
   const p = join(resolve(project), "BRIEF.md");
@@ -265,7 +306,7 @@ export function main(argv = process.argv.slice(2), { run = spawnSync, now = () =
   let brief = null, measured;
   try {
     if (project) brief = readBrief(project);
-    measured = measure(file, run);
+    measured = measure(file, run, { step: motionStep(brief) });
   } catch (e) { err(`qc-mp4: ${e.message}\n`); return 2; }
 
   const results = evaluate(measured.metrics, brief, measured.duration, { draft });

@@ -28,13 +28,19 @@
 //   --lemo puts a lemo-canvas style profile (styles.mjs, engine lemo-canvas) on the bold-tier pick:
 //   its project starts from the opus-video skeleton (composition.mjs) instead of the blank example,
 //   so lemo.mjs add finds its markers, and STYLEFRAME.md says to run lemo.mjs add before building.
-//   Without --lemo, a `lemo_style:` in BRIEF.md does the same.
+//   Without --lemo, a `lemo_style:` in BRIEF.md does the same. A `lemo_ref:` (grammar-only lemo
+//   style, lemo-pick.mjs choose) instead gives no pick a style profile: every STYLEFRAME.md points at
+//   that style's STYLE.md in the lemo cache, PICK.json keeps lemo_ref, and choose writes no
+//   style_profile (drops a stale one) unless --style-profile names one.
+//   Fonts an index.html loads from assets/fonts/ are copied in from <project>/assets/fonts or the
+//   system font folders (init WARNs on a missing one; render exits 2).
 //   --directions replaces the pick: 1 to 3 direction ids in the given order become picks 1..n, each
 //   keeps its own tier; ids must exist, be unique, fit --aspect and not be banned by the brand
 //   (exit 2 otherwise).
-// render: renders every pitch/<n>-*/index.html at --quality draft to pitch/<n>.mp4, cuts a poster
-//   pitch/<n>.png at 60% of the clip, tiles pitch/sheet.jpg, measures motion (qc-mp4 MOTION) and
-//   writes PITCH.md: the 3 options with paths, the two knobs, 3–4 swappable keywords per group
+// render: copies missing fonts (exit 2 when not found), renders every pitch/<n>-*/index.html at
+//   --quality draft to pitch/<n>.mp4, cuts a poster pitch/<n>.png at 60% of the clip, tiles
+//   pitch/sheet.jpg, measures motion (qc-mp4 MOTION) and
+//   writes PITCH.md: the options (as many as were pitched) with paths, the two knobs, 3–4 swappable keywords per group
 //   and the reply syntax. Show PITCH.md + sheet.jpg (+ the MP4s) to the user and wait.
 // choose: compat check (directions.mjs); warnings → exit 3 so the agent asks the user once, then
 //   re-run with --accept-warnings if they keep it. Writes BRIEF.md frontmatter: direction,
@@ -47,11 +53,12 @@
 //   fails MOTION (render; PITCH.md is still written), rebuild it · 6 init on a brief_version: 3 brief
 //   whose user has not seen the case suggestion yet (no case_search:, no CASES.md; skill ov-cases).
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, realpathSync, rmSync, copyFileSync } from "node:fs";
 import { join, resolve, relative } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
+import { homedir } from "node:os";
 import { wantsHelp, helpText } from "./cli-help.mjs";
 import { frontmatter } from "./check-viet-pro.mjs";
 import { loadDirections, pickDirections, scoreDirection, compatWarnings, resolveSelection, wordBudget, upstream, DIMENSIONS, DIM_VI, TIER_VI } from "./directions.mjs";
@@ -64,6 +71,7 @@ import { PLACEHOLDER, CASE_SUGGEST_VERSION, CASE_SUGGEST_FIX, hasCaseSuggestion 
 import { DEFAULT_VOICE, DEFAULT_TTS_MODEL } from "./voice-defaults.mjs";
 import { contactSheet, winArgs } from "./make-demo.mjs";
 import { measureMotion, motionVerdict } from "./qc-mp4.mjs";
+import { CATALOG, cacheHome, repoDir } from "./lemo.mjs";
 
 const WIN = process.platform === "win32";
 const posix = (p) => p.split("\\").join("/");
@@ -137,7 +145,7 @@ ${style.engine === "lemo-canvas" ? `- **Engine lemo-canvas (${style.lemo.kind}):
 // One finished styleframe per direction (from a real pitch), shown to the agent as a reference.
 const EXAMPLES = fileURLToPath(new URL("../references/styleframe-examples/", import.meta.url));
 
-export function styleframeMd({ n, pick, topic, aspect, energy, data, brand = null, style = null }) {
+export function styleframeMd({ n, pick, topic, aspect, energy, data, brand = null, style = null, lemoRef = null }) {
   const d = pick.direction;
   const example = join(EXAMPLES, `${d.id}.html`);
   const [w, h] = SIZE[aspect] || SIZE["9:16"];
@@ -154,7 +162,7 @@ ${d.styleframe_vi}
 - Luật chống slideshow: ${d.anti_slideshow_vi}
 - Style: ${sel.style.kind} \`${sel.style.name}\` · Blueprint: ${sel.blueprints.map((b) => `\`${b}\``).join(", ")} · Rule: ${sel.rules.map((r) => `\`${r}\``).join(", ")} · Seam: ${sel.seams.map((s) => `\`${s}\``).join(", ")}
 ${existsSync(example) ? `- Ví dụ cùng hướng: \`${example}\` (styleframe mẫu từ một pitch thật, chủ đề khác; học cách dựng, không chép chữ hay màu)\n` : ""}
-${styleMd(style, d, brand)}${brandMd(brand)}## Bắt buộc
+${lemoRefMd(lemoRef)}${styleMd(style, d, brand)}${brandMd(brand)}## Bắt buộc
 1. Đọc hết \`RECIPES.md\` cùng thư mục trước khi viết \`index.html\`; dựng bằng đúng các cơ chế trong đó.
 2. Dùng chữ thật của chủ đề (tên sản phẩm, con số, câu hook ngắn), không lorem ipsum, không bịa số liệu.
 3. ${brand ? "Font heading của brand nếu có đủ dấu tiếng Việt; không thì Be Vietnam Pro." : "Font có đủ dấu tiếng Việt (Be Vietnam Pro hoặc font preset đã kiểm dấu)."}
@@ -185,6 +193,65 @@ function briefLemo(project, profiles) {
   return v ? lemoProfile(v, profiles) : null;
 }
 
+// BRIEF.md `lemo_ref:` (lemo-pick.mjs choose, a grammar-only lemo-opuscar style) → { slug, guide,
+// name, uses, found } from the pinned library cache, or null. lemo_style wins when both are set.
+export function briefLemoRef(project, env = process.env, catalog = CATALOG) {
+  const p = join(project, "BRIEF.md");
+  if (!existsSync(p)) return null;
+  const fm = frontmatter(readFileSync(p, "utf8"));
+  const slug = String(setv(fm.lemo_ref) || "").trim();
+  if (!slug || setv(fm.lemo_style)) return null;
+  const dir = join(repoDir(cacheHome(env), JSON.parse(readFileSync(catalog, "utf8"))), "styles", slug);
+  let meta = {};
+  try { meta = JSON.parse(readFileSync(join(dir, "style.json"), "utf8")); } catch { /* fetch not run yet */ }
+  const guide = join(dir, "STYLE.md");
+  return { slug, guide, name: meta.en || slug, uses: meta.uses || [], found: existsSync(guide) };
+}
+
+// STYLEFRAME.md section for a lemo_ref: the look comes from the style's STYLE.md, not a style profile.
+export function lemoRefMd(ref) {
+  if (!ref) return "";
+  const uses = Array.isArray(ref.uses) ? ref.uses.join("; ") : String(ref.uses || "");
+  return `## Giao diện: ngữ pháp lemo-opuscar \`${ref.slug}\` (${ref.name})
+Người dùng đã chọn phong cách này (BRIEF.md \`lemo_ref: ${ref.slug}\`). Giao diện (màu, chữ, chất liệu, nhịp chuyển động) lấy từ STYLE.md của nó, không từ style profile; hướng vẫn quyết định cách kể bằng hình.
+- Đọc hết: \`${ref.guide}\`${ref.found ? "" : ` (chưa có: chạy \`node ${join(OV_DIR, "scripts", "lemo.mjs")} fetch\`)`}
+${uses ? `- Hợp với: ${uses}\n` : ""}- Dựng bằng GSAP/DOM/SVG/canvas trong index.html theo ngữ pháp đó; chữ tiếng Việt ở lớp DOM, hình là hàm thuần của t.
+- Chỉ học ngữ pháp hình; không chép câu chuyện, cảnh hay chữ ký của phim mẫu.
+
+`;
+}
+
+// Font files an index.html loads from assets/fonts/ (url("assets/fonts/X.ttf")).
+export const fontRefs = (html) => [...new Set([...String(html).matchAll(/url\(\s*["']?(?:\.\/)?assets\/fonts\/([^"')]+)["']?\s*\)/g)].map((m) => m[1]))];
+
+// Where make-pitch looks for those files: the project's assets/fonts, then the user's font folders.
+export function fontDirs(project, env = process.env, platform = process.platform) {
+  const home = env.HOME || env.USERPROFILE || homedir();
+  const dirs = [join(project, "assets", "fonts")];
+  if (platform === "darwin") dirs.push(join(home, "Library", "Fonts"), "/Library/Fonts");
+  else if (platform === "win32") dirs.push(join(env.LOCALAPPDATA || join(home, "AppData", "Local"), "Microsoft", "Windows", "Fonts"), "C:\\Windows\\Fonts");
+  else dirs.push(join(home, ".local", "share", "fonts"), join(home, ".fonts"), "/usr/share/fonts/truetype");
+  return dirs;
+}
+
+const fontsMsg = (missing) => (missing.size ? `\nWARN font chưa có: ${[...missing].join(", ")}; chép vào <project>/assets/fonts/ (tải Be Vietnam Pro từ Google Fonts) rồi chạy lại` : "");
+
+// Copies every assets/fonts file the styleframe's index.html loads but lacks; returns the names not found.
+export function copyFonts(dir, sources) {
+  const index = join(dir, "index.html");
+  if (!existsSync(index)) return [];
+  const missing = [];
+  for (const f of fontRefs(readFileSync(index, "utf8"))) {
+    const dest = join(dir, "assets", "fonts", f);
+    if (existsSync(dest)) continue;
+    const src = sources.map((s) => join(s, f)).find((x) => x !== dest && existsSync(x));
+    if (!src) { missing.push(f); continue; }
+    mkdirSync(join(dir, "assets", "fonts"), { recursive: true });
+    copyFileSync(src, dest);
+  }
+  return missing;
+}
+
 // --directions "A8,A6" → picks in that order with pickDirections' shape, or { msg } naming the bad id.
 // Same filters as pickDirections: the direction must fit the aspect and not be banned.
 export function chosenDirections(list, { category, aspect, energy, topic, exclude = [] }, data) {
@@ -210,6 +277,8 @@ export function init(o, data, up = upstream()) {
   const project = resolve(o.project);
   let lemoId = null;
   try { lemoId = o.lemo ? lemoProfile(o.lemo, profiles) : briefLemo(project, profiles); } catch (e) { if (e instanceof StyleError) return { code: 2, msg: `${o.lemo ? "--lemo" : "BRIEF lemo_style"}: ${e.message}` }; throw e; }
+  // A grammar-only lemo style (lemo_ref) sets the look of every pick from its STYLE.md; no style profile.
+  const lemoRef = lemoId ? null : briefLemoRef(project, o.env);
   const energy = o.energy || "vua";
   if (!data.energy[energy]) return { code: 2, msg: `--energy must be ${Object.keys(data.energy).join(", ")}` };
   let brand = null, brandWarn = "";
@@ -235,10 +304,10 @@ export function init(o, data, up = upstream()) {
   let old = [];
   try { old = JSON.parse(readFileSync(join(pitch, "PICK.json"), "utf8")).picks || []; } catch { /* first init */ }
   const used = new Set(lemoId ? [lemoId] : []);
-  const rows = [];
+  const rows = [], fontWarn = new Set();
   const lemoPick = lemoId ? (picks.find((p) => p.tier === "bold") || picks[picks.length - 1]) : null;
   for (const p of picks) {
-    const styleId = p === lemoPick ? lemoId : defaultStyle(p.direction, energy, profiles, used);
+    const styleId = p === lemoPick ? lemoId : lemoRef ? null : defaultStyle(p.direction, energy, profiles, used);
     if (styleId) used.add(styleId);
     const name = `${p.n}-${p.direction.slug}`;
     const dir = join(pitch, name);
@@ -251,13 +320,15 @@ export function init(o, data, up = upstream()) {
       if (p === lemoPick) writeFileSync(join(dir, "index.html"), sizeSkeleton(readFileSync(SKELETON, "utf8"), o.aspect === "16:9" ? "16:9" : "9:16"));
       scaffold = sha(join(dir, "index.html"));
     }
-    writeFileSync(join(dir, "STYLEFRAME.md"), styleframeMd({ n: p.n, pick: p, topic: o.topic, aspect: o.aspect, energy, data, brand, style: styleId ? profiles[styleId] : null }));
+    for (const f of copyFonts(dir, fontDirs(project, o.env))) fontWarn.add(f);
+    writeFileSync(join(dir, "STYLEFRAME.md"), styleframeMd({ n: p.n, pick: p, topic: o.topic, aspect: o.aspect, energy, data, brand, style: styleId ? profiles[styleId] : null, lemoRef }));
     const sel = resolveSelection(p.direction, {}, data);
     writeFileSync(join(dir, "RECIPES.md"), buildRecipes({ blueprints: sel.blueprints, rules: sel.rules, seams: sel.seams, direction: p.direction, style: sel.style }, data, up));
-    rows.push({ n: p.n, id: p.id, tier: p.tier, dir: posix(relative(project, dir)), why: p.why, scaffold, ...(styleId ? { style_profile: styleId } : {}) });
+    rows.push({ n: p.n, id: p.id, tier: p.tier, dir: posix(relative(project, dir)), why: p.why, scaffold, ...(styleId ? { style_profile: styleId } : {}), ...(lemoRef ? { lemo_ref: lemoRef.slug } : {}) });
   }
-  writeFileSync(join(pitch, "PICK.json"), JSON.stringify({ topic: o.topic, aspect: o.aspect, category: o.category || "", energy, duration_s: Number(o.duration) || Number(briefFm.duration_s) || 15, ...(brand ? { brand: brand.path } : {}), picks: rows }, null, 2) + "\n");
-  return { code: 0, msg: `make-pitch: 3 hướng → ${rows.map((r) => `${r.n}. ${r.id}${r.style_profile ? ` + ${r.style_profile}` : ""} (${r.dir})`).join(" · ")}${brandWarn}\nNext: viết index.html 3 giây cho từng thư mục theo STYLEFRAME.md + RECIPES.md, rồi chạy make-pitch.mjs render --project .` };
+  writeFileSync(join(pitch, "PICK.json"), JSON.stringify({ topic: o.topic, aspect: o.aspect, category: o.category || "", energy, duration_s: Number(o.duration) || Number(briefFm.duration_s) || 15, ...(brand ? { brand: brand.path } : {}), ...(lemoRef ? { lemo_ref: lemoRef.slug } : {}), picks: rows }, null, 2) + "\n");
+  const refWarn = lemoRef && !lemoRef.found ? `\nWARN lemo_ref ${lemoRef.slug}: chưa có ${lemoRef.guide}; chạy node ${join(OV_DIR, "scripts", "lemo.mjs")} fetch trước khi dựng` : "";
+  return { code: 0, msg: `make-pitch: ${rows.length} hướng → ${rows.map((r) => `${r.n}. ${r.id}${r.style_profile ? ` + ${r.style_profile}` : r.lemo_ref ? ` + lemo_ref ${r.lemo_ref}` : ""} (${r.dir})`).join(" · ")}${brandWarn}${refWarn}${fontsMsg(fontWarn)}\nNext: viết index.html 3 giây cho từng thư mục theo STYLEFRAME.md + RECIPES.md, rồi chạy make-pitch.mjs render --project .` };
 }
 
 function keywordMenu(data, picks) {
@@ -281,6 +352,8 @@ function render(o, data) {
     const dir = join(project, r.dir);
     if (!existsSync(join(dir, "index.html"))) return { code: 2, msg: `${r.dir}/index.html not found` };
     if (r.scaffold && sha(join(dir, "index.html")) === r.scaffold) return { code: 2, msg: `${r.dir}/index.html is still the blank hyperframes scaffold (styleframe chưa viết); write it from STYLEFRAME.md + RECIPES.md first` };
+    const noFont = copyFonts(dir, fontDirs(project, o.env));
+    if (noFont.length) return { code: 2, msg: `${r.dir}/index.html loads assets/fonts/${noFont.join(", assets/fonts/")} but the file is not in ${r.dir}/assets/fonts, <project>/assets/fonts or the system font folders; copy it there (Be Vietnam Pro: Google Fonts) and re-run render` };
   }
   const missing = ["ffmpeg", "ffprobe"].filter((t) => spawnSync(t, ["-version"], { stdio: "ignore" }).status !== 0);
   if (missing.length) return { code: 1, msg: `${missing.join(" and ")} not found; install ffmpeg (brew install ffmpeg) and re-run make-pitch.mjs render` };
@@ -304,21 +377,29 @@ function render(o, data) {
   }
   const sheet = join(pitch, "sheet.jpg");
   const sheetOk = contactSheet(posters, sheet);
+  writeFileSync(join(pitch, "PITCH.md"), pitchMd(info, lines, sheetOk, data));
+  return renderResult(lines, sheetOk);
+}
+
+// PITCH.md: the options as many as were pitched (--directions may ask for 1 or 2), the knobs and the reply syntax.
+export function pitchMd(info, lines, sheetOk, data) {
   const picks = info.picks.map((r) => ({ ...r, direction: data.directions.find((d) => d.id === r.id) }));
-  const md = [`# PITCH — ${info.topic}`, "",
-    `Khổ ${info.aspect} · ${info.duration_s} giây. Xem ${sheetOk ? "`pitch/sheet.jpg` (3 khung xếp theo thứ tự 1 · 2 · 3) và " : ""}3 clip 3 giây bên dưới, rồi chọn bằng mắt.`, "",
-    "## 3 hướng", "",
+  const k = lines.length;
+  const order = lines.map((l) => l.n).join(" · ");
+  const ex = lines[Math.min(2, k) - 1]?.n ?? 1;
+  return [`# PITCH — ${info.topic}`, "",
+    `Khổ ${info.aspect} · ${info.duration_s} giây. Xem ${sheetOk ? `\`pitch/sheet.jpg\` (${k} khung${k > 1 ? ` xếp theo thứ tự ${order}` : ""}) và ` : ""}${k} clip 3 giây bên dưới, rồi ${k > 1 ? "chọn" : "duyệt"} bằng mắt.`, "",
+    ...(info.lemo_ref ? [`Giao diện mọi phương án theo ngữ pháp lemo-opuscar \`${info.lemo_ref}\` (BRIEF.md \`lemo_ref\`).`, ""] : []),
+    `## ${k} hướng`, "",
     ...lines.flatMap((l) => { const d = data.directions.find((x) => x.id === l.id); return [`### ${l.n}. ${d.ten_vi} (${TIER_VI[l.tier]})`, "", d.mo_ta_vi, "", `- Mở đầu: ${d.hook_vi}`, `- Clip: \`${l.mp4}\` · khung: \`${l.png}\``, `- Đo chuyển động: ${l.motion.level} — ${l.motion.detail}`, ""]; }),
     "## Chỉnh thêm (không bắt buộc)", "",
-    `- **Nhịp** (\`nhịp: <mã>\`): ${Object.entries(data.energy).map(([k, v]) => `\`${k}\` ${v.ten_vi}`).join(" · ")}`,
-    `- **Tông màu** (\`màu: <mã>\`): ${Object.entries(data.palette).map(([k, v]) => `\`${k}\` ${v.ten_vi}`).join(" · ")}`,
+    `- **Nhịp** (\`nhịp: <mã>\`): ${Object.entries(data.energy).map(([key, v]) => `\`${key}\` ${v.ten_vi}`).join(" · ")}`,
+    `- **Tông màu** (\`màu: <mã>\`): ${Object.entries(data.palette).map(([key, v]) => `\`${key}\` ${v.ten_vi}`).join(" · ")}`,
     keywordMenu(data, picks), "",
     "## Cách trả lời", "",
-    "- Chỉ cần gõ số: `2`",
-    "- Hoặc số kèm điều chỉnh: `2, chuyển cảnh: lao-xuyen-tam, nhịp: em`",
+    `- Chỉ cần gõ số: \`${ex}\``,
+    `- Hoặc số kèm điều chỉnh: \`${ex}, chuyển cảnh: lao-xuyen-tam, nhịp: em\``,
     "- Muốn agent tự chọn: `tự chọn` (ghi là auto trong BRIEF.md)", ""].join("\n");
-  writeFileSync(join(pitch, "PITCH.md"), md);
-  return renderResult(lines, sheetOk);
 }
 
 // PITCH.md and sheet.jpg are written either way; a styleframe that fails MOTION exits 4 so the agent
@@ -327,7 +408,7 @@ export function renderResult(lines, sheetOk) {
   const head = `make-pitch: ${lines.length} clip → pitch/ · ${sheetOk ? "pitch/sheet.jpg · " : ""}pitch/PITCH.md`;
   const bad = lines.filter((l) => l.motion.level === "FAIL").map((b) => b.n);
   if (bad.length) return { code: 4, msg: `${head}\nFAIL  styleframe ${bad.join(", ")} gần như đứng yên (MOTION)\nNext: dựng lại styleframe ${bad.join(", ")} theo RECIPES.md rồi chạy lại make-pitch.mjs render; chưa gửi cho người dùng.` };
-  return { code: 0, msg: `${head}\nNext: gửi PITCH.md + sheet.jpg (và 3 clip) cho người dùng, dừng chờ câu trả lời, rồi chạy make-pitch.mjs choose.` };
+  return { code: 0, msg: `${head}\nNext: gửi PITCH.md + sheet.jpg (và ${lines.length} clip) cho người dùng, dừng chờ câu trả lời, rồi chạy make-pitch.mjs choose.` };
 }
 
 function choose(o, data) {
@@ -351,7 +432,9 @@ function choose(o, data) {
   if (o.palette === "thuong-hieu" && !brand) return { code: 2, msg: "--palette thuong-hieu cần brand.json (chép references/brand.example.json thành shared-assets/brand.json)" };
   const swaps = Object.fromEntries(DIMENSIONS.filter((d) => o[d]).map((d) => [d, o[d]]));
   const profiles = loadProfiles();
-  let styleId = row.style_profile && profiles[row.style_profile] ? row.style_profile : defaultStyle(direction, energy, profiles);
+  // A lemo_ref in BRIEF.md takes the look from its STYLE.md: no style profile unless --style-profile names one.
+  const lemoRef = briefLemoRef(project, o.env);
+  let styleId = row.style_profile && profiles[row.style_profile] ? row.style_profile : lemoRef ? null : defaultStyle(direction, energy, profiles);
   // A lemo_style in BRIEF.md outranks the pick's own style: the chosen direction is drawn in that look.
   try { styleId = briefLemo(project, profiles) || styleId; } catch (e) { if (e instanceof StyleError) return { code: 2, msg: `BRIEF lemo_style: ${e.message}` }; throw e; }
   if (o["style-profile"]) {
@@ -381,7 +464,7 @@ function choose(o, data) {
     music_only_s: budget.music_only_s,
     creative_selection: o.auto ? "auto" : "user",
     styleframe: `${row.dir}/index.html`,
-    style_profile: styleId || "",
+    style_profile: styleId || (lemoRef ? null : ""),
     creative_override: null,
   });
   brief = setSection(brief, "creative_direction", [
@@ -389,6 +472,8 @@ function choose(o, data) {
     `- Mô tả: ${direction.mo_ta_vi}`,
     `- Style: ${sel.style.kind} \`${sel.style.name}\``,
     ...(style ? [`- Style profile: ${style.ten_vi} (\`${style.id}\`), giao diện lấy từ \`data/styles/${style.id}.json\`${brand ? "; màu thương hiệu thắng bảng màu của style" : ""}`] : []),
+    ...(lemoRef && !o["style-profile"] ? [`- Giao diện: ngữ pháp lemo-opuscar \`${lemoRef.slug}\` (${lemoRef.name}), đọc \`${lemoRef.guide}\`; không có style profile`] : []),
+    ...(lemoRef && o["style-profile"] ? [`- Ngữ pháp lemo-opuscar \`${lemoRef.slug}\` (\`${lemoRef.guide}\`) vẫn quyết định chất liệu và chuyển động; style profile chỉ cho bảng màu và chữ`] : []),
     `- Blueprint: ${sel.blueprints.map((b) => `\`${b}\``).join(", ")} · Rule: ${sel.rules.map((r) => `\`${r}\``).join(", ")}`,
     `- Chuyển cảnh: ${sel.seams.map((s) => `\`${s}\``).join(", ")}${sel.allow_soft ? " (cho phép chuyển cảnh mềm)" : ""}`,
     `- SFX: ${sel.sfx.map((s) => `"${s}"`).join(", ")}`,
@@ -399,7 +484,7 @@ function choose(o, data) {
     ...(warnings.length ? [`- Cảnh báo phối đã được người dùng chấp nhận: ${warnings.join("; ")}`] : []),
   ].join("\n"));
   writeFileSync(briefPath, brief);
-  return { code: 0, msg: `make-pitch: BRIEF.md ← direction ${direction.id}${styleId ? `, style_profile ${styleId}` : ""}, energy ${energy}, word_budget ${budget.words}, music_only_s ${budget.music_only_s}${Object.keys(swaps).length ? `, swaps ${Object.entries(swaps).map(([k, v]) => `${k}=${v}`).join(", ")}` : ""}${aspectWarn}${brandWarn}\nNext: bước 2 viết kịch bản viet-pro theo ngân sách lời này (hình dẫn, lời theo).` };
+  return { code: 0, msg: `make-pitch: BRIEF.md ← direction ${direction.id}${styleId ? `, style_profile ${styleId}` : lemoRef ? `, giao diện lemo_ref ${lemoRef.slug}` : ""}, energy ${energy}, word_budget ${budget.words}, music_only_s ${budget.music_only_s}${Object.keys(swaps).length ? `, swaps ${Object.entries(swaps).map(([k, v]) => `${k}=${v}`).join(", ")}` : ""}${aspectWarn}${brandWarn}\nNext: bước 2 viết kịch bản viet-pro theo ngân sách lời này (hình dẫn, lời theo).` };
 }
 
 function parseArgs(argv) {
