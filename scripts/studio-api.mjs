@@ -14,7 +14,8 @@
 // optional project.json scenes groups) and the mixBalance key of COMMANDS (mix-balance.mjs), the
 // delivery keys export, vietPro, captions and platform of COMMANDS, and VOICE_DENIED_TOOLS. The music
 // keys arrange (arrange-music.mjs) and verifyArrangement (verify-arrangement.mjs) are new keys too,
-// as are the timeline keys beatFit (beat-fit.mjs) and cues (cues.mjs).
+// as are the timeline keys beatFit (beat-fit.mjs) and cues (cues.mjs). The gateway function restore
+// (an earlier manifest back as a new version) is added without a bump; Studio checks it exists.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,7 +23,7 @@ import { findSkill } from "./skill-paths.mjs";
 import { ELEVEN_REFUSED } from "./director-guard.mjs";
 
 export { load, validate, SCHEMA, FILE, SERIES_FILE, validateSeries, seriesDirOf } from "./manifest.mjs";
-export { patch, undo, redo, redoTarget, readHistory, derive, EXIT, ACTORS, OPS } from "./gateway.mjs";
+export { patch, undo, redo, restore, redoTarget, readHistory, derive, EXIT, ACTORS, OPS } from "./gateway.mjs";
 // Motion Studio ranks the cases again when CASES.md was made for another brief.
 export { casesStale } from "./case-fingerprint.mjs";
 export { enqueue, list, next, finish, cancelRequest, ask, answer, expireWaiting, STATUSES, ASK_KINDS, ASK_GATES, ID } from "./requests.mjs";

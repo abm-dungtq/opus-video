@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
-import { applyOps, patch, undo, redo, redoTarget, derive, readHistory, deriveHtml, derivePlan, remapEvents, EXIT } from "../gateway.mjs";
+import { applyOps, patch, undo, redo, restore, redoTarget, derive, readHistory, deriveHtml, derivePlan, remapEvents, EXIT } from "../gateway.mjs";
 import { load, save } from "../manifest.mjs";
 import { main as timingMain } from "../timing.mjs";
 
@@ -628,4 +628,41 @@ test("add_event with an anchor is a studio event; undo removes it", () => withPr
   assert.equal(e.studio, true);
   assert.equal(undo(dir, { base: r.version }).code, EXIT.ok);
   assert.equal((load(dir).events ?? []).some((x) => x.sound === "assets/sfx/pop.mp3"), false);
+}));
+
+test("restore writes an earlier manifest back as a new version once the files are back", () => withProject((dir) => {
+  assert.equal(derive(dir).code, 0);
+  const before = snapshot(dir);
+  const v1 = load(dir);
+  assert.equal(patch(dir, { actor: "director", base: 1, ops: [{ op: "resize_shot", id: "s1", duration: 3.5 }] }).code, 0);
+  assert.equal(patch(dir, { actor: "director", base: 2, ops: [{ op: "resize_shot", id: "s1", duration: 4 }] }).code, 0);
+  // Studio puts the text files back first, then calls restore.
+  for (const f of ["index.html", "PLAN.md"]) writeFileSync(join(dir, f), before[f]);
+  const r = restore(dir, { base: 3, manifest: v1, note: "hoàn tác lượt AI r1" });
+  assert.equal(r.code, EXIT.ok, r.error);
+  const v4 = load(dir);
+  assert.equal(v4.version, 4);
+  assert.deepEqual(v4.shots, v1.shots);
+  assert.deepEqual(v4.lines, v1.lines);
+  const h = readHistory(dir).at(-1);
+  assert.equal(h.actor, "restore");
+  assert.equal(h.note, "hoàn tác lượt AI r1");
+  assert.equal(readFileSync(join(dir, "PLAN.md"), "utf8"), before["PLAN.md"]);
+  // Running derive again changes nothing: the restored files already match the manifest.
+  const after = snapshot(dir);
+  assert.equal(derive(dir).code, 0);
+  assert.deepEqual(snapshot(dir), after);
+  // A restore can itself be undone, back to v3.
+  assert.equal(undo(dir, { base: 4 }).code, EXIT.ok);
+  assert.equal(load(dir).shots[0].end, 4);
+}));
+
+test("restore checks the base, and patch refuses the restore actor", () => withProject((dir) => {
+  const v1 = load(dir);
+  assert.equal(patch(dir, { actor: "human", base: 1, ops: [{ op: "resize_shot", id: "s1", duration: 3.5 }] }).code, 0);
+  const files = snapshot(dir);
+  assert.equal(restore(dir, { base: 1, manifest: v1 }).code, EXIT.conflict);
+  assert.deepEqual(snapshot(dir), files);
+  assert.equal(restore(dir, { base: 2, manifest: null }).code, EXIT.usage);
+  assert.equal(patch(dir, { actor: "restore", base: 2, ops: [] }).code, EXIT.usage);
 }));

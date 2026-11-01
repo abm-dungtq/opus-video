@@ -60,6 +60,8 @@
 // "## Sự kiện" rows a change dropped are kept in its history line and put back by its undo.
 // redo re-applies the change the newest undo reverted, as a new version (actor "redo"); it works
 // only while the last changes are undos and redos: any other change clears what can be redone.
+// restore() (no CLI command) writes a whole earlier manifest back as a new version (actor
+// "restore"); Motion Studio calls it after putting a project's text files back to undo an AI turn.
 // A project whose index.html has no TIMING:BEGIN/END (capabilities.editable false, every project
 // imported from before the skeleton) is view only: patch, undo, redo and derive exit 4.
 // Exit: 0 ok · 1 cannot read or write · 2 bad usage · 3 CONFLICT · 4 view-only project ·
@@ -76,7 +78,7 @@ import { EVENTS_SECTION, SECTIONS, fold, parseTable, sceneId } from "./check-pre
 import { eventTime } from "./sfx-sync.mjs";
 
 export const EXIT = { ok: 0, io: 1, usage: 2, conflict: 3, viewOnly: 4, invalid: 5, nothingToUndo: 7, busy: 8, nothingToRedo: 9 };
-export const ACTORS = ["human", "director", "timing", "import", "undo", "redo"];
+export const ACTORS = ["human", "director", "timing", "import", "undo", "redo", "restore"];
 export { WORKFLOW_MODES };
 // OPS names every op applyOps accepts; Studio checks it before sending one.
 export const OPS = Object.freeze(["resize_shot", "move_line", "set_shot", "set_line_text", "set_line_speaker", "set_line_audio",
@@ -403,9 +405,10 @@ function commit(dir, { base, actor, build, lockWaitMs }) {
     r.next.updated = new Date().toISOString();
     // Derive first, so a composition that cannot take the change leaves every file as it was,
     // then write it, and project.json last: a reader that sees v+1 also sees its derived files.
-    const d = derive(dir, { manifest: r.next, prev: m, dry: true, restoreRows: r.restoreRows });
+    const prev = r.prev ?? m;
+    const d = derive(dir, { manifest: r.next, prev, dry: true, restoreRows: r.restoreRows });
     if (d.code) return d;
-    const w = derive(dir, { manifest: r.next, prev: m, restoreRows: r.restoreRows });
+    const w = derive(dir, { manifest: r.next, prev, restoreRows: r.restoreRows });
     if (w.code) return w;
     // Dropped "## Sự kiện" rows are kept in the history line, so an undo can put them back.
     record(dir, r.next, { actor, base: m.version, ops: r.ops, receipt: [...r.receipt, ...w.events], ...(w.dropped.length ? { dropped_rows: w.dropped } : {}), ...(r.extra ?? {}) });
@@ -420,7 +423,7 @@ function commit(dir, { base, actor, build, lockWaitMs }) {
 
 // note: optional free text kept in the history line (the director's reason, a Studio request id).
 export function patch(dir, { actor, base, ops, note, lockWaitMs }) {
-  if (!ACTORS.includes(actor) || actor === "undo" || actor === "redo" || actor === "import") return { code: EXIT.usage, error: `actor phải là human | director | timing` };
+  if (!["human", "director", "timing"].includes(actor)) return { code: EXIT.usage, error: `actor phải là human | director | timing` };
   return commit(dir, { base, actor, lockWaitMs, build: (m) => ({ ...applyOps(m, ops, { html: readHtml(dir, m), root: resolve(dir) }), ops, ...(note ? { extra: { note: String(note) } } : {}) }) });
 }
 
@@ -462,6 +465,20 @@ export function undo(dir, { base, lockWaitMs }) {
       const prev = JSON.parse(readFileSync(snapPath(dir, target.v - 1), "utf8"));
       const next = { ...prev, version: m.version, updated: m.updated };
       return { next, ops: [], receipt: [`hoàn tác v${target.v}: ${(target.receipt ?? []).join("; ")}`], extra: { undoes: target.v }, restoreRows: target.dropped_rows ?? [] };
+    },
+  });
+}
+
+// Writes a whole earlier manifest back as a new version (Motion Studio's undo of an AI turn). The
+// caller has already put the project's text files back as they were at that manifest, so derive
+// runs with that manifest as prev: the rows and tags already match it and nothing is remapped.
+export function restore(dir, { base, manifest, note, lockWaitMs }) {
+  if (!manifest || typeof manifest !== "object" || !Array.isArray(manifest.shots)) return { code: EXIT.usage, error: "restore cần một manifest" };
+  return commit(dir, {
+    base, actor: "restore", lockWaitMs,
+    build: (m) => {
+      const next = { ...structuredClone(manifest), version: m.version, updated: m.updated };
+      return { next, prev: manifest, ops: [], receipt: [`khôi phục v${manifest.version ?? "?"}`], ...(note ? { extra: { note: String(note) } } : {}) };
     },
   });
 }
