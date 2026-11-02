@@ -2,11 +2,14 @@
 
 ## Unreleased
 
+## v2.9.0 (2026-11-02): ảnh 2K qua gflow, README viết lại
+
 ### Added
 - `gflow.mjs image --upscale`: passes `--upscale 2k` to gflow-studio's `image t2i|i2i` (added 2026-11-02) and keeps Flow's free 2K copy beside each image as `<name>.2k.<ext>`; with `--count > 1` the copy follows its image's new name. Paths go to stderr and `upscaled_files` in the ledger, stdout keeps one line per image. A gflow without the option stops the run before anything is sent; a failed upscale keeps the 1K image.
 
 ### Changed
 - `references/engine-selection.md`: the 513-case count is now marked as the count at the time it was taken (the yihui corpus now has 808 cases).
+- README.md and README.vi.md rewritten for this release: example case suggestions, AI images and clips through Google Flow, updated route chains, scripts table and troubleshooting rows. The Vietnamese text went through viet-pro lint.
 
 ## v2.8.0 (2026-11-02): style kinetic-film, gợi ý case trước hướng, jev-eval
 

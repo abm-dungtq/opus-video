@@ -2,14 +2,14 @@
 
 [English](README.md) · **Tiếng Việt**
 
-opus-video là plugin cho Claude Code, dùng được cả với OpenAI Codex và Google Antigravity, biến một chủ đề hay một bản brief thành video tiếng Việt hoàn chỉnh. Agent làm cùng bạn theo một quy trình cố định: brief, chọn hướng hình ảnh, kịch bản phải qua cổng [viet-pro](https://github.com/abm-dungtq/viet-pro-codex), giọng đọc ElevenLabs, hiệu ứng âm thanh và nhạc, dựng bằng [HyperFrames](https://hyperframes.dev) (HTML và GSAP), clip nháp (animatic) để bạn duyệt, rồi render bản giao, kiểm tra chất lượng và viết caption. Video xuất ra là MP4 khổ 16:9, 9:16 hoặc 1:1. Plugin không tự đăng gì lên mạng xã hội.
+opus-video là plugin cho Claude Code, dùng được cả với OpenAI Codex và Google Antigravity. Bạn đưa một chủ đề hoặc một bản brief, agent làm cùng bạn ra video tiếng Việt hoàn chỉnh theo một quy trình cố định: brief, gợi ý case mẫu, chọn hướng hình ảnh, kịch bản qua cổng [viet-pro](https://github.com/abm-dungtq/viet-pro-codex), giọng ElevenLabs, hiệu ứng âm thanh và nhạc, dựng bằng [HyperFrames](https://hyperframes.dev) (HTML và GSAP), clip nháp (animatic) để bạn duyệt, rồi render bản giao, kiểm tra chất lượng và viết caption. Video xuất ra là MP4 khổ 16:9, 9:16 hoặc 1:1. Plugin không tự đăng gì lên mạng xã hội.
 
-[![Release](https://img.shields.io/badge/release-v2.8.0-orange.svg)](https://github.com/abm-dungtq/opus-video/releases/tag/v2.8.0)
+[![Release](https://img.shields.io/badge/release-v2.9.0-orange.svg)](https://github.com/abm-dungtq/opus-video/releases/tag/v2.9.0)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Node ≥ 22](https://img.shields.io/badge/node-%E2%89%A5%2022-339933.svg)
-![Tests](https://img.shields.io/badge/tests-699%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-756%20passing-brightgreen.svg)
 
-[Video mẫu](#video-mẫu) · [Plugin làm được gì](#plugin-làm-được-gì) · [Cài đặt](#cài-đặt) · [Skill và hướng](#các-skill-và-bốn-hướng-vận-hành) · [Quy trình](#quy-trình-9-bước) · [Cổng viet-pro](#cổng-viet-pro) · [Script](#các-script-chính) · [Phong cách Lemo-Opuscar](#phong-cách-lemo-opuscar) · [Motion Studio](#motion-studio) · [Test](#test-và-xử-lý-lỗi) · [Ghi công](#ghi-công-và-giấy-phép) · [Đóng góp](#đóng-góp)
+[Video mẫu](#video-mẫu) · [Plugin làm được gì](#plugin-làm-được-gì) · [Cài đặt](#cài-đặt) · [Skill và hướng](#các-skill-và-bốn-hướng-vận-hành) · [Quy trình](#quy-trình-9-bước) · [Cổng viet-pro](#cổng-viet-pro) · [Case mẫu](#gợi-ý-case-mẫu) · [Ảnh và clip AI](#ảnh-và-clip-ai-qua-google-flow) · [Script](#các-script-chính) · [Phong cách Lemo-Opuscar](#phong-cách-lemo-opuscar) · [Motion Studio](#motion-studio) · [Test](#test-và-xử-lý-lỗi) · [Ghi công](#ghi-công-và-giấy-phép) · [Đóng góp](#đóng-góp)
 
 ## Video mẫu
 
@@ -24,20 +24,21 @@ Các video dưới đây làm bằng opus-video. Bấm vào ảnh để mở fil
 
 ## Plugin làm được gì
 
-- **Bạn chọn hình bằng mắt.** Với dự án mới, agent dựng ba styleframe ngắn từ chính chủ đề của bạn, mỗi cái một hướng khác hẳn nhau. Bạn chọn một, rồi kịch bản mới được viết, trong giới hạn số từ của hướng đó. Có 8 hướng đạo diễn và 64 hồ sơ phong cách, cộng hai phong cách canvas lấy từ lemo-opuscar (xem [Phong cách Lemo-Opuscar](#phong-cách-lemo-opuscar)). Style `kinetic-film` cắt chữ khổng lồ trên từng phách nhạc nhanh, và QA của nó chặn mọi đoạn đứng hình dài hơn 0,6 giây.
+- **Bắt đầu từ case mẫu.** Ngay sau brief, Jev xếp hạng 1.003 video làm bằng Claude Opus 5.5 theo brief của bạn và gửi ba case hợp nhất, mỗi case có link bài gốc, lý do chọn và video demo nếu có. Chọn một case thì agent chép prompt của nó, chuyển thể cho video của bạn (xem [Gợi ý case mẫu](#gợi-ý-case-mẫu)).
+- **Bạn chọn hình bằng mắt.** Agent dựng ba styleframe ngắn từ chính chủ đề của bạn, mỗi cái theo một hướng khác hẳn nhau. Bạn chọn một, rồi kịch bản mới được viết trong giới hạn số từ của hướng đó. Plugin có 8 hướng đạo diễn và 64 hồ sơ phong cách, cộng hai phong cách canvas lấy từ lemo-opuscar. Riêng `kinetic-film` cắt chữ khổng lồ trên từng phách của bài nhạc nhanh, và QA của nó chặn mọi đoạn đứng hình dài quá 0,6 giây.
 - **Chưa duyệt animatic thì chưa có bản cuối.** Agent render animatic 540p để bạn duyệt. `render-final.mjs` từ chối render bản giao (exit 5) khi thiếu plan, thiếu animatic, chưa duyệt, hoặc animatic gần như đứng yên.
-- **Đồng bộ có đo đạc.** Hiệu ứng âm thanh được đo theo khung đồng bộ ITU-R BT.1359-1, chữ trên hình được so với lúc từ đó được đọc, nhạc nằm dưới giọng 4 đến 7 dB (`mix-balance.mjs`).
-- **Âm thanh.** Giọng ElevenLabs có mốc thời gian từng từ, hiệu ứng âm thanh và nhạc. Nhạc có thể soạn theo kế hoạch từng đoạn, cắt lại theo ô nhịp cho khớp timeline và đối chiếu với bản gốc. Điểm cắt cảnh có thể bám theo phách, hiệu ứng âm thanh có thể gắn vào một từ được đọc. Forced alignment lấy mốc từng từ cho giọng thu thật. Gemini TTS là lựa chọn thêm cho giọng đọc.
+- **Đồng bộ có số đo.** Hiệu ứng âm thanh được đo theo khung đồng bộ ITU-R BT.1359-1, chữ trên hình được so với lúc từ đó được đọc, nhạc nằm dưới giọng 4 đến 7 dB (`mix-balance.mjs`). Khi đưa video về -14 LUFS mà đỉnh vượt -1,5 dBTP, `audio-mix` chạy bộ giới hạn đỉnh thay vì dừng sớm.
+- **Âm thanh.** Giọng ElevenLabs có mốc thời gian từng từ, hiệu ứng âm thanh và nhạc. Nhạc soạn được theo kế hoạch từng đoạn, cắt lại theo ô nhịp cho khớp timeline rồi đối chiếu với bản gốc. Điểm cắt cảnh bám được theo phách, hiệu ứng âm thanh gắn được vào một từ. Forced alignment lấy mốc từng từ cho giọng thu thật. Gemini TTS là lựa chọn thêm cho giọng đọc.
+- **Ảnh và clip AI.** `gflow.mjs` tạo ảnh Nano Banana và clip Veo hay Omni Flash qua Google Flow. Ảnh có thể gắn sẵn nhân vật theo `@Tên` và lưu thêm bản 2K. Clip tốn credit nên chỉ chạy khi bạn đã đồng ý (xem [Ảnh và clip AI qua Google Flow](#ảnh-và-clip-ai-qua-google-flow)).
 - **Dữ liệu thật.** Tiện ích xung quanh lấy từ OpenStreetMap, kèm khoảng cách và thời gian đi bộ. Bài báo, file PDF và trang tóm tắt arXiv được lưu nguyên văn trong `sources/`, nên con số nào trên hình cũng đối chiếu được với bản gốc.
-- **Case tham khảo.** Bộ chỉ mục 1.003 video làm bằng Claude Opus 5.5 (từ hai danh sách giấy phép MIT), được xếp hạng theo brief bằng TypeSafe Jev khi có key, nếu không thì theo từ khoá.
 - **Footage thật (beta).** Cắt clip nói chuyện hay phỏng vấn tại các khoảng lặng, hoặc giữ clip của người nói làm trục cho phần dựng mới.
-- **Sửa trên timeline.** Dự án có thể có timeline `project.json`. Mọi chỉnh sửa đi qua một cổng lệnh duy nhất, nên mỗi lần sửa là một phiên bản, hoàn tác và làm lại được. Một MCP server mở phần này cho các phiên agent.
+- **Sửa trên timeline.** Dự án có thể có timeline `project.json`. Mọi chỉnh sửa đi qua một cổng lệnh duy nhất, nên mỗi lần sửa là một phiên bản, hoàn tác và làm lại được. Một MCP server mở phần này cho các phiên agent, và [Motion Studio](#motion-studio) dùng nó làm giao diện.
 
 ## Cài đặt
 
 ### Cần có
 
-Node.js 22 trở lên, git, ffmpeg kèm ffprobe. `agy` (Antigravity CLI đã đăng nhập) là tuỳ chọn, dùng cho bước Gemini chấm video trong `judge.mjs`; thiếu nó thì QA soát bằng ảnh tĩnh.
+Node.js 22 trở lên, git, ffmpeg kèm ffprobe. Hai công cụ sau là tuỳ chọn: `agy` (Antigravity CLI đã đăng nhập) cho bước Gemini chấm video trong `judge.mjs`, thiếu nó thì QA soát bằng ảnh tĩnh; `gflow` cho ảnh và clip AI.
 
 ### Trình cài đặt
 
@@ -87,7 +88,7 @@ claude plugin install opus-video@opus-video-private
 ```
 ELEVENLABS_API_KEY=...
 OPUS_VIDEO_VOICE_ID=...
-# tuỳ chọn: TypeSafe Jev xếp hạng case tham khảo và phong cách lemo, soát kịch bản
+# tuỳ chọn: TypeSafe Jev xếp hạng case mẫu và phong cách lemo, soát kịch bản
 TYPESAFE_API_KEY=...
 # tuỳ chọn: chỉ cần khi dùng giọng Gemini
 GEMINI_API_KEY=...
@@ -108,7 +109,7 @@ node ~/.claude/skills/opus-video/scripts/eleven.mjs doctor
 
 Mở phiên agent mới và tả video bạn cần, ví dụ "làm video giới thiệu <sản phẩm> dài 30 giây, khổ 16:9 và 9:16".
 
-- Claude Code tự chọn skill `opus-video`. Bạn cũng có thể gọi từ menu lệnh gạch chéo, nơi skill của plugin nằm dưới tiền tố `opus-video:`.
+- Claude Code tự chọn skill `opus-video`. Bạn cũng gọi được từ menu lệnh gạch chéo, nơi skill của plugin nằm dưới tiền tố `opus-video:`.
 - Codex: `$opus-video <yêu cầu>`.
 - Antigravity: `/opus-video <yêu cầu>`, hoặc "dùng skill opus-video để ...".
 - Agent khác: "Đọc `<opus-video>/skills/opus-video/SKILL.md` và làm theo để ...".
@@ -120,48 +121,48 @@ Plugin có 11 skill. `opus-video` là điểm vào: nó chọn hướng rồi g�
 | Skill | Việc |
 |---|---|
 | `opus-video` | Điểm vào: chọn hướng, giữ luật chung và các cổng |
-| `ov-setup` | Bước 0: `setup-check`, `eleven.mjs doctor`, key |
+| `ov-setup` | Bước 0: `setup-check`, `eleven.mjs doctor`, key, `gflow.mjs doctor` khi cần ảnh AI |
 | `ov-brief` | Bước 1: `BRIEF.md` tối thiểu, bộ nhận diện thương hiệu |
+| `ov-cases` | Gợi ý ba case mẫu ngay sau brief, chép prompt case vào `build/TEMPLATE.md`; hướng làm nhanh từ một case |
 | `ov-direction` | Bước 1b: ba styleframe, chốt hướng và phong cách; gợi ý lemo-opuscar chỉ cho video 3D, sản phẩm hay theo nhạc |
-| `ov-cases` | Case tham khảo (Jev hoặc `find-cases`); hướng làm nhanh từ một case |
 | `ov-script` | Bước 2: cổng viet-pro đầy đủ, kiểm chứng nguồn |
 | `ov-audio` | Bước 5: giọng, SFX, nhạc, đo phách, mốc thời gian, mix |
-| `ov-build` | Bước 3 đến 7: storyboard, engine, `PLAN.md`, dựng, animatic, render nháp |
+| `ov-build` | Bước 3 đến 7: storyboard, engine, `PLAN.md`, dựng, ảnh và clip AI, animatic, render nháp |
 | `ov-footage` | Footage thật, hoặc clip của người nói làm trục |
 | `ov-deliver` | Bước 7 đến 9: render bản giao, QA, caption, xuất file |
 | `ov-studio` | `project.json`, cổng lệnh, nhập dự án cũ, Motion Studio |
 
-Thư mục `agents/` có hai agent: `ov-director` (chỉ đọc; viết hướng dựng từng cảnh và duyệt contact sheet) và `ov-executor` (chạy quy trình theo hướng đã chốt). Nói `--poor` hoặc "tiết kiệm" để làm hết trong một phiên với một vòng duyệt; không cổng nào bị bỏ. Chi tiết ở [references/dao-dien-va-thi-cong.md](references/dao-dien-va-thi-cong.md).
+Thư mục `agents/` có hai agent: `ov-director` chỉ đọc, viết hướng dựng từng cảnh và duyệt contact sheet; `ov-executor` chạy quy trình theo hướng đã chốt. Nói `--poor` hoặc "tiết kiệm" để làm hết trong một phiên với một vòng duyệt; không cổng nào bị bỏ. Chi tiết ở [references/dao-dien-va-thi-cong.md](references/dao-dien-va-thi-cong.md).
 
 | Hướng | Khi bạn nói | Chuỗi skill |
 |---|---|---|
-| `dao-dien` (đạo diễn, mặc định) | "làm video", "explainer", "quảng cáo" | setup → brief → direction → script → audio → build → deliver |
-| `nhanh` (theo một case) | "làm nhanh", "giống video này" | setup → brief → cases → script → audio → build → deliver |
-| `tu-nhac` (từ nhạc hoặc footage) | "từ bài nhạc này", "theo beat", "từ clip của tôi" | setup → brief → audio (đo phách trước) hoặc footage → direction → script → build → deliver |
+| `dao-dien` (đạo diễn, mặc định) | "làm video", "explainer", "quảng cáo" | setup → brief → gợi ý case → direction → script → audio → build → deliver |
+| `nhanh` (theo một case) | "làm nhanh", "theo mẫu", "giống video này" | setup → brief → gợi ý case → chọn một case → script → audio → build → deliver |
+| `tu-nhac` (từ nhạc hoặc footage) | "từ bài nhạc này", "theo beat", "từ clip của tôi" | setup → brief → gợi ý case → audio (đo phách trước) hoặc footage → direction → script → build → deliver |
 | `timeline` (sửa dự án đã có) | "sửa video", "mở studio", "đổi shot" | studio → sửa qua gateway → audio (chỉ câu đã đổi) → deliver |
 
-Hướng nào cũng giữ cổng viet-pro và các cổng giao của `render-final.mjs`. Hướng nhanh chỉ thay ba styleframe bằng một case tham khảo.
+Hướng nào cũng giữ cổng viet-pro và các cổng giao của `render-final.mjs`. Hướng nhanh chỉ thay ba styleframe bằng case bạn chọn.
 
 ## Quy trình 9 bước
 
 | Bước | Việc | Skill |
 |---|---|---|
 | 0 | Kiểm tra công cụ, skill, key | `ov-setup` |
-| 1 | Brief tối thiểu | `ov-brief` |
+| 1 | Brief tối thiểu, rồi gợi ý ba case mẫu | `ov-brief`, `ov-cases` |
 | 1b | Ba styleframe, bạn chọn hướng (gợi ý lemo-opuscar khi cần) | `ov-direction` |
 | 2 | Kịch bản qua cổng viet-pro | `ov-script` |
-| 3, 4, 4b | Storyboard (có tra case), engine, `PLAN.md` và cổng plan | `ov-build` |
+| 3, 4, 4b | Storyboard, engine, `PLAN.md` và cổng plan | `ov-build` |
 | 5 | Giọng, SFX, nhạc, mốc thời gian, mix | `ov-audio` |
 | 6, 6b | Dựng cảnh, rồi animatic để bạn duyệt | `ov-build` |
 | 7 | Render bản giao qua `render-final.mjs` | `ov-deliver` |
 | 8 | QA: `qc-mp4`, `word-sync`, `video-lint`, `judge` nếu có | `ov-deliver` |
 | 9 | Caption, bàn giao và xuất theo từng nền tảng | `ov-deliver` |
 
-Ở hướng đạo diễn, thứ tự là 0, 1, 1b, 2, 3, 4, 4b, 5, 6, 6b, 7, 8, 9. Bốn cổng không bỏ được: hướng bạn chọn bằng mắt, kịch bản qua viet-pro, `PLAN.md`, và animatic đã duyệt. Thư mục dự án cuối cùng có `BRIEF.md`, `STORYBOARD.md`, bảng kịch bản, `PLAN.md`, `DEMO.md`, `QA.md`, `CAPTIONS.md`, `assets/` và `renders/`.
+Ở hướng đạo diễn, thứ tự là 0, 1, 1b, 2, 3, 4, 4b, 5, 6, 6b, 7, 8, 9. Bốn cổng không bỏ được: hướng bạn chọn bằng mắt, kịch bản qua viet-pro, `PLAN.md` và animatic đã duyệt. Thư mục dự án cuối cùng có `BRIEF.md`, `CASES.md`, `STORYBOARD.md`, bảng kịch bản, `PLAN.md`, `DEMO.md`, `QA.md`, `CAPTIONS.md`, `assets/` và `renders/`.
 
 ## Cổng viet-pro
 
-Mọi lời đọc, chữ trên hình và caption tiếng Việt đều đi qua quy trình [viet-pro](https://github.com/abm-dungtq/viet-pro-codex) trước khi tạo giọng hay render: bảng kịch bản ba cột, một lượt Humanizer có ghi chép, lint, và biên bản `## viet_pro` trong dự án. Sau đó:
+Mọi lời đọc, chữ trên hình và caption tiếng Việt đều qua quy trình [viet-pro](https://github.com/abm-dungtq/viet-pro-codex) trước khi tạo giọng hay render: bảng kịch bản ba cột, một lượt Humanizer có ghi chép, lint, và biên bản `## viet_pro` trong dự án. Sau đó chạy:
 
 ```bash
 node <opus-video>/scripts/check-viet-pro.mjs --project .                     # trước khi tạo giọng (stage script)
@@ -170,6 +171,44 @@ node <opus-video>/scripts/check-viet-pro.mjs --project . --stage delivery    # t
 
 Lệnh trả exit 0 khi đạt, exit 1 khi cổng chặn. `eleven.mjs` chạy lại đúng cổng này trước khi tạo hay căn giọng, và trả exit 4 khi cổng còn chặn. Sửa một câu đọc về sau thì cổng phải đạt lại trước khi đọc lại câu đó. Quy trình chi tiết ở [references/script-workflow.md](references/script-workflow.md).
 
+## Gợi ý case mẫu
+
+Kho case gồm 1.003 video làm bằng Claude Opus 5.5, lấy từ hai danh sách giấy phép MIT; 718 video trong số đó có video demo xem được. Với mọi video mới, agent viết lại brief thành `BRIEF.case-query.json` (JSON tiếng Anh) rồi chạy:
+
+```bash
+node <opus-video>/scripts/rerank-cases.mjs --suggest --project .
+node <opus-video>/scripts/case-template.mjs --project . --case <id> [--reference]
+node <opus-video>/scripts/case-template.mjs --project . --show
+```
+
+`--suggest` nhờ Jev xếp hạng cả kho theo loại video, chủ đề và phong cách, bỏ case trùng bài đăng, rồi in ba case kèm link, một dòng mô tả, lý do và dòng `Video demo:` khi có. Kết quả ghi vào `CASES.md` cùng `case_search:` và `case_refs:` trong `BRIEF.md`. Case lệch chủ đề xếp dưới mọi case cùng chủ đề, dù hợp loại và phong cách đến đâu. Jev lỗi hay thiếu key thì dòng đầu của khối gợi ý nói rõ.
+
+Bạn chọn một case, `case-template.mjs` ghi `build/TEMPLATE.md`: video demo, bài gốc, trang prompt trong repo (ghim commit), lý do Jev chọn, kèm hai mục agent viết là vì sao prompt này hợp và prompt đã chuyển thể cho video của bạn. `--show` in khối đó cho bạn xem, và trả exit 3 khi một mục vẫn còn chỗ trống. Hướng `dao-dien` và `tu-nhac` dùng `--reference`, chỉ lấy case làm tham khảo.
+
+Brief mới mang `brief_version: 3`. Chưa có `case_search:` hay `CASES.md` thì `make-pitch.mjs init` trả exit 6 và `check-preflight` không đạt. Dự án `brief_version: 2` chỉ nhận cảnh báo.
+
+## Ảnh và clip AI qua Google Flow
+
+`gflow.mjs` gọi [gflow-studio](https://github.com/abm-dungtq/gflow-studio), bản gflow-cli của abm-dungtq, để tạo ảnh Nano Banana và clip Veo hoặc Omni Flash. Cài một lần và đăng nhập Google Flow trong cửa sổ Chrome:
+
+```bash
+uv tool install "git+https://github.com/abm-dungtq/gflow-studio.git@main"
+uvx --from "git+https://github.com/abm-dungtq/gflow-studio.git@main" playwright install chromium
+gflow auth login --browser chrome --profile <tên>
+node <opus-video>/scripts/gflow.mjs doctor
+```
+
+```bash
+node <opus-video>/scripts/gflow.mjs image --prompt-file prompts/k1.txt --out assets/gen/k1.png [--ref a.png] [--cast series/cast.json] [--upscale]
+node <opus-video>/scripts/gflow.mjs video --start assets/gen/k1.png --prompt-file prompts/c1.txt --out assets/gen/c1.mp4 --spend [--upscale]
+```
+
+- Ảnh không tốn credit. Có `--ref` thì lệnh chạy `i2i`; không có thì chạy `t2i`.
+- `--cast` đọc file nhân vật (tên → ảnh đã duyệt, `null` khi chưa có). Mỗi `@Tên` trong prompt được gắn ảnh của nhân vật đó; tên nào không gắn được thì lệnh in ra.
+- `image --upscale` lưu thêm bản 2K miễn phí cạnh mỗi ảnh, tên `<tên>.2k.<đuôi>`; ảnh 1K vẫn giữ vì bản nâng vẽ lại chi tiết nhỏ. Tuỳ chọn này cần bản gflow-studio có `image --upscale` (hiện ở nhánh `an-trinh-duyet`); bản cũ hơn thì lệnh dừng trước khi gửi gì lên Flow.
+- `video` tốn credit Flow, nên lệnh từ chối khi thiếu `--spend`. `video --upscale` thay clip 720p bằng bản 1080p xuất miễn phí.
+- Mọi lần chạy dồn vào một dự án Flow có tên (mặc định là tên thư mục dự án) và được ghi vào `assets/gen/gflow-ledger.jsonl` trước và sau khi chạy. Lệnh không bao giờ tự gửi lại một lần chạy lỗi.
+
 ## Các script chính
 
 Mọi script nằm trong `scripts/`, chỉ dùng thư viện có sẵn của Node, và in cách dùng, cờ, mã thoát khi gọi `--help`.
@@ -177,9 +216,11 @@ Mọi script nằm trong `scripts/`, chỉ dùng thư viện có sẵn của Nod
 | Nhóm | Script |
 |---|---|
 | Cài đặt | `setup-check.mjs`, `skill-paths.mjs` |
+| Case mẫu | `rerank-cases.mjs` (`--suggest`), `case-template.mjs`, `find-cases.mjs` |
 | Hướng hình ảnh | `make-pitch.mjs` (`init`, `render`, `choose`), `directions.mjs`, `styles.mjs`, `lemo-pick.mjs`, `lemo.mjs`, `brand.mjs` |
-| Kịch bản và nguồn | `check-viet-pro.mjs`, `voice-gate.mjs`, `source-ingest.mjs`, `poi-fetch.mjs`, `find-cases.mjs`, `rerank-cases.mjs`, `case-template.mjs` |
+| Kịch bản và nguồn | `check-viet-pro.mjs`, `voice-gate.mjs`, `source-ingest.mjs`, `poi-fetch.mjs` |
 | Âm thanh | `eleven.mjs` (`doctor`, `tts`, `sfx`, `music`, `align`, `audio-meta`), `beat-grid.mjs`, `arrange-music.mjs`, `verify-arrangement.mjs`, `audio-mix.mjs`, `mix-balance.mjs` |
+| Ảnh và clip AI | `gflow.mjs` (`doctor`, `image`, `video`) |
 | Dựng | `composition.mjs` (`init`, `add-part`), `timing.mjs`, `recipe-pack.mjs`, `beat-fit.mjs`, `cues.mjs`, `reframe.mjs` |
 | Cổng và QA | `check-preflight.mjs` (`--stage plan`, `--stage final`), `make-demo.mjs`, `sfx-sync.mjs`, `word-sync.mjs`, `qc-mp4.mjs`, `video-lint.mjs`, `judge.mjs` |
 | Bàn giao | `render-final.mjs`, `captions-from-transcript.mjs`, `export.mjs` |
@@ -191,7 +232,7 @@ Hướng dẫn dài hơn: [giới thiệu](docs/gioi-thieu.md), [hướng dẫn 
 
 ## Phong cách Lemo-Opuscar
 
-[lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) của LemoLab là thư viện phong cách phim viết bằng code. Ở commit mà opus-video ghim (trong `data/lemo/styles.json`) thư viện có 59 phong cách; xem trong [gallery](https://lemomo-ai.github.io/lemo-opuscar/). Ở bước 1b, `ov-direction` gợi ý hai hoặc ba phong cách trước khi dựng styleframe, nhưng chỉ với video 3D, sản phẩm, theo nhạc, hoặc khi bạn nhắc lemo; video giải thích có lời tiếng Việt đi thẳng tới style profile.
+[lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) của LemoLab là thư viện phong cách phim viết bằng code. Ở commit opus-video ghim (trong `data/lemo/styles.json`), thư viện có 59 phong cách; xem trong [gallery](https://lemomo-ai.github.io/lemo-opuscar/). Motion Studio tải đúng commit này. Ở bước 1b, `ov-direction` gợi ý hai hoặc ba phong cách trước khi dựng styleframe, nhưng chỉ với video 3D, video sản phẩm, video theo nhạc hoặc khi bạn nhắc tới lemo. Video giải thích có lời tiếng Việt đi thẳng tới hồ sơ phong cách.
 
 ```bash
 node <opus-video>/scripts/lemo.mjs fetch     # mỗi máy một lần, cần mạng
@@ -199,19 +240,18 @@ node <opus-video>/scripts/lemo-pick.mjs rank --brief-json BRIEF.case-query.json 
 node <opus-video>/scripts/lemo-pick.mjs choose --project . --style <slug> --search "<lemo_search>"
 ```
 
-- `fetch` tải thêm `style.json` và `STYLE.md` của từng phong cách vào cache trên máy. `rank` đọc các file đó; `--library <dir>` trỏ sang một bản thư viện khác, ví dụ cache của Motion Studio.
-- `BRIEF.case-query.json` là bản brief dạng JSON tiếng Anh mà agent viết từ brief của bạn cho `ov-cases`.
-- Có `TYPESAFE_API_KEY` thì Jev chấm mọi phong cách từ 0 đến 4 trong một lần gọi: hình, công dụng quen thuộc và giọng của phong cách có hợp brief không. Điểm bằng nhau thì xếp theo từ khoá.
-- Không có key, hoặc lần gọi Jev lỗi (lỗi HTTP, quá thời gian, trả về sai dạng), `rank` xếp theo từ khoá và vẫn trả exit 0: từ của brief có trong công dụng của phong cách được tính ba lần, trong tên và nhóm hai lần, trong câu tóm tắt phim mẫu và phần mở đầu `STYLE.md` một lần. Khi lần gọi lỗi, lệnh in một dòng báo trên stderr.
+- `fetch` tải `style.json` và `STYLE.md` của từng phong cách vào cache trên máy. `rank` đọc các file đó; `--library <dir>` trỏ sang một bản thư viện khác, ví dụ cache của Motion Studio.
+- Có `TYPESAFE_API_KEY` thì Jev chấm mọi phong cách từ 0 đến 4 trong một lần gọi, xét hình, công dụng quen thuộc và giọng của phong cách có hợp brief không. Điểm bằng nhau thì xếp theo từ khoá.
+- Không có key, hoặc lần gọi Jev lỗi, `rank` xếp theo từ khoá và vẫn trả exit 0. Từ của brief có trong công dụng của phong cách được tính ba lần, trong tên và nhóm hai lần, trong câu tóm tắt phim mẫu và phần mở đầu `STYLE.md` một lần. Khi lần gọi lỗi, lệnh in một dòng báo trên stderr.
 - Mỗi kết quả có lý do bằng tiếng Việt và cho biết phong cách đó là lớp canvas mà `lemo.mjs add` vẽ được, hay phải dựng theo ngữ pháp trong `STYLE.md`. `--stats` in giá trị `lemo_search` để ghi vào brief.
-- `choose` ghi lựa chọn vào front matter của `BRIEF.md`: `lemo_style: <slug>` nếu là phong cách có lớp canvas (hiện có `watercolor` và `glass-product`), hoặc `lemo_ref: <slug>` nếu chỉ dựng theo ngữ pháp. Lệnh cũng ghi `lemo_search:` (`jev` hoặc `keyword (<lý do>)`) và thêm một dòng ghi công LemoLab vào `assets/CREDITS.md`.
+- `choose` ghi lựa chọn vào front matter của `BRIEF.md`: `lemo_style: <slug>` cho phong cách có lớp canvas (hiện có `watercolor` và `glass-product`), hoặc `lemo_ref: <slug>` cho phong cách chỉ dựng theo ngữ pháp. Lệnh cũng ghi `lemo_search:` và thêm một dòng ghi công LemoLab vào `assets/CREDITS.md`.
 - Với phong cách có lớp canvas, `lemo.mjs add --project . --style <slug>` chép engine vào dự án và vẽ nó dưới composition HyperFrames. Chữ tiếng Việt vẫn nằm ở lớp HTML. Lớp này vẽ cho khổ 16:9; bản dọc cần scene riêng.
 
 Hợp đồng của scene, giấy phép và số đo tốc độ render nằm ở [references/lemo-canvas.md](references/lemo-canvas.md).
 
 ## Motion Studio
 
-[Motion Studio](https://github.com/abm-dungtq/motion-studio) là một ứng dụng web riêng, chạy trên máy bạn. Ở đó bạn tạo dự án, giao việc cho đạo diễn AI và duyệt bằng thẻ, sửa timeline, xuất MP4 hoặc bộ lớp dựng cho CapCut, Final Cut Pro, Premiere và DaVinci Resolve. opus-video là provider của Studio. Script `studio.mjs` trong plugin chỉ là lớp chuyển tiếp: nó tìm Studio qua `MOTION_STUDIO_HOME` rồi chạy:
+[Motion Studio](https://github.com/abm-dungtq/motion-studio) là ứng dụng web riêng, chạy trên máy bạn. Ở đó bạn tạo dự án, giao việc cho đạo diễn AI và duyệt bằng thẻ, sửa timeline, xuất MP4 hoặc bộ lớp dựng cho CapCut, Final Cut Pro, Premiere và DaVinci Resolve. opus-video là provider của Studio. Script `studio.mjs` trong plugin chỉ chuyển tiếp: nó tìm Studio qua `MOTION_STUDIO_HOME` rồi chạy.
 
 ```bash
 node <opus-video>/scripts/studio.mjs start --background   # http://127.0.0.1:4317
@@ -219,7 +259,7 @@ node <opus-video>/scripts/studio.mjs status
 node <opus-video>/scripts/studio.mjs stop
 ```
 
-Studio chỉ gọi plugin qua `scripts/studio-api.mjs`, file này xuất `STUDIO_API = 4` và phiên bản plugin. Bảng tương thích nằm trong README của Motion Studio.
+Studio chỉ gọi plugin qua `scripts/studio-api.mjs`. File này xuất `STUDIO_API = 4`, phiên bản plugin và các lệnh Studio dùng, trong đó có lệnh gợi ý case. Bảng tương thích nằm trong README của Motion Studio.
 
 ## Test và xử lý lỗi
 
@@ -229,15 +269,17 @@ node --test "<opus-video>/scripts/tests/*.test.mjs"
 
 Giữ dấu nháy để Node tự mở rộng mẫu tên file. Vài test dùng một dự án thật; trỏ chúng sang dự án của bạn bằng `OPUS_VIDEO_SMOKE_DIR` và `OPUS_VIDEO_ABM_DIR`.
 
-Để đo chính model Jev, chạy `node <opus-video>/scripts/jev-eval.mjs` khi đã có key. Lệnh chấm rerank case (single và composite), lemo-pick, kiểm lời đọc và gợi ý hướng của Motion Studio trên các bộ vàng bạn đã duyệt, in bảng mốc, nay, không-Jev và trạng thái, và thoát 1 khi có bộ đo tụt. Một lượt đủ tốn khoảng 0,10 USD. `.agentkit/test-impact.json` giúp `ak test optimize --base origin/main` chọn nhóm test Jev offline khi file Jev thay đổi. Chi tiết ở [references/jev-eval.md](references/jev-eval.md).
+Muốn đo chính model Jev thì chạy `node <opus-video>/scripts/jev-eval.mjs` khi đã có key. Lệnh chấm rerank case (đơn và tổng hợp), lemo-pick, kiểm lời đọc và gợi ý hướng của Motion Studio trên các bộ mẫu bạn đã duyệt, in bảng so với mốc, và thoát 1 khi có bộ đo tụt. Một lượt đủ tốn khoảng 0,10 USD. `.agentkit/test-impact.json` giúp `ak test optimize --base origin/main` chọn nhóm test Jev offline khi file Jev thay đổi. Chi tiết ở [references/jev-eval.md](references/jev-eval.md).
 
 | Hiện tượng | Cách xử lý |
 |---|---|
 | `setup-check` báo thiếu skill | `npx hyperframes skills`, rồi mở phiên agent mới |
 | viet-pro tự kiểm lỗi | Cài lại viet-pro |
 | `eleven.mjs` trả exit 4 | Cổng kịch bản đang chặn: chạy `check-viet-pro.mjs --project .` và sửa các dòng FAIL |
+| `make-pitch.mjs init` trả exit 6 | Chưa gợi ý case: chạy `rerank-cases.mjs --suggest --project .` |
 | `render-final.mjs` trả exit 5 | Thiếu plan, animatic hoặc chưa duyệt: chạy `check-preflight.mjs --project . --stage final` |
 | `lemo-pick.mjs` trả exit 4 | Chưa có thư viện phong cách: chạy `lemo.mjs fetch` |
+| `gflow.mjs` trả exit 23 | Flow đổi giao diện: chạy `gflow update` rồi hỏi người dùng trước khi tạo lại |
 | Windows không thấy `ffmpeg` sau khi cài | Mở cửa sổ terminal mới |
 
 Gỡ cài đặt: xoá thư mục `opus-video` trong thư mục skill của từng agent, và xoá `~/.config/opus-video/` nếu không cần giữ key.
@@ -251,7 +293,7 @@ opus-video dùng giấy phép MIT ([LICENSE](LICENSE)). Phần lấy từ bên t
 - Hai hồ sơ phong cách lemo và `templates/lemo/` phỏng theo [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) của LemoLab (mã MIT, phim mẫu CC BY 4.0). `lemo.mjs` chép engine của nó và three.js (MIT) vào dự án của bạn kèm giấy phép, còn `lemo-pick.mjs` đọc file phong cách từ cache trên máy; repo này không phân phối lại cả hai.
 - Style `kinetic-film` học ngữ pháp từ các phim chữ kinetic nhịp nhanh, trong đó có skill scenario-kinetic-film của Scenario; repo này không chứa mã hay văn bản nào của skill đó.
 - `third_party/hyperframes-skills/` là bản chép nguyên trạng một số file từ skill của HyperFrames v0.8.184 (Apache-2.0).
-- Case tham khảo trong `data/` lấy từ hai danh sách giấy phép MIT. Prompt thuộc về tác giả gốc, mỗi dòng có link tới tác giả, video gốc không được phân phối lại. Nguồn và commit ghi ở [data/SOURCES.md](data/SOURCES.md).
+- Case mẫu trong `data/` lấy từ hai danh sách giấy phép MIT. Prompt thuộc về tác giả gốc, mỗi dòng có link tới tác giả, video gốc không được phân phối lại. Nguồn và commit ghi ở [data/SOURCES.md](data/SOURCES.md).
 
 ## Đóng góp
 
