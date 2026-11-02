@@ -122,7 +122,7 @@ The plugin has 11 skills. `opus-video` is the entry point; it picks a route and 
 | `opus-video` | Entry point: chooses the route, holds the shared rules and gates |
 | `ov-setup` | Step 0: `setup-check`, `eleven.mjs doctor`, keys |
 | `ov-brief` | Step 1: minimal `BRIEF.md`, brand kit |
-| `ov-direction` | Step 1b: lemo-opuscar style suggestions, three styleframes, chosen direction and style |
+| `ov-direction` | Step 1b: three styleframes, chosen direction and style; lemo-opuscar suggestions only for 3D, product or music-led videos |
 | `ov-cases` | Reference cases (Jev or `find-cases`); the quick route from one case |
 | `ov-script` | Step 2: full viet-pro gate, source checking |
 | `ov-audio` | Step 5: voice, SFX, music, beat grid, timing, mix |
@@ -190,7 +190,7 @@ Longer guides, in Vietnamese: [introduction](docs/gioi-thieu.md), [agent install
 
 ## Lemo-Opuscar styles
 
-[lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) by LemoLab is a library of film styles written in code. At the commit opus-video pins (in `data/lemo/styles.json`) it has 59 styles; you can browse them in its [gallery](https://lemomo-ai.github.io/lemo-opuscar/). At step 1b, `ov-direction` suggests two or three of them for your brief before the styleframes.
+[lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) by LemoLab is a library of film styles written in code. At the commit opus-video pins (in `data/lemo/styles.json`) it has 59 styles; you can browse them in its [gallery](https://lemomo-ai.github.io/lemo-opuscar/). At step 1b, `ov-direction` suggests two or three of them before the styleframes, but only for 3D, product or music-led videos, or when you ask for lemo; voiced Vietnamese explainers go straight to the style profiles.
 
 ```bash
 node <opus-video>/scripts/lemo.mjs fetch     # once per machine, needs network

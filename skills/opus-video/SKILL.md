@@ -49,7 +49,7 @@ Skill điều phối: biến một ý tưởng thành MP4 hoàn chỉnh. Skill n
 |---|---|
 | 0 kiểm tra cài đặt, thiết lập key | `ov-setup` |
 | 1 brief tối thiểu | `ov-brief` |
-| 1b gợi ý phong cách lemo-opuscar (Jev), pitch 3 styleframe, chọn hướng và style | `ov-direction` |
+| 1b pitch 3 styleframe, chọn hướng và style (gợi ý lemo-opuscar chỉ khi video 3D, sản phẩm hay theo nhạc) | `ov-direction` |
 | 2 kịch bản qua cổng viet-pro | `ov-script` |
 | 3 storyboard (tra case ở `ov-cases`), 4 engine, 4b PLAN.md, 6 dựng, 6b animatic, 7 render nháp | `ov-build` |
 | 5 giọng, SFX, nhạc, TIMING, mix | `ov-audio` |

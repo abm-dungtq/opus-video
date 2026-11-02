@@ -122,7 +122,7 @@ Plugin có 11 skill. `opus-video` là điểm vào: nó chọn hướng rồi g�
 | `opus-video` | Điểm vào: chọn hướng, giữ luật chung và các cổng |
 | `ov-setup` | Bước 0: `setup-check`, `eleven.mjs doctor`, key |
 | `ov-brief` | Bước 1: `BRIEF.md` tối thiểu, bộ nhận diện thương hiệu |
-| `ov-direction` | Bước 1b: gợi ý phong cách lemo-opuscar, ba styleframe, chốt hướng và phong cách |
+| `ov-direction` | Bước 1b: ba styleframe, chốt hướng và phong cách; gợi ý lemo-opuscar chỉ cho video 3D, sản phẩm hay theo nhạc |
 | `ov-cases` | Case tham khảo (Jev hoặc `find-cases`); hướng làm nhanh từ một case |
 | `ov-script` | Bước 2: cổng viet-pro đầy đủ, kiểm chứng nguồn |
 | `ov-audio` | Bước 5: giọng, SFX, nhạc, đo phách, mốc thời gian, mix |
@@ -148,7 +148,7 @@ Hướng nào cũng giữ cổng viet-pro và các cổng giao của `render-fin
 |---|---|---|
 | 0 | Kiểm tra công cụ, skill, key | `ov-setup` |
 | 1 | Brief tối thiểu | `ov-brief` |
-| 1b | Gợi ý lemo-opuscar, ba styleframe, bạn chọn hướng | `ov-direction` |
+| 1b | Ba styleframe, bạn chọn hướng (gợi ý lemo-opuscar khi cần) | `ov-direction` |
 | 2 | Kịch bản qua cổng viet-pro | `ov-script` |
 | 3, 4, 4b | Storyboard (có tra case), engine, `PLAN.md` và cổng plan | `ov-build` |
 | 5 | Giọng, SFX, nhạc, mốc thời gian, mix | `ov-audio` |
@@ -190,7 +190,7 @@ Hướng dẫn dài hơn: [giới thiệu](docs/gioi-thieu.md), [hướng dẫn 
 
 ## Phong cách Lemo-Opuscar
 
-[lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) của LemoLab là thư viện phong cách phim viết bằng code. Ở commit mà opus-video ghim (trong `data/lemo/styles.json`) thư viện có 59 phong cách; xem trong [gallery](https://lemomo-ai.github.io/lemo-opuscar/). Ở bước 1b, `ov-direction` gợi ý hai hoặc ba phong cách hợp brief trước khi dựng styleframe.
+[lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) của LemoLab là thư viện phong cách phim viết bằng code. Ở commit mà opus-video ghim (trong `data/lemo/styles.json`) thư viện có 59 phong cách; xem trong [gallery](https://lemomo-ai.github.io/lemo-opuscar/). Ở bước 1b, `ov-direction` gợi ý hai hoặc ba phong cách trước khi dựng styleframe, nhưng chỉ với video 3D, sản phẩm, theo nhạc, hoặc khi bạn nhắc lemo; video giải thích có lời tiếng Việt đi thẳng tới style profile.
 
 ```bash
 node <opus-video>/scripts/lemo.mjs fetch     # mỗi máy một lần, cần mạng

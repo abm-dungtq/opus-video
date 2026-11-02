@@ -15,7 +15,7 @@ Danh mục và commit lemo được ghim nằm trong `data/lemo/styles.json`. `n
 
 ## Chọn phong cách theo brief (`lemo-pick.mjs`)
 
-Thư viện ở commit đã ghim có 59 phong cách; gallery: https://lemomo-ai.github.io/lemo-opuscar/. Bước 1b (`ov-direction`) dùng `lemo-pick.mjs` để gợi ý 2–3 phong cách:
+Thư viện ở commit đã ghim có 59 phong cách; gallery: https://lemomo-ai.github.io/lemo-opuscar/. Bước 1b (`ov-direction`) dùng `lemo-pick.mjs` để gợi ý 2–3 phong cách, nhưng chỉ khi video 3D, sản phẩm, theo nhạc không lời hoặc người dùng nhắc lemo:
 
 ```bash
 node $OV/scripts/lemo-pick.mjs rank --brief-json BRIEF.case-query.json --limit 3 --stats
