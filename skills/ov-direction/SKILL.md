@@ -1,6 +1,6 @@
 ---
 name: ov-direction
-description: "Bước 1b của opus-video: gợi ý 2–3 phong cách lemo-opuscar bằng Jev (lemo-pick.mjs), pitch sáng tạo gồm 3 styleframe dựng bằng nội dung thật của người dùng (make-pitch.mjs init/render/choose), người dùng chọn hướng đạo diễn bằng mắt, rồi ghi direction, energy, palette, word_budget và style_profile vào BRIEF.md. Bắt buộc với dự án mới (brief_version: 2) trong hướng dao-dien và tu-nhac. Không dùng cho hướng nhanh theo mẫu (ov-cases), cho footage chỉ cắt gọn (ov-footage) hay để viết kịch bản (ov-script)."
+description: "Bước 1b của opus-video: pitch sáng tạo gồm 3 styleframe dựng bằng nội dung thật của người dùng (make-pitch.mjs init/render/choose), người dùng chọn hướng đạo diễn bằng mắt, rồi ghi direction, energy, palette, word_budget và style_profile vào BRIEF.md; gợi ý phong cách lemo-opuscar (lemo-pick.mjs) chỉ khi video 3D, sản phẩm, theo nhạc không lời hoặc người dùng nhắc lemo. Bắt buộc với dự án mới (brief_version: 2) trong hướng dao-dien và tu-nhac. Không dùng cho hướng nhanh theo mẫu (ov-cases), cho footage chỉ cắt gọn (ov-footage) hay để viết kịch bản (ov-script)."
 ---
 
 # ov-direction: pitch 3 styleframe, chọn hướng và style
@@ -9,7 +9,15 @@ description: "Bước 1b của opus-video: gợi ý 2–3 phong cách lemo-opusc
 
 ## Bước 1b: pitch sáng tạo
 
-**Gợi ý phong cách lemo-opuscar (trước `init`, một lần mỗi dự án).** [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) của LemoLab có 59 phong cách phim dựng bằng code (mã MIT, phim mẫu CC BY 4.0). Jev chọn 2–3 phong cách hợp brief:
+**Gợi ý phong cách lemo-opuscar (tuỳ chọn, trước `init`).** [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) của LemoLab có 59 phong cách phim dựng bằng code (mã MIT, phim mẫu CC BY 4.0). Phim mẫu của nó là phim 16:9 không lời, và chỉ 2 phong cách vẽ được thành lớp canvas; 57 phong cách còn lại chỉ là `STYLE.md` để tham khảo. Video có lời đọc tiếng Việt, phụ đề, chữ khớp lời hay khổ 9:16 thì 63 style profile vẽ bằng HyperFrames của `make-pitch` đã đủ, nên mặc định bỏ qua bước này và đi thẳng tới 3 styleframe.
+
+Chỉ chạy bước này khi có một trong ba điều:
+
+- người dùng nhắc lemo, tên một phong cách lemo, hay đòi chất liệu vẽ bằng code (thuỷ màu tự vẽ, sản phẩm thuỷ tinh 3D);
+- `--category` của brief là `3d`, `product` hoặc `story-music`;
+- video theo nhạc, không lời đọc.
+
+Khi chạy, Jev chọn 2–3 phong cách hợp brief:
 
 - Dùng `BRIEF.case-query.json` đã viết ở bước gợi ý case (`ov-cases`); chưa có thì viết theo khuôn ở đó và chạy `rerank-cases.mjs --suggest --project .` trước. Rồi chạy:
   ```bash
@@ -43,7 +51,7 @@ Sau bước này: viết kịch bản theo hướng đã chọn (`ov-script`), v
 | `$OV/references/creative-directions.md` | Bước 1b: 8 hướng đạo diễn, 2 núm, 5 nhóm từ khoá đổi được, từ vựng chuyển cảnh (sinh từ `data/directions.json`) |
 | `$OV/scripts/directions.mjs` | Bước 0/1b: `check` (token có thật trong HyperFrames, cũng chạy trong setup-check), `pick` (3 hướng tương phản), `compat` (cảnh báo phối sai), `doc --write` |
 | `$OV/scripts/make-pitch.mjs` | Bước 1b: `init` (3 project styleframe + STYLEFRAME.md + RECIPES.md; `--lemo` đặt một style lemo-canvas cho hướng táo bạo), `render` (3 clip, sheet.jpg, PITCH.md menu số; exit 4 khi styleframe FAIL MOTION), `choose` (ghi BRIEF, exit 3 khi phối sai) |
-| `$OV/scripts/lemo-pick.mjs` | Bước 1b: `rank` (Jev xếp hạng 59 phong cách lemo-opuscar theo brief, thiếu key hay lỗi thì xếp theo từ khoá), `choose` (ghi `lemo_style` hoặc `lemo_ref`, `lemo_search` và ghi công) |
+| `$OV/scripts/lemo-pick.mjs` | Bước 1b (tuỳ chọn): `rank` (Jev xếp hạng 59 phong cách lemo-opuscar theo brief, thiếu key hay lỗi thì xếp theo từ khoá), `choose` (ghi `lemo_style` hoặc `lemo_ref`, `lemo_search` và ghi công) |
 | `$OV/references/lemo-canvas.md` | Lớp canvas lemo, cách chọn phong cách, giấy phép và ghi công |
 | `$OV/scripts/recipe-pack.mjs` | Bước 1b (và 6): gom blueprint/rule/seam theo hướng thành `RECIPES.md` |
 | `$OV/references/style-system.md` | Bước 1b và 4b: 64 style, `style_profile`, `## style_layers`, luật resolve theo cảnh (`styles.mjs`) |

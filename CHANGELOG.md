@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- Step 1b (`ov-direction`) no longer starts every new project with `lemo-pick.mjs`. The lemo-opuscar suggestion runs only for 3D, product or music-led videos, or when the user asks for lemo; voiced Vietnamese explainers go straight to the style profiles of `make-pitch`. Of 40 projects, only 4 test or demo projects had picked a lemo style.
+
 ### Fixed
 - `case-template.mjs`: a section of `build/TEMPLATE.md` ends only at the template's own headings, so an adapted prompt that keeps the case's `## Scene 1` style headings is read whole by `--show` and kept on a rewrite (it used to stop at the first `## ` line).
 - `rerank-cases.mjs --suggest` with an invalid `BRIEF.case-query.json` ranks from BRIEF.md instead, or exits 2 and writes nothing when there is no BRIEF.md. It used to write an unranked CASES.md, which opened the pitch gate.
