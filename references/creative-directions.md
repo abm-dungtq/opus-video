@@ -51,7 +51,7 @@ Hướng quyết định cách kể bằng hình. Giao diện (màu, chữ, ch�
 - Hook: Giây đầu: một từ khoá đập vào giữa khung trên nhịp trống đầu tiên, nền đảo màu.
 - Styleframe 3 giây: 3 giây: ba từ khoá của chủ đề lần lượt đập vào theo 3 beat, từ sau húc văng từ trước, nền đổi cực màu ở beat thứ ba.
 - Style: style `Maximalist Type` · Blueprint: `kinetic-type-beats`, `ticker-takeover` · Rule: `kinetic-beat-slam`, `reactive-displacement`, `waterfall-entry`
-- Style profile gợi ý: `kinetic-typography` Chữ chuyển động (4/5), `athletic-impact` Thể thao bùng nổ (5/5), `extreme-energy` Cảm giác mạnh (5/5), `swiss-kinetic-editorial` Chữ Thuỵ Sĩ chuyển động (3/5), `pixel-arcade` Trò chơi điện tử pixel (4/5)
+- Style profile gợi ý: `kinetic-typography` Chữ chuyển động (4/5), `athletic-impact` Thể thao bùng nổ (5/5), `extreme-energy` Cảm giác mạnh (5/5), `kinetic-film` Chữ nổ theo beat (5/5), `pixel-arcade` Trò chơi điện tử pixel (4/5)
 - Chuyển cảnh: `beat-cut`, `waterfall-cut`
 - SFX: "punchy modern electronic stomp clap", "tight transient percussion hit" · Nhịp: don-dap · Nhóm: motion, story-music, product
 - Case tham khảo: `y:raphaelaubryy-687877`, `y:techhalla-498547`

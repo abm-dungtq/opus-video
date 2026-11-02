@@ -33,6 +33,7 @@ Chép mục "Sàn chất lượng", "Chống slideshow" và "Kỷ luật GSAP" c
 - **Bắt buộc gom công thức:** `node $OV/scripts/recipe-pack.mjs --project .` → `build/RECIPES.md` (blueprint, rule, seam mà PLAN.md khai, lấy nguyên văn từ HyperFrames). Đọc hết trước khi viết HTML; với frame worker thì chép vào prompt. Áp dụng cả khi dựng tay `general-video`. Cổng final chặn khi file này thiếu hoặc cũ hơn PLAN.md.
 - Cảnh mở đầu dựng tiếp từ styleframe đã chọn (`styleframe:` trong BRIEF.md).
 - HyperFrames: gọi skill `hyperframes`. Vì đã có `BRIEF.md`, nó sẽ đi vào workflow ghi ở `workflow:`.
+- **Style có `motion_gate`** (hiện có `kinetic-film`): dựng theo công thức trong `references/styles/detail/kinetic-film.md` (tên công thức ghi ở cột Hình / hiệu ứng của PLAN.md, không ghi vào Blueprint/Rule); `qc-mp4` và cổng animatic FAIL khi có đoạn đứng yên dài hơn `max_hold_s` ngoài `tail_s` giây cuối. Cổng đọc `style_profile` nền và áp cho cả video, kể cả cảnh mượn lớp style khác, nên không đặt cảnh đọc chậm (demo UI) trong video có style này.
 - **Bắt buộc** chạy `hyperframes catalog --query "<hiệu ứng>"` trước khi tự viết hiệu ứng, và ưu tiên block hoặc blueprint đã chọn ở bước 3.
 - Workflow có frame preset (`build-frame.mjs`): kiểm tra font preset có đủ dấu tiếng Việt (`engine-selection.md`). Thiếu thì đổi sang Be Vietnam Pro và copy file font vào `assets/fonts/`.
 - Remotion: dùng skill `ak-remotion`.

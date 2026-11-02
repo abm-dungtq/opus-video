@@ -7,7 +7,7 @@ opus-video là plugin cho Claude Code, dùng được cả với OpenAI Codex v�
 [![Release](https://img.shields.io/badge/release-v2.7.1-orange.svg)](https://github.com/abm-dungtq/opus-video/releases/tag/v2.7.1)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Node ≥ 22](https://img.shields.io/badge/node-%E2%89%A5%2022-339933.svg)
-![Tests](https://img.shields.io/badge/tests-683%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-699%20passing-brightgreen.svg)
 
 [Video mẫu](#video-mẫu) · [Plugin làm được gì](#plugin-làm-được-gì) · [Cài đặt](#cài-đặt) · [Skill và hướng](#các-skill-và-bốn-hướng-vận-hành) · [Quy trình](#quy-trình-9-bước) · [Cổng viet-pro](#cổng-viet-pro) · [Script](#các-script-chính) · [Phong cách Lemo-Opuscar](#phong-cách-lemo-opuscar) · [Motion Studio](#motion-studio) · [Test](#test-và-xử-lý-lỗi) · [Ghi công](#ghi-công-và-giấy-phép) · [Đóng góp](#đóng-góp)
 
@@ -24,7 +24,7 @@ Các video dưới đây làm bằng opus-video. Bấm vào ảnh để mở fil
 
 ## Plugin làm được gì
 
-- **Bạn chọn hình bằng mắt.** Với dự án mới, agent dựng ba styleframe ngắn từ chính chủ đề của bạn, mỗi cái một hướng khác hẳn nhau. Bạn chọn một, rồi kịch bản mới được viết, trong giới hạn số từ của hướng đó. Có 8 hướng đạo diễn và 64 hồ sơ phong cách, cộng hai phong cách canvas lấy từ lemo-opuscar (xem [Phong cách Lemo-Opuscar](#phong-cách-lemo-opuscar)).
+- **Bạn chọn hình bằng mắt.** Với dự án mới, agent dựng ba styleframe ngắn từ chính chủ đề của bạn, mỗi cái một hướng khác hẳn nhau. Bạn chọn một, rồi kịch bản mới được viết, trong giới hạn số từ của hướng đó. Có 8 hướng đạo diễn và 64 hồ sơ phong cách, cộng hai phong cách canvas lấy từ lemo-opuscar (xem [Phong cách Lemo-Opuscar](#phong-cách-lemo-opuscar)). Style `kinetic-film` cắt chữ khổng lồ trên từng phách nhạc nhanh, và QA của nó chặn mọi đoạn đứng hình dài hơn 0,6 giây.
 - **Chưa duyệt animatic thì chưa có bản cuối.** Agent render animatic 540p để bạn duyệt. `render-final.mjs` từ chối render bản giao (exit 5) khi thiếu plan, thiếu animatic, chưa duyệt, hoặc animatic gần như đứng yên.
 - **Đồng bộ có đo đạc.** Hiệu ứng âm thanh được đo theo khung đồng bộ ITU-R BT.1359-1, chữ trên hình được so với lúc từ đó được đọc, nhạc nằm dưới giọng 4 đến 7 dB (`mix-balance.mjs`).
 - **Âm thanh.** Giọng ElevenLabs có mốc thời gian từng từ, hiệu ứng âm thanh và nhạc. Nhạc có thể soạn theo kế hoạch từng đoạn, cắt lại theo ô nhịp cho khớp timeline và đối chiếu với bản gốc. Điểm cắt cảnh có thể bám theo phách, hiệu ứng âm thanh có thể gắn vào một từ được đọc. Forced alignment lấy mốc từng từ cho giọng thu thật. Gemini TTS là lựa chọn thêm cho giọng đọc.
@@ -246,6 +246,7 @@ opus-video dùng giấy phép MIT ([LICENSE](LICENSE)). Phần lấy từ bên t
 - `scripts/cut.mjs` phỏng theo ý tưởng của [open-edit](https://github.com/veedstudio/open-edit) (Apache-2.0, VEED LIMITED).
 - Hồ sơ phong cách, khung composition, nguyên tắc chuyển động, thuật toán beat-grid, reframe và chọn phong cách, sắp nhạc, beat-fit, cues, phụ đề karaoke, đường bao giọng và vai đạo diễn, thợ dựng phỏng theo skill motion-video của AgentKit (MIT, BestAgentKits).
 - Hai hồ sơ phong cách lemo và `templates/lemo/` phỏng theo [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) của LemoLab (mã MIT, phim mẫu CC BY 4.0). `lemo.mjs` chép engine của nó và three.js (MIT) vào dự án của bạn kèm giấy phép, còn `lemo-pick.mjs` đọc file phong cách từ cache trên máy; repo này không phân phối lại cả hai.
+- Style `kinetic-film` học ngữ pháp từ các phim chữ kinetic nhịp nhanh, trong đó có skill scenario-kinetic-film của Scenario; repo này không chứa mã hay văn bản nào của skill đó.
 - `third_party/hyperframes-skills/` là bản chép nguyên trạng một số file từ skill của HyperFrames v0.8.184 (Apache-2.0).
 - Case tham khảo trong `data/` lấy từ hai danh sách giấy phép MIT. Prompt thuộc về tác giả gốc, mỗi dòng có link tới tác giả, video gốc không được phân phối lại. Nguồn và commit ghi ở [data/SOURCES.md](data/SOURCES.md).
 

@@ -19,6 +19,7 @@
 //   detail point at real files; ten_vi ≤ 5 words, mo_ta_vi one sentence ≤ 25 words; no alias shared
 //   by two styles; engine is hyperframes or lemo-canvas, and a lemo-canvas profile names a style
 //   of data/lemo/styles.json in lemo.style with the same kind; index.json equal to `index`.
+//   motion_gate (optional): { max_hold_s 0.2–2, tail_s 0–10 }, read by qc-mp4 MOTION.
 // find: names fold case, diacritics, separators and filler words ("style", "kiểu", "phong cách").
 //   Exact id or alias scores 1; else the best of 0.7 × name similarity (1 when the query holds a
 //   whole name or a name holds it, else the bigram Dice score when ≥ 0.5) and 0.6 × the share of
@@ -166,6 +167,16 @@ export function lookup(name, profiles) {
   throw new StyleError(`unknown style "${name}"; nearest: ${near.join(", ") || "none"}`, 2);
 }
 
+// motion_gate of a style (id or alias) → { max_hold_s, tail_s }; null when the style is unknown or has
+// none. A broken styles folder throws: a gate must not switch off silently.
+export function motionGate(name, profiles) {
+  const all = profiles || loadProfiles();
+  let id;
+  try { id = lookup(name, all); } catch { return null; }
+  const g = all[id].motion_gate;
+  return g ? { max_hold_s: g.max_hold_s, tail_s: g.tail_s } : null;
+}
+
 export function buildIndex(profiles) {
   const rows = Object.keys(profiles).sort().map((id) => {
     const p = profiles[id];
@@ -217,6 +228,17 @@ export function validateProfiles(profiles, { dir = STYLES_DIR, root = OV_DIR, le
     if (!Array.isArray(p.signature_moves) || !p.signature_moves.length) err("signature_moves needs at least one move");
     else p.signature_moves.forEach((m, i) => { const e = moveError(m); if (e) err(`signature_moves[${i}] ${e}`); });
     if (p.detail && !existsSync(join(root, p.detail))) err(`detail file ${p.detail} not found`);
+    if (p.motion_gate !== undefined) {
+      const g = p.motion_gate;
+      if (!g || typeof g !== "object" || Array.isArray(g)) err("motion_gate must be an object");
+      else {
+        const within = (v, lo, hi) => typeof v === "number" && v >= lo && v <= hi;
+        if (!within(g.max_hold_s, 0.2, 2)) err("motion_gate.max_hold_s must be a number within 0.2-2");
+        if (!within(g.tail_s, 0, 10)) err("motion_gate.tail_s must be a number within 0-10");
+        const extra = Object.keys(g).filter((k) => k !== "max_hold_s" && k !== "tail_s");
+        if (extra.length) err(`motion_gate has unknown keys ${extra.join(", ")}`);
+      }
+    }
     const engine = p.engine ?? "hyperframes";
     if (!ENGINES.includes(engine)) err(`engine must be one of ${ENGINES.join(", ")}`);
     if (engine === "lemo-canvas") {
