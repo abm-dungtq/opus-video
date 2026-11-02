@@ -24,9 +24,11 @@ if (a[0] === "project") {
   console.log(JSON.stringify(a[1] === "list" ? { status: "ok", projects: known } : { status: "ok", project_id: "new-id", title: a[a.indexOf("--name") + 1] }, null, 2));
   process.exit(0);
 }
+if (a.includes("--help")) { console.log(process.env.FAKE_NO_UPSCALE ? "--model" : "--model\\n--upscale [2k|4k]"); process.exit(0); }
 const code = Number(process.env.FAKE_EXIT ?? 0);
-if (code === 0 && a.includes("-o")) writeFileSync(a[a.indexOf("-o") + 1], "img");
-if (code === 0 && a.includes("--out")) { const d = a[a.indexOf("--out") + 1]; writeFileSync(d + "/m_1.png", "a"); writeFileSync(d + "/m_2.png", "b"); }
+const up = a[0] === "image" && a.includes("--upscale") && !process.env.FAKE_UPSCALE_SKIP;
+if (code === 0 && a.includes("-o")) { const o = a[a.indexOf("-o") + 1]; writeFileSync(o, "img"); if (up) writeFileSync(o.replace(/\\.[^.]+$/, ".2k.png"), "img2k"); }
+if (code === 0 && a.includes("--out")) { const d = a[a.indexOf("--out") + 1]; writeFileSync(d + "/m_1.png", "a"); writeFileSync(d + "/m_2.png", "b"); if (up) { writeFileSync(d + "/m_1.2k.png", "a2k"); writeFileSync(d + "/m_2.2k.png", "b2k"); } }
 if (code !== 0) console.error("selector drift");
 if (code === 0 && a.includes("--upscale")) console.log(JSON.stringify(process.env.FAKE_UPSCALE_WARN ? { status: "ok", upscale_warning: process.env.FAKE_UPSCALE_WARN } : { status: "ok", upscaled: "1080p" }, null, 2));
 process.exit(code);
@@ -181,4 +183,36 @@ test("a cast whose listed image is missing stops before gflow runs", () => {
   const v = run(["video", "--start", join(dir, "ref.png"), "--prompt-file", join(dir, "p.txt"), "--out", join(dir, "v.mp4"), "--spend", "--cast", cast]);
   assert.equal(v.status, 2);
   assert.match(v.stderr, /chỉ dùng cho image/);
+});
+
+test("image --upscale asks gflow for 2k and keeps each 2K copy beside its image", () => {
+  assert.ok(imageArgs({ ref: [], out: "x.png", upscale: true }, "p").includes("2k"));
+  assert.ok(!imageArgs({ ref: [], out: "x.png" }, "p").includes("--upscale"));
+  const one = join(dir, "up", "key.png");
+  const r = run(["image", "--prompt-file", join(dir, "p.txt"), "--out", one, "--upscale"]);
+  assert.equal(r.status, 0, r.stderr);
+  const call = r.calls.find((c) => c[0] === "image" && !c.includes("--help"));
+  assert.deepEqual(call.slice(call.indexOf("--upscale"), call.indexOf("--upscale") + 2), ["--upscale", "2k"]);
+  assert.equal(r.stdout.trim(), one, "stdout keeps one line per image");
+  assert.ok(existsSync(join(dir, "up", "key.2k.png")));
+  assert.deepEqual(ledgerRows().at(-1).upscaled_files.map((f) => basename(f.path)), ["key.2k.png"]);
+
+  const many = join(dir, "up2", "pose.png");
+  mkdirSync(join(dir, "up2"), { recursive: true });
+  const m = run(["image", "--prompt-file", join(dir, "p.txt"), "--out", many, "--count", "2", "--upscale"]);
+  assert.equal(m.status, 0, m.stderr);
+  assert.deepEqual(m.stdout.trim().split("\n").map((f) => basename(f)), ["pose-1.png", "pose-2.png"]);
+  for (const f of ["pose-1.2k.png", "pose-2.2k.png"]) assert.ok(existsSync(join(dir, "up2", f)), f);
+  assert.equal(readFileSync(join(dir, "up2", "pose-2.2k.png"), "utf8"), "b2k", "the copy follows its own image");
+
+  const skipped = run(["image", "--prompt-file", join(dir, "p.txt"), "--out", join(dir, "up3", "k.png"), "--upscale"], { FAKE_UPSCALE_SKIP: "1" });
+  assert.equal(skipped.status, 0);
+  assert.match(skipped.stderr, /1\/1 ảnh không có bản 2K/);
+});
+
+test("image --upscale stops before sending when gflow has no such option", () => {
+  const r = run(["image", "--prompt-file", join(dir, "p.txt"), "--out", join(dir, "up4", "k.png"), "--upscale"], { FAKE_NO_UPSCALE: "1" });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /chưa có `image --upscale`/);
+  assert.ok(!r.calls.some((c) => c[0] === "image" && !c.includes("--help")), "nothing sent to Flow");
 });
