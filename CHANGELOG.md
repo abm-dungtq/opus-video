@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- `references/engine-selection.md`: the 513-case count is now marked as the count at the time it was taken (the yihui corpus now has 808 cases).
+
 ## v2.8.0 (2026-11-02): style kinetic-film, gợi ý case trước hướng, jev-eval
 
 ### Added
