@@ -7,7 +7,7 @@ opus-video is a Claude Code plugin, also usable from OpenAI Codex and Google Ant
 [![Release](https://img.shields.io/badge/release-v2.7.1-orange.svg)](https://github.com/abm-dungtq/opus-video/releases/tag/v2.7.1)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Node ≥ 22](https://img.shields.io/badge/node-%E2%89%A5%2022-339933.svg)
-![Tests](https://img.shields.io/badge/tests-683%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-699%20passing-brightgreen.svg)
 
 [Examples](#examples) · [What it does](#what-it-does) · [Install](#install) · [Skills and routes](#skills-and-the-four-routes) · [Workflow](#the-9-step-workflow) · [viet-pro gate](#the-viet-pro-gate) · [Scripts](#key-scripts) · [Lemo-Opuscar styles](#lemo-opuscar-styles) · [Motion Studio](#motion-studio) · [Tests](#tests-and-troubleshooting) · [Credits](#credits-and-licence) · [Contributing](#contributing)
 
@@ -24,7 +24,7 @@ These videos were made with opus-video. Click a poster to play the MP4 from the 
 
 ## What it does
 
-- **You pick the look by eye.** For a new project the agent renders three short styleframes from your own topic in contrasting directions. You choose one, and the script is written afterwards inside that direction's word budget. There are 8 director directions and 64 style profiles, plus two canvas styles from lemo-opuscar (see [Lemo-Opuscar styles](#lemo-opuscar-styles)).
+- **You pick the look by eye.** For a new project the agent renders three short styleframes from your own topic in contrasting directions. You choose one, and the script is written afterwards inside that direction's word budget. There are 8 director directions and 64 style profiles, plus two canvas styles from lemo-opuscar (see [Lemo-Opuscar styles](#lemo-opuscar-styles)). A `kinetic-film` style cuts huge words on every beat of a fast track, and its QA fails any hold longer than 0.6 s.
 - **Nothing final ships without an approved animatic.** A 540p animatic is rendered for approval, and `render-final.mjs` refuses a delivery render (exit 5) when the plan, the animatic or the approval is missing, or when the animatic barely moves.
 - **Measured sync.** Sound effects are checked against the ITU-R BT.1359-1 sync windows, on-screen words against the moment each word is spoken, and music is held 4 to 7 dB under the voice (`mix-balance.mjs`).
 - **Sound.** ElevenLabs voice with word timestamps, sound effects and music. Music can be composed from a section plan, re-cut bar by bar onto your timeline and verified against its source. Cuts can be snapped to the beat and sound effects pinned to a spoken word. Forced alignment gives word timings for a recorded voice. Gemini TTS is an optional voice provider.
@@ -249,6 +249,7 @@ opus-video is MIT-licensed ([LICENSE](LICENSE)). Third-party material is listed 
 - `scripts/cut.mjs` adapts ideas from [open-edit](https://github.com/veedstudio/open-edit) (Apache-2.0, VEED LIMITED).
 - Style profiles, the composition skeleton, motion principles, the beat-grid, reframe and style-resolution algorithms, music arrangement, beat-fit, cues, karaoke captions, the voice envelope and the director and executor roles adapt the motion-video skill of AgentKit (MIT, BestAgentKits).
 - The two lemo style profiles and `templates/lemo/` adapt [lemo-opuscar](https://github.com/lemomo-ai/lemo-opuscar) by LemoLab (code MIT, demo films CC BY 4.0). `lemo.mjs` copies its engines and three.js (MIT) into your project with their licences, and `lemo-pick.mjs` reads its style files from the local cache; this repository redistributes neither.
+- The `kinetic-film` style learns its grammar from fast kinetic-type films, including Scenario's scenario-kinetic-film skill; no code or text from that skill is included.
 - `third_party/hyperframes-skills/` is an unchanged copy of files from HyperFrames v0.8.184 skills (Apache-2.0).
 - The reference cases in `data/` come from two MIT-licensed lists. Each prompt belongs to its author, every row links to it, and source videos are not redistributed. Sources and commits are in [data/SOURCES.md](data/SOURCES.md).
 

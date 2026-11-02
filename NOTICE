@@ -33,3 +33,8 @@ styles for a brief. Lemo-Opuscar is by LemoLab; its demo films are licensed CC B
 
 scripts/lemo.mjs also copies three.js (https://threejs.org, MIT License, see
 third_party/three/LICENSE) from the npm package into a user's project for three.js styles.
+
+The kinetic-film style (data/styles/kinetic-film.json, references/kinetic-film.md,
+references/styles/detail/kinetic-film.md) is original work for opus-video. Its film grammar was
+inspired by the scenario-kinetic-film skill of Scenario; no code, text or assets from that skill
+are included.
