@@ -1,6 +1,6 @@
 # Chọn engine dựng
 
-Trong corpus 513 case (yihui), Opus 5.5 hầu như luôn viết animation thành code: canvas có 351 case, svg 219, threejs 147, shader 104, gsap 100. Muốn ra MP4 thì phải có một engine **seek được theo thời gian** để chụp từng frame. Thứ tự ưu tiên như sau.
+Trong 513 case yihui đầu tiên của corpus (lúc đếm; corpus nay có 808 case yihui), Opus 5.5 hầu như luôn viết animation thành code: canvas có 351 case, svg 219, threejs 147, shader 104, gsap 100. Muốn ra MP4 thì phải có một engine **seek được theo thời gian** để chụp từng frame. Thứ tự ưu tiên như sau.
 
 ## 1. HyperFrames (mặc định)
 
