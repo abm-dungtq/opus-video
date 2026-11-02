@@ -4,7 +4,7 @@
 
 opus-video là plugin cho Claude Code, dùng được cả với OpenAI Codex và Google Antigravity, biến một chủ đề hay một bản brief thành video tiếng Việt hoàn chỉnh. Agent làm cùng bạn theo một quy trình cố định: brief, chọn hướng hình ảnh, kịch bản phải qua cổng [viet-pro](https://github.com/abm-dungtq/viet-pro-codex), giọng đọc ElevenLabs, hiệu ứng âm thanh và nhạc, dựng bằng [HyperFrames](https://hyperframes.dev) (HTML và GSAP), clip nháp (animatic) để bạn duyệt, rồi render bản giao, kiểm tra chất lượng và viết caption. Video xuất ra là MP4 khổ 16:9, 9:16 hoặc 1:1. Plugin không tự đăng gì lên mạng xã hội.
 
-[![Release](https://img.shields.io/badge/release-v2.7.1-orange.svg)](https://github.com/abm-dungtq/opus-video/releases/tag/v2.7.1)
+[![Release](https://img.shields.io/badge/release-v2.8.0-orange.svg)](https://github.com/abm-dungtq/opus-video/releases/tag/v2.8.0)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Node ≥ 22](https://img.shields.io/badge/node-%E2%89%A5%2022-339933.svg)
 ![Tests](https://img.shields.io/badge/tests-699%20passing-brightgreen.svg)
