@@ -116,7 +116,7 @@
       "energy": ["don-dap"],
       "tags": ["loud", "precise"],
       "style": { "kind": "style", "name": "Maximalist Type" },
-      "styles_goi_y": ["kinetic-typography", "athletic-impact", "extreme-energy", "swiss-kinetic-editorial", "pixel-arcade"],
+      "styles_goi_y": ["kinetic-typography", "athletic-impact", "extreme-energy", "kinetic-film", "pixel-arcade"],
       "blueprints": ["kinetic-type-beats", "ticker-takeover"],
       "rules": ["kinetic-beat-slam", "reactive-displacement", "waterfall-entry"],
       "seams": ["beat-cut", "waterfall-cut"],

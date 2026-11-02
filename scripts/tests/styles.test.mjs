@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  STYLES_DIR, STYLE_DIMENSIONS, StyleError, buildIndex, defaultStyle, findStyles, loadProfiles, lookup, main, moveError, moveText,
+  STYLES_DIR, STYLE_DIMENSIONS, StyleError, buildIndex, defaultStyle, findStyles, loadProfiles, lookup, main, motionGate, moveError, moveText,
   norm, paletteCss, parseLayers, planSceneList, renderMarkdown, resolveProject, resolveSpec, suggestStyles, validateProfiles,
 } from "../styles.mjs";
 import { checkData, compatWarnings, loadDirections, main as directionsMain } from "../directions.mjs";
@@ -38,7 +38,7 @@ test("every profile has a Vietnamese name and description; validate passes; inde
   assert.deepEqual(Object.keys(rows[0]), ["id", "ten_vi", "name", "family", "aliases", "energy", "best_for", "summary", "mo_ta_vi", "depth", "engine"]);
   assert.deepEqual(rows.map((r) => r.id), [...rows.map((r) => r.id)].sort());
   assert.equal(text.trim().split("\n").length, Object.keys(profiles).length + 2, "one line per style plus the brackets");
-  assert.deepEqual(rows.filter((r) => r.depth === "reference").map((r) => r.id), ["cinematic-product-launch", "comic-multiverse", "glass-keynote"]);
+  assert.deepEqual(rows.filter((r) => r.depth === "reference").map((r) => r.id), ["cinematic-product-launch", "comic-multiverse", "glass-keynote", "kinetic-film"]);
 });
 
 test("validate reports broken profiles and a stale index", () => {
@@ -381,4 +381,20 @@ test("validate reports a malformed signature move; variety-captions moves are al
     assert.equal(typeof m, "object");
     assert.equal(moveError(m), null);
   }
+});
+
+test("motion_gate: optional { max_hold_s, tail_s } within range, no other keys; motionGate reads it", () => {
+  const errs = (gate) => {
+    const all = JSON.parse(JSON.stringify(profiles));
+    all["saas-bento"].motion_gate = gate;
+    return validateProfiles(all).filter((e) => e.startsWith("saas-bento:"));
+  };
+  assert.deepEqual(errs({ max_hold_s: 0.6, tail_s: 3 }).filter((e) => /motion_gate/.test(e)), []);
+  assert.ok(errs({ max_hold_s: 5, tail_s: 3 }).some((e) => /motion_gate\.max_hold_s must be/.test(e)));
+  assert.ok(errs({ max_hold_s: 0.6, tail_s: 3, foo: 1 }).some((e) => /motion_gate has unknown keys foo/.test(e)));
+  assert.ok(errs([0.6]).some((e) => /motion_gate must be an object/.test(e)));
+  assert.deepEqual(motionGate("kinetic-film"), { max_hold_s: 0.6, tail_s: 4 });
+  assert.deepEqual(motionGate("Kinetic Film"), { max_hold_s: 0.6, tail_s: 4 });
+  assert.equal(motionGate("glass-keynote"), null);
+  assert.equal(motionGate("khong-co"), null);
 });
