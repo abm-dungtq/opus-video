@@ -185,6 +185,7 @@ Mọi script nằm trong `scripts/`, chỉ dùng thư viện có sẵn của Nod
 | Bàn giao | `render-final.mjs`, `captions-from-transcript.mjs`, `export.mjs` |
 | Timeline | `gateway.mjs` (`patch`, `undo`, `redo`, `log`, `show`, `derive`), `manifest-import.mjs`, `studio.mjs` |
 | Footage | `cut.mjs` (`probe`, `apply-edl`) |
+| Chất lượng Jev | `jev-eval.mjs`, `jev-audit-eval.mjs` |
 
 Hướng dẫn dài hơn: [giới thiệu](docs/gioi-thieu.md), [hướng dẫn cài cho agent](docs/cai-dat-agent.md), [hướng dẫn chuyên sâu](docs/huong-dan-chuyen-sau.md), [thư viện prompt](docs/thu-vien-prompt/README.md). Ghi chú từng bản phát hành ở [CHANGELOG.md](CHANGELOG.md).
 
@@ -227,6 +228,8 @@ node --test "<opus-video>/scripts/tests/*.test.mjs"
 ```
 
 Giữ dấu nháy để Node tự mở rộng mẫu tên file. Vài test dùng một dự án thật; trỏ chúng sang dự án của bạn bằng `OPUS_VIDEO_SMOKE_DIR` và `OPUS_VIDEO_ABM_DIR`.
+
+Để đo chính model Jev, chạy `node <opus-video>/scripts/jev-eval.mjs` khi đã có key. Lệnh chấm rerank case (single và composite), lemo-pick, kiểm lời đọc và gợi ý hướng của Motion Studio trên các bộ vàng bạn đã duyệt, in bảng mốc, nay, không-Jev và trạng thái, và thoát 1 khi có bộ đo tụt. Một lượt đủ tốn khoảng 0,10 USD. `.agentkit/test-impact.json` giúp `ak test optimize --base origin/main` chọn nhóm test Jev offline khi file Jev thay đổi. Chi tiết ở [references/jev-eval.md](references/jev-eval.md).
 
 | Hiện tượng | Cách xử lý |
 |---|---|

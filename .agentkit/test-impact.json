@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "coverage_complete": true,
+  "groups": [
+    {
+      "id": "jev-offline",
+      "argv": [
+        "node",
+        "--test",
+        "scripts/tests/jev-audit.test.mjs",
+        "scripts/tests/jev-client.test.mjs",
+        "scripts/tests/jev-eval.test.mjs",
+        "scripts/tests/rerank-cases.test.mjs",
+        "scripts/tests/rerank-composite.test.mjs",
+        "scripts/tests/lemo-pick.test.mjs"
+      ],
+      "cwd": ".",
+      "execution_class": "parallel-hermetic",
+      "timeout_seconds": 300,
+      "owned_paths": [
+        "scripts/jev-*.mjs",
+        "scripts/rerank-*.mjs",
+        "scripts/lemo-pick*.mjs",
+        "scripts/tests/jev-*.test.mjs",
+        "scripts/tests/rerank-*.test.mjs",
+        "scripts/tests/lemo-pick*.test.mjs",
+        "data/jev-eval/**",
+        "data/jev-audit-eval.jsonl"
+      ]
+    },
+    {
+      "id": "all",
+      "argv": [
+        "node",
+        "--test",
+        "scripts/tests/*.test.mjs"
+      ],
+      "cwd": ".",
+      "execution_class": "exclusive-process",
+      "timeout_seconds": 1800,
+      "owned_paths": [
+        "scripts/jev-client.mjs",
+        ".agentkit/**"
+      ]
+    }
+  ],
+  "full_suite": [
+    "all"
+  ]
+}
