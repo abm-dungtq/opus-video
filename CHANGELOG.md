@@ -2,21 +2,7 @@
 
 ## Unreleased
 
-### Changed
-- Step 1b (`ov-direction`) no longer starts every new project with `lemo-pick.mjs`. The lemo-opuscar suggestion runs only for 3D, product or music-led videos, or when the user asks for lemo; voiced Vietnamese explainers go straight to the style profiles of `make-pitch`. Of 40 projects, only 4 test or demo projects had picked a lemo style.
-
-### Fixed
-- `case-template.mjs`: a section of `build/TEMPLATE.md` ends only at the template's own headings, so an adapted prompt that keeps the case's `## Scene 1` style headings is read whole by `--show` and kept on a rewrite (it used to stop at the first `## ` line).
-- `rerank-cases.mjs --suggest` with an invalid `BRIEF.case-query.json` ranks from BRIEF.md instead, or exits 2 and writes nothing when there is no BRIEF.md. It used to write an unranked CASES.md, which opened the pitch gate.
-- The topic floor also applies after the `--pair` tournament.
-- An empty suggestion clears the old `case_refs:` in BRIEF.md.
-- `CASES.md` ends with `brief_fingerprint:` (`case-fingerprint.mjs`: the query file, the BRIEF.md body, topic and aspect). `studio-api.mjs` exports `casesStale(dir)`, so Motion Studio ranks again once the brief changed instead of showing cases for the old brief. A CASES.md without the line is never stale.
-- When Jev did not run and no keyword or category was given, a case's reason no longer claims it matched one.
-
-- `make-pitch init` read only `lemo_style:` and gave a grammar-only `lemo_ref:` style a guessed style profile; every styleframe now points at that style's `STYLE.md`, PICK.json keeps `lemo_ref`, `choose` writes no `style_profile` for it, and `check-preflight` no longer warns about the missing profile.
-- `make-pitch init --directions A1` said "3 hướng"; it and PITCH.md now count the directions actually picked.
-- `make-pitch` styleframes that load `assets/fonts/*` (the lemo skeleton) got no fonts; `init` copies them from the project or the user's font folders and `render` stops with exit 2 when one is missing.
-- `eleven.mjs sfx` kept up to 0.7 s of quiet lead-in before the hit; it now trims to the onset (-20 dB, shared with `sfx-sync`) with a short fade-in. Its log reported the API's byte count for the trimmed file; it now shows both.
+## v2.8.0 (2026-11-02): style kinetic-film, gợi ý case trước hướng, jev-eval
 
 ### Added
 - `gateway.mjs` exports `restore(dir, { base, manifest, note })`: writes a whole earlier manifest back as a new version with actor `restore` (a history line, base check, lock and derive like any change). Motion Studio uses it to undo an AI turn after putting the project's text files back, so derive takes that manifest as the previous one and moves nothing. `patch()` accepts only human, director and timing; a restore can be undone like any other version.
@@ -40,12 +26,25 @@
 - `.agentkit/test-impact.json`: `ak test optimize --base <ref>` selects the offline Jev test group (`jev-offline`) when Jev, rerank or lemo-pick files change, and the full suite for `jev-client.mjs`, the manifest itself or any unmapped path.
 
 ### Changed
+- Step 1b (`ov-direction`) no longer starts every new project with `lemo-pick.mjs`. The lemo-opuscar suggestion runs only for 3D, product or music-led videos, or when the user asks for lemo; voiced Vietnamese explainers go straight to the style profiles of `make-pitch`. Of 40 projects, only 4 test or demo projects had picked a lemo style.
 - Every new-video route (`dao-dien`, `nhanh`, `tu-nhac`) runs the case suggestion right after `ov-brief` and sends the block to the user; before, `dao-dien` and `tu-nhac` only looked up cases at the storyboard step, after the direction was chosen, and never showed them. `ov-build` reads `CASES.md` instead of searching again.
 - `studio-api.mjs` `SKILLS` adds `ov-cases`, so the Motion Studio director can run the suggestion and put the block in its receipt.
 - `data/SOURCES.md`: corpus checked against upstream on 2026-10-31 (both repos unchanged at 92aee2f and 028bc52).
 - `lemo.mjs fetch` also checks out `styles/*/style.json` and `styles/*/STYLE.md` (`LIBRARY_GLOBS`), about 2 MB in all. An existing cache picks them up on the next fetch.
 - `audio-mix` (and `render-final`, which calls it) runs a true-peak limiter when the -14 LUFS gain would push the peak over -1.5 dBTP, instead of stopping short of the target. The loudness target lives in one place (`LOUDNORM` in `audio-mix.mjs`) and `qc-mp4` reads its -16…-12 LUFS range from it.
 - `video-lint.mjs --project <dir>` like the other scripts; `--hyperframes <dir>` still works, and both together must name the same folder.
+
+### Fixed
+- `case-template.mjs`: a section of `build/TEMPLATE.md` ends only at the template's own headings, so an adapted prompt that keeps the case's `## Scene 1` style headings is read whole by `--show` and kept on a rewrite (it used to stop at the first `## ` line).
+- `rerank-cases.mjs --suggest` with an invalid `BRIEF.case-query.json` ranks from BRIEF.md instead, or exits 2 and writes nothing when there is no BRIEF.md. It used to write an unranked CASES.md, which opened the pitch gate.
+- The topic floor also applies after the `--pair` tournament.
+- An empty suggestion clears the old `case_refs:` in BRIEF.md.
+- `CASES.md` ends with `brief_fingerprint:` (`case-fingerprint.mjs`: the query file, the BRIEF.md body, topic and aspect). `studio-api.mjs` exports `casesStale(dir)`, so Motion Studio ranks again once the brief changed instead of showing cases for the old brief. A CASES.md without the line is never stale.
+- When Jev did not run and no keyword or category was given, a case's reason no longer claims it matched one.
+- `make-pitch init` read only `lemo_style:` and gave a grammar-only `lemo_ref:` style a guessed style profile; every styleframe now points at that style's `STYLE.md`, PICK.json keeps `lemo_ref`, `choose` writes no `style_profile` for it, and `check-preflight` no longer warns about the missing profile.
+- `make-pitch init --directions A1` said "3 hướng"; it and PITCH.md now count the directions actually picked.
+- `make-pitch` styleframes that load `assets/fonts/*` (the lemo skeleton) got no fonts; `init` copies them from the project or the user's font folders and `render` stops with exit 2 when one is missing.
+- `eleven.mjs sfx` kept up to 0.7 s of quiet lead-in before the hit; it now trims to the onset (-20 dB, shared with `sfx-sync`) with a short fade-in. Its log reported the API's byte count for the trimmed file; it now shows both.
 
 ## v2.7.1 (2026-10-25): sửa nhạc theo plan và karaoke
 

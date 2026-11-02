@@ -4,7 +4,7 @@
 
 opus-video is a Claude Code plugin, also usable from OpenAI Codex and Google Antigravity, that turns a topic or brief into a finished Vietnamese video. The agent works with you through a fixed pipeline: brief, a choice of visual direction, a script that must pass the [viet-pro](https://github.com/abm-dungtq/viet-pro-codex) gate, ElevenLabs voice, sound effects and music, a [HyperFrames](https://hyperframes.dev) build (HTML and GSAP), an animatic you approve, then a delivery render, QA and captions. Output is MP4 in 16:9, 9:16 or 1:1. The plugin never posts to social media for you.
 
-[![Release](https://img.shields.io/badge/release-v2.7.1-orange.svg)](https://github.com/abm-dungtq/opus-video/releases/tag/v2.7.1)
+[![Release](https://img.shields.io/badge/release-v2.8.0-orange.svg)](https://github.com/abm-dungtq/opus-video/releases/tag/v2.8.0)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Node ≥ 22](https://img.shields.io/badge/node-%E2%89%A5%2022-339933.svg)
 ![Tests](https://img.shields.io/badge/tests-699%20passing-brightgreen.svg)
