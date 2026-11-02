@@ -4,7 +4,7 @@
 //
 //   node gflow.mjs doctor [--profile p]
 //   node gflow.mjs image --prompt-file f.txt --out assets/gen/x.png [--ref a.png ...] [--aspect 9:16]
-//                        [--model nano2] [--count 1-4] [--cast cast.json] [--profile p] [--project dir] [--flow-project name]
+//                        [--model nano2] [--count 1-4] [--cast cast.json] [--upscale] [--profile p] [--project dir] [--flow-project name]
 //   node gflow.mjs video --start a.png [--end b.png] --prompt-file f.txt --out assets/gen/x.mp4 --spend
 //                        [--model veo-lite] [--duration 4|6|8|10] [--aspect 9:16] [--resolution 360p|720p]
 //                        [--upscale] [--profile p] [--project dir] [--flow-project name]
@@ -15,6 +15,11 @@
 // --upscale replaces the 720p clip at --out with Flow's free 1080p export (no extra credits; needs gflow
 // installed from gflow-studio, whose `video i2v` has `--upscale`). If the export fails gflow keeps the 720p clip and exits 0;
 // the warning is printed and written to the ledger.
+// image --upscale also saves Flow's free 2K upscale beside each image as <name>.2k.<ext> (gflow
+// `image t2i|i2i --upscale 2k`); the 1K image stays, since the upscale re-draws small details. With
+// --count > 1 the copy follows its image's new name (<out>-<n>.2k.<ext>). Its paths go to stderr and
+// the ledger (upscaled_files); stdout keeps one line per image. A gflow without that option stops
+// the run before anything is sent. A failed upscale keeps the image: gflow prints a warning, exit 0.
 //
 // --ref name=path names a reference (gflow's own syntax); a plain path is named after its file stem.
 // @name in the prompt then points at that image (gflow writes "reference image N" in its place).
@@ -82,6 +87,7 @@ export function imageArgs(o, prompt) {
   if (!Number.isInteger(count) || count < 1 || count > 4) throw new Error("--count phải từ 1 đến 4");
   const args = ["image", o.ref.length ? "i2i" : "t2i", prompt, "--model", model, "--aspect", aspect, "-n", String(count), "--json"];
   for (const r of o.ref) args.push("--ref", r);
+  if (o.upscale) args.push("--upscale", "2k");
   if (count === 1) args.push("-o", o.out); else args.push("--out", dirname(o.out));
   if (o.profile) args.push("--profile", o.profile);
   return args;
@@ -164,18 +170,50 @@ function checkFiles(paths) {
   for (const p of paths) if (!existsSync(p) || !statSync(p).isFile()) fail(`không thấy file: ${p}`);
 }
 
-// --count > 1: gflow writes <dir>/<media_name>_<n>.<ext>; rename the new ones to <out>-<n><ext>.
-function collect(o, before, kind) {
-  if (kind === "video") return existsSync(o.out) ? [o.out] : [];
+const IMAGE_EXT = [".jpg", ".jpeg", ".png", ".webp"];
+const UPSCALED = /\.2k\.(png|jpe?g|webp)$/i;
+const stemOf = (p) => p.slice(0, p.length - extname(p).length);
+// The 2K copy gflow --upscale saved beside an image, or null.
+export const upscaledOf = (image) => IMAGE_EXT.map((e) => `${stemOf(image)}.2k${e}`).find((p) => existsSync(p)) ?? null;
+
+// The images of a run, plus their 2K copies when --upscale asked for them: { files, upscaled }.
+// --count > 1: gflow writes <dir>/<media_name>_<n>.<ext>; rename the new ones to <out>-<n><ext>,
+// and each one's <media_name>_<n>.2k.<ext> to <out>-<n>.2k.<ext>.
+export function collect(o, before, kind) {
+  if (kind === "video") return { files: existsSync(o.out) ? [o.out] : [], upscaled: [] };
+  const twin = (from, to) => {
+    const sib = o.upscale ? upscaledOf(from) : null;
+    if (!sib) return null;
+    const dest = `${stemOf(to)}.2k${extname(sib)}`;
+    if (dest !== sib) renameSync(sib, dest);
+    return dest;
+  };
   if (Number(o.count ?? 1) === 1) {
     // gflow may write the real extension itself (key.png asked, key.jpg written).
-    const stem = o.out.slice(0, o.out.length - extname(o.out).length);
-    const hit = [o.out, ...[".jpg", ".jpeg", ".png", ".webp"].map((e) => stem + e)].find((p) => existsSync(p) && !before.has(basename(p)));
-    return hit ? [realExt(hit)] : existsSync(o.out) ? [realExt(o.out)] : [];
+    const stem = stemOf(o.out);
+    const hit = [o.out, ...IMAGE_EXT.map((e) => stem + e)].find((p) => existsSync(p) && !before.has(basename(p))) ?? (existsSync(o.out) ? o.out : null);
+    if (!hit) return { files: [], upscaled: [] };
+    const file = realExt(hit), up = twin(hit, file);
+    return { files: [file], upscaled: up ? [up] : [] };
   }
   const dir = dirname(o.out), ext = extname(o.out) || ".png", stem = basename(o.out, ext);
-  const fresh = readdirSync(dir).filter((f) => !before.has(f) && /\.(png|jpe?g|webp)$/i.test(f)).sort();
-  return fresh.map((f, i) => { const to = join(dir, `${stem}-${i + 1}${ext}`); renameSync(join(dir, f), to); return realExt(to); });
+  const fresh = readdirSync(dir).filter((f) => !before.has(f) && /\.(png|jpe?g|webp)$/i.test(f) && !UPSCALED.test(f)).sort();
+  const files = [], upscaled = [];
+  fresh.forEach((f, i) => {
+    const from = join(dir, f), to = join(dir, `${stem}-${i + 1}${ext}`);
+    renameSync(from, to);
+    const file = realExt(to);
+    files.push(file);
+    const up = twin(from, file);
+    if (up) upscaled.push(up);
+  });
+  return { files, upscaled };
+}
+
+// gflow-studio builds before 2026-11-02 have no `image --upscale`.
+function requireImageUpscale() {
+  const h = spawnSync(BIN, ["image", "t2i", "--help"], { encoding: "utf8" });
+  if (!/--upscale/.test(`${h.stdout}${h.stderr}`)) fail('gflow này chưa có `image --upscale`; cập nhật gflow-studio: uv tool install --reinstall "git+https://github.com/abm-dungtq/gflow-studio.git@an-trinh-duyet"', 2);
 }
 
 // Flow often returns JPEG whatever the name asked for; rename so the extension tells the truth
@@ -246,7 +284,10 @@ function generate(kind, o) {
     if (!o.start) fail("cần --start (ảnh khung đầu)");
     if (!o.spend) fail("tạo video tốn credit Flow: thêm --spend khi người dùng đã đồng ý");
     checkFiles([o.start, ...(o.end ? [o.end] : [])]);
-  } else checkFiles(o.ref.map(refPath));
+  } else {
+    checkFiles(o.ref.map(refPath));
+    if (o.upscale) requireImageUpscale();
+  }
   let args;
   try { args = kind === "video" ? videoArgs(o, prompt) : imageArgs(o, prompt); } catch (e) { fail(e.message); }
   const project = resolve(o.project ?? ".");
@@ -264,7 +305,7 @@ function generate(kind, o) {
   const env = { GFLOW_CLI_LEASE_WAIT_SECONDS: "600", ...process.env };
   const r = spawnSync(BIN, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, env });
   if (r.error) { ledger(project, { id, status: "failed", exit: null, error: r.error.message }); fail(`không chạy được ${BIN}: ${r.error.message}. Cài: uv tool install \"git+https://github.com/abm-dungtq/gflow-studio.git@main\"`, 1); }
-  const files = r.status === 0 ? collect(o, before, kind) : [];
+  const { files, upscaled: upFiles } = r.status === 0 ? collect(o, before, kind) : { files: [], upscaled: [] };
   if (r.status === 0 && !files.length) {
     ledger(project, { id, status: "failed", exit: 0, error: "gflow báo xong nhưng không có file" });
     fail("gflow báo xong nhưng không thấy file đầu ra; không gửi lại, xem thư mục output của gflow", 1);
@@ -277,9 +318,12 @@ function generate(kind, o) {
     if (/project.*(not.?found|404|deleted|permission|does not exist)/i.test(tail)) console.error(`gflow.mjs: có thể dự án Flow "${flowName}" (${flowId}) đã bị xoá trên web. Dùng --flow-project <tên-khác>, hoặc xoá khoá "${o.profile ?? "default"}:${flowName}" trong assets/gen/gflow-projects.json để tạo mới.`);
     fail(`gflow thoát mã ${r.status}; không tự gửi lại${r.status === 23 ? " (Flow đổi giao diện: cập nhật bằng `gflow update`)" : ""}`, r.status ?? 1);
   }
-  const upscale = o.upscale ? pickJson(r.stdout, (j) => (j.upscaled || j.upscale_warning ? { upscaled: j.upscaled, upscale_warning: j.upscale_warning } : null)) : null;
+  const upscale = o.upscale && kind === "video" ? pickJson(r.stdout, (j) => (j.upscaled || j.upscale_warning ? { upscaled: j.upscaled, upscale_warning: j.upscale_warning } : null)) : null;
   if (upscale?.upscale_warning) console.error(`gflow.mjs: ${upscale.upscale_warning}`);
-  ledger(project, { id, status: "ok", exit: 0, ...upscale, files: files.map((f) => ({ path: f, sha: sha(readFileSync(f)), bytes: statSync(f).size })) });
+  const stamp = (f) => ({ path: f, sha: sha(readFileSync(f)), bytes: statSync(f).size });
+  if (kind === "image" && o.upscale && upFiles.length < files.length) console.error(`gflow.mjs: ${files.length - upFiles.length}/${files.length} ảnh không có bản 2K (gflow đã in lệnh nâng lại ở trên); ảnh 1K vẫn dùng được`);
+  for (const f of upFiles) console.error(`gflow.mjs: bản 2K ${f}`);
+  ledger(project, { id, status: "ok", exit: 0, ...upscale, files: files.map(stamp), ...(kind === "image" && o.upscale ? { upscaled_files: upFiles.map(stamp) } : {}) });
   for (const f of files) console.log(f);
 }
 
