@@ -29,7 +29,7 @@ Chỉ bắt đầu khi `check-viet-pro.mjs --project .` đã PASS ở bước 2 
 - Nhạc theo composition plan (drop phải rơi đúng phách): `eleven.mjs music --plan <plan.json> --out assets/bgm/raw/bgm-raw.mp3`, đo `beat-grid.mjs --write` trên bản thô, viết `assets/bgm/music-arrangement.json`, rồi `node $OV/scripts/arrange-music.mjs --project .` và `node $OV/scripts/verify-arrangement.mjs --project .` (phải `VERIFY PASS`). Chi tiết ở mục 3c của `audio-pipeline.md`.
 - Lịch cảnh theo beat (dự án có `project.json` và lưới beat): `node $OV/scripts/beat-fit.mjs --project . --tight` in bảng, `--apply` ghi qua gateway (hoàn tác bằng `gateway.mjs undo`). Ghim một cắt cảnh hay một câu vào beat bằng op `pin_beat`.
 - SFX theo anchor: `node $OV/scripts/cues.mjs add --project . --sound <file> --shot s2 --word "<cụm>" --apply`, sau khi đổi lịch thì `cues.mjs place --project . --apply`, kiểm bằng `cues.mjs check`. Chi tiết ở mục 3d của `audio-pipeline.md`.
-- Đo mix: `node $OV/scripts/mix-balance.mjs --project .`, đích nhạc thấp hơn giọng 4–7 dB lúc có lời. `audio-mix` tự giảm nhạc nền có `data-fx-carve` theo giọng.
+- Đo mix: `node $OV/scripts/mix-balance.mjs --project .`, đích nhạc thấp hơn giọng 4–7 dB lúc có lời. `audio-mix` tự giảm nhạc nền có `data-fx-carve` theo giọng. Kết quả được lưu ở `.opus/mix-balance-cache.json` theo nội dung HTML, file tiếng, words.json và cờ dự án cũ; tiếng không đổi thì lần sau trả ngay (`"cached": true` trong `--json`), cả khi `check-preflight --stage final` gọi. `--no-cache` bắt đo lại.
 
 ## Theo hướng vận hành
 

@@ -5,7 +5,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { balanceVerdict, checkBalance, main } from "../mix-balance.mjs";
+import { CACHE_FILE, balanceKey, balanceVerdict, checkBalance, main } from "../mix-balance.mjs";
+import { main as audioMix, parseTracks } from "../audio-mix.mjs";
 
 const CLI = fileURLToPath(new URL("../mix-balance.mjs", import.meta.url));
 const hasFfmpeg = spawnSync("ffmpeg", ["-version"]).status === 0;
@@ -102,5 +103,65 @@ test("CLI: one BALANCE line, exit 1 on FAIL, --json, --write-qa; bad usage and m
     const bad = spawnSync("node", [CLI, "--project", dir], { encoding: "utf8" });
     assert.equal(bad.status, 2);
     assert.match(bad.stderr, /#bgm/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// The key inputs of one project, as checkBalance reads them.
+const keyOf = (dir, legacy = false) => {
+  const text = readFileSync(join(dir, "index.html"), "utf8");
+  return balanceKey({ root: dir, text, tracks: parseTracks(text, dir, dir), legacy });
+};
+
+test("balanceKey: same inputs same key; a byte in a voice file, words.json, the HTML or the legacy flag changes it", { skip: !hasFfmpeg && "ffmpeg missing" }, () => {
+  const dir = project(5);
+  try {
+    const k = keyOf(dir);
+    assert.match(k, /^[0-9a-f]{64}$/);
+    assert.equal(keyOf(dir), k);
+    assert.notEqual(keyOf(dir, true), k, "legacy");
+    const vo = join(dir, "vo.wav"), words = join(dir, "vo.wav.words.json"), html = join(dir, "index.html");
+    for (const [f, edit] of [[vo, (b) => { b[b.length - 1] ^= 1; return b; }], [words, (b) => Buffer.concat([b, Buffer.from(" ")])], [html, (b) => Buffer.concat([b, Buffer.from("\n")])]]) {
+      const before = readFileSync(f);
+      writeFileSync(f, edit(Buffer.from(before)));
+      assert.notEqual(keyOf(dir), k, f);
+      writeFileSync(f, before);
+      assert.equal(keyOf(dir), k, `${f} restored`);
+    }
+    rmSync(words);
+    assert.notEqual(keyOf(dir), k, "words.json removed");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("checkBalance cache: unchanged sound answers from .opus without mixing; a changed file, cache:false or a broken cache mixes again", { skip: !hasFfmpeg && "ffmpeg missing" }, () => {
+  const dir = project(5);
+  let mixes = 0;
+  const mix = (args, o) => { mixes++; return audioMix(args, o); };
+  try {
+    const first = checkBalance({ dir, mix });
+    assert.equal(mixes, 1);
+    assert.equal(first.cached, undefined);
+    const file = join(dir, CACHE_FILE);
+    assert.equal(JSON.parse(readFileSync(file, "utf8")).result.level, first.level);
+    const again = checkBalance({ dir, mix });
+    assert.equal(mixes, 1, "no second mix");
+    assert.equal(again.cached, true);
+    assert.equal(again.level, first.level);
+    assert.equal(again.under_db, first.under_db);
+    assert.equal(again.line, first.line);
+    checkBalance({ dir, mix, cache: false });
+    assert.equal(mixes, 2, "cache:false mixes");
+    const vo = join(dir, "vo.wav"), b = readFileSync(vo);
+    b[b.length - 1] ^= 1;
+    writeFileSync(vo, b);
+    assert.equal(checkBalance({ dir, mix }).cached, undefined);
+    assert.equal(mixes, 3, "changed voice mixes");
+    writeFileSync(file, "{not json");
+    assert.equal(checkBalance({ dir, mix }).cached, undefined);
+    assert.equal(mixes, 4, "broken cache mixes");
+    assert.equal(checkBalance({ dir, mix }).cached, true, "rewritten after the broken one");
+    const j = JSON.parse(spawnSync("node", [CLI, "--project", dir, "--json"], { encoding: "utf8" }).stdout);
+    assert.equal(j.cached, true);
+    const nc = JSON.parse(spawnSync("node", [CLI, "--project", dir, "--json", "--no-cache"], { encoding: "utf8" }).stdout);
+    assert.equal(nc.cached, undefined);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
