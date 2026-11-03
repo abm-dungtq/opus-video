@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- `mix-balance` lưu kết quả đo vào `.opus/mix-balance-cache.json`, khoá bằng sha256 nội dung HTML, mọi file tiếng, words.json, cờ dự án cũ và mã đo. Tiếng không đổi thì không dựng lại bản trộn, nên `check-preflight --stage final` của dự án dài không còn mất vài phút ở bước này. Cờ mới `--no-cache`.
+
 ## v2.9.0 (2026-11-02): ảnh 2K qua gflow, README viết lại
 
 ### Added
